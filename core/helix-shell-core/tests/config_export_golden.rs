@@ -373,6 +373,57 @@ fn rust_export_matches_cpp_for_desktop_config_smoke() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_launcher_providers() {
+    assert_rust_export_matches_fixture_config(
+        "launcher_providers",
+        "[shell.launcher.providers.calculator]\nprefix = \"calc\"\nglobal = true\n\n[shell.launcher.providers.emoji]\nprefix = \"emo\"\n\n[shell.launcher.providers.session]\nprefix = \"session\"\nglobal = false\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_shell_panel_glass() {
+    assert_rust_export_matches_fixture_config("shell_panel_glass", "[shell.panel]\nglass = 0.25\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_hooks_empty_section() {
+    assert_rust_export_matches_fixture_config("hooks_empty_section", "[hooks]\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_example_toml() {
+    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../example.toml");
+    if !example.is_file() {
+        return;
+    }
+    let root = unique_temp_dir("example");
+    let config_dir = root.join("cfg").join("helix");
+    let state_dir = root.join("state").join("helix");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&state_dir).unwrap();
+    fs::copy(&example, config_dir.join("config.toml")).unwrap();
+    fs::write(state_dir.join("settings.toml"), "\n").unwrap();
+    let paths = ConfigPaths {
+        config_dir,
+        settings_toml: state_dir.join("settings.toml"),
+    };
+    let rust = rust_export_toml(&paths).expect("example.toml rust export");
+    let Some(bin) = discover_config_export_bin() else {
+        eprintln!("skip rust_export_matches_cpp_for_example_toml: helix-config-export not built");
+        let _ = fs::remove_dir_all(root);
+        return;
+    };
+    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin)
+        .expect("cpp export");
+    assert_eq!(
+        rust,
+        cpp,
+        "example.toml rust/cpp export drift; fix patch rules or regenerate defaults"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn rust_export_matches_cpp_for_minimal_fixture() {
     let root = unique_temp_dir("minimal");
     let paths = minimal_fixture(&root);

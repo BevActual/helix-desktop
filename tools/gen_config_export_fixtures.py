@@ -154,6 +154,19 @@ CASES: list[tuple[str, str, str, dict[str, str] | None]] = [
         "\n",
         None,
     ),
+    (
+        "launcher_providers",
+        '[shell.launcher.providers.calculator]\nprefix = "calc"\nglobal = true\n\n[shell.launcher.providers.emoji]\nprefix = "emo"\n\n[shell.launcher.providers.session]\nprefix = "session"\nglobal = false\n',
+        "\n",
+        None,
+    ),
+    (
+        "shell_panel_glass",
+        "[shell.panel]\nglass = 0.25\n",
+        "\n",
+        None,
+    ),
+    ("hooks_empty_section", "[hooks]\n", "\n", None),
     ('light_theme', '[theme]\nmode = "light"\n', "\n", None),
     (
         "config_include",

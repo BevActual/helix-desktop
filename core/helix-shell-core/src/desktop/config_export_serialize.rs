@@ -7,6 +7,74 @@
 
 use toml::Value as Toml;
 
+use super::config_export_key_chord::export_key_chord_spec;
+
+pub(crate) fn f32_bits(value: f64) -> f64 {
+    (value as f32) as f64
+}
+
+fn round_export_floats(value: &mut Toml) {
+    match value {
+        Toml::Float(v) => *value = Toml::Float(f32_bits(*v)),
+        Toml::Table(table) => {
+            let keys: Vec<String> = table.keys().cloned().collect();
+            for key in keys {
+                if let Some(child) = table.get_mut(&key) {
+                    round_export_floats(child);
+                }
+            }
+        }
+        Toml::Array(items) => {
+            for child in items.iter_mut() {
+                round_export_floats(child);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn normalize_keybinds_export(root: &mut Toml) {
+    let keybinds = root
+        .get_mut("keybinds")
+        .and_then(Toml::as_table_mut);
+    if let Some(table) = keybinds {
+        let keys: Vec<String> = table.keys().cloned().collect();
+        for key in keys {
+            let items = table.get(&key).and_then(Toml::as_array);
+            if let Some(items) = items {
+                let normalized = Toml::Array(
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str())
+                        .map(export_key_chord_spec)
+                        .filter(|spec| !spec.is_empty())
+                        .map(Toml::String)
+                        .collect(),
+                );
+                table.insert(key, normalized);
+            }
+        }
+    }
+}
+
+/// C++ `pathStringField` omits empty optional wallpaper paths.
+fn strip_empty_wallpaper_default_path(root: &mut Toml) {
+    let mut remove_default = false;
+    if let Some(wallpaper) = root.get_mut("wallpaper").and_then(Toml::as_table_mut) {
+        if let Some(default) = wallpaper.get_mut("default").and_then(Toml::as_table_mut) {
+            if default.get("path") == Some(&Toml::String(String::new())) {
+                default.remove("path");
+            }
+            remove_default = default.is_empty();
+        }
+    }
+    if remove_default {
+        if let Some(wallpaper) = root.get_mut("wallpaper").and_then(Toml::as_table_mut) {
+            wallpaper.remove("default");
+        }
+    }
+}
+
 fn sort_table_keys(table: &mut toml::map::Map<String, Toml>) {
     let mut entries: Vec<(String, Toml)> = table
         .iter()
@@ -82,4 +150,7 @@ pub fn finalize_serialized_export(root: &mut Toml) {
     sort_calendar_accounts(root);
     sort_placement_widget_tables(root);
     strip_false_placement_flip_flags(root);
+    normalize_keybinds_export(root);
+    strip_empty_wallpaper_default_path(root);
+    round_export_floats(root);
 }

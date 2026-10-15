@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 use toml::Value as Toml;
 
 use super::config_export_defaults::assemble_default_export;
-use super::config_export_serialize::finalize_serialized_export;
+use super::config_export_serialize::{finalize_serialized_export, f32_bits};
 use super::settings::{ConfigPaths, ConfigStore};
 
 fn default_export_root() -> &'static Toml {
@@ -313,6 +313,59 @@ fn rebuild_calendar_accounts_from_merged(root: &mut Toml, merged: &Toml) {
     }
 }
 
+/// Schema fields emitted only when set (e.g. `shell.panel.glass`) still live under an exported ancestor.
+fn is_allowed_merged_extra_leaf(path: &str, merged: &Toml, default: &Toml) -> bool {
+    if dot_path_exists(default, path) || dot_path_get(merged, path).is_none() {
+        return false;
+    }
+    if !is_merged_leaf_exported(path, default) {
+        return false;
+    }
+    let mut prefix = path;
+    while let Some((parent, _)) = prefix.rsplit_once('.') {
+        if dot_path_exists(default, parent) {
+            return true;
+        }
+        prefix = parent;
+    }
+    false
+}
+
+fn default_launcher_provider_export_table() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("prefix".to_string(), Toml::String(String::new()));
+    Toml::Table(table)
+}
+
+fn rebuild_launcher_providers_from_merged(root: &mut Toml, merged: &Toml) {
+    let merged_providers = merged
+        .get("shell")
+        .and_then(|shell| shell.get("launcher"))
+        .and_then(|launcher| launcher.get("providers"))
+        .and_then(Toml::as_table);
+    let merged_providers = match merged_providers {
+        Some(table) if !table.is_empty() => table,
+        _ => return,
+    };
+    let shell = match root.get_mut("shell").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    let launcher = shell
+        .entry("launcher".to_string())
+        .or_insert_with(|| Toml::Table(toml::map::Map::new()));
+    let launcher = launcher.as_table_mut().unwrap();
+    let providers = launcher
+        .entry("providers".to_string())
+        .or_insert_with(|| Toml::Table(toml::map::Map::new()));
+    let providers = providers.as_table_mut().unwrap();
+    for name in merged_providers.keys() {
+        providers
+            .entry(name.clone())
+            .or_insert_with(|| default_launcher_provider_export_table());
+    }
+}
+
 fn is_merged_widget_path(path: &str, merged: &Toml) -> bool {
     let parts = path.split('.').collect::<Vec<_>>();
     if parts.first().map(|s| *s) != Some("widget") || parts.len() < 2 {
@@ -340,6 +393,7 @@ fn merged_export_is_patchable(store: &ConfigStore) -> bool {
             || is_allowed_calendar_account_path(path, &merged)
             || is_allowed_desktop_widgets_path(path, &merged)
             || is_allowed_lockscreen_widgets_path(path, &merged)
+            || is_allowed_merged_extra_leaf(path, &merged, default)
     })
 }
 
@@ -587,7 +641,8 @@ fn coerce_patch_value(template: &Toml, patch: &Toml) -> Toml {
         (Toml::Integer(_), Toml::Float(value)) if value.fract() == 0.0 => {
             Toml::Integer(*value as i64)
         }
-        (Toml::Float(_), Toml::Integer(value)) => Toml::Float(*value as f64),
+        (Toml::Float(_), Toml::Integer(value)) => Toml::Float(f32_bits(*value as f64)),
+        (Toml::Float(_), Toml::Float(value)) => Toml::Float(f32_bits(*value)),
         (Toml::Array(template_items), Toml::Array(patch_items))
             if template_items.len() == patch_items.len() =>
         {
@@ -600,6 +655,9 @@ fn coerce_patch_value(template: &Toml, patch: &Toml) -> Toml {
             )
         }
         (Toml::Table(template_table), Toml::Table(patch_table)) => {
+            if patch_table.is_empty() {
+                return template.clone();
+            }
             let mut table = toml::map::Map::new();
             for (key, patch_value) in patch_table {
                 let coerced = match template_table.get(key) {
@@ -636,11 +694,13 @@ fn set_dot_path(root: &mut Toml, path: &str, value: Toml) {
 }
 
 fn patch_default_export(store: &ConfigStore) -> Toml {
-    let mut root = default_export_root().clone();
+    let default = default_export_root();
+    let mut root = default.clone();
     let merged = store.merged_for_config_export();
     rebuild_bar_from_merged(&mut root, &merged);
     rebuild_bar_monitors_from_merged(&mut root, &merged);
     rebuild_widget_from_merged(&mut root, &merged);
+    rebuild_launcher_providers_from_merged(&mut root, &merged);
     rebuild_calendar_accounts_from_merged(&mut root, &merged);
     rebuild_desktop_widgets_from_merged(&mut root, &merged);
     rebuild_lockscreen_widgets_from_merged(&mut root, &merged);
@@ -648,7 +708,7 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
-        if !is_merged_leaf_exported(&path, default_export_root())
+        if !is_merged_leaf_exported(&path, default)
             || is_wallpaper_runtime_merged_path(&path)
             || is_calendar_account_parse_only_path(&path)
         {
@@ -665,6 +725,7 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
             || is_allowed_calendar_account_path(&path, &merged)
             || is_allowed_desktop_widgets_path(&path, &merged)
             || is_allowed_lockscreen_widgets_path(&path, &merged)
+            || is_allowed_merged_extra_leaf(&path, &merged, default)
         {
             set_dot_path(&mut root, &path, value);
         }
@@ -715,6 +776,61 @@ mod tests {
             settings_toml: state_dir.join("settings.toml"),
         };
         assert!(rust_export_toml(&paths).is_none());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn first_unpatchable_merged_leaf(store: &ConfigStore) -> Option<String> {
+        let merged = store.merged_for_config_export();
+        let default = default_export_root();
+        let mut leaves = Vec::new();
+        collect_leaf_paths(&merged, "", &mut leaves);
+        leaves.into_iter().find(|path| {
+            if !is_merged_leaf_exported(path, default) {
+                return false;
+            }
+            if is_wallpaper_runtime_merged_path(path) || is_calendar_account_parse_only_path(path) {
+                return false;
+            }
+            !dot_path_exists(default, path)
+                && !is_allowed_extra_bar_path(path, &merged)
+                && !is_merged_widget_path(path, &merged)
+                && !is_allowed_calendar_account_path(path, &merged)
+                && !is_allowed_desktop_widgets_path(path, &merged)
+                && !is_allowed_lockscreen_widgets_path(path, &merged)
+                && !is_allowed_merged_extra_leaf(path, &merged, default)
+        })
+    }
+
+    #[test]
+    fn example_toml_is_rust_export_patchable() {
+        let example = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../example.toml");
+        if !example.is_file() {
+            return;
+        }
+        let root = std::env::temp_dir().join(format!(
+            "helix-export-example-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let config_dir = root.join("cfg").join("helix");
+        let state_dir = root.join("state").join("helix");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::create_dir_all(&state_dir).unwrap();
+        std::fs::copy(&example, config_dir.join("config.toml")).unwrap();
+        std::fs::write(state_dir.join("settings.toml"), "\n").unwrap();
+        let paths = ConfigPaths {
+            config_dir,
+            settings_toml: state_dir.join("settings.toml"),
+        };
+        let store = ConfigStore::load(paths.clone());
+        if rust_export_toml(&paths).is_none() {
+            let bad = first_unpatchable_merged_leaf(&store).unwrap_or_else(|| "?".into());
+            panic!("example.toml not patchable for rust export (first leaf: {bad})");
+        }
         let _ = std::fs::remove_dir_all(root);
     }
 }

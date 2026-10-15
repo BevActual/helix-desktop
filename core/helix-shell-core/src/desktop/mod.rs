@@ -11,6 +11,7 @@ pub mod config_export;
 mod config_export_rust;
 mod config_export_defaults;
 mod config_export_serialize;
+mod config_export_key_chord;
 mod config_merge;
 mod config_settings_migrate;
 pub mod compositor_ipc;

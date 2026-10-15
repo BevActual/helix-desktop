@@ -828,7 +828,6 @@ if build_tests
       foreach _helper : [
         ['HELIX_TEMPLATE_APPLY_BIN', 'helix-template-apply'],
         ['HELIX_THEME_PALETTE_BIN', 'helix-theme-palette'],
-        ['HELIX_CONFIG_EXPORT_BIN', 'helix-config-export'],
       ]
         foreach _build_dir : ['build-debug']
           _helper_bin = meson.project_source_root() / _build_dir / _helper[1]
