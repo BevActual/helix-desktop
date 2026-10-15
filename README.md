@@ -8,7 +8,7 @@ Product structure and runtime roles: [docs/design/product-structure.md](docs/des
 
 The **live session shell is the Tauri/Rust build** (`shell/helix-shell-tauri`, installed with `tools/switch-shell.sh install`). The C++ session UI is removed; see [docs/design/session-shell.md](docs/design/session-shell.md). Desktop authority is **`helix-desktop`** (`services/helix-desktop`, bus name `org.helix.Desktop`, unit `helix-service.service`); contracts under `protocols/` are the shared boundary.
 
-The compositor lives in-tree at [`compositor/`](compositor/) (helix-niri fork; own Cargo workspace). Login is the Tauri greeter at [`greeter/`](greeter/) (`helix-greeter`). **Fedora + helix-niri are the sole shell target**; other compositors are not a supported product surface.
+The compositor lives in-tree at [`compositor/`](compositor/) (helix-niri fork; crates in the same Cargo workspace). Login is the Tauri greeter at [`greeter/`](greeter/) (`helix-greeter`). **Fedora + helix-niri are the sole shell target**; other compositors are not a supported product surface.
 
 It gives you a polished, configurable desktop without stitching together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, settings UI, and a pile of service panels. Control Center also owns first-party services (packages, Tailscale, Firewall, Printers, Privacy, and similar tools).
 

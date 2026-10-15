@@ -1,11 +1,11 @@
 [package]
 name = "niri-visual-tests"
-version.workspace = true
-description.workspace = true
-authors.workspace = true
-license.workspace = true
-edition.workspace = true
-repository.workspace = true
+version = "26.4.0"
+description = "A scrollable-tiling Wayland compositor"
+authors = ["Ivan Molodetskikh <yalterz@gmail.com>"]
+license = "GPL-3.0-or-later"
+edition = "2021"
+repository = "https://github.com/niri-wm/niri"
 
 [dependencies]
 adw = { version = "0.8.1", package = "libadwaita", features = ["v1_4"] }

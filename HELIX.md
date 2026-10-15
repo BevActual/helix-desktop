@@ -10,7 +10,7 @@
 | Path | Role |
 |---|---|
 | **greeter/** | Login greeter (Tauri; greetd) |
-| **compositor/** | Helix compositor (niri fork; own Cargo workspace) |
+| **compositor/** | Helix compositor (niri fork; crates in the root Cargo workspace) |
 | **shell/**, **apps/**, **services/**, **core/** | Helix Shell (Tauri + desktop authority + helpers) |
 
 Login flow: **greetd → helix-greeter → helix-niri + Helix Shell**. Fedora and helix-niri are the sole shell target.
@@ -24,7 +24,7 @@ tools/switch-shell.sh install
 Compositor / greeter (from this tree):
 
 ```sh
-cd compositor && cargo build --release
+cargo build --release -p niri
 cargo build --profile fast -p helix-greeter
 ```
 
@@ -35,7 +35,7 @@ Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite
 | Path | Role |
 |---|---|
 | `greeter/` | Tauri login greeter (`helix-greeter`) |
-| `compositor/` | niri fork (excluded from root Cargo workspace) |
+| `compositor/` | niri fork (`niri`, `niri-config`, `niri-ipc`, `niri-visual-tests`; members of the root Cargo workspace) |
 | `core/` | Pure core, desktop API client, shared-ui |
 | `shell/` | Live session shell (Tauri) |
 | `apps/` | Settings, Software, Monitor, Mobius (`helix-mobius`) |

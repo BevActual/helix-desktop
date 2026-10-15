@@ -1,6 +1,6 @@
 # Building Helix from source
 
-Helix is a Cargo workspace (Rust) with npm-built frontends, plus a niri fork in `compositor/` (its own Cargo workspace). Fedora with
+Helix is a Cargo workspace (Rust) with npm-built frontends, plus the niri fork in `compositor/`, whose crates are members of the same workspace. Fedora with
 helix-niri is the one supported target. Layout: [docs/design/product-structure.md](docs/design/product-structure.md).
 
 ## What builds what
@@ -9,7 +9,7 @@ helix-niri is the one supported target. Layout: [docs/design/product-structure.m
 |---|---|---|
 | Desktop service, assistant, inference service, upgrade helper | `cargo build -p helix-desktop -p helix-assistant -p helix-inference -p helix-system-upgrade` | Rust, a C compiler, `clang` and PipeWire headers |
 | Session shell, greeter, Settings, Mobius, Software, System Monitor | `cargo build --workspace` (each app's `build.rs` runs its npm build when `node_modules` exists) | the above, plus WebKitGTK, GTK 3, libsoup 3, gtk-layer-shell; Node and npm for the frontends |
-| Compositor | `cd compositor && cargo build --release` | Rust, Wayland and libinput development packages |
+| Compositor | `cargo build --release -p niri` (or `just build-compositor release`) | the above, plus libinput, libseat, gbm, udev, xkbcommon, pango and libdisplay-info development packages |
 | Model engines (optional) | by hand into `third_party/*-install`; see [inference-capabilities.md](docs/design/inference-capabilities.md) | CMake, a C++ compiler |
 | Install layout | `tools/install.sh` | nothing beyond the build |
 

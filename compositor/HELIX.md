@@ -1,6 +1,6 @@
 # Helix compositor (helix-niri)
 
-Helix’s compositor, at `compositor/` in the product tree. It is a **separate Cargo workspace** (GPL niri fork)—build with `cd compositor && cargo …`, not from the shell workspace at the repo root. Upstream [niri](https://github.com/niri-wm/niri) plus a `background-effect` **liquid-glass** child. The KDL child and its plumbing started as a port of [Niri-glass](https://github.com/zaroutt/Niri-glass); the lens model is Helix’s own (see below).
+Helix’s compositor, at `compositor/` in the product tree. It is part of the root Cargo workspace (a niri fork): build it with `cargo build -p niri` from the repository root. Upstream [niri](https://github.com/niri-wm/niri) plus a `background-effect` **liquid-glass** child. The KDL child and its plumbing started as a port of [Niri-glass](https://github.com/zaroutt/Niri-glass); the lens model is Helix’s own (see below).
 
 Product placement: [`docs/design/product-structure.md`](../docs/design/product-structure.md). Fedora + helix-niri is the sole Helix shell target.
 
@@ -44,7 +44,7 @@ helix {
 
 IPC: `HelixPlaceOnAgentDesk`, `HelixFocusAgentDesk`, `HelixScreenshotOutput`, `HelixScreenshotAllOutputs`, `HelixAgentDesk` request. Workspace events include `is_agent_desk`. `HelixCapabilities` reports `agent_desk: true`.
 
-After changing compositor IPC, rebuild (`cargo build --release --bin niri` in `compositor/`), run `tools/install-trusted-niri.sh apply`, and log out and back in. The session that is already running keeps its old `niri` binary until then; `desktop-capture all` and per-output capture need the installed build.
+After changing compositor IPC, rebuild (`cargo build --release -p niri --bin niri` from the repository root), run `tools/install-trusted-niri.sh apply`, and log out and back in. The session that is already running keeps its old `niri` binary until then; `desktop-capture all` and per-output capture need the installed build.
 
 Nested tests (`tools/nested/run.sh`) set `HELIX_NESTED_HEADLESS=1` so niri starts with the headless backend and a 1280×720 output instead of winit on the host display.
 

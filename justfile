@@ -5,9 +5,14 @@ set positional-arguments
 default:
     @just --list
 
-# Everything in the workspace (needs the Tauri system libraries: WebKitGTK, GTK3, gtk-layer-shell, libsoup3).
+# Everything except the compositor's GTK 4 visual-test harness. Needs the Tauri system libraries (WebKitGTK, GTK 3, gtk-layer-shell,
+# libsoup 3) and the compositor's (libinput, libseat, gbm, udev, xkbcommon, pango, libdisplay-info).
 build profile="fast":
-    cargo build --profile {{profile}} --workspace
+    cargo build --profile {{profile}} --workspace --exclude niri-visual-tests
+
+# The compositor only (helix-niri, the `niri` binary).
+build-compositor profile="fast":
+    cargo build --profile {{profile}} -p niri
 
 # Only what the desktop service and its tests need: no web view libraries required.
 build-services profile="fast":
@@ -27,7 +32,7 @@ run:
 
 # Unit and crate tests, then the integration tests that need a private D-Bus session and the built services.
 test profile="fast": (build-services profile)
-    cargo test --workspace --quiet
+    cargo test --workspace --exclude niri-visual-tests --quiet
     tools/test-integration.sh
 
 # Unit and golden tests of the core crates (models, policy, config; one crate per concern).

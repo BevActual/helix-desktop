@@ -13,7 +13,7 @@ greetd → helix-greeter → helix-niri (compositor) + Helix Shell (+ apps)
 | Stage | Tree | Process role |
 |---|---|---|
 | Login | `greeter/` | Authenticates; starts the session (greetd) |
-| Compositor | `compositor/` | Wayland display server (niri fork; own Cargo workspace) |
+| Compositor | `compositor/` | Wayland display server (niri fork; crates in the root Cargo workspace) |
 | Shell session | `shell/`, `apps/`, `services/`, `core/` | Panels, Control Center, Settings, desktop authority |
 
 Fedora + helix-niri are the sole shell target. Everything else is a helper or contract around that session.
@@ -61,7 +61,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `services/helix-assistant`, `helix-inference`, `helix-system-upgrade` | Agent client, inference fabric, pkexec upgrade helper | Desktop bus name (assistant/inference use their own names) |
 | `services/helix-wallpaper`, `helix-idle` | Small session helpers | Desktop bus name |
 | `greeter/` | Login only | Session shell surfaces |
-| `compositor/` | Display server (separate workspace) | Shell chrome |
+| `compositor/` | Display server (niri fork) | Shell chrome |
 | `services/helix-inference/native/` | Interim llama + whisper shims for Cargo bins | Session UI |
 | `services/helix-image/native/` | C stable-diffusion shim for the Cargo image worker | Session UI |
 | `tools/` | Install, nested e2e, layering checks | Product runtime |

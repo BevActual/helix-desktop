@@ -1,4 +1,4 @@
-# cargo-deny policy: `cargo deny check`. Generated against the dependency tree of 2026-10-15; the licence list is every SPDX
+# cargo-deny policy: `cargo deny check`. Generated against the dependency tree of 2026-10-16 (compositor included); the licence list is every SPDX
 # identifier that tree already uses, so a new licence shows up as a failure to review rather than slipping in.
 [advisories]
 version = 2
@@ -23,6 +23,8 @@ allow = [
     "CDLA-Permissive-2.0",
     "MPL-2.0",
     "LGPL-2.1-or-later",
+    # The compositor crates (niri fork) in this workspace.
+    "GPL-3.0-or-later",
 ]
 confidence-threshold = 0.9
 
