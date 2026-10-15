@@ -173,7 +173,6 @@ fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
     if names.is_empty() {
         return;
     }
-    names.sort();
 
     let export_bar = match root.get_mut("bar").and_then(Toml::as_table_mut) {
         Some(table) => table,
@@ -197,9 +196,27 @@ fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
             .entry(name.clone())
             .or_insert_with(|| template.clone());
     }
+    let order = merged_bar
+        .get("order")
+        .and_then(Toml::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|value| value.as_str().map(str::to_string))
+                .filter(|name| names.contains(name))
+                .collect::<Vec<_>>()
+        })
+        .filter(|order| !order.is_empty());
+    let order = match order {
+        Some(order) => order,
+        None => {
+            names.sort();
+            names
+        }
+    };
     export_bar.insert(
         "order".to_string(),
-        Toml::Array(names.into_iter().map(Toml::String).collect()),
+        Toml::Array(order.into_iter().map(Toml::String).collect()),
     );
 }
 

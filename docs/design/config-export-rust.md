@@ -8,6 +8,7 @@ Theme templates read `config.*` from `config_export::serialize` output (C++ toda
 |------|-------------------|
 | Minimal fixture byte match | `cargo test -p helix-shell-core --test config_export_golden` |
 | Regenerate golden | `tools/gen_config_export_golden.sh` |
+| Verify golden fresh | `tools/verify_config_export_golden.sh` |
 | Schema read/write inverses | `meson test config_schema_roundtrip` (`tests/config_schema_roundtrip_test.cpp`) |
 
 ## C++ sources of truth

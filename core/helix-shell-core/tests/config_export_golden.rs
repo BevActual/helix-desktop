@@ -227,6 +227,13 @@ fn rust_export_matches_cpp_for_default_and_secondary_bars() {
 
 /// `tools/nested/helix-desktop-config-smoke.sh` config tree (bar name + idle + templates).
 #[test]
+fn rust_export_matches_cpp_for_explicit_bar_order() {
+    assert_rust_export_matches_cpp(
+        "[bar]\norder = [\"zed\", \"alpha\"]\n\n[bar.zed]\nenabled = true\n\n[bar.alpha]\nenabled = true\n",
+    );
+}
+
+#[test]
 fn rust_export_matches_cpp_for_desktop_config_smoke() {
     assert_rust_export_matches_cpp(
         "[bar.main]\nenabled = true\nthickness = 34\n\n[idle.behavior.lock]\ntimeout = 420\nenabled = true\naction = \"lock\"\n\n[theme.templates]\nbuiltin_ids = [\"helix\", \"qt\"]\n",
