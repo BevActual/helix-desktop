@@ -15,7 +15,7 @@ cargo build --profile fast -p helix-greeter
 # binary: target/fast/helix-greeter
 ```
 
-Binary name stays **`helix-greeter`**. Appearance sync and greetd session scripts follow the shell’s contracts (`docs/user/configuration/shell.mdx` greeter section; design: `docs/design/greeter-tauri.md`).
+Binary name stays **`helix-greeter`**. Appearance sync is `helix-greeter-apply-appearance` (built with the desktop service): Settings **Appearance → Sync login screen** copies palette, wallpaper, roundness, glass, refraction, font, high contrast, reduced motion, and UI scale into `/var/lib/helix-greeter`. Greetd session scripts follow the shell’s contracts (`docs/user/configuration/shell.mdx` greeter section; design: `docs/design/greeter-tauri.md`).
 
 ## Chrome match
 

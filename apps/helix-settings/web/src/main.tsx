@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { invoke, type Change, type RowView } from "@helix/ui";
 import { RowsPage, type PageHandle, type PageSpec } from "./pages/RowsPage";
 import { AboutPage } from "./pages/AboutPage";
+import { AppearancePage } from "./pages/AppearancePage";
 import { KeyboardPage } from "./pages/KeyboardPage";
 import { WallpaperPage } from "./pages/WallpaperPage";
 import { NetworkPage } from "./pages/NetworkPage";
@@ -28,6 +29,11 @@ const report = (text: string) => {
 
 const serviceChange = (page: string) => (id: string, change: Change) => invoke<void>("setting_change", { page, id, change });
 
+const appearance: PageSpec = {
+  change: serviceChange("appearance"),
+  empty: "There is nothing to adjust here on this desktop.",
+};
+
 /** Every page that is only rows. Names match the host page's `PAGES`. */
 const specs: Record<string, PageSpec> = {
   dock: {
@@ -43,13 +49,21 @@ const specs: Record<string, PageSpec> = {
     empty: "No displays reported.",
     note: "Resolution, scale and arrangement are set in the compositor's configuration.",
   },
-  appearance: { change: serviceChange("appearance"), empty: "There is nothing to adjust here on this desktop." },
   accessibility: { change: serviceChange("accessibility"), empty: "There is nothing to adjust here on this desktop." },
 };
 
 /** Pages with their own components (not only rows). */
 const custom: Record<string, (props: { register: (handle: PageHandle) => void; options: MountOptions }) => ReactElement> = {
   about: ({ register }) => <AboutPage register={register} />,
+  appearance: ({ register, options }) => (
+    <AppearancePage
+      spec={appearance}
+      register={register}
+      initialRows={options.initialRows}
+      onRows={options.onRows}
+      report={report}
+    />
+  ),
   keyboard: ({ register }) => <KeyboardPage register={register} report={report} />,
   wallpaper: ({ register }) => <WallpaperPage register={register} report={report} />,
   network: ({ register }) => <NetworkPage register={register} />,

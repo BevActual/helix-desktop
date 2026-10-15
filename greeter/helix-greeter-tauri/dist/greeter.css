@@ -25,3 +25,8 @@ body.greeter { background: radial-gradient(120% 120% at 30% 10%, #2a2f5a 0%, #0e
 .g-link { background: transparent; color: var(--label-2); font-size: 12.5px; padding: 4px 6px; }
 .g-link:hover { color: var(--accent); }
 .g-session { background: var(--fill-1); color: var(--label); border-radius: var(--r-ctl); padding: 4px 8px; font-size: 12.5px; }
+:root[data-glass="solid"] .g-card,
+:root[data-contrast="1"] .g-card { background: var(--greeter-surface, var(--glass)); backdrop-filter: none; }
+:root[data-glass="glass"] .g-card { backdrop-filter: blur(40px) saturate(1.6); }
+:root[data-refract="1"] .g-card { backdrop-filter: blur(48px) saturate(1.8); }
+:root[data-contrast="1"] .g-card { box-shadow: inset 0 0 0 1px var(--label); }

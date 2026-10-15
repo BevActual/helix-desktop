@@ -4,7 +4,28 @@ import { invoke } from "@helix/ui";
 
 interface User { username: string; name: string; }
 interface Session { id: string; name: string; }
-interface Offer { users: User[]; sessions: Session[]; dark: boolean; }
+interface Colors {
+  background: string;
+  on_background: string;
+  surface: string;
+  on_surface: string;
+  primary: string;
+  on_primary: string;
+}
+interface Offer {
+  users: User[];
+  sessions: Session[];
+  dark: boolean;
+  font: string;
+  ui_scale: number;
+  corner_radius_scale: number;
+  transparency_mode: string;
+  refraction: boolean;
+  high_contrast: boolean;
+  reduced_motion: boolean;
+  colors: Colors | null;
+  wallpaper_url: string;
+}
 type Step =
   | { kind: "prompt"; secret: boolean; message: string }
   | { kind: "info"; message: string; error: boolean }
@@ -45,7 +66,30 @@ function Greeter() {
   useEffect(() => {
     invoke<Offer>("greeter_offer").then((value) => {
       setOffer(value);
-      document.documentElement.dataset.theme = value.dark ? "dark" : "light";
+      const root = document.documentElement;
+      root.dataset.theme = value.dark ? "dark" : "light";
+      root.dataset.glass = value.high_contrast ? "solid" : value.transparency_mode;
+      root.dataset.contrast = value.high_contrast ? "1" : "0";
+      root.dataset.refract = value.refraction ? "1" : "0";
+      root.dataset.motion = value.reduced_motion ? "0" : "1";
+      root.style.setProperty("--r-panel", `${Math.round(24 * value.corner_radius_scale)}px`);
+      root.style.setProperty("--r-card", `${Math.round(18 * value.corner_radius_scale)}px`);
+      if (value.font) root.style.fontFamily = value.font;
+      root.style.setProperty("zoom", String(value.ui_scale));
+      if (value.colors) {
+        root.style.setProperty("--label", value.colors.on_background);
+        root.style.setProperty("--label-2", value.colors.on_surface);
+        root.style.setProperty("--accent", value.colors.primary);
+        root.style.setProperty("--on-accent", value.colors.on_primary);
+        root.style.setProperty("--greeter-surface", value.colors.surface);
+        document.body.style.backgroundColor = value.colors.background;
+      }
+      if (value.wallpaper_url && !/["\\()]/.test(value.wallpaper_url)) {
+        const dim = value.dark ? "rgba(0,0,0,.35)" : "rgba(255,255,255,.2)";
+        document.body.style.backgroundImage = `linear-gradient(${dim}, ${dim}), url("${value.wallpaper_url}")`;
+        document.body.style.backgroundSize = "cover";
+        document.body.style.backgroundPosition = "center";
+      }
       setSession(value.sessions[0]?.id ?? "");
     });
   }, []);

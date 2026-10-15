@@ -28,7 +28,12 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 const WINDOW: &str = "settings";
 
 /// The service settings the Appearance page shows, in order. A change to any other id is refused before it is sent.
-const APPEARANCE: &[&str] = &["theme.mode", "theme.pure_black_dark"];
+const APPEARANCE: &[&str] = &[
+    "theme.mode",
+    "theme.pure_black_dark",
+    "shell.greeter_sync.auto_sync",
+    "shell.greeter_sync.privilege_command",
+];
 
 /// Only what something on this desktop acts on (the service applies high contrast to GTK applications).
 const ACCESSIBILITY: &[&str] = &["accessibility.high_contrast"];
@@ -943,6 +948,7 @@ pub(crate) fn write_choice(app: &AppHandle, source: Source) -> Result<(), String
     eprintln!("SETTINGS wallpaper chosen");
     let view = scan_wallpapers(app);
     let _ = app.emit("wallpaper-view", view);
+    greeter_auto_sync(app, "wallpaper");
     Ok(())
 }
 
@@ -1203,6 +1209,199 @@ fn displays_rows() -> Vec<RowView> {
     rows
 }
 
+fn catalog_bool(state: &State, id: &str) -> bool {
+    state
+        .catalog
+        .entries()
+        .iter()
+        .find(|entry| entry.get("id").and_then(|value| value.as_str()) == Some(id))
+        .and_then(|entry| entry.get("value").and_then(|value| value.as_bool()))
+        .unwrap_or(false)
+}
+
+fn catalog_text(state: &State, id: &str) -> String {
+    state
+        .catalog
+        .entries()
+        .iter()
+        .find(|entry| entry.get("id").and_then(|value| value.as_str()) == Some(id))
+        .and_then(|entry| entry.get("value").and_then(|value| value.as_str()))
+        .unwrap_or("")
+        .to_string()
+}
+
+fn apply_bin() -> Result<std::path::PathBuf, String> {
+    if let Some(path) = std::env::var_os("HELIX_GREETER_APPLY_BIN") {
+        return Ok(std::path::PathBuf::from(path));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let sibling = dir.join("helix-greeter-apply-appearance");
+            if sibling.is_file() {
+                return Ok(sibling);
+            }
+        }
+    }
+    Err("helix-greeter-apply-appearance is not installed.".into())
+}
+
+fn greeter_dest() -> std::path::PathBuf {
+    std::env::var_os("HELIX_GREETER_STATE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("/var/lib/helix-greeter"))
+}
+
+fn staging_dir() -> Result<std::path::PathBuf, String> {
+    let base = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    let dir = base.join(format!("helix-greeter-sync-{}", std::process::id()));
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).map_err(|error| error.to_string())?;
+    }
+    std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+        .map_err(|error| error.to_string())?;
+    Ok(dir)
+}
+
+struct ApplyExit {
+    code: i32,
+    message: String,
+}
+
+fn command_output(cmd: &std::ffi::OsStr, args: &[std::ffi::OsString]) -> Result<ApplyExit, String> {
+    let output = std::process::Command::new(cmd)
+        .args(args)
+        .output()
+        .map_err(|error| format!("could not run {}: {error}", cmd.to_string_lossy()))?;
+    if output.status.success() {
+        return Ok(ApplyExit {
+            code: 0,
+            message: String::new(),
+        });
+    }
+    let message = String::from_utf8_lossy(&output.stderr);
+    let message = message.trim();
+    let message = if message.is_empty() {
+        format!("greeter sync failed ({})", output.status)
+    } else {
+        message.to_string()
+    };
+    Ok(ApplyExit {
+        code: output.status.code().unwrap_or(1),
+        message,
+    })
+}
+
+fn privilege_argv(
+    command: &str,
+    bin: &std::path::Path,
+    staging: &std::path::Path,
+    dest: &std::path::Path,
+) -> Result<Vec<std::ffi::OsString>, String> {
+    let mut args: Vec<std::ffi::OsString> = if command.trim().is_empty() {
+        vec!["pkexec".into()]
+    } else {
+        command
+            .split_whitespace()
+            .map(std::ffi::OsString::from)
+            .collect()
+    };
+    if args.is_empty() || args.len() > 8 {
+        return Err("Greeter sync privilege command is too long.".into());
+    }
+    args.push(bin.as_os_str().to_os_string());
+    args.push("--sync".into());
+    args.push(staging.as_os_str().to_os_string());
+    args.push("--dest".into());
+    args.push(dest.as_os_str().to_os_string());
+    Ok(args)
+}
+
+/// One sync at a time: the staging directory is shared, and a second password prompt on top of the first helps nobody.
+static GREETER_SYNC: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Copy the current theme and wallpaper into the greeter state directory.
+fn greeter_sync_blocking(app: &AppHandle) -> Result<(), String> {
+    let _one_at_a_time = GREETER_SYNC.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let bin = apply_bin()?;
+    let staging = staging_dir()?;
+    let result = greeter_sync_from(app, &bin, &staging);
+    let _ = std::fs::remove_dir_all(&staging);
+    result
+}
+
+fn greeter_sync_from(app: &AppHandle, bin: &std::path::Path, staging: &std::path::Path) -> Result<(), String> {
+    let staged = command_output(
+        bin.as_os_str(),
+        &["--stage".into(), staging.as_os_str().to_os_string()],
+    )?;
+    if staged.code != 0 {
+        return Err(staged.message);
+    }
+    let dest = greeter_dest();
+    let direct = command_output(
+        bin.as_os_str(),
+        &[
+            "--sync".into(),
+            staging.as_os_str().to_os_string(),
+            "--dest".into(),
+            dest.as_os_str().to_os_string(),
+        ],
+    )?;
+    // Exit 2 means the state directory is not writable. Anything else is a bad payload, and a nested
+    // test must not ask for a password.
+    if direct.code == 0 {
+        return Ok(());
+    }
+    if direct.code != 2 || helix_shell_core::nested_test_session() {
+        return Err(direct.message);
+    }
+    let privilege = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        catalog_text(&state, "shell.greeter_sync.privilege_command")
+    };
+    let argv = privilege_argv(&privilege, bin, staging, &dest)?;
+    let (cmd, rest) = argv.split_first().ok_or("empty privilege command")?;
+    let installed = command_output(cmd, rest)?;
+    if installed.code == 0 {
+        Ok(())
+    } else {
+        Err(installed.message)
+    }
+}
+
+fn greeter_auto_sync(app: &AppHandle, id: &str) {
+    if id == "shell.greeter_sync.privilege_command" {
+        return;
+    }
+    let enabled = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        catalog_bool(&state, "shell.greeter_sync.auto_sync")
+    };
+    if !enabled {
+        return;
+    }
+    // The sync can wait on an administrator password; keep it off the command that changed the setting.
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Err(error) = greeter_sync_blocking(&app) {
+            eprintln!("SETTINGS greeter sync: {error}");
+        }
+    });
+}
+
+#[tauri::command]
+async fn greeter_sync(app: AppHandle) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || greeter_sync_blocking(&app))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 /// A change to one row. The page names the row and what it wants; the catalog model decides whether that is a legal write.
 #[tauri::command]
 async fn setting_change(
@@ -1235,6 +1434,9 @@ async fn setting_change(
     }
     eprintln!("SETTINGS set {} {}", update.id, update.value);
     refresh_settings(&app).await;
+    if page == "appearance" {
+        greeter_auto_sync(&app, &id);
+    }
     Ok(())
 }
 
@@ -1354,6 +1556,7 @@ fn main() {
             bluetooth_pair_cancel,
             pairing_view,
             setting_change,
+            greeter_sync,
             layout_reporting,
             report_layout
         ])
