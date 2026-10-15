@@ -1,0 +1,11 @@
+[theme]
+source = "wallpaper"
+wallpaper_scheme = "m3-content"
+mode = "dark"
+
+[theme.templates]
+builtin_ids = ["helix", "qt", "kitty", "niri", "gtk3"]
+
+[theme.templates.user.mine]
+input_path = "./mine.tpl"
+output_path = "$XDG_DATA_HOME/mine/out.txt"

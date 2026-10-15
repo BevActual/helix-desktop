@@ -43,6 +43,7 @@ fn run_scenario(root: &Path) {
         custom_palette: config_value(&config, "custom_palette").unwrap_or_default(),
         community_cache: None,
         shell_light: config_value(&config, "mode").as_deref() == Some("light"),
+        wallpaper: None,
     };
 
     let steps = fs::read_to_string(root.join("steps")).unwrap();

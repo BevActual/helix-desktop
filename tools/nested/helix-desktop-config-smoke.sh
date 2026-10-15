@@ -3,6 +3,9 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BIN="${HELIX_SERVICE_BIN:-$ROOT/target/fast/helix-desktop}"
+# The service's msg socket is $XDG_RUNTIME_DIR/helix-$WAYLAND_DISPLAY.sock. Use a name of our own so that on a machine with a
+# live session this never talks to (or takes) the real shell's socket.
+export WAYLAND_DISPLAY="wayland-smoke-$$"
 
 if [[ -z "${HELIX_DESKTOP_CONFIG_SMOKE_INNER:-}" ]]; then
   cargo build --profile fast -p helix-desktop --quiet
