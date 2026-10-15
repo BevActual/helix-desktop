@@ -147,7 +147,7 @@ pub fn set_role(inputs: &Inputs, role: u32, hex_color: &str) -> Result<Outcome, 
 pub fn set_accent(inputs: &Inputs, hex_color: &str) -> Result<Outcome, String> {
     let args = ["set-accent", hex_color];
     let (Some((selection, dir)), Some(parsed)) = (&inputs.local, parse_hex(hex_color)) else {
-        return run_helper(&args).map(|name| Outcome::Helper(name));
+        return run_helper(&args).map(Outcome::Helper);
     };
     local_result(save_role_color_as_custom(dir, selection, ColorRole::Primary, parsed), &args)
 }

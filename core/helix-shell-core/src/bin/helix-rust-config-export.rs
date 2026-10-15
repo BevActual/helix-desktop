@@ -6,7 +6,7 @@ use helix_shell_core::desktop::config_export::rust_export_toml;
 use helix_shell_core::desktop::settings::ConfigPaths;
 
 fn main() -> ExitCode {
-    for arg in std::env::args().skip(1) {
+    if let Some(arg) = std::env::args().nth(1) {
         if arg == "--help" || arg == "-h" {
             println!("Usage: helix-rust-config-export");
             println!("Print schema-normalized effective config (Rust config_export) on stdout.");

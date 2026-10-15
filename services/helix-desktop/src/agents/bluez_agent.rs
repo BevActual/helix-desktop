@@ -37,8 +37,8 @@ impl BluezAgent {
     ) -> Result<String, BluezAgentError> {
         match self.hub.bt_request_pin_code(device.to_string()).await {
             Ok(pin) => Ok(pin),
-            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected.into()),
-            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled.into()),
+            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected),
+            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled),
         }
     }
 
@@ -53,8 +53,8 @@ impl BluezAgent {
             .await
         {
             Ok(()) => Ok(()),
-            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected.into()),
-            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled.into()),
+            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected),
+            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled),
         }
     }
 
@@ -64,8 +64,8 @@ impl BluezAgent {
     ) -> Result<u32, BluezAgentError> {
         match self.hub.bt_request_passkey(device.to_string()).await {
             Ok(passkey) => Ok(passkey),
-            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected.into()),
-            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled.into()),
+            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected),
+            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled),
         }
     }
 
@@ -81,8 +81,8 @@ impl BluezAgent {
             .await
         {
             Ok(()) => Ok(()),
-            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected.into()),
-            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled.into()),
+            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected),
+            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled),
         }
     }
 
@@ -97,8 +97,8 @@ impl BluezAgent {
             .await
         {
             Ok(()) => Ok(()),
-            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected.into()),
-            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled.into()),
+            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected),
+            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled),
         }
     }
 
@@ -108,8 +108,8 @@ impl BluezAgent {
     ) -> Result<(), BluezAgentError> {
         match self.hub.bt_request_authorization(device.to_string()).await {
             Ok(()) => Ok(()),
-            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected.into()),
-            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled.into()),
+            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected),
+            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled),
         }
     }
 
@@ -124,8 +124,8 @@ impl BluezAgent {
             .await
         {
             Ok(()) => Ok(()),
-            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected.into()),
-            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled.into()),
+            Err(BtAgentOutcome::Rejected) => Err(BluezAgentError::Rejected),
+            Err(BtAgentOutcome::Canceled) => Err(BluezAgentError::Canceled),
         }
     }
 

@@ -377,53 +377,6 @@ fn uses_default_bar(store: &ConfigStore) -> bool {
     }
 }
 
-#[cfg(test)]
-mod bar_names_tests {
-    use super::*;
-    use crate::desktop::settings::{ConfigPaths, ConfigStore};
-    use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[test]
-    fn config_smoke_shape_resolves_main_bar() {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let home = std::env::temp_dir().join(format!("helix-bar-smoke-{nanos}"));
-        fs::create_dir_all(home.join("helix")).unwrap();
-        fs::create_dir_all(home.join("state/helix")).unwrap();
-        fs::write(
-            home.join("helix/config.toml"),
-            r#"[bar]
-order = ["main"]
-
-[bar.main]
-enabled = true
-thickness = 34
-
-[idle.behavior.lock]
-timeout = 420
-enabled = true
-action = "lock"
-
-[theme.templates]
-builtin_ids = ["helix", "qt"]
-"#,
-        )
-        .unwrap();
-        // SAFETY: single-threaded test; `from_env` prefers HELIX_* over XDG_*.
-        unsafe {
-            std::env::remove_var("HELIX_CONFIG_HOME");
-            std::env::remove_var("HELIX_STATE_HOME");
-            std::env::set_var("XDG_CONFIG_HOME", &home);
-            std::env::set_var("XDG_STATE_HOME", home.join("state"));
-        }
-        let store = ConfigStore::load(ConfigPaths::from_env());
-        assert_eq!(bar_names(&store), vec!["main".to_string()]);
-    }
-}
-
 pub(crate) fn bar_names(store: &ConfigStore) -> Vec<String> {
     if uses_default_bar(store) {
         return vec!["default".to_string()];
@@ -512,4 +465,51 @@ pub fn entries(
         }
     }
     out
+}
+
+#[cfg(test)]
+mod bar_names_tests {
+    use super::*;
+    use crate::desktop::settings::{ConfigPaths, ConfigStore};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn config_smoke_shape_resolves_main_bar() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("helix-bar-smoke-{nanos}"));
+        fs::create_dir_all(home.join("helix")).unwrap();
+        fs::create_dir_all(home.join("state/helix")).unwrap();
+        fs::write(
+            home.join("helix/config.toml"),
+            r#"[bar]
+order = ["main"]
+
+[bar.main]
+enabled = true
+thickness = 34
+
+[idle.behavior.lock]
+timeout = 420
+enabled = true
+action = "lock"
+
+[theme.templates]
+builtin_ids = ["helix", "qt"]
+"#,
+        )
+        .unwrap();
+        // SAFETY: single-threaded test; `from_env` prefers HELIX_* over XDG_*.
+        unsafe {
+            std::env::remove_var("HELIX_CONFIG_HOME");
+            std::env::remove_var("HELIX_STATE_HOME");
+            std::env::set_var("XDG_CONFIG_HOME", &home);
+            std::env::set_var("XDG_STATE_HOME", home.join("state"));
+        }
+        let store = ConfigStore::load(ConfigPaths::from_env());
+        assert_eq!(bar_names(&store), vec!["main".to_string()]);
+    }
 }

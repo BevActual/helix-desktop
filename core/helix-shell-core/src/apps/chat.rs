@@ -13,6 +13,9 @@ pub const MAX_MESSAGES: usize = 400;
 /// Pictures on one message, and pictures sent along with one request (the newest ones; the service accepts four).
 pub const MAX_IMAGES_PER_MESSAGE: usize = 4;
 pub const MAX_IMAGES_PER_TURN: usize = 4;
+
+/// For each message (by index into the returned context list), the picture paths that go with it.
+pub type MessagePictures = Vec<(usize, Vec<String>)>;
 pub const MAX_MESSAGE_CHARS: usize = 20_000;
 /// How much history goes to the model with a turn (characters; a token is about four).
 pub const CONTEXT_CHARS: usize = 12_000;
@@ -226,7 +229,7 @@ impl Conversation {
 
     /// The same messages, and for each one (by index into the returned list) the pictures that go with it. Only the newest
     /// [`MAX_IMAGES_PER_TURN`] pictures are kept; older ones stay in the chat but are not sent again.
-    pub fn context_with_pictures(&self, system: &str) -> (Vec<(&'static str, String)>, Vec<(usize, Vec<String>)>) {
+    pub fn context_with_pictures(&self, system: &str) -> (Vec<(&'static str, String)>, MessagePictures) {
         let start = self.context_start(self.messages.len());
         let kept = &self.messages[start..];
         let mut prompt = if system.trim().is_empty() {

@@ -121,7 +121,7 @@ pub fn read_view() -> CompositorConfigView {
     let snippet = read_snippet(niri_dir.as_deref());
     let includes = niri_dir
         .as_deref()
-        .map(|dir| list_includes(dir))
+        .map(list_includes)
         .unwrap_or_default();
     CompositorConfigView {
         niri_dir: niri_dir

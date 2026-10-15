@@ -150,11 +150,9 @@ fn user_manifest_path() -> Option<PathBuf> {
 
 fn resolve_host_executable() -> Option<PathBuf> {
     if let Ok(bindir) = std::env::var("HELIX_BINDIR") {
-        for name in ["helix-desktop"] {
-            let p = PathBuf::from(&bindir).join(name);
-            if p.is_file() {
-                return Some(p);
-            }
+        let p = PathBuf::from(&bindir).join("helix-desktop");
+        if p.is_file() {
+            return Some(p);
         }
     }
     if let Ok(path) = std::env::current_exe() {
@@ -166,12 +164,10 @@ fn resolve_host_executable() -> Option<PathBuf> {
 }
 
 fn path_looks_like_helix_host(path: &Path) -> bool {
-    match path.file_name().and_then(|n| n.to_str()) {
-        Some("helix-shell")
-        | Some("helix-pywalfox")
-        | Some("helix-desktop") => true,
-        _ => false,
-    }
+    matches!(
+        path.file_name().and_then(|n| n.to_str()),
+        Some("helix-shell" | "helix-pywalfox" | "helix-desktop")
+    )
 }
 
 fn read_existing_manifest_host() -> Option<PathBuf> {
@@ -216,6 +212,22 @@ fn pywalfox_config_path() -> Option<PathBuf> {
     xdg_config_home().map(|c| c.join("pywalfox").join("config.json"))
 }
 
+fn set_theme_mode(mode: &str) -> Result<(), String> {
+    let path = pywalfox_config_path().ok_or_else(|| "HOME is not set".to_string())?;
+    let mut root: Value = fs::read_to_string(&path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .filter(Value::is_object)
+        .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+    if let Some(table) = root.as_object_mut() {
+        table.insert("theme_mode".into(), Value::String(mode.to_string()));
+    }
+    fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+    fs::write(&path, format!("{}\n", serde_json::to_string_pretty(&root).unwrap()))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,20 +248,4 @@ mod tests {
         assert!(validate_colors_json(&path).is_err());
         let _ = fs::remove_dir_all(&dir);
     }
-}
-
-fn set_theme_mode(mode: &str) -> Result<(), String> {
-    let path = pywalfox_config_path().ok_or_else(|| "HOME is not set".to_string())?;
-    let mut root: Value = fs::read_to_string(&path)
-        .ok()
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .filter(Value::is_object)
-        .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
-    if let Some(table) = root.as_object_mut() {
-        table.insert("theme_mode".into(), Value::String(mode.to_string()));
-    }
-    fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    fs::write(&path, format!("{}\n", serde_json::to_string_pretty(&root).unwrap()))
-        .map_err(|e| e.to_string())?;
-    Ok(())
 }

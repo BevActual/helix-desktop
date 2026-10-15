@@ -180,9 +180,7 @@ impl Store {
             .filter(|p| category.is_empty() || in_category(p, category))
             .filter_map(|p| {
                 let title = p.title.to_ascii_lowercase();
-                let rank = if q.is_empty() {
-                    0
-                } else if title == q {
+                let rank = if q.is_empty() || title == q {
                     0
                 } else if title.starts_with(&q) {
                     1

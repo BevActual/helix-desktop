@@ -155,6 +155,27 @@ mod tests {
 
     #[test]
     fn templates_apply_ok_when_desktop_registered() {
+        // Template apply reads config and assets from the environment, so this takes the env
+        // lock and builds its own home like the template_apply integration tests.
+        let _guard = crate::testing::ENV_LOCK.lock().unwrap();
+        use crate::testing::fixtures::{apply_test_env, copy_tree, repo_root, temp_home};
+        let repo = repo_root();
+        let scenario = repo.join("core/helix-theme/tests/golden/apply/wallpaper-content");
+        let assets = repo.join("assets");
+        let home = temp_home("msg-ipc-apply");
+        std::fs::write(
+            home.join("cfg/helix/config.toml"),
+            "[theme]\nsource = \"wallpaper\"\nwallpaper_scheme = \"m3-content\"\nmode = \"dark\"\n\n[theme.templates]\nbuiltin_ids = [\"helix\", \"qt\"]\n",
+        )
+        .unwrap();
+        if scenario.join("files").is_dir() {
+            copy_tree(&scenario.join("files"), &home.join("cfg"));
+        }
+        if scenario.join("statefiles").is_dir() {
+            copy_tree(&scenario.join("statefiles"), &home.join("state/helix"));
+        }
+        apply_test_env(&home, &assets);
+
         let mut state = State::new(crate::agents::new_hub());
         state.desktop = Some(":1.42".into());
         let out = handle_line(&mut state, "templates-apply");

@@ -213,6 +213,19 @@ pub fn read_paths(paths: &[String]) -> Result<Vec<Attachment>, String> {
     Ok(out)
 }
 
+/// Choose pictures with the system picker; returns their bytes (the caller checks and stores them).
+pub fn pick_pictures() -> Result<Vec<Vec<u8>>, String> {
+    let mut out = Vec::new();
+    for path in pick_paths(true)?.into_iter().take(4) {
+        let meta = std::fs::metadata(&path).map_err(|_| "Could not read that file.".to_string())?;
+        if !meta.is_file() || meta.len() > crate::images::MAX_BYTES as u64 {
+            return Err("Pictures can be up to 8 MB.".into());
+        }
+        out.push(std::fs::read(&path).map_err(|_| "Could not read that file.".to_string())?);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,17 +281,4 @@ mod tests {
         assert!(!is_probably_text(Path::new("a.bin"), &[0, 1, 2]));
         assert!(is_probably_text(Path::new("a.txt"), b"hello"));
     }
-}
-
-/// Choose pictures with the system picker; returns their bytes (the caller checks and stores them).
-pub fn pick_pictures() -> Result<Vec<Vec<u8>>, String> {
-    let mut out = Vec::new();
-    for path in pick_paths(true)?.into_iter().take(4) {
-        let meta = std::fs::metadata(&path).map_err(|_| "Could not read that file.".to_string())?;
-        if !meta.is_file() || meta.len() > crate::images::MAX_BYTES as u64 {
-            return Err("Pictures can be up to 8 MB.".into());
-        }
-        out.push(std::fs::read(&path).map_err(|_| "Could not read that file.".to_string())?);
-    }
-    Ok(out)
 }

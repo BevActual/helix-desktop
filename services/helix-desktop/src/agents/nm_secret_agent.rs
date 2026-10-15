@@ -40,10 +40,10 @@ impl NmSecretAgent {
         flags: u32,
     ) -> Result<HashMap<String, HashMap<String, OwnedValue>>, NmSecretError> {
         if !AgentHub::nm_flags_allow_interaction(flags) {
-            return Err(NmSecretError::NoSecrets.into());
+            return Err(NmSecretError::NoSecrets);
         }
         if !AgentHub::nm_setting_supported(&setting_name) {
-            return Err(NmSecretError::NoSecrets.into());
+            return Err(NmSecretError::NoSecrets);
         }
         let ssid = AgentHub::extract_ssid(&connection);
         tracing::info!(ssid, setting = setting_name, "GetSecrets prompt");
@@ -55,11 +55,11 @@ impl NmSecretAgent {
             Ok(secret) => Ok(AgentHub::build_nm_secrets(&setting_name, &secret)),
             Err(NmSecretOutcome::NoSecrets(reason)) => {
                 tracing::debug!(reason, "GetSecrets -> NoSecrets");
-                Err(NmSecretError::NoSecrets.into())
+                Err(NmSecretError::NoSecrets)
             }
             Err(NmSecretOutcome::UserCanceled(reason)) => {
                 tracing::debug!(reason, "GetSecrets -> UserCanceled");
-                Err(NmSecretError::UserCanceled.into())
+                Err(NmSecretError::UserCanceled)
             }
         }
     }

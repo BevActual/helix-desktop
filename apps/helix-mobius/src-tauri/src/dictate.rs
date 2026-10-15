@@ -60,7 +60,7 @@ impl Dictation {
                     Ok(0) | Err(_) => break,
                     Ok(n) => {
                         let mut peak = 0i32;
-                        for pair in chunk[..n].chunks_exact(2) {
+                        for pair in chunk[..n].as_chunks::<2>().0 {
                             peak = peak.max(i32::from(i16::from_le_bytes([pair[0], pair[1]])).abs());
                         }
                         level((peak as f32 / 32768.0).min(1.0));

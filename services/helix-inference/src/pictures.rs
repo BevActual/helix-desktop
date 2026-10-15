@@ -84,8 +84,8 @@ pub fn scale_down(picture: &ImageInput, max_side: u32) -> ImageInput {
             for sy in y0..y1.min(picture.height) {
                 for sx in x0..x1.min(picture.width) {
                     let at = (sy as usize * picture.width as usize + sx as usize) * 3;
-                    for c in 0..3 {
-                        sum[c] += u64::from(picture.rgb[at + c]);
+                    for (c, channel) in sum.iter_mut().enumerate() {
+                        *channel += u64::from(picture.rgb[at + c]);
                     }
                 }
             }
@@ -125,7 +125,7 @@ pub fn validate_image_request(request: &ChatRequest) -> Result<(), String> {
     if prompt.contains('\0') {
         return Err("image prompt contains an invalid character".into());
     }
-    let side_ok = |v: u32| (256..=768).contains(&v) && v % 64 == 0;
+    let side_ok = |v: u32| (256..=768).contains(&v) && v.is_multiple_of(64);
     if !side_ok(request.image_width) || !side_ok(request.image_height) {
         return Err("image dimensions must be multiples of 64 between 256 and 768".into());
     }

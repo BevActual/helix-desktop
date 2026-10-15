@@ -1,7 +1,7 @@
 //! Frozen export fixtures for the in-process Rust exporter (`helix-rust-config-export` CLI).
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -23,7 +23,7 @@ use helix_shell_core::desktop::settings::ConfigPaths;
 use helix_shell_core::ConfigStore;
 use toml::Value as Toml;
 
-fn minimal_fixture(root: &PathBuf) -> ConfigPaths {
+fn minimal_fixture(root: &Path) -> ConfigPaths {
     let config_dir = root.join("cfg").join("helix");
     let state_dir = root.join("state").join("helix");
     fs::create_dir_all(&config_dir).unwrap();

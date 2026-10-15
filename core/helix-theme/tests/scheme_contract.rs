@@ -134,21 +134,29 @@ fn terminal_and_accent_contrast_for_every_scheme() {
             let background = Color::from_argb(
                 *tokens
                     .get("terminal_background")
-                    .expect(&format!("{label} {mode} terminal_background")),
+                    .unwrap_or_else(|| panic!("{label} {mode} terminal_background")),
             );
             for key in COLOR_KEYS {
-                let color = Color::from_argb(*tokens.get(key).expect(&format!("{label} {mode} {key}")));
+                let color = Color::from_argb(
+                    *tokens
+                        .get(key)
+                        .unwrap_or_else(|| panic!("{label} {mode} {key}")),
+                );
                 assert!(
                     contrast_ratio(color, background) >= 4.5,
                     "{label} {mode} {key}"
                 );
             }
             for key in ACCENT_KEYS {
-                let bg = Color::from_argb(*tokens.get(key).expect(&format!("{label} {mode} {key}")));
+                let bg = Color::from_argb(
+                    *tokens
+                        .get(key)
+                        .unwrap_or_else(|| panic!("{label} {mode} {key}")),
+                );
                 let fg = Color::from_argb(
                     *tokens
                         .get(&format!("on_{key}"))
-                        .expect(&format!("{label} {mode} on_{key}")),
+                        .unwrap_or_else(|| panic!("{label} {mode} on_{key}")),
                 );
                 assert!(contrast_ratio(fg, bg) >= 4.5, "{label} {mode} on_{key}");
             }

@@ -136,7 +136,7 @@ pub fn idle_catalog_entries(store: &ConfigStore) -> Vec<Value> {
                 "group": format!("Idle · {name}"),
                 "type": typ,
                 "value": value,
-                "minimum": if *field == "timeout" || *field == "locked_timeout" { 0 } else { 0 },
+                "minimum": 0,
                 "maximum": if *field == "timeout" || *field == "locked_timeout" { 86400 } else { 0 },
                 "overridden": store.overridden_path(&id),
                 "group-overridden": group_overridden,
@@ -155,15 +155,13 @@ pub fn idle_catalog_entries(store: &ConfigStore) -> Vec<Value> {
                     .get_json_value(&format!("idle:{name}:action"))
                     .and_then(|v| v.as_str().map(|s| s == "command"))
                     .unwrap_or(false);
-                if action_is_command
+                let has_command = action_is_command
                     || store
                         .get_json_value(&format!("idle:{name}:command"))
-                        .is_some()
-                {
-                    if !options.iter().any(|o| o.as_str() == Some("command")) {
-                        options.push(Value::String("command".into()));
-                        labels.push(Value::String("Existing custom command".into()));
-                    }
+                        .is_some();
+                if has_command && !options.iter().any(|o| o.as_str() == Some("command")) {
+                    options.push(Value::String("command".into()));
+                    labels.push(Value::String("Existing custom command".into()));
                 }
                 entry["options"] = Value::Array(options);
                 entry["option-labels"] = Value::Array(labels);
@@ -335,6 +333,16 @@ pub fn validate_idle_field(field: &str, value: Value) -> Result<Value, String> {
     }
 }
 
+pub fn desktop_extension_entries(store: &ConfigStore, include_desktop: bool) -> Vec<Value> {
+    if !include_desktop {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    out.extend(bar_scalar_entries(store));
+    out.extend(idle_catalog_entries(store));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,14 +385,4 @@ mod tests {
         let store = store_with_bar();
         assert_eq!(bar_names(&store), vec!["main".to_string()]);
     }
-}
-
-pub fn desktop_extension_entries(store: &ConfigStore, include_desktop: bool) -> Vec<Value> {
-    if !include_desktop {
-        return Vec::new();
-    }
-    let mut out = Vec::new();
-    out.extend(bar_scalar_entries(store));
-    out.extend(idle_catalog_entries(store));
-    out
 }

@@ -151,7 +151,7 @@ fn merged_bar_names(merged: &Toml) -> Vec<String> {
 /// Extra `[bar.<name>]` tables are allowed before `config_export::serialize` runs in C++.
 fn is_allowed_extra_bar_path(path: &str, merged: &Toml) -> bool {
     let parts = path.split('.').collect::<Vec<_>>();
-    if parts.first().map(|s| *s) != Some("bar") {
+    if parts.first().copied() != Some("bar") {
         return false;
     }
     if parts.len() == 2 && parts[1] == "order" {
@@ -382,13 +382,13 @@ fn rebuild_launcher_providers_from_merged(root: &mut Toml, merged: &Toml) {
     for name in merged_providers.keys() {
         providers
             .entry(name.clone())
-            .or_insert_with(|| default_launcher_provider_export_table());
+            .or_insert_with(default_launcher_provider_export_table);
     }
 }
 
 fn is_merged_widget_path(path: &str, merged: &Toml) -> bool {
     let parts = path.split('.').collect::<Vec<_>>();
-    if parts.first().map(|s| *s) != Some("widget") || parts.len() < 2 {
+    if parts.first().copied() != Some("widget") || parts.len() < 2 {
         return false;
     }
     merged_widget_names(merged).iter().any(|name| name == parts[1])
@@ -1041,6 +1041,18 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     root
 }
 
+/// Effective export when the merged user config is patchable; else `None`.
+pub fn rust_export_from_store(store: &ConfigStore) -> Option<Toml> {
+    if !merged_export_is_patchable(store) {
+        return None;
+    }
+    Some(patch_default_export(store))
+}
+
+pub fn rust_export_toml(paths: &ConfigPaths) -> Option<Toml> {
+    rust_export_from_store(&ConfigStore::load(paths.clone()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1157,16 +1169,4 @@ mod tests {
         }
         let _ = std::fs::remove_dir_all(root);
     }
-}
-
-/// Effective export when the merged user config is patchable; else `None`.
-pub fn rust_export_from_store(store: &ConfigStore) -> Option<Toml> {
-    if !merged_export_is_patchable(store) {
-        return None;
-    }
-    Some(patch_default_export(store))
-}
-
-pub fn rust_export_toml(paths: &ConfigPaths) -> Option<Toml> {
-    rust_export_from_store(&ConfigStore::load(paths.clone()))
 }

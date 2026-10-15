@@ -174,10 +174,8 @@ impl HookRunner {
                     picked = Some(next);
                     break;
                 }
-                if picked.is_none() {
-                    if guard.queue.is_empty() && guard.running == 0 {
-                        inner.1.notify_all();
-                    }
+                if picked.is_none() && guard.queue.is_empty() && guard.running == 0 {
+                    inner.1.notify_all();
                 }
                 picked
             };

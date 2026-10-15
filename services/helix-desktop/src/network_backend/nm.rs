@@ -60,7 +60,8 @@ pub fn probe() -> bool {
 
 impl NmBackend {
     pub fn new() -> Self {
-        let backend = Self {
+        
+        Self {
             fields: NetworkFields {
                 available: false,
                 enabled: false,
@@ -85,8 +86,7 @@ impl NmBackend {
             wifi_secret: String::new(),
             last_snapshot: json!({"available": false}),
             scanning: false,
-        };
-        backend
+        }
     }
 
     pub fn is_available(&self) -> bool {
@@ -297,36 +297,36 @@ fn refresh_state(scanning: bool) -> Result<Refreshed, String> {
 }
 
 fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed, String> {
-    let nm_props = get_all(&conn, NM_PATH, NM_IFACE)?;
+    let nm_props = get_all(conn, NM_PATH, NM_IFACE)?;
     let wireless_enabled = prop_bool(&nm_props, "WirelessEnabled").unwrap_or(false);
 
-    let (saved_ssids, wired_paths, cellular_paths) = load_saved_connections(&conn)?;
+    let (saved_ssids, wired_paths, cellular_paths) = load_saved_connections(conn)?;
     let wired_available = !wired_paths.is_empty();
     let cellular_available = !cellular_paths.is_empty();
-    let cellular_active = cellular_is_active(&conn, &cellular_paths)?;
-    let vpns = load_vpns(&conn)?;
+    let cellular_active = cellular_is_active(conn, &cellular_paths)?;
+    let vpns = load_vpns(conn)?;
 
-    let device_paths = call_devices(&conn)?;
+    let device_paths = call_devices(conn)?;
     let mut access_points = Vec::new();
     let mut primary_wifi: Option<WifiDeviceState> = None;
     let mut primary_ethernet: Option<EthernetDeviceState> = None;
 
     for path in device_paths {
-        let device_props = get_all(&conn, &path, DEVICE_IFACE)?;
+        let device_props = get_all(conn, &path, DEVICE_IFACE)?;
         let device_type = prop_u32(&device_props, "DeviceType").unwrap_or(0);
         let interface = prop_str(&device_props, "Interface").unwrap_or_default();
         let state = prop_u32(&device_props, "State").unwrap_or(0);
         let ip4_path = prop_object_path(&device_props, "Ip4Config").unwrap_or_default();
 
         if device_type == NM_DEVICE_TYPE_WIFI {
-            if let Ok(wifi_props) = get_all(&conn, &path, DEVICE_WIFI_IFACE) {
+            if let Ok(wifi_props) = get_all(conn, &path, DEVICE_WIFI_IFACE) {
                 let active_ap = prop_object_path(&wifi_props, "ActiveAccessPoint").unwrap_or_default();
                 let aps = load_access_points(conn, &path, &active_ap, &saved_ssids)?;
                 access_points.extend(aps);
-                let signal = active_ap_strength(&conn, &active_ap);
-                let ssid = active_ap_ssid(&conn, &active_ap);
+                let signal = active_ap_strength(conn, &active_ap);
+                let ssid = active_ap_ssid(conn, &active_ap);
                 let connected = state == NM_DEVICE_STATE_ACTIVATED;
-                let resolving = state >= NM_DEVICE_STATE_PREPARE && state < NM_DEVICE_STATE_ACTIVATED;
+                let resolving = (NM_DEVICE_STATE_PREPARE..NM_DEVICE_STATE_ACTIVATED).contains(&state);
                 let candidate = WifiDeviceState {
                     interface,
                     connected,
@@ -341,7 +341,7 @@ fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed,
             }
         } else if device_type == NM_DEVICE_TYPE_ETHERNET {
             let connected = state == NM_DEVICE_STATE_ACTIVATED;
-            let resolving = state >= NM_DEVICE_STATE_PREPARE && state < NM_DEVICE_STATE_ACTIVATED;
+            let resolving = (NM_DEVICE_STATE_PREPARE..NM_DEVICE_STATE_ACTIVATED).contains(&state);
             let candidate = EthernetDeviceState {
                 interface,
                 connected,
@@ -368,14 +368,14 @@ fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed,
                     scanning,
                     ssid: wifi.ssid,
                     signal: wifi.signal,
-                    address: ipv4_address(&conn, &wifi.ip4_path),
+                    address: ipv4_address(conn, &wifi.ip4_path),
                     interface: wifi.interface,
                     kind: 3,
                     cellular_active,
                     wired_available,
                     cellular_available,
                 },
-                read_dns(&conn),
+                read_dns(conn),
             )
         } else {
             (
@@ -407,14 +407,14 @@ fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed,
                 scanning: false,
                 ssid: String::new(),
                 signal: 0,
-                address: ipv4_address(&conn, &eth.ip4_path),
+                address: ipv4_address(conn, &eth.ip4_path),
                 interface: eth.interface,
                 kind: 2,
                 cellular_active,
                 wired_available,
                 cellular_available,
             },
-            read_dns(&conn),
+            read_dns(conn),
         )
     } else {
         (
@@ -604,9 +604,10 @@ fn dedupe_access_points(aps: Vec<AccessPoint>) -> Vec<AccessPoint> {
     deduped
 }
 
-fn load_saved_connections(
-    conn: &Connection,
-) -> Result<(HashSet<String>, Vec<String>, Vec<String>), String> {
+/// Saved Wi-Fi SSIDs, wired profile paths, and cellular profile paths.
+type SavedConnections = (HashSet<String>, Vec<String>, Vec<String>);
+
+fn load_saved_connections(conn: &Connection) -> Result<SavedConnections, String> {
     let reply = nm_call(conn, SETTINGS_PATH, SETTINGS_IFACE, "ListConnections", &())?;
     let paths = reply
         .body()

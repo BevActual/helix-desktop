@@ -4,7 +4,7 @@
 //!
 //! Image generation is the separate `helix-image` crate (its ggml must not share a link with whisper).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     println!("cargo:rustc-check-cfg=cfg(helix_llama)");
@@ -20,7 +20,7 @@ fn main() {
     link_whisper(&root);
 }
 
-fn link_llama(root: &PathBuf) {
+fn link_llama(root: &Path) {
     let prefix = root.join("third_party/llama-install");
     let lib = prefix.join("lib64");
     if !lib.join("libllama.so").exists() {
@@ -48,7 +48,7 @@ fn link_llama(root: &PathBuf) {
     println!("cargo:rustc-link-lib=dylib=stdc++");
 }
 
-fn link_whisper(root: &PathBuf) {
+fn link_whisper(root: &Path) {
     let prefix = root.join("third_party/whisper-install");
     let lib = prefix.join("lib64");
     if !lib.join("libwhisper.a").exists() {

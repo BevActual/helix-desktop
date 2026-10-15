@@ -138,7 +138,7 @@ pub fn list(downloads: &Downloads, loaded: &[String]) -> Vec<Card> {
             bytes,
             memory_gb: 0.0,
             installed: true,
-            loaded: loaded.iter().any(|l| *l == name),
+            loaded: loaded.contains(&name),
             in_catalog: false,
             progress: None,
         });

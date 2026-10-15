@@ -93,7 +93,7 @@ fn main() -> ExitCode {
         }
         let plain = language == "auto"
             || ((2..=3).contains(&language.len())
-                && language.bytes().all(|c| (b'a'..=b'z').contains(&c)));
+                && language.bytes().all(|c| c.is_ascii_lowercase()));
         if !plain {
             return fail("bad language");
         }
@@ -114,8 +114,8 @@ fn main() -> ExitCode {
         }
         let mut samples = Vec::with_capacity(count as usize);
         let mut peak = 0.0f32;
-        for chunk in pcm_bytes.chunks_exact(2) {
-            let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
+        for chunk in pcm_bytes.as_chunks::<2>().0 {
+            let sample = i16::from_le_bytes(*chunk);
             let f = sample as f32 / 32768.0;
             peak = peak.max(f.abs());
             samples.push(f);

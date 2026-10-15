@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 pub type Argb = u32;
 
-const PI: f64 = 3.141592653589793;
+const PI: f64 = std::f64::consts::PI;
 
 #[derive(Clone, Copy)]
 struct Vec3 {

@@ -746,6 +746,7 @@ impl Agent {
 }
 
 impl Agent {
+    #[allow(clippy::too_many_arguments)]
     async fn run_shell_action(
         &self,
         emitter: &SignalEmitter<'_>,

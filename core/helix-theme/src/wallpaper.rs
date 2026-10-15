@@ -94,7 +94,9 @@ fn argb(color: Rgb) -> u32 {
 /// Quantize, drop low-chroma clusters (as matugen does), score, take the first ranked colour.
 fn extract_seed(rgb112: &[u8]) -> Rgb {
     let pixels: Vec<Rgb> = rgb112
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .map(|p| Rgb::new(p[0], p[1], p[2]))
         .collect();
     let mut result = QuantizerCelebi::quantize(&pixels, 128);
@@ -220,7 +222,7 @@ pub fn load_and_resize(path: &std::path::Path, scheme: Scheme) -> Result<Vec<u8>
         box_resize(rgba.as_raw(), width, height, SIDE, SIDE)
     };
     let mut rgb = Vec::with_capacity(SIDE * SIDE * 3);
-    for pixel in resized.chunks_exact(4) {
+    for pixel in resized.as_chunks::<4>().0 {
         rgb.extend_from_slice(&pixel[..3]);
     }
     Ok(rgb)

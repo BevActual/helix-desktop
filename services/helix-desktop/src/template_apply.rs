@@ -60,11 +60,10 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let state_dir = paths.settings_toml.parent()?.to_path_buf();
     let community_name = text("theme.community_palette").unwrap_or_default();
     let offline = flag("shell.offline_mode");
-    if source == PaletteSource::Community {
-        if !crate::palette_catalog::ensure_community_palette_cached(&state_dir, &community_name, offline) {
+    if source == PaletteSource::Community
+        && !crate::palette_catalog::ensure_community_palette_cached(&state_dir, &community_name, offline) {
             return None;
         }
-    }
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
@@ -184,57 +183,10 @@ pub fn reapply_templates(state: &mut State) -> Result<(), String> {
 #[cfg(test)]
 mod apply_integration_tests {
     use std::fs;
-    use std::path::Path;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::reapply_templates;
     use crate::state::State;
-
-    fn copy_tree(from: &Path, to: &Path) {
-        for entry in fs::read_dir(from).unwrap().flatten() {
-            let dest = to.join(entry.file_name());
-            if entry.file_type().unwrap().is_dir() {
-                fs::create_dir_all(&dest).unwrap();
-                copy_tree(&entry.path(), &dest);
-            } else {
-                if let Some(parent) = dest.parent() {
-                    fs::create_dir_all(parent).unwrap();
-                }
-                fs::copy(entry.path(), dest).unwrap();
-            }
-        }
-    }
-
-    fn temp_home(tag: &str) -> std::path::PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let home = std::env::temp_dir().join(format!("helix-desktop-{tag}-{nanos}"));
-        let _ = fs::remove_dir_all(&home);
-        for sub in ["cfg/helix", "state/helix", "data", "cache"] {
-            fs::create_dir_all(home.join(sub)).unwrap();
-        }
-        home
-    }
-
-    fn apply_test_env(home: &Path, assets: &Path) {
-        unsafe {
-            std::env::remove_var("HELIX_CONFIG_HOME");
-            std::env::remove_var("HELIX_STATE_HOME");
-            std::env::remove_var("HELIX_TEMPLATE_APPLY_CMD");
-            std::env::set_var("HOME", home);
-            std::env::set_var("XDG_CONFIG_HOME", home.join("cfg"));
-            std::env::set_var("XDG_STATE_HOME", home.join("state"));
-            std::env::set_var("XDG_DATA_HOME", home.join("data"));
-            std::env::set_var("XDG_CACHE_HOME", home.join("cache"));
-            std::env::set_var("HELIX_ASSETS_DIR", assets);
-        }
-    }
-
-    fn repo_root() -> std::path::PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-    }
+    use crate::testing::fixtures::{apply_test_env, copy_tree, repo_root, temp_home};
 
     #[test]
     fn wallpaper_source_applies_in_process_without_cpp_helper() {

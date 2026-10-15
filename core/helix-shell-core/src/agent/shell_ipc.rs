@@ -68,7 +68,7 @@ pub fn shell_socket_path() -> Option<PathBuf> {
         let modified = entry.metadata().and_then(|m| m.modified()).ok()?;
         found.push((modified, entry.path()));
     }
-    found.sort_by(|a, b| b.0.cmp(&a.0));
+    found.sort_by_key(|a| std::cmp::Reverse(a.0));
     for (_, path) in &found {
         if socket_answers(path) {
             return Some(path.clone());

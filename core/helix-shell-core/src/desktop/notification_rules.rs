@@ -227,7 +227,7 @@ pub fn validate(value: &Value) -> Result<Value, String> {
                         .map(|n| n as i64)
                 })
                 .ok_or("Invalid notification duration")?;
-            if number < -1 || number > 2_147_483_647 {
+            if !(-1..=2_147_483_647).contains(&number) {
                 return Err("Invalid notification duration".into());
             }
             rule["override_duration"] = json!(number);

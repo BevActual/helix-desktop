@@ -81,10 +81,6 @@ impl HelperSession {
         Ok(session)
     }
 
-    pub fn user_name(&self) -> &str {
-        self.user.name.as_ref()
-    }
-
     pub fn is_complete(&self) -> bool {
         self.complete
     }

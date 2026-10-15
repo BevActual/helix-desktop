@@ -189,7 +189,7 @@ fn kmeans_cluster(colors: &[Color], k: usize, iterations: usize) -> Vec<Cluster>
             count: cluster_counts[ci],
         })
         .collect();
-    results.sort_by(|a, b| b.count.cmp(&a.count)); // stable
+    results.sort_by_key(|r| std::cmp::Reverse(r.count)); // stable
     results
 }
 
@@ -296,7 +296,7 @@ fn score_count(input: &[(Color, i32)]) -> Vec<Scored> {
         .enumerate()
         .map(|(i, (_, entries))| (i, entries.iter().map(|e| e.count).sum()))
         .collect();
-    totals.sort_by(|a, b| b.1.cmp(&a.1)); // stable
+    totals.sort_by_key(|t| std::cmp::Reverse(t.1)); // stable
     let family_count = totals.len();
     let mut result = Vec::new();
     for (rank, (index, _)) in totals.iter().enumerate() {
@@ -329,7 +329,7 @@ fn score_dysfunctional(input: &[(Color, i32)]) -> Vec<Scored> {
         .enumerate()
         .map(|(i, (_, entries))| (i, entries.iter().map(|e| e.count).sum()))
         .collect();
-    totals.sort_by(|a, b| b.1.cmp(&a.1)); // stable
+    totals.sort_by_key(|t| std::cmp::Reverse(t.1)); // stable
 
     let dominant_center = family_center_hue(families[totals[0].0].0);
     let total_colorful: i32 = totals.iter().map(|t| t.1).sum();

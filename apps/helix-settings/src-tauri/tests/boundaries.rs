@@ -23,8 +23,9 @@ fn settings_holds_the_manager_role_only() {
         ".activity()",
         "RegisterDesktop",
         "SetEnabled",
-        // The model, and unsafe page habits.
-        "helix-inference",
+        // The model (Settings may install/restart the runtime service, but never call the
+        // org.helix.Inference bus), and unsafe page habits.
+        "org.helix.Inference",
         "WEBKIT_DISABLE",
         "innerHTML",
         "eval(",

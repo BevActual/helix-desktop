@@ -424,11 +424,7 @@ pub fn installation_base(installation: &str) -> PathBuf {
 }
 
 pub fn arch() -> &'static str {
-    match std::env::consts::ARCH {
-        "aarch64" => "aarch64",
-        "arm" => "arm",
-        other => other,
-    }
+    std::env::consts::ARCH
 }
 
 /// Candidate icon files for an application, best first.

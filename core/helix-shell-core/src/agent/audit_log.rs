@@ -83,7 +83,7 @@ impl AuditLog {
             Err(_) => return Vec::new(),
         };
         let mut records = Vec::new();
-        for line in BufReader::new(file).lines().flatten() {
+        for line in BufReader::new(file).lines().map_while(Result::ok) {
             if line.trim().is_empty() {
                 continue;
             }
@@ -166,7 +166,7 @@ fn civil_from_days(days: i32) -> (i32, u32, u32) {
 }
 
 fn days_from_civil(year: i32, month: u32, day: u32) -> Option<i32> {
-    if month < 1 || month > 12 || day < 1 || day > 31 {
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
     let y = year - if month <= 2 { 1 } else { 0 };

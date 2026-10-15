@@ -104,29 +104,6 @@ pub struct ModelInfo {
     pub vision: bool,
 }
 
-/// A message's content as one string for engines that take text: parts are joined, and each image part becomes `marker`.
-/// The images the content refers to are appended to `used`, in order.
-pub fn flatten_content(content: &Value, marker: &str, used: Option<&mut Vec<usize>>) -> String {
-    if let Some(text) = content.as_str() {
-        return text.to_string();
-    }
-    let mut out = String::new();
-    let mut used = used;
-    for part in content.as_array().into_iter().flatten() {
-        match part.get("type").and_then(Value::as_str) {
-            Some("text") => out.push_str(part.get("text").and_then(Value::as_str).unwrap_or("")),
-            Some("image") => {
-                out.push_str(marker);
-                if let Some(used) = used.as_deref_mut() {
-                    used.push(part.get("index").and_then(Value::as_u64).unwrap_or(0) as usize);
-                }
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
 pub type ProgressFn = Arc<dyn Fn(&str, f64) + Send + Sync>;
 
 pub trait Backend: Send + Sync {

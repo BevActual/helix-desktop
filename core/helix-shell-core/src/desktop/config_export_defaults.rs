@@ -161,7 +161,7 @@ pub fn write_notification_defaults() -> Toml {
     let mut table = toml::map::Map::new();
     table.insert(
         "background_opacity".to_string(),
-        Toml::Float(0.97000002861022949),
+        Toml::Float(0.970_000_028_610_229_5),
     );
     table.insert("border".to_string(), Toml::Boolean(true));
     table.insert("collapse_on_dismiss".to_string(), Toml::Boolean(true));
@@ -322,7 +322,7 @@ pub fn write_dock_defaults() -> Toml {
     table.insert("auto_hide".to_string(), Toml::Boolean(false));
     table.insert(
         "background_opacity".to_string(),
-        Toml::Float(0.87999999523162842),
+        Toml::Float(0.879_999_995_231_628_4),
     );
     table.insert("border".to_string(), Toml::String("outline".to_string()));
     table.insert("border_width".to_string(), Toml::Float(0.0));
@@ -330,8 +330,8 @@ pub fn write_dock_defaults() -> Toml {
     table.insert("cross_axis_padding".to_string(), Toml::Integer(8));
     table.insert("enabled".to_string(), Toml::Boolean(true));
     table.insert("icon_size".to_string(), Toml::Integer(48));
-    table.insert("inactive_opacity".to_string(), Toml::Float(0.85000002384185791));
-    table.insert("inactive_scale".to_string(), Toml::Float(0.85000002384185791));
+    table.insert("inactive_opacity".to_string(), Toml::Float(0.850_000_023_841_857_9));
+    table.insert("inactive_scale".to_string(), Toml::Float(0.850_000_023_841_857_9));
     table.insert("item_spacing".to_string(), Toml::Integer(6));
     table.insert(
         "launcher_custom_image".to_string(),
@@ -1052,7 +1052,10 @@ pub fn write_lockscreen_widgets_defaults() -> Toml {
     Toml::Table(table)
 }
 
-pub(crate) const PORTED_SCHEMA_WRITERS: &[(&str, fn() -> Toml)] = &[
+/// A root table name and the writer that produces its schema-default export.
+pub(crate) type ExportWriter = (&'static str, fn() -> Toml);
+
+pub(crate) const PORTED_SCHEMA_WRITERS: &[ExportWriter] = &[
     ("storage", write_storage_defaults),
     ("shell", write_shell_defaults),
     ("accessibility", write_accessibility_defaults),
@@ -1087,7 +1090,7 @@ pub(crate) fn schema_section_default_writer(section: &str) -> Option<fn() -> Tom
 }
 
 /// `config_export::serialize` root tables outside `config_sections.cpp`.
-pub(crate) const EXTRA_EXPORT_ROOT_WRITERS: &[(&str, fn() -> Toml)] = &[
+pub(crate) const EXTRA_EXPORT_ROOT_WRITERS: &[ExportWriter] = &[
     ("bar", write_bar_defaults),
     ("widget", write_widget_defaults),
     ("desktop_widgets", write_desktop_widgets_defaults),

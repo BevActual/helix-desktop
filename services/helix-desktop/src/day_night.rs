@@ -14,7 +14,7 @@ fn local_time() -> LocalTime {
             minute_of_day: tm.tm_hour * 60 + tm.tm_min,
             second: tm.tm_sec,
             day_of_year: tm.tm_yday + 1,
-            gmt_offset_secs: i64::from(tm.tm_gmtoff),
+            gmt_offset_secs: tm.tm_gmtoff,
         }
     }
 }

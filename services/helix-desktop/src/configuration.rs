@@ -153,7 +153,7 @@ fn apply_ordered_list_update(
         state
             .config
             .apply_ordered_list(id, validated)
-            .map_err(|message| fdo::Error::InvalidArgs(message))?;
+            .map_err(fdo::Error::InvalidArgs)?;
     }
     Ok(())
 }
@@ -352,7 +352,7 @@ impl Configuration {
         state
             .config
             .commit_remote_overrides(baseline, candidate)
-            .map_err(|message| fdo::Error::Failed(message))?;
+            .map_err(fdo::Error::Failed)?;
         drop(state);
         Self::changed(&emitter).await.ok();
         Ok(())

@@ -112,7 +112,7 @@ mod tests {
         assert!(store(&dir, b"").is_err());
         assert!(load(&dir, "../../etc/passwd").is_err());
         assert!(load(&dir, "0000000000000000").is_err());
-        remove(&dir, &[id.clone()]);
+        remove(&dir, std::slice::from_ref(&id));
         assert!(load(&dir, &id).is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }

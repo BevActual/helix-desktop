@@ -1,4 +1,4 @@
-"""protocols/dbus/org.helix.Desktop.xml is the D-Bus contract; cpp/desktop_api/protocol.h must agree with it."""
+"""Structural rules for the D-Bus contracts in protocols/dbus/ (the Rust catalog check lives in helix-desktop-api)."""
 import pathlib
 import re
 import sys
@@ -17,11 +17,6 @@ assert not set(drafts) & set(interfaces), "an interface cannot be both draft and
 # Other services' contracts (one file per bus name) get the same structural rules.
 others = load(root / "protocols/dbus/org.helix.Inference.xml")
 assert set(others) == {"org.helix.Inference1"}, others
-
-header = (root / "cpp/desktop_api/protocol.h").read_text()
-declared = set(re.findall(r'Interface = "(org\.helix\.Desktop\.[A-Za-z]+\d+)"', header))
-assert declared, "no interface constants found in protocol.h"
-assert declared == set(interfaces), f"protocol.h and XML disagree: {declared ^ set(interfaces)}"
 
 for name, node in {**interfaces, **drafts, **others}.items():
     assert re.fullmatch(r"org\.helix\.(Desktop\.)?[A-Z][A-Za-z]*\d+", name), f"{name}: needs a versioned name"

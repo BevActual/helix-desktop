@@ -27,7 +27,7 @@ pub fn dict_entry(fields: HashMap<&str, OwnedValue>) -> OwnedValue {
 }
 
 pub fn owned_to_json(value: &OwnedValue) -> Option<serde_json::Value> {
-    value_to_json(&**value)
+    value_to_json(value)
 }
 
 fn normalize_dict_key(key: &str) -> String {
@@ -73,7 +73,7 @@ fn value_to_json(value: &Value<'_>) -> Option<serde_json::Value> {
             }
             Some(serde_json::Value::Object(object))
         }
-        Value::Value(inner) => value_to_json(&**inner),
+        Value::Value(inner) => value_to_json(inner),
         _ => None,
     }
 }

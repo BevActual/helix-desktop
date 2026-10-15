@@ -21,7 +21,6 @@ pub enum PolkitError {
     FailedReason(String),
     Cancelled,
     NotSupported,
-    NotAuthorized,
 }
 
 #[derive(Debug, Deserialize, Serialize, Type)]
@@ -116,7 +115,6 @@ async fn run_authentication(
                     };
                     {
                         let session = Arc::clone(&session);
-                        let password = password;
                         tokio::task::spawn_blocking(move || {
                             session
                                 .lock()
