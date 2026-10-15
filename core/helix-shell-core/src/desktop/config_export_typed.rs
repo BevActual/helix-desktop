@@ -13,9 +13,11 @@ use super::config_export_defaults::{
 use super::config_export_rust::export_filtered_schema_section;
 use super::config_export_serialize::f32_bits;
 use super::config_export_typed_scalar::{
-    export_calendar_section_from_merged, export_hooks_section_from_merged,
-    export_location_section_from_merged, export_nightlight_section_from_merged,
-    export_tailscale_section_from_merged, export_weather_section_from_merged,
+    export_audio_section_from_merged, export_backdrop_section_from_merged,
+    export_brightness_section_from_merged, export_calendar_section_from_merged,
+    export_hooks_section_from_merged, export_location_section_from_merged,
+    export_nightlight_section_from_merged, export_tailscale_section_from_merged,
+    export_weather_section_from_merged,
 };
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -520,6 +522,9 @@ pub(crate) fn export_typed_schema_section(
         "tailscale" => Some(export_tailscale_section_from_merged(merged)),
         "location" => Some(export_location_section_from_merged(merged)),
         "hooks" => Some(export_hooks_section_from_merged(merged)),
+        "audio" => Some(export_audio_section_from_merged(merged)),
+        "backdrop" => Some(export_backdrop_section_from_merged(merged)),
+        "brightness" => Some(export_brightness_section_from_merged(merged)),
         _ => None,
     };
     if let Some(table) = struct_export {
