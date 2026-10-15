@@ -3,8 +3,8 @@
 //! Milestone B default tree: [`config_export_serialize::serialize_default_config`].
 //! Milestone C effective export: `merge_export_subtree` per `SCHEMA_EXPORT_SECTIONS` + `bar`,
 //! dynamic calendar/idle/bar/shell-provider passes, `merge_export_subtree` on `widget` / placement
-//! roots (placement `widget` tables deferred), residual leaf patch for anything else, then
-//! [`config_export_serialize::finalize_serialized_export`]. Future: typed
+//! roots (placement `widget` tables deferred), then [`config_export_serialize::finalize_serialized_export`].
+//! Future: typed
 //! `parseConfigTable` + `writeTable` (see `docs/design/config-export-rust.md`).
 
 use std::sync::OnceLock;
@@ -18,22 +18,6 @@ use super::config_export_defaults::{
 };
 use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
 use super::settings::{ConfigPaths, ConfigStore};
-
-fn export_root_section(path: &str) -> &str {
-    path.split('.').next().unwrap_or("")
-}
-
-fn is_parsed_export_section_path(path: &str) -> bool {
-    let section = export_root_section(path);
-    section == "bar" || SCHEMA_EXPORT_SECTIONS.contains(&section)
-}
-
-fn is_extra_export_root_path(path: &str) -> bool {
-    matches!(
-        export_root_section(path),
-        "widget" | "desktop_widgets" | "lockscreen_widgets"
-    )
-}
 
 fn default_export_root() -> &'static Toml {
     static ROOT: OnceLock<Toml> = OnceLock::new();
@@ -352,6 +336,10 @@ fn is_allowed_merged_extra_leaf(path: &str, merged: &Toml, default: &Toml) -> bo
     if !is_merged_leaf_exported(path, default) {
         return false;
     }
+    // Reject bogus two-level keys like `shell.list` (C++ parse ignores unknown fields).
+    if path.split('.').count() < 3 {
+        return false;
+    }
     let mut prefix = path;
     while let Some((parent, _)) = prefix.rsplit_once('.') {
         if dot_path_exists(default, parent) {
@@ -667,7 +655,13 @@ fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
 }
 
 /// Overlay merged config onto export defaults (C++ `parseConfigTable` + `writeTable` shape at the TOML layer).
-fn merge_export_subtree(template: &Toml, patch: &Toml) -> Toml {
+fn merge_export_subtree(
+    template: &Toml,
+    patch: &Toml,
+    merged: &Toml,
+    default: &Toml,
+    path_prefix: &str,
+) -> Toml {
     match (template, patch) {
         (Toml::Table(template_table), Toml::Table(patch_table)) => {
             if patch_table.is_empty() {
@@ -675,11 +669,28 @@ fn merge_export_subtree(template: &Toml, patch: &Toml) -> Toml {
             }
             let mut out = template_table.clone();
             for (key, patch_value) in patch_table {
-                let merged = match out.get(key) {
-                    Some(template_value) => merge_export_subtree(template_value, patch_value),
-                    None => patch_value.clone(),
+                let path = if path_prefix.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path_prefix}.{key}")
                 };
-                out.insert(key.clone(), merged);
+                let merged_value = match out.get(key) {
+                    Some(template_value) => merge_export_subtree(
+                        template_value,
+                        patch_value,
+                        merged,
+                        default,
+                        &path,
+                    ),
+                    None if is_allowed_merged_extra_leaf(&path, merged, default)
+                        || is_merged_widget_path(&path, merged)
+                        || is_allowed_extra_bar_path(&path, merged) =>
+                    {
+                        patch_value.clone()
+                    }
+                    None => continue,
+                };
+                out.insert(key.clone(), merged_value);
             }
             Toml::Table(out)
         }
@@ -812,7 +823,7 @@ fn rebuild_parsed_export_section(
     let section_root = match merged.get(section) {
         Some(merged_section) => {
             let overlay = merged_overlay_for_parsed_section(section, merged_section);
-            merge_export_subtree(&default_section, &overlay)
+            merge_export_subtree(&default_section, &overlay, merged, default, section)
         }
         None => default_section,
     };
@@ -931,7 +942,7 @@ fn merge_export_root_from_merged(
         .or_else(|| dot_path_get(default, section))
         .unwrap_or_else(writer);
     let overlay = merged_overlay_for_extra_export_root(section, merged_section);
-    let section_root = merge_export_subtree(&default_section, &overlay);
+    let section_root = merge_export_subtree(&default_section, &overlay, merged, default, section);
     if let Some(root_table) = root.as_table_mut() {
         root_table.insert(section.to_string(), section_root);
     }
@@ -1002,14 +1013,6 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     apply_bar_monitor_leaves_from_merged(&mut root, &merged, default);
     rebuild_launcher_providers_from_merged(&mut root, &merged);
     apply_deferred_parsed_section_leaves_from_merged(&mut root, &merged, default);
-    let mut leaves = Vec::new();
-    collect_leaf_paths(&merged, "", &mut leaves);
-    for path in leaves {
-        if is_parsed_export_section_path(&path) || is_extra_export_root_path(&path) {
-            continue;
-        }
-        apply_merged_export_leaf(&mut root, &path, &merged, default);
-    }
     sync_bar_radii_from_merged(&mut root, &merged);
     finalize_serialized_export(&mut root);
     root
@@ -1029,7 +1032,12 @@ mod tests {
         defaults.insert("on_startup".to_string(), Toml::Array(vec![]));
         let defaults = Toml::Table(defaults);
         let merged = Toml::Table(toml::map::Map::new());
-        assert_eq!(merge_export_subtree(&defaults, &merged), defaults);
+        let empty_merged = Toml::Table(toml::map::Map::new());
+        let empty_default = Toml::Table(toml::map::Map::new());
+        assert_eq!(
+            merge_export_subtree(&defaults, &merged, &empty_merged, &empty_default, "hooks"),
+            defaults
+        );
     }
 
     #[test]
