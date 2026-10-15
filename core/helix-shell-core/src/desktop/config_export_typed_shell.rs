@@ -7,8 +7,6 @@ use super::config_export_rust::{coerce_patch_value, merge_export_subtree, merged
 use super::config_export_serialize::f32_bits;
 use super::config_export_typed_scalar::overlay_known_leaves;
 
-const MERGE_SUBTREE_KEYS: &[&str] = &["keyboard_layout", "session"];
-
 const OVERLAY_SUBTREE_KEYS: &[&str] = &[
     "animation",
     "greeter_sync",
@@ -391,6 +389,136 @@ fn empty_table() -> Toml {
     Toml::Table(toml::map::Map::new())
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct ShellSessionExport {
+    grid: bool,
+    grid_columns: i64,
+    show_shortcuts: bool,
+    power: Toml,
+    actions: Toml,
+}
+
+impl ShellSessionExport {
+    fn export_defaults() -> Self {
+        Self::from_export_table(
+            write_shell_defaults()
+                .get("session")
+                .expect("shell.session defaults"),
+        )
+    }
+
+    fn from_export_table(table: &Toml) -> Self {
+        let table = table.as_table().expect("session table");
+        Self {
+            grid: table.get("grid").and_then(Toml::as_bool).unwrap_or(false),
+            grid_columns: table
+                .get("grid_columns")
+                .and_then(Toml::as_integer)
+                .unwrap_or(3),
+            show_shortcuts: table
+                .get("show_shortcuts")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            power: table.get("power").cloned().unwrap_or_else(empty_table),
+            actions: table.get("actions").cloned().unwrap_or(Toml::Array(vec![])),
+        }
+    }
+
+    fn from_merged(merged: &Toml, default: &Toml, shell_overlay: &Toml) -> Self {
+        let defaults = write_shell_defaults();
+        let session_defaults = defaults.get("session").expect("session");
+        let patch = shell_overlay
+            .get("session")
+            .cloned()
+            .unwrap_or_else(empty_table);
+        let empty = empty_table();
+        let mut patch_scalars = patch.as_table().cloned().unwrap_or_default();
+        patch_scalars.remove("power");
+        patch_scalars.remove("actions");
+        let mut table = overlay_known_leaves(session_defaults, &Toml::Table(patch_scalars));
+        let out_table = table.as_table_mut().expect("session export table");
+        let patch_table = patch.as_table();
+        let def_power = session_defaults.get("power").unwrap_or(&empty);
+        if patch_table.is_some_and(|table| table.contains_key("power")) {
+            let patch_power = patch.get("power").expect("power in patch");
+            out_table.insert(
+                "power".to_string(),
+                merge_export_subtree(
+                    def_power,
+                    patch_power,
+                    merged,
+                    default,
+                    "shell.session.power",
+                ),
+            );
+        }
+        let empty_actions = Toml::Array(vec![]);
+        let def_actions = session_defaults.get("actions").unwrap_or(&empty_actions);
+        if patch_table.is_some_and(|table| table.contains_key("actions")) {
+            let patch_actions = patch.get("actions").expect("actions in patch");
+            out_table.insert(
+                "actions".to_string(),
+                merge_export_subtree(
+                    def_actions,
+                    patch_actions,
+                    merged,
+                    default,
+                    "shell.session.actions",
+                ),
+            );
+        }
+        Self::from_export_table(&table)
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert("grid".to_string(), Toml::Boolean(self.grid));
+        table.insert("grid_columns".to_string(), Toml::Integer(self.grid_columns));
+        table.insert("show_shortcuts".to_string(), Toml::Boolean(self.show_shortcuts));
+        table.insert("power".to_string(), self.power.clone());
+        table.insert("actions".to_string(), self.actions.clone());
+        Toml::Table(table)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct ShellKeyboardLayoutExport {
+    table: Toml,
+}
+
+impl ShellKeyboardLayoutExport {
+    fn export_defaults() -> Self {
+        Self {
+            table: write_shell_defaults()
+                .get("keyboard_layout")
+                .expect("shell.keyboard_layout defaults")
+                .clone(),
+        }
+    }
+
+    fn from_merged(merged: &Toml, default: &Toml, shell_overlay: &Toml) -> Self {
+        let defaults = write_shell_defaults();
+        let default_sub = defaults.get("keyboard_layout").expect("keyboard_layout");
+        let patch = shell_overlay
+            .get("keyboard_layout")
+            .cloned()
+            .unwrap_or_else(empty_table);
+        Self {
+            table: merge_export_subtree(
+                default_sub,
+                &patch,
+                merged,
+                default,
+                "shell.keyboard_layout",
+            ),
+        }
+    }
+
+    fn write_export_table(&self) -> Toml {
+        self.table.clone()
+    }
+}
+
 fn overlay_subtree(defaults: &Toml, merged_shell: Option<&Toml>, key: &str) -> Toml {
     let default_sub = defaults.get(key).expect("shell subtree default");
     let merged_sub = merged_shell.and_then(|shell| shell.get(key));
@@ -446,18 +574,14 @@ pub(crate) fn export_shell_section_from_merged(merged: &Toml, default: &Toml) ->
         "launcher".to_string(),
         ShellLauncherExport::from_merged(merged, default, &overlay).write_export_table(),
     );
-
-    for key in MERGE_SUBTREE_KEYS {
-        let default_sub = default_table.get(*key).expect("shell subtree default");
-        let patch = overlay
-            .get(*key)
-            .cloned()
-            .unwrap_or_else(|| Toml::Table(toml::map::Map::new()));
-        out.insert(
-            (*key).to_string(),
-            merge_export_subtree(default_sub, &patch, merged, default, &format!("shell.{key}")),
-        );
-    }
+    out.insert(
+        "session".to_string(),
+        ShellSessionExport::from_merged(merged, default, &overlay).write_export_table(),
+    );
+    out.insert(
+        "keyboard_layout".to_string(),
+        ShellKeyboardLayoutExport::from_merged(merged, default, &overlay).write_export_table(),
+    );
 
     Toml::Table(out)
 }
@@ -467,6 +591,66 @@ mod tests {
     use super::*;
     use super::super::config_export_rust::export_filtered_schema_section;
     use super::super::config_export_serialize::serialize_default_config;
+
+    #[test]
+    fn session_and_keyboard_layout_match_full_merge() {
+        let default = serialize_default_config();
+        let shell_defaults = write_shell_defaults();
+        assert_eq!(
+            ShellSessionExport::export_defaults().write_export_table(),
+            shell_defaults.get("session").expect("session").clone(),
+        );
+        assert_eq!(
+            ShellKeyboardLayoutExport::export_defaults().write_export_table(),
+            shell_defaults
+                .get("keyboard_layout")
+                .expect("keyboard_layout")
+                .clone(),
+        );
+        let merged: Toml = toml::from_str(
+            r#"
+[shell.session]
+grid = true
+grid_columns = 4
+
+[[shell.session.actions]]
+action = "lock"
+enabled = false
+
+[shell.session.power]
+lid_close = "suspend"
+
+[shell.keyboard_layout]
+layout = "us"
+"#,
+        )
+        .unwrap();
+        let merged_shell = merged.get("shell").expect("shell");
+        let shell_overlay = merged_overlay_for_parsed_section("shell", merged_shell);
+        for (key, typed) in [
+            (
+                "session",
+                ShellSessionExport::from_merged(&merged, &default, &shell_overlay)
+                    .write_export_table(),
+            ),
+            (
+                "keyboard_layout",
+                ShellKeyboardLayoutExport::from_merged(&merged, &default, &shell_overlay)
+                    .write_export_table(),
+            ),
+        ] {
+            let default_sub = shell_defaults.get(key).unwrap();
+            let patch = shell_overlay.get(key).unwrap();
+            let via_merge = merge_export_subtree(
+                default_sub,
+                patch,
+                &merged,
+                &default,
+                &format!("shell.{key}"),
+            );
+            assert_eq!(typed, via_merge, "subtree {key}");
+        }
+    }
 
     #[test]
     fn launcher_export_matches_defaults_and_full_merge() {
