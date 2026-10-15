@@ -1,4 +1,4 @@
-//! CLI mirror of `helix-config-export` using the in-process Rust exporter.
+//! CLI for the in-process Rust config exporter (fixture regeneration and smoke checks).
 
 use std::process::ExitCode;
 

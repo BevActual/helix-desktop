@@ -33,7 +33,7 @@ shell keeps running until each replacement is at parity. This document records w
    command takes validated typed arguments.
 4. **Enter never approves; approval is armed after a delay (700 ms); closing/escaping denies.** Port the behaviour and its tests.
 5. **Tests prove behaviour, and are mutation-checked:** break the code, confirm the test fails. Unit-test state machines
-   with no UI in them (see `src/shell/assistant/assistant_session.*` and its test).
+   with no UI in them (see `core/helix-shell-core/src/apps/assistant.rs` and its tests).
 6. **Layering ratchet.** Pure logic in plain crates with no Tauri dependency; the Tauri crate is a thin face.
 
 ## Target layout

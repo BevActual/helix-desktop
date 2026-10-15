@@ -11,7 +11,7 @@ pub struct Interface {
     pub signals: Vec<String>,
 }
 
-/// Bus name and object path, the same constants as `src/desktop_api/protocol.h`.
+/// Bus name and object path for `org.helix.Desktop`.
 pub const BUS_NAME: &str = "org.helix.Desktop";
 pub const OBJECT_PATH: &str = "/org/helix/Desktop";
 
@@ -71,14 +71,7 @@ pub fn protocol_xml() -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_interfaces, protocol_xml, BUS_NAME, OBJECT_PATH};
-
-    #[test]
-    fn names_match_protocol_header() {
-        let header = include_str!("../../../src/desktop_api/protocol.h");
-        assert!(header.contains(&format!("\"{BUS_NAME}\"")));
-        assert!(header.contains(&format!("\"{OBJECT_PATH}\"")));
-    }
+    use super::{parse_interfaces, protocol_xml};
 
     #[test]
     fn xml_matches_the_rust_catalog() {

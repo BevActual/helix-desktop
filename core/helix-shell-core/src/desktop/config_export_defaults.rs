@@ -1,7 +1,7 @@
 //! Schema-default `writeTable` slices for `config_export::serialize` (milestone B).
 //!
-//! Section order matches `helix::config::schema::sections()` in
-//! `src/config/schema/config_sections.cpp`. Extra root tables (`bar`, `widget`,
+//! Section order matches the former C++ `helix::config::schema::sections()`
+//! (`config_sections.cpp`, removed). Extra root tables (`bar`, `widget`,
 //! `desktop_widgets`, `lockscreen_widgets`) are emitted after these sections in C++.
 
 use toml::Value as Toml;
@@ -417,7 +417,7 @@ pub fn write_shell_defaults() -> Toml {
         Toml::Table(table)
     });
     table.insert("keyboard_layout".to_string(), {
-        let mut table = toml::map::Map::new();
+        let table = toml::map::Map::new();
         Toml::Table(table)
     });
     table.insert("launcher".to_string(), {
@@ -434,7 +434,7 @@ pub fn write_shell_defaults() -> Toml {
         table.insert("show_icons".to_string(), Toml::Boolean(true));
         table.insert("sort_by_usage".to_string(), Toml::Boolean(true));
         table.insert("dmenu".to_string(), {
-            let mut table = toml::map::Map::new();
+            let table = toml::map::Map::new();
             Toml::Table(table)
         });
         table.insert("panels".to_string(), {
@@ -533,7 +533,7 @@ Toml::Array(vec![
         table.insert("grid_columns".to_string(), Toml::Integer(3));
         table.insert("show_shortcuts".to_string(), Toml::Boolean(true));
         table.insert("power".to_string(), {
-            let mut table = toml::map::Map::new();
+            let table = toml::map::Map::new();
             Toml::Table(table)
         });
         table.insert("actions".to_string(), {
@@ -900,7 +900,7 @@ Toml::Array(vec![
         table.insert("thickness".to_string(), Toml::Integer(34));
         table.insert("widget_spacing".to_string(), Toml::Integer(8));
         table.insert("dead_zone".to_string(), {
-            let mut table = toml::map::Map::new();
+            let table = toml::map::Map::new();
             Toml::Table(table)
         });
         table.insert("capsule_group".to_string(), {

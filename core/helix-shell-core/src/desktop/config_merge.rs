@@ -1,4 +1,4 @@
-//! `mergeConfigWithIncludes` parity for `config.toml` trees (`src/config/config_merge.cpp`).
+//! `mergeConfigWithIncludes` parity for `config.toml` trees (port of the former C++ `config_merge.cpp`).
 
 use std::collections::HashSet;
 use std::fs;

@@ -16,7 +16,7 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 
 **Apps have a React frontend** built by the npm workspace at the repo root (`apps/<app>/web`, `core/shared-ui/react`; see `frontend-stack.md`). A Rust-only checkout still builds: without `node_modules` the hand-written pages are used.
 
-**The session shell is Tauri** (`tools/switch-shell.sh install`). C++ session UI and GTK apps are deleted; `helix-service` stays in C++ under `src/desktop/`.
+**The session shell is Tauri** (`tools/switch-shell.sh install`). C++ session UI and GTK apps are deleted; `org.helix.Desktop` is Rust (`services/helix-desktop`). Remaining C++ under `cpp/` is config validation, inference glue, and agent policy units (`desktop-contract-tests.md` for bus behaviour).
 
 ## Build
 

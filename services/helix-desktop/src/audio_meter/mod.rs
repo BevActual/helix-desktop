@@ -60,10 +60,6 @@ impl AudioMeterManager {
         self.stop(owner);
     }
 
-    pub fn clear(&self) {
-        self.slots.lock().expect("audio meter slots").clear();
-    }
-
     /// Returns `(owner, source, peak, available)` for active leases after expiry cleanup.
     pub fn poll(&self) -> Vec<(String, u32, f64, bool)> {
         let now = Instant::now();

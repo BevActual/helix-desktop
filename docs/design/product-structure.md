@@ -62,10 +62,20 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `services/helix-wallpaper`, `helix-idle` | Small session helpers | Desktop bus name |
 | `greeter/` | Login only | Session shell surfaces |
 | `compositor/` | Display server (separate workspace) | Shell chrome |
-| `src/desktop/` | Agent/policy fixtures for contract tests (not a shipped service) | New UI |
-| `src/` (platform) | C++ `helix_core` config/validate, inference glue, contract-test fixtures | New session UI |
+| `services/helix-inference/native/` | Interim llama + whisper shims for Cargo bins | Session UI |
+| `services/helix-image/native/` | C stable-diffusion shim for the Cargo image worker | Session UI |
 | `tools/` | Install, nested e2e, layering checks | Product runtime |
 | `docs/design/` | Architecture + HIG | Generated dumps (`archive/`) |
+
+## Build ownership (how it works)
+
+| System | Builds | Install / run |
+|---|---|---|
+| **Cargo** (workspace root) | Session services, Tauri apps/shell, `helix-inference` + `helix-transcribe` + `helix-image`, theme, config export | `just install-rust-desktop`, `just build-inference`, `tools/install-inference.sh` |
+| **Meson** | Units, polkit policy, assets, llama engine install tag. No compiled platform C++ | `meson install` |
+| **compositor/** | Own Cargo workspace (niri fork) | Separate |
+
+Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Shrink `cpp/` until it is gone (`cpp-to-rust.md`).
 
 ## How it should function
 
@@ -90,7 +100,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-mobius/` |
 | `helix-wallpaper`, `helix-idle` | helpers | `services/` |
 | `helix-assistant` | Agent Surface client; never in the shell | `services/helix-assistant` |
-| `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (llama glue + workers still partly C++ under `src/inference/`) |
+| `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (+ `helix-transcribe` bin; interim native/ llama; Meson `helix-image` until ported) |
 | `helix-system-upgrade` | polkit-gated `dnf` plan helper | `services/helix-system-upgrade` |
 | Helix MCP server | MCP → Agent Surface for MCP-capable apps/agents | `tools/helix-agent/` |
 
@@ -99,16 +109,16 @@ Rules that stay true after cutover:
 - The **shell never holds Agent Surface grants** for the model. Assistant stays a separate process.
 - **Mobius never holds Agent Surface grants**; desktop act uses `Shell1.AssistantSubmit`.
 - Inference stays sandboxed and D-Bus activated (`assets/services/helix-inference.service.in` today).
-- New service binaries land under `services/`; `src/` shrinks until platform C++ is gone or isolated.
+- New service binaries land under `services/`. Platform `cpp/` is gone; the remaining C++ is the llama and image engine shims under `services/*/native/`.
 - Agentic fabric: `inference-fabric.md`.
 
 ## Structure tensions to resolve (active)
 
 | Tension | Today | Target |
 |---|---|---|
-| Theme | `core/helix-theme`, `services/helix-desktop` | C++ `src/theme/` removed; `src/config/theme/` for scheme validation only |
-| Inference workers | `helix-transcribe`, `helix-image`, llama shim in `src/inference/` | Rust or isolated crates; service shell already Rust |
-| Contract-test C++ | `desktop_service_test`, agent policy units in `src/desktop/` | Keep until fully duplicated in Rust, or freeze goldens and delete |
+| Theme | `core/helix-theme`, `services/helix-desktop` | Legacy C++ theme tree removed |
+| Inference workers | Rust `helix-transcribe` and `helix-image` crates; llama and image engine shims under `services/*/native/` | Replace those shims with Rust |
+| Agent policy C++ | **Deleted** | `helix-shell-core::agent` |
 | Greeter | Tauri scaffold | Full greetd product surface |
 | Doc drift | Soak + entry docs still mention C++ desktop | This file is the structure SoT; others link here |
 

@@ -1,5 +1,5 @@
 //! Risk tiers from `protocols/ipc/msg-risk.toml`. Unknown commands are Blocked (fail closed).
-//! Port of `helix::agent::RiskPolicy` (C++ `src/desktop/agent_policy.*`).
+//! Port of the former C++ `helix::agent::RiskPolicy` (`agent_policy.*`, removed).
 
 use std::collections::BTreeMap;
 

@@ -47,8 +47,6 @@ latitude = 47.6062
 longitude = -122.3321
 EOF
 HELIX_ASSETS_DIR="$ROOT/assets"
-# Default in-process theme (matches CI). Set HELIX_DISABLE_CPP_THEME_HELPERS=0 only to test a legacy HELIX_*_BIN override.
-export HELIX_DISABLE_CPP_THEME_HELPERS="${HELIX_DISABLE_CPP_THEME_HELPERS:-1}"
 "$BIN" &
 PID=$!
 trap 'kill "$PID" 2>/dev/null || true' EXIT

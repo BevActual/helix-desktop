@@ -27,11 +27,6 @@ impl RuntimeState {
         Self { path, data }
     }
 
-    /// Re-reads the file; used after an external helper (C++ `helix-template-apply`) updated it.
-    pub fn reload(&mut self) {
-        self.data = read_file(&self.path).unwrap_or_default();
-    }
-
     pub fn get_string(&self, owner: &str, key: &str) -> Option<&str> {
         match self.data.get(owner)?.get(key)? {
             Entry::String(text) => Some(text),

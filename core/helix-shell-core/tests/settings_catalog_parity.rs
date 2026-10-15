@@ -23,7 +23,7 @@ fn same_number(a: &Value, b: &Value) -> bool {
 }
 
 #[test]
-fn pristine_catalog_matches_cpp() {
+fn pristine_catalog_matches_golden() {
     let golden: Vec<Value> =
         serde_json::from_str(include_str!("golden/settings_catalog_defaults.json")).unwrap();
     let want = rows(&golden);

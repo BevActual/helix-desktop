@@ -3,8 +3,10 @@
 Status: living design + implementation notes. Wire contracts for Agent Surface / Inference1 live in
 `protocols/dbus/org.helix.Desktop.xml` (and related). `agentic-os.md` is the product north star;
 sections below mark what ships versus what is still open.
-Product homes: live under `src/assistant/` and `src/inference/`; target
-`services/helix-assistant` and `services/helix-inference` (`product-structure.md`).
+Product homes: `services/helix-assistant` and `services/helix-inference` (Rust).
+Speech worker is Cargo (`helix-transcribe`). Interim llama lives under
+`services/helix-inference/native/`; Meson still builds optional `helix-image`
+(`cpp/inference/image_*`) until that worker is Rust (`cpp-to-rust.md`).
 
 ## Why a second design
 
@@ -138,7 +140,7 @@ tests (`tools/nested/helix-desktop-agent-integration.sh`, CI job `helix-desktop-
 is the verified executable, plus the script path for interpreters, so two Python agents do not share grants.
 Known weak spot: an arbitrary binary named `helix-settings` could claim the manager role; sandboxing agent
 runners is the real fix (see the limit above). The C++ shell registers as confirmer and shows `agent-confirm`
-(`src/desktop/` (confirmation queue)): a queue (sanitized text, at most 8 pending and 3 per client, refused beyond that) and a panel
+(`cpp/desktop/` confirmation queue): a queue (sanitized text, at most 8 pending and 3 per client, refused beyond that) and a panel
 where Enter never approves, Escape denies, Allow stays disabled for 700 ms after each new request, grant tiers
 default to least privilege and closing the panel denies what is pending. It was checked in a nested helix-niri
 session with isolated state: a real access request opened the dialog and closing it denied the request. Not yet
@@ -223,7 +225,7 @@ in `assistant_main.cpp`; the service's `ListTools` and `--execute` apply the sam
 ## Implementation status: helix-inference
 
 `helix-inference` is a separate, D-Bus-activated process (`org.helix.Inference`, interface `org.helix.Inference1`,
-contract in `protocols/dbus/org.helix.Inference.xml`). The queue (`inference_queue`), the engine (`llama_backend`) and the
+contract in `protocols/dbus/org.helix.Inference.xml`). The queue (Rust `services/helix-inference`), the interim C++ engine (`llama_backend`) and the
 D-Bus layer (`inference_service`) are built and tested; `tests/inference_service_integration.py` drives the service with a
 scripted backend over a real bus (streaming, replies only to the requester, strict arguments, per-client limit, cancel,
 cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a real model.
@@ -291,7 +293,7 @@ It is a thin face over `helix-assistant --json`, which prints one JSON object pe
 - Enter never confirms (focus stays in the input, and a submit while a change is waiting is ignored), Do it is disabled
   for 700 ms after it appears, Escape backs out of a pending request before it closes the panel, and opening the panel
   always starts fresh.
-- The state machine (`src/assistant/assistant_session.*`) has no UI in it and is unit tested, including late answers
+- The state machine (`core/helix-shell-core/src/apps/assistant.rs`) has no UI in it and is unit tested, including late answers
   after cancel, a second yes, malformed output, and display-safety of model text. Mutation-checked.
 - Tried in a nested niri session on a private bus with the real 7B model: typing, "Thinking...", the confirmation, two
   stray Enter presses (nothing ran, audit empty), keyboard-driven Do it (ran through Agent Surface, audited as allowed), the

@@ -1,6 +1,6 @@
 //! One conversation with `helix-assistant`. No process and no widgets: a runner starts the
 //! assistant, and [`Session::deliver`] is how its output comes back. The rules match
-//! `src/shell/assistant/assistant_session.*`:
+//! Former C++ `assistant_session` (now Rust):
 //! a change runs only after confirm, and only the exact call that was shown;
 //! cancel or a newer request makes a late answer harmless;
 //! everything shown is display-safe.

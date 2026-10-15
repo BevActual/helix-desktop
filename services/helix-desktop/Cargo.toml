@@ -9,6 +9,10 @@ description = "Rust org.helix.Desktop service (migrating from C++ helix-service)
 name = "helix-desktop"
 path = "src/main.rs"
 
+[[bin]]
+name = "helix-fake-bluez"
+path = "src/bin/helix-fake-bluez.rs"
+
 [dependencies]
 helix-shell-core = { path = "../../core/helix-shell-core" }
 helix-theme = { path = "../../core/helix-theme" }

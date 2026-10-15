@@ -3,11 +3,15 @@ name = "helix-inference"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "org.helix.Inference: the sandboxed model service. Port of C++ src/inference (service, queue, routing, workers)."
+description = "org.helix.Inference: sandboxed model service + worker bins (Rust)."
 
 [[bin]]
 name = "helix-inference"
 path = "src/main.rs"
+
+[[bin]]
+name = "helix-transcribe"
+path = "src/bin/helix-transcribe.rs"
 
 [build-dependencies]
 cc = "1"

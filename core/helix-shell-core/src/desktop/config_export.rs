@@ -1,9 +1,8 @@
 //! Effective config for theme templates (`config.*`). Rust export is default ([`rust_export_toml`],
-//! `helix-rust-config-export` CLI). Legacy C++ export is opt-in via [`export_effective_toml`]’s
-//! `export_bin` / [`discover_config_export_bin`] for local parity tests. Milestone C
-//! (`parseConfigTable` → serialize) is tracked in `docs/design/config-export-rust.md`.
+//! `helix-rust-config-export` CLI). Milestone C (`parseConfigTable` → serialize) is tracked in
+//! `docs/design/config-export-rust.md`.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 use serde_json::Value;
@@ -58,41 +57,6 @@ pub fn discover_rust_config_export_bin() -> Option<PathBuf> {
     None
 }
 
-/// Locate legacy C++ `helix-config-export` (`HELIX_CONFIG_EXPORT_BIN`, build dirs).
-pub fn discover_config_export_bin() -> Option<PathBuf> {
-    if let Ok(path) = std::env::var("HELIX_CONFIG_EXPORT_BIN") {
-        if !path.is_empty() {
-            let candidate = PathBuf::from(path);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        for name in ["helix-config-export", "helix-config-export.exe"] {
-            if let Some(parent) = exe.parent() {
-                let sibling = parent.join(name);
-                if sibling.is_file() {
-                    return Some(sibling);
-                }
-            }
-        }
-        for ancestor in exe.ancestors() {
-            for subdir in ["", "build-debug", "build-fast", "_build"] {
-                let candidate = if subdir.is_empty() {
-                    ancestor.join("helix-config-export")
-                } else {
-                    ancestor.join(subdir).join("helix-config-export")
-                };
-                if candidate.is_file() {
-                    return Some(candidate);
-                }
-            }
-        }
-    }
-    None
-}
-
 /// `config_export::serialize(makeDefaultConfig())` (milestone B).
 pub fn default_export_toml() -> Toml {
     serialize_default_config()
@@ -113,71 +77,15 @@ pub fn rust_export_from_store(store: &ConfigStore) -> Option<Toml> {
     config_export_rust::rust_export_from_store(store)
 }
 
-/// Run `helix-config-export` and parse stdout as TOML.
-pub fn cpp_export_toml(paths: &ConfigPaths, bin: &Path) -> Option<Toml> {
-    let mut command = Command::new(bin);
-    configure_export_env(&mut command, paths);
-    let output = command.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let text = String::from_utf8(output.stdout).ok()?;
-    text.parse().ok()
-}
-
-/// Effective export TOML: in-process Rust when patchable; else C++ only when `export_bin` is set.
-pub fn export_effective_toml(store: &ConfigStore, export_bin: Option<&Path>) -> Option<Toml> {
-    if let Some(root) = rust_export_from_store(store) {
-        return Some(root);
-    }
-    export_bin.and_then(|bin| cpp_export_toml(store.paths(), bin))
+/// Effective export TOML from the in-process Rust exporter.
+pub fn export_effective_toml(store: &ConfigStore) -> Option<Toml> {
+    rust_export_from_store(store)
 }
 
 /// `config_export::serialize` JSON when export succeeds; else merged TOML JSON.
-pub fn template_config_for_apply(store: &ConfigStore, export_bin: Option<&Path>) -> Value {
-    if let Some(root) = export_effective_toml(store, export_bin) {
+pub fn template_config_for_apply(store: &ConfigStore) -> Value {
+    if let Some(root) = export_effective_toml(store) {
         return toml_to_json_value(&root);
     }
     store.template_config_table()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn temp_root() -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("helix-core-export-{nanos}"))
-    }
-
-    #[test]
-    fn cpp_export_matches_schema_bar_root() {
-        let Some(bin) = discover_config_export_bin() else {
-            eprintln!("skip cpp_export_matches_schema_bar_root: helix-config-export not built");
-            return;
-        };
-        let root = temp_root();
-        let config_dir = root.join("cfg").join("helix");
-        let state_dir = root.join("state").join("helix");
-        fs::create_dir_all(&config_dir).unwrap();
-        fs::create_dir_all(&state_dir).unwrap();
-        fs::write(config_dir.join("config.toml"), "[theme]\nmode = \"dark\"\n").unwrap();
-        fs::write(state_dir.join("settings.toml"), "").unwrap();
-
-        let paths = ConfigPaths {
-            config_dir,
-            settings_toml: state_dir.join("settings.toml"),
-        };
-        let exported = cpp_export_toml(&paths, &bin).expect("export");
-        assert!(exported.get("bar").is_some());
-        let store = ConfigStore::load(paths);
-        assert!(store.template_config_table().get("bar").is_none());
-        let _ = fs::remove_dir_all(root);
-    }
 }

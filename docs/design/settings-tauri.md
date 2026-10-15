@@ -13,7 +13,7 @@ service still owns the setting (theme mode, night light, key chords, …).
 - A separate Tauri 2 application, one window (a normal toplevel, not a layer surface), its own process, started on demand and gone when
   closed, so it costs nothing while closed (the shell's budget is for the shell).
 - Installed as `helix-settings` (replacing the C++ binary) because the service recognises the Agent Surface *manager* by that executable name.
-  **That check must be tightened first** (`src/desktop/agent_endpoint.cpp:271` compares only the file name: any file called
+  **That check must be tightened first** (legacy C++ agent endpoint compared only the file name: any file called
   `helix-settings` qualifies). It should compare the canonical path with the installed locations (`/usr/local/bin`, `/usr/bin`), with a
   test-only environment override.
 - Started by `helix-panel settings` (and the shell's Settings entries); a second start asks the running one to show a page

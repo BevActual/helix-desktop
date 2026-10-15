@@ -66,21 +66,15 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 
 The approval dialog and the greeter are hand-written HTML/CSS/JS with no build step; the shell is moving to React in slices. Rules and status: `docs/design/frontend-stack.md`.
 
-### C++ platform (desktop service / assistant / inference — shrinking)
+### Meson
+
+Meson installs units, policies, and assets. It does not compile platform C++. Session services, config, theme, and inference workers are Cargo.
 
 | Layer | Library |
 |-------|---------|
-| IPC and service runtime | `sdbus-c++`, `glib-2.0`, `gobject-2.0`, `gio-2.0` |
-| Wayland helpers (service) | `libwayland-client`, `wayland-protocols` |
-| Audio | `libpipewire-0.3`, `wireplumber-0.5`, `libsndfile` |
-| Authentication | `PAM`, `polkit-agent-1`, `polkit-gobject-1` |
-| Credentials and encryption | `libsecret-1`, `libsodium` |
-| HTTP | `libcurl` |
-| Config | `tomlplusplus` |
-| JSON | `nlohmann/json` |
-| Theme generation | Material Color Utilities (vendored) |
-| Images (service helpers) | `libwebp`, `libjxl`, `librsvg` |
-| Memory allocation | `jemalloc` (optional) |
+| Config export and validation | Rust (`helix-shell-core`) |
+| Theme generation | Rust (`helix-theme`, vendored `material-colors`) |
+| Desktop bus | Rust (`helix-desktop`) |
 
 ## Runtime Assets
 
@@ -186,8 +180,8 @@ python3 tools/i18n-check.py
 ## Project Layout
 
 ```text
-src/
-  main.cpp          Entry point
+cpp/                C++ platform library (config, inference glue, tests); session UI is Rust/Tauri
+  (no main.cpp)     helix_core static lib only
   app/              Application bootstrap, main loop, poll sources
   auth/             PAM and fingerprint authentication
   calendar/         CalDAV, Google Calendar, iCalendar parsing, polling
@@ -253,7 +247,7 @@ src/
     wallpaper/      Wallpaper surfaces, paths, picker panel
     widgets_editor/ Background widget editor
   system/           Desktop entries, brightness, weather, location, system monitor, hardware services
-  theme/            Palette generation, templates, theme service, template application
+  config/theme/     Scheme tokens and color roles (runtime theme: core/helix-theme)
   time/             Time service and polling
   ui/
     controls/       Reusable controls (Button, Input, Label, Select, Slider, Box, ...)

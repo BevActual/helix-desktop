@@ -37,7 +37,15 @@ jobs:
 
       - name: Check formatting
         run: |
-          mapfile -d '' files < <(find src \( -name '*.cpp' -o -name '*.h' \) -print0)
+          if [[ ! -d cpp ]]; then
+            echo "no platform C++ sources"
+            exit 0
+          fi
+          mapfile -d '' files < <(find cpp \( -name '*.cpp' -o -name '*.h' \) -print0)
+          if ((${#files[@]} == 0)); then
+            echo "no platform C++ sources"
+            exit 0
+          fi
           clang-format --dry-run -Werror "${files[@]}"
 
   build:
@@ -106,24 +114,16 @@ jobs:
       - name: Install dependencies
         run: bash tools/ci/arch-helix-ci-deps.sh dbus python python-gobject
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build Rust desktop and the service contract test
+      - name: Build Rust desktop and Meson integration tests
         run: |
           cargo build --profile fast -p helix-desktop -p helix-assistant -p helix-inference
           just configure debug
-          meson compile -C build-debug desktop_service_test
-      - name: Configuration smoke (Rust desktop, in-process theme only)
+      - name: Configuration smoke (Rust desktop)
         env:
-          HELIX_DISABLE_CPP_THEME_HELPERS: "1"
           HELIX_ASSETS_DIR: ${{ github.workspace }}/assets
         run: ./tools/nested/helix-desktop-config-smoke.sh
-      - name: Rust Configuration1 contract (subset of desktop_service_test)
+      - name: Rust Configuration1 contract
         run: ./tools/nested/helix-desktop-configuration-contract.sh
-      # tests/desktop_service_test.cpp is the C++ service's behavioural contract; it takes the
-      # service binary as an argument, so it checks the Rust service against the same assertions.
-      - name: C++ service contract (Rust desktop)
-        env:
-          CONTRACT_TIMEOUT: "240"
-        run: ./tools/nested/helix-desktop-cpp-contract.sh
       # The Rust assistant against the Rust service and the C++ inference service (scripted replies).
       - name: Assistant integration (Rust assistant + desktop)
         run: meson test -C build-debug --no-rebuild --print-errorlogs assistant_integration

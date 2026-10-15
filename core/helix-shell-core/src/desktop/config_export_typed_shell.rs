@@ -51,6 +51,7 @@ struct ShellScreenRecordExport {
 }
 
 impl ShellScreenRecordExport {
+    #[cfg(test)]
     fn export_defaults() -> Self {
         Self::from_export_table(
             write_shell_defaults()
@@ -128,6 +129,7 @@ struct ShellScreenshotExport {
 }
 
 impl ShellScreenshotExport {
+    #[cfg(test)]
     fn export_defaults() -> Self {
         Self::from_export_table(
             write_shell_defaults()
@@ -259,6 +261,7 @@ struct ShellLauncherExport {
 }
 
 impl ShellLauncherExport {
+    #[cfg(test)]
     fn export_defaults() -> Self {
         Self::from_export_table(
             write_shell_defaults()
@@ -399,6 +402,7 @@ struct ShellSessionExport {
 }
 
 impl ShellSessionExport {
+    #[cfg(test)]
     fn export_defaults() -> Self {
         Self::from_export_table(
             write_shell_defaults()
@@ -487,6 +491,7 @@ struct ShellKeyboardLayoutExport {
 }
 
 impl ShellKeyboardLayoutExport {
+    #[cfg(test)]
     fn export_defaults() -> Self {
         Self {
             table: write_shell_defaults()
@@ -564,6 +569,7 @@ struct ShellRootScalarsExport {
 }
 
 impl ShellRootScalarsExport {
+    #[cfg(test)]
     fn export_defaults() -> Self {
         Self::from_scalar_table(shell_scalar_defaults_table())
     }
@@ -731,6 +737,7 @@ impl ShellRootScalarsExport {
     }
 }
 
+#[cfg(test)]
 fn shell_scalar_defaults_table() -> toml::map::Map<String, Toml> {
     ShellRootScalarsExport::shell_scalar_defaults()
 }

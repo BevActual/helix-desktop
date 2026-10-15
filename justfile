@@ -3,7 +3,6 @@ set positional-arguments
 mode := "debug"
 build-dir := "build-" + mode
 prefix := "/usr/local"
-cpp-std := "c++23"
 
 default:
     @just --list
@@ -11,7 +10,7 @@ default:
 configure m=mode install_prefix=prefix:
     #!/usr/bin/env bash
     set -euo pipefail
-    args=(--buildtype={{ if m == "release" { "release" } else { "debug" } }} -Dcpp_std={{cpp-std}} -Dtests=auto)
+    args=(--buildtype={{ if m == "release" { "release" } else { "debug" } }} -Dtests=auto)
     [[ "{{m}}" == "release" ]] && args+=(-Db_lto=true)
     [[ "{{m}}" == "asan"    ]] && args+=(-Db_sanitize=address,undefined)
     if [[ -d "build-{{m}}" ]]; then
@@ -21,19 +20,21 @@ configure m=mode install_prefix=prefix:
     fi
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
+# Cargo owns session services, config export, and inference workers.
 build m=mode: (_ensure-configured m)
-    # Meson: `helix_core` only (wallpaper scheme validation in `src/config/theme/`).
-    meson compile -C build-{{m}} helix_core_base
     cargo build -p helix-shell-core --bin helix-rust-config-export
+
+# Inference fabric, speech worker, and image worker (engines optional).
+build-inference profile="fast":
+    cargo build --profile {{profile}} -p helix-inference --bin helix-inference --bin helix-transcribe
+    cargo build --profile {{profile}} -p helix-image
 
 # Rust template-engine driver for `core/helix-theme/tools/regen_golden_template.sh`.
 build-theme-golden:
     cargo build -p helix-theme --bin gen-golden-template
 
-# Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
+# Desktop service. Live session and apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
-    mkdir -p build-{{m}}/helix-tmp
-    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix_core_base -j {{jobs}}
     cargo build -p helix-shell-core --bin helix-rust-config-export
 
 # Legacy GTK Settings only (needs -Ddesktop_apps=enabled). Prefer: (cargo build -p helix-settings)
@@ -49,10 +50,8 @@ _ensure-configured m=mode:
         exit 0
     fi
     configure_output="$(meson configure "build-{{m}}")"
-    current_cpp_std="$(awk '$1 == "cpp_std" { print $2; found=1 } END { if (!found) exit 1 }' <<<"$configure_output")"
     current_tests="$(awk '$1 == "tests" { print $2; found=1 } END { if (!found) exit 1 }' <<<"$configure_output")"
     args=()
-    [[ "$current_cpp_std" != "{{cpp-std}}" ]] && args+=(-Dcpp_std={{cpp-std}})
     [[ "$current_tests" != "auto" ]] && args+=(-Dtests=auto)
     if (( ${#args[@]} > 0 )); then
         meson configure "build-{{m}}" "${args[@]}"
@@ -85,7 +84,7 @@ install m:
     # The Rust helix-desktop is the org.helix.Desktop owner (the unit and activation file run it).
     just install-rust-desktop {{m}}
 
-# Build and install the Rust org.helix.Desktop service next to the meson-installed binaries.
+# Build and install Rust session services (Desktop, assistant, inference + workers, upgrade helper).
 install-rust-desktop m:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -98,9 +97,14 @@ install-rust-desktop m:
     install -Dm755 target/release/helix-desktop "${DESTDIR:-}${prefix}/helix-desktop"
     install -Dm755 target/release/helix-assistant "${DESTDIR:-}${prefix}/helix-assistant"
     install -Dm755 target/release/helix-inference "${DESTDIR:-}${prefix}/helix-inference"
+    if [[ -x target/release/helix-transcribe ]]; then
+        install -Dm755 target/release/helix-transcribe "${DESTDIR:-}${prefix}/helix-transcribe"
+    else
+        echo "note: helix-transcribe not built (needs third_party/whisper-install); skipping" >&2
+    fi
     libexec=$(meson introspect "build-{{m}}" --buildoptions | python3 -c 'import json,sys; o={x["name"]:x["value"] for x in json.load(sys.stdin)}; print(o["prefix"] + "/" + o["libexecdir"])')
     install -Dm755 target/release/helix-system-upgrade "${DESTDIR:-}${libexec}/helix-system-upgrade"
-    echo "installed ${DESTDIR:-}${prefix}/{helix-desktop,helix-assistant,helix-inference} and ${DESTDIR:-}${libexec}/helix-system-upgrade"
+    echo "installed ${DESTDIR:-}${prefix}/{helix-desktop,helix-assistant,helix-inference[,helix-transcribe]} and ${DESTDIR:-}${libexec}/helix-system-upgrade"
 
 uninstall m:
     #!/usr/bin/env bash
@@ -112,19 +116,24 @@ uninstall m:
     ninja -C build-{{m}} uninstall
 
 format:
-    find src tests \( -name '*.cpp' -o -name '*.h' \) -print0 | xargs -0 clang-format -i
-    find src tests \( -name '*.cpp' -o -name '*.h' \) -print0 | xargs -0 grep -ZlP '\s+$' | xargs -0 -r sed -i 's/[[:space:]]*$//'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -d cpp ]]; then
+        echo "no platform C++ sources"
+        exit 0
+    fi
+    find cpp tests \( -name '*.cpp' -o -name '*.h' \) -print0 | xargs -0 -r clang-format -i
+    find cpp tests \( -name '*.cpp' -o -name '*.h' \) -print0 | xargs -0 -r grep -ZlP '\s+$' | xargs -0 -r sed -i 's/[[:space:]]*$//'
 
 _clang_tidy m=mode *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    meson compile -C "build-{{m}}" wayland-protocol-headers
-    src_root="$(realpath src)"
-    # compile_commands.json stores build-relative paths, so clang-tidy emits header
-    # diagnostics as ../src/...; the header-filter must match that form (an absolute
-    # ^${src_root} anchor never matches, silently dropping every header diagnostic).
-    # ../src/ also excludes vendored third_party/*/src/* headers.
-    run-clang-tidy -quiet -use-color -p "build-{{m}}" -j "$(nproc)" -header-filter='\.\./src/.*' {{args}} "^${src_root}/.*"
+    if [[ ! -d cpp ]]; then
+        echo "no platform C++ sources"
+        exit 0
+    fi
+    cpp_root="$(realpath cpp)"
+    run-clang-tidy -quiet -use-color -p "build-{{m}}" -j "$(nproc)" -header-filter='\.\./cpp/.*' {{args}} "^${cpp_root}/.*"
 
 lint m=mode: (_ensure-configured m)
     just _clang_tidy {{m}} '-warnings-as-errors=*'

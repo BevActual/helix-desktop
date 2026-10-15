@@ -31,9 +31,9 @@ Split processes: `helix-shell-strut` (exclusive zone) + `helix-shell-bar` (`HELI
 | Area | Location | Notes |
 |------|----------|-------|
 | Desktop authority | `services/helix-desktop` | `org.helix.Desktop`; unit `helix-service.service` runs `helix-desktop` |
-| Assistant / inference | `services/helix-assistant`, `services/helix-inference` | D-Bus processes are Rust; llama glue + `helix-transcribe` / `helix-image` workers under `src/inference/` |
-| Theme | `core/helix-theme` + `helix-desktop` | C++ `src/theme/` removed; see `cpp-to-rust.md` |
-| Contract tests | `tests/desktop_service_test.cpp`, `services/helix-desktop/tests/configuration_contract.rs` | C++ integration test + growing Rust Configuration1 contract (`tools/nested/helix-desktop-configuration-contract.sh`) |
+| Assistant / inference | `services/helix-assistant`, `services/helix-inference` | Rust; `helix-transcribe` is Cargo; Meson still builds optional `helix-image` |
+| Theme | `core/helix-theme` + `helix-desktop` | Legacy C++ theme tree removed; see `cpp-to-rust.md` |
+| Contract tests | `services/helix-desktop/tests/contract/` | Rust bus harness; `helix-fake-bluez`; see `desktop-contract-tests.md` |
 
 See `product-structure.md` and `cpp-to-rust.md`.
 
@@ -51,8 +51,8 @@ dev/                  nested probes only
 target/               cargo output (fast/release)
 protocols/            D-Bus + IPC contracts (source of truth)
 tools/                switch-shell, nested e2e, helpers
-src/desktop/          contract-test fixtures (agent policy, tool schema)
-src/inference/        llama glue + transcribe/image workers (service is services/helix-inference)
+services/helix-inference/  service + helix-transcribe + native/ llama|whisper
+cpp/inference/             Meson helix-image sources only (temporary)
 assets/               icons, templates, translations
 docs/design/          architecture + HIG; see README.md; archive/ is retired dumps
 ```

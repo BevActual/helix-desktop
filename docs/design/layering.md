@@ -1,6 +1,6 @@
 # Source layering
 
-`src/` is checked for dependency direction by `tools/check-layers.py` (meson test `layering`). Rules and module
+`cpp/` is checked for dependency direction by `tools/check-layers.py` (meson test `layering`). Rules and module
 assignments live in `tools/layers.toml`; today's known violations are in `tools/layers-baseline.txt`.
 
 ## Layers
@@ -16,7 +16,7 @@ A module may include its own layer and the layers below it.
 
 `desktop` (the desktop service), `inference` (the model runtime) and `apps` (Settings, Software, System Monitor) are **independent processes**. They may
 include base, platform and each other, never display or shell, so they can run without the shell. They currently have
-no violations. `desktop_api` is the client library for the service (protocol, client, display text); every process uses it.
+no violations. `desktop_api` holds wire constants (`protocol.h`), peer identity helpers, and display text; Rust/Tauri apps use `helix-desktop-api` on the bus.
 
 ## The ratchet
 
@@ -29,7 +29,7 @@ no violations. `desktop_api` is the client library for the service (protocol, cl
 
 The baseline went from 106 to **10**. Moves, in the order they were made:
 
-- `desktop_api/`: the client library for the desktop service (protocol, client, display text, route table, network proxy).
+- `desktop_api/`: protocol constants, peer identity, display text (C++ `DesktopClient` removed; bus clients are Rust).
 - `core/`: `poll_source.h` and `color.h` (27 modules reached up for them), `motion_durations.h`, `style_defaults.h`,
   `image_decoder` and `image_orientation`, `input/keybind_action.h`, `input/text_input_client.h`.
 - `config/theme/color_roles`: `ColorRole`, `ColorSpec`, `Palette` and the role/token helpers (plain data).

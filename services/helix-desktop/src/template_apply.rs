@@ -1,17 +1,14 @@
 //! Theme template reapply for Rust `helix-desktop` (`TemplateApplyService` parity).
 
-use std::path::Path;
 use std::process::Command;
 
-use helix_shell_core::desktop::compositor_ipc;
 use helix_shell_core::desktop::settings::active_icon_theme_name;
-use helix_shell_core::ConfigStore;
 use helix_theme::apply::{self, ApplyInputs, CommunityTemplate, Outcome};
 use helix_theme::custom::{resolve_palette, PaletteSource, ThemeSelection};
 use helix_theme::template::make_theme_data;
 use helix_theme::transform::apply_resolved_transforms;
 
-use crate::assets_path::{builtin_templates_root, helix_assets_dir, helix_template_apply_bin};
+use crate::assets_path::{builtin_templates_root, helix_assets_dir};
 use crate::state::State;
 
 const STATE_OWNER: &str = "theme_templates";
@@ -176,121 +173,11 @@ pub fn reapply_templates(state: &mut State) -> Result<(), String> {
         }
     }
 
-    // Like a successful helper run, an in-process apply does not reload niri itself; the
-    // templates' own hooks do that.
-    if crate::assets_path::cpp_theme_helpers_disabled() {
-        return match apply_in_process(state) {
-            Some(result) => result,
-            None => Err(
-                "Template apply is not supported for this theme configuration in-process".into(),
-            ),
-        };
-    }
-
-    if let Some(result) = apply_in_process(state) {
-        return result;
-    }
-
-    let config = &state.config;
-    if run_cpp_template_apply()? {
-        tracing::info!("template apply: completed via helix-template-apply");
-        state.runtime.reload();
-        return Ok(());
-    }
-
-    if helix_template_apply_bin().is_none() {
-        tracing::warn!(
-            "template apply: helix-template-apply not found after in-process path declined; running builtin post-hooks only"
-        );
-    }
-
-    if std::env::var_os("NIRI_SOCKET").is_some() {
-        compositor_ipc::reload_config();
-    }
-
-    run_builtin_post_hooks(config)?;
-
-    Ok(())
-}
-
-fn run_cpp_template_apply() -> Result<bool, String> {
-    let Some(bin) = helix_template_apply_bin() else {
-        return Ok(false);
-    };
-    let mut command = Command::new(&bin);
-    if let Some(assets) = helix_assets_dir() {
-        command.env("HELIX_ASSETS_DIR", assets);
-    }
-    let output = command.output().map_err(|error| error.to_string())?;
-    if output.status.success() {
-        return Ok(true);
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let message = stderr.trim();
-    if message.is_empty() {
-        Err("template apply failed".into())
-    } else {
-        Err(message.lines().last().unwrap_or(message).to_string())
-    }
-}
-
-fn enabled_builtin_template_ids(config: &ConfigStore) -> Vec<String> {
-    if !config
-        .get("theme.templates.enable_builtin_templates")
-        .as_bool()
-        .unwrap_or(true)
-    {
-        return Vec::new();
-    }
-    config
-        .get_raw_list("theme.templates.builtin_ids")
-        .and_then(|value| value.as_array().cloned())
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn run_script(apply_sh: &Path) -> Result<(), String> {
-    let status = Command::new("bash")
-        .arg(apply_sh)
-        .arg("apply")
-        .status()
-        .map_err(|error| error.to_string())?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("template hook failed: {}", apply_sh.display()))
-    }
-}
-
-/// Runs shipped `assets/templates/<id>/apply.sh apply` for enabled built-in template ids.
-fn run_builtin_post_hooks(config: &ConfigStore) -> Result<(), String> {
-    let Some(assets) = helix_assets_dir() else {
-        return Ok(());
-    };
-    let root = builtin_templates_root(&assets);
-    let mut failures = Vec::new();
-    for id in enabled_builtin_template_ids(config) {
-        let script = root.join(&id).join("apply.sh");
-        if !script.is_file() {
-            continue;
-        }
-        if let Err(error) = run_script(&script) {
-            tracing::warn!(template = %id, %error, "builtin template post_hook failed");
-            failures.push(id);
-        }
-    }
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
-            "failed to apply built-in templates: {}",
-            failures.join(", ")
-        ))
+    match apply_in_process(state) {
+        Some(result) => result,
+        None => Err(
+            "Template apply is not supported for this theme configuration in-process".into(),
+        ),
     }
 }
 
@@ -336,14 +223,12 @@ mod apply_integration_tests {
             std::env::remove_var("HELIX_CONFIG_HOME");
             std::env::remove_var("HELIX_STATE_HOME");
             std::env::remove_var("HELIX_TEMPLATE_APPLY_CMD");
-            std::env::remove_var("HELIX_TEMPLATE_APPLY_BIN");
             std::env::set_var("HOME", home);
             std::env::set_var("XDG_CONFIG_HOME", home.join("cfg"));
             std::env::set_var("XDG_STATE_HOME", home.join("state"));
             std::env::set_var("XDG_DATA_HOME", home.join("data"));
             std::env::set_var("XDG_CACHE_HOME", home.join("cache"));
             std::env::set_var("HELIX_ASSETS_DIR", assets);
-            std::env::set_var("HELIX_DISABLE_CPP_THEME_HELPERS", "1");
         }
     }
 

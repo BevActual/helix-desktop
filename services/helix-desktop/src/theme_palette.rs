@@ -3,7 +3,7 @@
 //! Builtin and custom palette sources with a concrete dark/light shell mode run in-process
 //! through `helix-theme`. Wallpaper sources use in-process generation when the wallpaper decodes;
 //! community when the cache file exists. Unreadable wallpapers or missing community cache fall
-//! back to optional `HELIX_THEME_PALETTE_BIN` when helpers are not disabled; otherwise the call errors.
+//! otherwise the call errors (optional `HELIX_THEME_PALETTE_CMD` for tests).
 //! Builtin/custom sources resolve `theme.mode = auto` in-process via the day/night schedule.
 
 use std::path::PathBuf;
@@ -14,8 +14,6 @@ use helix_theme::custom::{
     save_current_as_custom, save_role_color_as_custom, ColorRole, PaletteSource, SaveError, ThemeSelection,
     parse_hex,
 };
-
-use crate::assets_path::helix_theme_palette_bin;
 
 /// Selection state captured from config while the state lock is held.
 #[derive(Clone, Debug)]
@@ -91,7 +89,7 @@ fn community_cache(config: &ConfigStore, source: PaletteSource) -> Option<PathBu
     Some(helix_theme::custom::community_palette_cache_path(&state_dir, &name))
 }
 
-fn run_helper(args: &[&str]) -> Result<Option<String>, String> {
+fn run_helper(_args: &[&str]) -> Result<Option<String>, String> {
     if let Ok(cmd) = std::env::var("HELIX_THEME_PALETTE_CMD") {
         if !cmd.trim().is_empty() {
             let status = Command::new("sh")
@@ -106,24 +104,7 @@ fn run_helper(args: &[&str]) -> Result<Option<String>, String> {
         }
     }
 
-    let bin = helix_theme_palette_bin()
-        .ok_or_else(|| "Palette could not be saved".to_string())?;
-    tracing::info!(bin = %bin.display(), args = ?args, "theme palette: using helix-theme-palette");
-    let output = Command::new(&bin)
-        .args(args)
-        .output()
-        .map_err(|error| error.to_string())?;
-    if output.status.success() {
-        let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        return Ok(if name.is_empty() { None } else { Some(name) });
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let message = stderr.trim();
-    if message.is_empty() {
-        Err("Palette could not be saved".into())
-    } else {
-        Err(message.lines().last().unwrap_or(message).to_string())
-    }
+    Err("Palette could not be saved".into())
 }
 
 fn helper_named(args: &[&str]) -> Result<Outcome, String> {

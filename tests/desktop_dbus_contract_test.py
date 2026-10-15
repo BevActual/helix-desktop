@@ -1,4 +1,4 @@
-"""protocols/dbus/org.helix.Desktop.xml is the D-Bus contract; src/desktop_api/protocol.h must agree with it."""
+"""protocols/dbus/org.helix.Desktop.xml is the D-Bus contract; cpp/desktop_api/protocol.h must agree with it."""
 import pathlib
 import re
 import sys
@@ -18,7 +18,7 @@ assert not set(drafts) & set(interfaces), "an interface cannot be both draft and
 others = load(root / "protocols/dbus/org.helix.Inference.xml")
 assert set(others) == {"org.helix.Inference1"}, others
 
-header = (root / "src/desktop_api/protocol.h").read_text()
+header = (root / "cpp/desktop_api/protocol.h").read_text()
 declared = set(re.findall(r'Interface = "(org\.helix\.Desktop\.[A-Za-z]+\d+)"', header))
 assert declared, "no interface constants found in protocol.h"
 assert declared == set(interfaces), f"protocol.h and XML disagree: {declared ^ set(interfaces)}"

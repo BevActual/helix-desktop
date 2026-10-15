@@ -6,6 +6,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
+/// Minimal nested contract seed (`theme.mode` only).
+pub const HELIX_TEST_CONFIG_TOML: &str = r#"[theme]
+mode = "dark"
+"#;
+
 pub fn contract_enabled() -> bool {
     std::env::var("HELIX_RUN_CONFIGURATION_CONTRACT")
         .ok()
@@ -44,15 +49,54 @@ pub fn json_array_value(row: &serde_json::Value) -> serde_json::Value {
         .unwrap_or_else(|| json!([]))
 }
 
-pub fn value_i64(row: &serde_json::Value) -> i64 {
-    row.get("value")
-        .and_then(|v| v.as_i64())
-        .expect("numeric setting value")
-}
-
 pub struct Session {
     pub root: PathBuf,
     child: Child,
+    bin: PathBuf,
+    config_home: PathBuf,
+    empty_share: PathBuf,
+    session_bus: String,
+    marker: String,
+}
+
+pub struct FakeBluez {
+    child: Child,
+}
+
+pub fn helix_fake_bluez_bin() -> Option<PathBuf> {
+    if let Ok(path) = std::env::var("HELIX_FAKE_BLUEZ_BIN") {
+        if !path.is_empty() {
+            let path = PathBuf::from(path);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+    let fast = helix_desktop_bin()
+        .parent()
+        .map(|dir| dir.join("helix-fake-bluez"));
+    fast.filter(|path| path.is_file())
+}
+
+impl FakeBluez {
+    /// Spawns `helix-fake-bluez` on the private session bus (replaces C++ `--fake-bluez`).
+    pub fn start() -> Option<Self> {
+        let path = helix_fake_bluez_bin()?;
+        let child = Command::new(&path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn helix-fake-bluez");
+        Some(Self { child })
+    }
+}
+
+impl Drop for FakeBluez {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
 }
 
 impl Session {
@@ -66,11 +110,8 @@ impl Session {
         std::fs::create_dir_all(&helix_cfg).expect("config dir");
         let empty_share = root.join("empty-share");
         std::fs::create_dir_all(&empty_share).expect("empty share");
-        std::fs::write(
-            helix_cfg.join("config.toml"),
-            "[theme]\nmode = \"dark\"\n",
-        )
-        .expect("write config");
+        std::fs::write(helix_cfg.join("config.toml"), HELIX_TEST_CONFIG_TOML)
+            .expect("write config");
 
         let bin = helix_desktop_bin();
         assert!(
@@ -98,8 +139,6 @@ impl Session {
             .env("DBUS_SYSTEM_BUS_ADDRESS", &session_bus)
             .env("PIPEWIRE_REMOTE", "helix-test-no-audio")
             .env("HELIX_DESKTOP_MOCK_AUDIO", "1")
-            .env("HELIX_DESKTOP_MOCK_NETWORK", "1")
-            .env("HELIX_DESKTOP_MOCK_BLUETOOTH", "1")
             .env("HELIX_DESKTOP_MOCK_DISPLAYS", "1")
             .env_remove("WAYLAND_DISPLAY")
             .env_remove("DISPLAY")
@@ -107,25 +146,54 @@ impl Session {
             .spawn()
             .expect("spawn helix-desktop");
 
-        Self { root, child }
+        Self {
+            root,
+            child,
+            bin,
+            config_home,
+            empty_share,
+            session_bus,
+            marker,
+        }
     }
 
     pub fn root(&self) -> &Path {
         &self.root
     }
 
-    pub fn settings_toml(&self) -> PathBuf {
-        self.root.join("state/helix/settings.toml")
+    pub fn config_toml(&self) -> PathBuf {
+        self.config_home.join("helix/config.toml")
     }
 
-    /// Current `settings.toml` bytes for `CommitOverrides` optimistic concurrency.
-    pub fn settings_baseline(&self) -> String {
-        let path = self.settings_toml();
-        if path.is_file() {
-            std::fs::read_to_string(&path).expect("read settings.toml")
-        } else {
-            String::new()
-        }
+    pub async fn restart_service(&mut self, desktop: &Desktop) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        self.child = Command::new(&self.bin)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .env("HELIX_DESKTOP_CONTRACT_TEST", &self.marker)
+            .env("HELIX_CONFIG_HOME", &self.config_home)
+            .env_remove("HELIX_STATE_HOME")
+            .env("XDG_STATE_HOME", self.root.join("state"))
+            .env("XDG_CACHE_HOME", self.root.join("cache"))
+            .env("XDG_DATA_HOME", self.root.join("data"))
+            .env("XDG_DATA_DIRS", &self.empty_share)
+            .env("GSETTINGS_BACKEND", "memory")
+            .env("DBUS_SYSTEM_BUS_ADDRESS", &self.session_bus)
+            .env("PIPEWIRE_REMOTE", "helix-test-no-audio")
+            .env("HELIX_DESKTOP_MOCK_AUDIO", "1")
+            .env("HELIX_DESKTOP_MOCK_DISPLAYS", "1")
+            .env_remove("WAYLAND_DISPLAY")
+            .env_remove("DISPLAY")
+            .env_remove("NIRI_SOCKET")
+            .spawn()
+            .expect("respawn helix-desktop");
+        wait_ready(desktop).await;
+    }
+
+    pub fn settings_toml(&self) -> PathBuf {
+        self.root.join("state/helix/settings.toml")
     }
 
     pub async fn wait_for_settings_file(&self) {

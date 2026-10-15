@@ -28,11 +28,8 @@ const NM_DEVICE_TYPE_WIFI: u32 = 2;
 const NM_DEVICE_TYPE_ETHERNET: u32 = 1;
 const NM_DEVICE_STATE_ACTIVATED: u32 = 100;
 const NM_DEVICE_STATE_PREPARE: u32 = 40;
-const NM_ACTIVE_ACTIVATING: u32 = 1;
-const NM_ACTIVE_ACTIVATED: u32 = 2;
 
 const NM80211_AP_SEC_NONE: u32 = 0;
-const NM80211_AP_SEC_KEY_MGMT_PSK: u32 = 0x00000100;
 const NM80211_AP_SEC_KEY_MGMT_8021X: u32 = 0x00000200;
 const NM80211_AP_SEC_KEY_MGMT_SAE: u32 = 0x00000400;
 const NM80211_AP_SEC_KEY_MGMT_EAP_SUITE_B: u32 = 0x00002000;
@@ -236,7 +233,6 @@ impl NmBackend {
             Validation::CaCertNotAbsolute => {
                 return Err("CA certificate path must be absolute".into());
             }
-            Validation::UnsupportedAp => return Err("Enterprise network unavailable".into()),
         }
         if ap.active {
             return Ok(());
@@ -329,7 +325,6 @@ fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed,
                 access_points.extend(aps);
                 let signal = active_ap_strength(&conn, &active_ap);
                 let ssid = active_ap_ssid(&conn, &active_ap);
-                let frequency = active_ap_frequency(&conn, &active_ap);
                 let connected = state == NM_DEVICE_STATE_ACTIVATED;
                 let resolving = state >= NM_DEVICE_STATE_PREPARE && state < NM_DEVICE_STATE_ACTIVATED;
                 let candidate = WifiDeviceState {
@@ -338,7 +333,6 @@ fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed,
                     resolving,
                     ssid,
                     signal,
-                    frequency,
                     ip4_path,
                 };
                 if primary_wifi.as_ref().map(|w| w.connected) != Some(true) || candidate.connected {
@@ -461,7 +455,6 @@ struct WifiDeviceState {
     resolving: bool,
     ssid: String,
     signal: u8,
-    frequency: u32,
     ip4_path: String,
 }
 
@@ -1137,16 +1130,6 @@ fn active_ap_ssid(conn: &Connection, ap_path: &str) -> String {
         .and_then(|props| prop_bytes(&props, "Ssid"))
         .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
         .unwrap_or_default()
-}
-
-fn active_ap_frequency(conn: &Connection, ap_path: &str) -> u32 {
-    if ap_path.is_empty() || ap_path == "/" {
-        return 0;
-    }
-    get_all(conn, ap_path, AP_IFACE)
-        .ok()
-        .and_then(|props| prop_u32(&props, "Frequency"))
-        .unwrap_or(0)
 }
 
 fn key_management_for(rsn_flags: u32) -> u32 {

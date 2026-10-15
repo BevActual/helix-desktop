@@ -65,3 +65,6 @@ shell/*/dist/react/
 greeter/*/dist/react/
 third_party/stable-diffusion.cpp-*/
 third_party/sd-install/
+
+# Legacy platform tree (canonical copy is `cpp/`). Ignore stray checkouts.
+/src/

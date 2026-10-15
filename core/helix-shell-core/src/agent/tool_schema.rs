@@ -1,5 +1,5 @@
-//! JSON Schema and prompt catalog of the desktop tool calls a client may make (port of `helix::agent::toolCallSchema` /
-//! `toolCatalog`, C++ `src/desktop/tool_schema.cpp`). Built from the msg command schema and the risk policy, the same two
+//! JSON Schema and prompt catalog of the desktop tool calls a client may make (port of the former C++
+//! `helix::agent::toolCallSchema` / `toolCatalog`). Built from the msg command schema and the risk policy, the same two
 //! sources the service enforces, so a model constrained by it can only name real commands. It narrows what a model can say;
 //! the service still decides what is allowed.
 //!

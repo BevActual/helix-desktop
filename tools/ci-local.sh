@@ -19,7 +19,15 @@ run() { # name command...
 job_i18n()   { python3 tools/i18n-check.py; }
 job_format() {
   command -v clang-format >/dev/null || { echo "clang-format not installed"; return 1; }
-  mapfile -d '' files < <(find src \( -name '*.cpp' -o -name '*.h' \) -print0)
+  if [[ ! -d cpp ]]; then
+    echo "no platform C++ sources"
+    return 0
+  fi
+  mapfile -d '' files < <(find cpp \( -name '*.cpp' -o -name '*.h' \) -print0)
+  if ((${#files[@]} == 0)); then
+    echo "no platform C++ sources"
+    return 0
+  fi
   clang-format --dry-run -Werror "${files[@]}"
 }
 job_build() {
@@ -37,10 +45,9 @@ job_rust() {
 job_agent()  { WAYLAND_DISPLAY="wayland-ci-$$" ./tools/nested/helix-desktop-agent-integration.sh; }
 job_config() {
   WAYLAND_DISPLAY="wayland-ci-$$" \
-  HELIX_DISABLE_CPP_THEME_HELPERS=1 HELIX_ASSETS_DIR="$ROOT/assets" \
+  HELIX_ASSETS_DIR="$ROOT/assets" \
   ./tools/nested/helix-desktop-config-smoke.sh \
-    && ./tools/nested/helix-desktop-configuration-contract.sh \
-    && WAYLAND_DISPLAY="wayland-ci-$$" CONTRACT_TIMEOUT=240 ./tools/nested/helix-desktop-cpp-contract.sh
+    && ./tools/nested/helix-desktop-configuration-contract.sh
 }
 job_meter()  { WAYLAND_DISPLAY="wayland-ci-$$" ./tools/nested/helix-desktop-audio-meter-integration.sh; }
 

@@ -96,18 +96,6 @@ impl MockBackend {
         true
     }
 
-    pub fn fields(&self) -> &NetworkFields {
-        &self.fields
-    }
-
-    pub fn access_points(&self) -> &[AccessPoint] {
-        &self.access_points
-    }
-
-    pub fn vpns(&self) -> &[Vpn] {
-        &self.vpns
-    }
-
     pub fn snapshot(&self) -> Value {
         super::snapshot_from_parts(&self.fields, &self.access_points, &self.vpns)
     }

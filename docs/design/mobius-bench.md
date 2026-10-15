@@ -18,7 +18,7 @@ The private cache fixes repeated GPU pipeline startup cost without making the re
 
 Validation: real worker PNG and real D-Bus generation/cancellation; API tests for size/type/path validation and private image/progress replies; queue tests for chat unload and cancellation; nested UI tests for creation despite a remote chat route, persisted pixels/provenance, PNG clipboard copy, prompt reuse, reopening, and Stop. Native Save uses a user-selected new filename; overwrite is refused. All 445 core tests and 15 regular Mobius tests passed; the two optional Ghidra tests were not rerun for this image change.
 
-Commands: `dbus-run-session -- python3 tests/inference_image_real.py "$PWD"`; `tools/nested/ui-suite.sh mobius-image-generation`; `meson test -C build-native-clean inference_queue inference_image_generation`.
+Commands: `dbus-run-session -- python3 tests/inference_image_real.py "$PWD"`; `tools/nested/ui-suite.sh mobius-image-generation`; `cargo test -p helix-inference`.
 
 `tools/bench/mobius-bench.py` sends a fixed set of prompts through the real inference service (the call Mobius makes) for each model and
 style and prints timings and answers. It reads the default system prompt from `helix-shell-core`, so it always measures what ships.

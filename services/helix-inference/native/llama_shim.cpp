@@ -1,6 +1,5 @@
-// A C ABI over helix::inference::LlamaBackend, so the Rust service can drive the llama.cpp engine. The engine code
-// (src/inference/llama_backend.cpp) is llama.cpp glue and stays C++; everything around it (D-Bus, queue, limits, routing,
-// workers) is Rust. Data crosses as JSON strings; the caller frees returned strings with hx_free.
+// C ABI over helix::inference::LlamaBackend for the Rust service. Interim llama.cpp glue lives in
+// native/inference/; target is a Rust engine path. Data crosses as JSON; caller frees with hx_free.
 #include "inference/llama_backend.h"
 
 #include <cstdlib>

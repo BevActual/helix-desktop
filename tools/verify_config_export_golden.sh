@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fail if Rust default export or frozen parity fixtures drift (C++ check optional).
+# Fail if Rust default export or frozen parity fixtures drift.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GOLDEN="$ROOT/core/helix-shell-core/tests/golden/config_export_minimal.toml"
@@ -7,18 +7,15 @@ GOLDEN="$ROOT/core/helix-shell-core/tests/golden/config_export_minimal.toml"
 cargo build -p helix-shell-core --bin helix-rust-config-export --quiet
 
 cargo test -p helix-shell-core desktop::config_export_defaults::tests::ported_schema_sections_match_golden_export --quiet
-cargo test -p helix-shell-core --test config_export_golden rust_export_matches_golden_without_cpp_helper --quiet
+cargo test -p helix-shell-core --test config_export_golden rust_export_matches_minimal_golden --quiet
 cargo test -p helix-shell-core --test config_export_golden --quiet
 
-BIN="${HELIX_CONFIG_EXPORT_BIN:-}"
+BIN="${HELIX_RUST_CONFIG_EXPORT_BIN:-${HELIX_CONFIG_EXPORT_BIN:-}}"
 if [[ -z "$BIN" ]]; then
   for candidate in \
     "$ROOT/target/debug/helix-rust-config-export" \
     "$ROOT/target/fast/helix-rust-config-export" \
-    "$ROOT/build-debug/helix-rust-config-export" \
-    "$ROOT/build-debug/helix-config-export" \
-    "$ROOT/build-fast/helix-config-export" \
-    "$ROOT/_build/helix-config-export"; do
+    "$ROOT/build-debug/helix-rust-config-export"; do
     if [[ -x "$candidate" ]]; then
       BIN="$candidate"
       break
@@ -29,7 +26,7 @@ fi
 if [[ -n "$BIN" && -x "$BIN" ]]; then
   TMP="$(mktemp)"
   trap 'rm -f "$TMP"' EXIT
-  HELIX_CONFIG_EXPORT_BIN="$BIN" "$ROOT/tools/gen_config_export_golden.sh" "$TMP"
+  HELIX_RUST_CONFIG_EXPORT_BIN="$BIN" "$ROOT/tools/gen_config_export_golden.sh" "$TMP"
   if ! python3 -c "
 import tomllib, sys
 from pathlib import Path

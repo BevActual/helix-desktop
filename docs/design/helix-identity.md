@@ -24,7 +24,7 @@ The product is **Helix**. Install names, IPC, UI strings, config paths, and docs
 | Mobius — Agents | Same bar dropdown (Agents mode) + Settings **Privacy & agents** (grants) |
 | Desktop service (live) | `helix-service` / `org.helix.Desktop` |
 | Desktop service (Rust target) | `helix-desktop` / same bus name (`services/helix-desktop`) |
-| Assistant / inference | `helix-assistant`, `helix-inference` (live under `src/`; target `services/`) |
+| Assistant / inference | `helix-assistant`, `helix-inference` (`services/`; Rust target — interim C++ in `cpp/inference/`) |
 | Helix MCP server | `tools/helix-agent` (stdio MCP for any MCP-capable app/agent) |
 | Agent Surface (desktop change) | D-Bus `org.helix.Desktop.AgentSurface1` + `AgentSurfaceActivity1` on `org.helix.Desktop`; see `agent-and-inference.md` |
 | Config / state | `~/.config/helix/`, `~/.local/state/helix/` |

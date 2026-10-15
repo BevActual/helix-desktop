@@ -88,7 +88,7 @@ Rules:
 ## Color
 
 Colors come from the palette (`src/ui/palette.h`); use roles, never literal colors, outside
-theme/palette code (`core/helix-theme`, `src/config/theme/`).
+theme/palette code (`core/helix-theme`, `cpp/config/theme/`).
 
 - **One accent.** `Primary` is the only accent: selection, the checked state, progress, and
   the keyboard focus ring (`focusRingColorSpec()`). `OnPrimary` sits on it.
@@ -247,8 +247,8 @@ hover-only drag handles for essential rearrange.
   the dropdown from that press.
 - **Quick Settings:** the full 2-column tile grid reorders (everyday and pins). Dragged
   solid module tiles dim; drop cue is a thin `Primary` outline or slot shift—never
-  glass-on-glass. Order persists in `control_center.shortcuts`. Settings → Quick shortcuts
-  remains the accessible and power editor.
+  glass-on-glass. Order is owned by the Tauri Quick Settings surface (legacy
+  `control_center.shortcuts` remains catalog-compatible until pruned).
 - **Motion:** sibling slides use `Style::animNormal` / spring; Reduced Motion snaps.
 
 ### Dropdown content

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Capture and compare org.helix.Desktop snapshots (C++ helix-service vs Rust helix-desktop).
+"""Capture and compare org.helix.Desktop snapshots across builds or machines.
 
   snapshot.py capture OUT.json     read-only: every domain's GetSnapshot + GetSettings
   snapshot.py diff A.json B.json   structural diff (keys, types, list lengths, stable scalars)
 
-Run `capture` once with the C++ service and once with the Rust one on the same machine and
-session, then `diff`. Volatile fields (signal strength, levels, timestamps) are reported as type
-only. Exit status is 1 when the structures differ.
+Capture twice (e.g. before/after a desktop change) on the same session, then `diff`.
+Volatile fields (signal strength, levels, timestamps) are reported as type only.
+Exit status is 1 when the structures differ.
 """
 import json
 import sys

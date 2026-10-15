@@ -60,7 +60,6 @@ struct BtPending {
 
 #[derive(Debug)]
 struct NmPending {
-    setting_name: String,
     wait: NmWait,
 }
 
@@ -169,9 +168,8 @@ impl AgentHub {
     pub fn cancel_nm_secret(&self, reason: &str) {
         let mut pending = self.nm_pending.lock().expect("nm_pending");
         if let Some(request) = pending.take() {
-            if let NmWait::Secret(sender) = request.wait {
-                let _ = sender.send(Err(()));
-            }
+            let NmWait::Secret(sender) = request.wait;
+            let _ = sender.send(Err(()));
         }
         tracing::debug!(reason, "canceled NM secret request");
     }
@@ -186,9 +184,8 @@ impl AgentHub {
         }
         let mut pending = self.nm_pending.lock().expect("nm_pending");
         if let Some(request) = pending.take() {
-            if let NmWait::Secret(sender) = request.wait {
-                let _ = sender.send(Ok(response.to_string()));
-            }
+            let NmWait::Secret(sender) = request.wait;
+            let _ = sender.send(Ok(response.to_string()));
         }
         Ok(())
     }
@@ -315,7 +312,6 @@ impl AgentHub {
             .ok_or(NmSecretOutcome::NoSecrets("no UI handler"))?;
         let (tx, rx) = oneshot::channel();
         *self.nm_pending.lock().expect("nm_pending") = Some(NmPending {
-            setting_name: setting_name.clone(),
             wait: NmWait::Secret(tx),
         });
         if let Err(error) = self

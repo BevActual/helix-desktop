@@ -8,8 +8,8 @@ existing inference service.
 
 ## What exists
 
-`helix-inference` (C++) is a D-Bus service (`org.helix.Inference1`) with a queue, limits and one engine: llama.cpp behind the `Backend`
-seam (`src/inference/backend.h`). The engine is built with `libmtmd` (llama.cpp's multimodal library) already, the service runs in its
+`helix-inference` is a Rust D-Bus service (`org.helix.Inference1`) with a queue, limits and one engine: llama.cpp behind the `Backend`
+seam (interim C++ `cpp/inference/backend.h`; target is a Rust engine path). The engine is built with `libmtmd` (llama.cpp's multimodal library) already, the service runs in its
 own user namespace, and routing (`inference-routing.toml`) maps task profiles (`act`, `chat`, `code`, `summarize`, `vision`) to a backend
 and model. Text chat, vision input, dictation, and local text-to-image generation work end to end. Speech output and embeddings remain planned.
 

@@ -121,6 +121,7 @@ pub enum Domain {
     Audio,
     Network,
     Bluetooth,
+    Displays,
     Appearance,
     /// Settings. Has no `Action`; use [`Desktop::settings`] and [`Desktop::update_setting`], and `watch` for changes.
     Configuration,
@@ -132,6 +133,7 @@ impl Domain {
             Self::Audio => "org.helix.Desktop.Audio1",
             Self::Network => "org.helix.Desktop.Network1",
             Self::Bluetooth => "org.helix.Desktop.Bluetooth1",
+            Self::Displays => "org.helix.Desktop.Displays1",
             Self::Appearance => "org.helix.Desktop.Appearance1",
             Self::Configuration => "org.helix.Desktop.Configuration1",
         }
@@ -167,6 +169,13 @@ impl Desktop {
 
     pub fn connection(&self) -> &zbus::Connection {
         &self.connection
+    }
+
+    /// Second handle on the same session bus (for concurrent signal watches).
+    pub fn clone_session(&self) -> Self {
+        Self {
+            connection: self.connection.clone(),
+        }
     }
 
     /// Claim the desktop role so the shell may register as Agent Surface confirmer.
@@ -250,6 +259,24 @@ impl Desktop {
     pub async fn bluetooth_reply(&self, response: &str, cancel: bool) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Bluetooth).await?;
         proxy.call("Reply", &(response, cancel)).await
+    }
+
+    /// `Bluetooth1.Cancel(operation)` from the desktop registrant.
+    pub async fn bluetooth_cancel(&self, operation: u64) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Bluetooth).await?;
+        proxy.call("Cancel", &(operation,)).await
+    }
+
+    /// `Audio1.StopInputMeter` (idempotent).
+    pub async fn audio_stop_input_meter(&self) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Audio).await?;
+        proxy.call("StopInputMeter", &()).await
+    }
+
+    /// `Audio1.StartInputMeter` with sink id (returns error for unknown sinks).
+    pub async fn audio_start_input_meter(&self, sink_id: u32) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Audio).await?;
+        proxy.call("StartInputMeter", &(sink_id,)).await
     }
 
     /// Calls `on_prompt` with every `Prompt` signal the service sends this client for a pairing (kind, device, passkey, pin, entered).

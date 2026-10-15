@@ -178,25 +178,23 @@ CASES: list[tuple[str, str, str, dict[str, str] | None]] = [
 
 
 def find_bin() -> Path:
-    env = os.environ.get("HELIX_CONFIG_EXPORT_BIN", "")
-    if env:
-        candidate = Path(env)
-        if candidate.is_file():
-            return candidate
+    for key in ("HELIX_RUST_CONFIG_EXPORT_BIN", "HELIX_CONFIG_EXPORT_BIN"):
+        env = os.environ.get(key, "")
+        if env:
+            candidate = Path(env)
+            if candidate.is_file():
+                return candidate
     for candidate in (
         ROOT / "target/debug/helix-rust-config-export",
         ROOT / "target/fast/helix-rust-config-export",
         ROOT / "build-debug/helix-rust-config-export",
-        ROOT / "build-debug/helix-config-export",
-        ROOT / "build-fast/helix-config-export",
-        ROOT / "_build/helix-config-export",
     ):
         if candidate.is_file():
             return candidate
     sys.exit(
         "error: build helix-rust-config-export "
         "(cargo build -p helix-shell-core --bin helix-rust-config-export) "
-        "or set HELIX_CONFIG_EXPORT_BIN"
+        "or set HELIX_RUST_CONFIG_EXPORT_BIN"
     )
 
 

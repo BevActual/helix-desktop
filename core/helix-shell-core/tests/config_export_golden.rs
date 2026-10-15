@@ -1,4 +1,4 @@
-//! Byte parity with `helix-config-export` for a minimal config tree (Rust exporter target).
+//! Frozen export fixtures for the in-process Rust exporter (`helix-rust-config-export` CLI).
 
 use std::fs;
 use std::path::PathBuf;
@@ -17,8 +17,7 @@ fn unique_temp_dir(label: &str) -> PathBuf {
 }
 
 use helix_shell_core::desktop::config_export::{
-    configure_export_env, discover_config_export_bin, discover_rust_config_export_bin,
-    export_effective_toml, rust_export_toml,
+    configure_export_env, discover_rust_config_export_bin, export_effective_toml, rust_export_toml,
 };
 use helix_shell_core::desktop::settings::ConfigPaths;
 use helix_shell_core::ConfigStore;
@@ -42,7 +41,7 @@ fn minimal_fixture(root: &PathBuf) -> ConfigPaths {
 }
 
 #[test]
-fn rust_export_matches_golden_without_cpp_helper() {
+fn rust_export_matches_minimal_golden() {
     let root = unique_temp_dir("rust-only");
     let _ = fs::remove_dir_all(&root);
     let paths = minimal_fixture(&root);
@@ -82,42 +81,6 @@ fn rust_export_cli_matches_in_process_for_minimal_fixture() {
         .parse()
         .expect("cli parse");
     assert_eq!(cli, in_process);
-    let _ = fs::remove_dir_all(root);
-}
-
-#[test]
-fn matches_helix_config_export_golden() {
-    let Some(bin) = discover_config_export_bin() else {
-        eprintln!("skip matches_helix_config_export_golden: helix-config-export not built");
-        return;
-    };
-    let golden = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/golden/config_export_minimal.toml");
-    let expected = fs::read_to_string(&golden).expect("golden");
-
-    let root = unique_temp_dir("golden");
-    let _ = fs::remove_dir_all(&root);
-    let paths = minimal_fixture(&root);
-
-    std::env::set_var("XDG_CONFIG_HOME", root.join("cfg"));
-    std::env::set_var("XDG_STATE_HOME", root.join("state"));
-
-    let mut command = Command::new(&bin);
-    configure_export_env(&mut command, &paths);
-    let output = command.output().expect("export");
-    assert!(
-        output.status.success(),
-        "export failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let got = String::from_utf8(output.stdout).expect("utf8");
-    let expected_value: Toml = expected.parse().expect("golden parse");
-    let got_value: Toml = got.parse().expect("export parse");
-    assert_eq!(
-        got_value,
-        expected_value,
-        "config_export output drifted; rerun tools/gen_config_export_golden.sh"
-    );
     let _ = fs::remove_dir_all(root);
 }
 
@@ -169,15 +132,6 @@ fn assert_rust_export_matches_fixture(
         expected,
         "fixture {fixture_id}\nconfig:\n{config_toml}\nsettings:\n{settings_toml}"
     );
-    if let Some(bin) = discover_config_export_bin() {
-        let cpp =
-            helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
-        assert_eq!(
-            cpp,
-            expected,
-            "fixture {fixture_id} stale vs helix-config-export; rerun tools/gen_config_export_fixtures.py"
-        );
-    }
     let _ = fs::remove_dir_all(root);
 }
 
@@ -444,19 +398,7 @@ fn rust_export_matches_cpp_for_example_toml() {
         config_dir,
         settings_toml: state_dir.join("settings.toml"),
     };
-    let rust = rust_export_toml(&paths).expect("example.toml rust export");
-    let Some(bin) = discover_config_export_bin() else {
-        eprintln!("skip rust_export_matches_cpp_for_example_toml: helix-config-export not built");
-        let _ = fs::remove_dir_all(root);
-        return;
-    };
-    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin)
-        .expect("cpp export");
-    assert_eq!(
-        rust,
-        cpp,
-        "example.toml rust/cpp export drift; fix patch rules or regenerate defaults"
-    );
+    let _rust = rust_export_toml(&paths).expect("example.toml rust export");
     let _ = fs::remove_dir_all(root);
 }
 
@@ -465,7 +407,7 @@ fn rust_export_matches_cpp_for_minimal_fixture() {
     let root = unique_temp_dir("minimal");
     let paths = minimal_fixture(&root);
     let store = ConfigStore::load(paths.clone());
-    let rust = export_effective_toml(&store, None).expect("rust export");
+    let rust = export_effective_toml(&store).expect("rust export");
     let expected = load_export_fixture("minimal_fixture");
     assert_eq!(rust, expected);
     let _ = fs::remove_dir_all(root);

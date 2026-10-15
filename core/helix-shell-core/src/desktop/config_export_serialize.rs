@@ -1,4 +1,4 @@
-//! Incremental port of C++ `config_export::serialize` (`src/config/config_export.cpp`).
+//! Port of the former C++ `config_export::serialize` (`config_export.cpp`, removed).
 //!
 //! Milestone A (today): golden-default patch in `config_export_rust.rs`, then
 //! [`finalize_serialized_export`] to match C++ ordering and omission rules.

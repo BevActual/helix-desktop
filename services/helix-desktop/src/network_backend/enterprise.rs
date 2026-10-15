@@ -22,7 +22,6 @@ pub enum Validation {
     MissingPassword,
     UnsupportedPhase2,
     CaCertNotAbsolute,
-    UnsupportedAp,
 }
 
 pub fn validate(credentials: &EnterpriseCredentials) -> Validation {

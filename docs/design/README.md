@@ -20,7 +20,8 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 |---|---|
 | `../../protocols/` | D-Bus + IPC schemas (source of truth for wire types) |
 | [desktop-service.md](desktop-service.md) | Domain API behavior for `org.helix.Desktop` (verify against `protocols/`) |
-| [layering.md](layering.md) | C++ `src/` dependency layers (ratchet while platform still lives there) |
+| [desktop-contract-tests.md](desktop-contract-tests.md) | What bus/integration tests must pass for Tauri + Settings; cleanup backlog |
+| [layering.md](layering.md) | C++ `cpp/` dependency layers (ratchet while platform still lives there) |
 | [trusted-surface.md](trusted-surface.md) | Trust boundaries for shell surfaces |
 
 ## Surfaces and apps

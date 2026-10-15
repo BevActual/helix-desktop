@@ -65,6 +65,7 @@ pub fn shell_palette_light(config: &ConfigStore) -> Option<bool> {
 }
 
 /// Resolved shell mode string (`ThemeService::resolvedShellMode`).
+#[cfg(test)]
 pub fn resolved_shell_mode_label(config: &ConfigStore) -> Option<&'static str> {
     let shell_mode = config
         .get("theme.shell_mode")

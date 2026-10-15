@@ -143,18 +143,11 @@ master enablement and event visibility. These preferences target shell surfaces;
 application controls retain native geometry and solid styling. Live multi-monitor
 routing remains an unverified hardware check.
 
-Desktop & Dock includes a native Control Center page selector backed by
-`control_center.visible_tabs`. Home remains available, built-in tab IDs are validated
-by the service, and updates preserve hidden extension tabs.
-
-Quick shortcuts use `shortcut-list` metadata at `control_center.shortcuts`.
-Settings supports native add, size, reorder, remove and reset controls. Entries
-contain only a known `type` and `small`, `wide` or `large` size. Saved extension
-and unavailable shortcut types remain editable; discovering new extension pins
-is still pending. `UpdateOrderedList` validates the payload and rejects stale
-baselines. Generic `Update` is rejected for this list. Reset respects the existing
-configuration precedence; an explicitly empty list stays empty. The migration
-inventory check also keeps the service's built-in catalog aligned with the shell.
+`control_center.visible_tabs` and `control_center.shortcuts` remain in the settings
+catalog and schema for config compatibility (and nested config smoke). The GTK
+Control Center / Settings editors that owned those UX surfaces are gone; Tauri
+Quick Control Center and Settings do not read these rows yet. Prune or re-home
+them only after an explicit product decision (see `desktop-contract-tests.md`).
 
 Notification rules are exposed as ordered dictionaries under `notification.filter`.
 Settings supports native add/edit/disable/reorder/remove/reset actions with application
@@ -192,9 +185,8 @@ The service test checks missing backends, strict validation, persistence, restar
 external edits, desktop capability gating, bar preferences and stale commits.
 An optional private PipeWire integration test uses a silent virtual source,
 verifying live levels, explicit stop, lease expiry, client loss, startup recovery and
-daemon restart without inspecting real hardware. The migration test compares current settings/navigation declarations with
-`desktop-migration.json`. `cutover` must remain false until every entry has a
-verified destination. The initial five pages do not replace Control Center.
+daemon restart without inspecting real hardware. Historical GTK tab routing is archived in
+`docs/design/archive/desktop-migration.json` (no meson gate). The initial five pages do not replace Control Center.
 
 ## Remaining migration work
 

@@ -5,7 +5,7 @@ shell — NetworkManager, BlueZ, PipeWire, niri, Settings, and Agent Surface flo
 only fake.
 
 What CI already covers without hardware: the C++ behavioural contract test
-(`tests/desktop_service_test.cpp` plus growing Rust slice in `services/helix-desktop/tests/configuration_contract.rs` via `tools/nested/helix-desktop-configuration-contract.sh`); frozen settings catalog
+(`services/helix-desktop/tests/contract/` via `tools/nested/helix-desktop-configuration-contract.sh`); frozen settings catalog
 goldens; theme/template/Wallhaven parity via C++ reference generators in `core/helix-theme`.
 
 ## Run it

@@ -1,11 +1,12 @@
-# Layering rules for src/, checked by tools/check-layers.py (meson test `layering`).
+# Layering rules for cpp/, checked by tools/check-layers.py (meson test `layering`).
 #
 # After retiring the C++ session UI, only base + platform + independent processes remain.
 
 [layers]
 base = ["util", "core", "i18n", "time"]
-platform = ["config", "net", "security", "ipc", "dbus", "pipewire", "system", "theme", "notification", "hooks", "auth", "debug", "idle", "cli", "desktop_api", "wayland", "compositors"]
+platform = ["config", "net", "security", "dbus", "system", "notification", "hooks", "auth", "debug", "idle", "wayland", "compositors"]
 
 [independent]
-modules = ["desktop", "apps", "inference", "assistant"]
+# `desktop` C++ tree deleted (agent lives in Rust). Remaining independent: inference workers (+ apps/assistant stubs).
+modules = ["apps", "assistant"]
 may_include = ["base", "platform", "independent"]

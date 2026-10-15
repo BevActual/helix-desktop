@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Layering check for src/: new upward includes fail, the recorded baseline may only shrink.
+"""Layering check for cpp/: new upward includes fail, the recorded baseline may only shrink.
 
   tools/check-layers.py <repo-root>                  check (exit 1 on a new violation or a stale baseline entry)
   tools/check-layers.py <repo-root> --update-baseline  rewrite the baseline from the current tree
@@ -31,11 +31,13 @@ def load(root):
 def violations(root):
     layer_of, rank, independent, allowed = load(root)
     found = {}
-    src = root / "src"
-    for path in sorted(src.rglob("*")):
+    tree = root / "cpp"
+    if not tree.is_dir():
+        return found
+    for path in sorted(tree.rglob("*")):
         if path.suffix not in (".h", ".cpp"):
             continue
-        parts = path.relative_to(src).parts
+        parts = path.relative_to(tree).parts
         if len(parts) < 2 or parts[0] not in layer_of:
             continue
         module = parts[0]
@@ -51,7 +53,7 @@ def violations(root):
             else:
                 bad = rank[there] > rank[here]
             if bad:
-                found[f"src/{'/'.join(parts)} -> {include}"] = (module, target[0])
+                found[f"cpp/{'/'.join(parts)} -> {include}"] = (module, target[0])
     return found
 
 
