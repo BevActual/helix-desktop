@@ -224,6 +224,73 @@ pub fn custom_palette_path(dir: &Path, name: &str) -> PathBuf {
     dir.join(format!("{name}.json"))
 }
 
+/// C++ `shortSchemeTag`.
+fn short_scheme_tag(scheme: &str) -> String {
+    const TAGS: [(&str, &str); 10] = [
+        ("m3-tonal-spot", "ts"),
+        ("m3-content", "mc"),
+        ("m3-fruit-salad", "fs"),
+        ("m3-rainbow", "rb"),
+        ("m3-monochrome", "mo"),
+        ("vibrant", "vib"),
+        ("faithful", "fth"),
+        ("soft", "sft"),
+        ("dysfunctional", "dys"),
+        ("muted", "mut"),
+    ];
+    if let Some((_, tag)) = TAGS.iter().find(|(full, _)| *full == scheme) {
+        return (*tag).to_string();
+    }
+    let mut fallback = sanitize_component(scheme);
+    if fallback.len() > 4 {
+        fallback.truncate(4);
+        while fallback.ends_with('-') {
+            fallback.pop();
+        }
+    }
+    fallback
+}
+
+/// C++ `suggestCustomPaletteName(wallpaperPath, scheme)`.
+pub fn suggest_custom_palette_name(wallpaper_path: &str, scheme: &str) -> String {
+    let mut base = String::new();
+    if let Some(color) = wallpaper_path.strip_prefix("color:") {
+        let component = sanitize_component(color);
+        base = if component.is_empty() { "solid".to_string() } else { format!("color-{component}") };
+    } else if !wallpaper_path.is_empty() {
+        let stem = Path::new(wallpaper_path)
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        base = sanitize_component(&stem);
+    }
+    if base.is_empty() {
+        base = "wallpaper".into();
+    }
+    let tag = short_scheme_tag(scheme);
+    if !tag.is_empty() {
+        base.push('-');
+        base.push_str(&tag);
+    }
+    base
+}
+
+/// C++ `saveWallpaperPaletteAsCustom` (the file; the caller selects the palette).
+pub fn save_wallpaper_as_custom(dir: &Path, sel: &ThemeSelection) -> Result<String, SaveError> {
+    if sel.source != PaletteSource::Wallpaper {
+        return Err("palette source is not wallpaper".to_string().into());
+    }
+    let Some(wallpaper) = &sel.wallpaper else {
+        return Err(SaveError::WallpaperSource);
+    };
+    let name = allocate_custom_palette_name(dir, &suggest_custom_palette_name(&wallpaper.path, &wallpaper.scheme));
+    if name.is_empty() {
+        return Err("failed to allocate custom palette name".to_string().into());
+    }
+    save_custom_palette(dir, &name, &wallpaper.generated)?;
+    Ok(name)
+}
+
 /// C++ `allocateCustomPaletteName(base)`: sanitized, suffixed `-2`..`-999` on collision.
 /// Empty when nothing usable is left.
 pub fn allocate_custom_palette_name(dir: &Path, base: &str) -> String {
@@ -395,11 +462,23 @@ pub struct ThemeSelection {
     pub community_cache: Option<PathBuf>,
     /// Resolved shell mode (`resolvedShellMode() == "light"`).
     pub shell_light: bool,
+    /// The palette generated from the wallpaper, when the source is `wallpaper` and it could be generated.
+    pub wallpaper: Option<WallpaperPalette>,
+}
+
+/// A palette generated from the wallpaper plus what its saved name is derived from.
+#[derive(Clone, Debug)]
+pub struct WallpaperPalette {
+    pub generated: GeneratedPalette,
+    /// The wallpaper path (or `color:#rrggbb`), as `suggestCustomPaletteName` reads it.
+    pub path: String,
+    /// The scheme name as configured (`m3-content`, `vibrant`, ...).
+    pub scheme: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SaveError {
-    /// Needs wallpaper palette generation, which is not ported yet; callers fall back.
+    /// The source is the wallpaper and no palette could be generated for it; callers fall back.
     WallpaperSource,
     Message(String),
 }
@@ -424,6 +503,7 @@ fn read_parsed(path: &Path) -> Option<FixedPalette> {
 /// C++ `resolveFromSource` for non-wallpaper sources; `None` means "use builtin".
 fn resolve_from_source(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPalette> {
     match sel.source {
+        PaletteSource::Wallpaper => sel.wallpaper.as_ref().map(|w| w.generated.clone()),
         PaletteSource::Custom if !sel.custom_palette.is_empty() => {
             let path = custom_palette_path(dir, &sel.custom_palette);
             path.exists().then(|| read_parsed(&path)).flatten().map(|p| expand_fixed_palette(&p))
@@ -448,7 +528,7 @@ fn resolve_from_source(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPale
 /// custom sources. `None` for wallpaper and community sources (not ported).
 pub fn resolve_palette(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPalette> {
     match sel.source {
-        PaletteSource::Wallpaper => None,
+        PaletteSource::Wallpaper => sel.wallpaper.as_ref().map(|w| w.generated.clone()),
         _ => Some(resolve(dir, sel)),
     }
 }
@@ -483,7 +563,7 @@ pub fn save_role_color_as_custom(
     role: ColorRole,
     color: Color,
 ) -> Result<String, SaveError> {
-    if sel.source == PaletteSource::Wallpaper {
+    if sel.source == PaletteSource::Wallpaper && sel.wallpaper.is_none() {
         return Err(SaveError::WallpaperSource);
     }
     let mut generated = resolve(dir, sel);
@@ -509,7 +589,7 @@ pub fn save_role_color_as_custom(
 /// C++ `saveCurrentPaletteAsCustom` (local path, non-wallpaper sources).
 pub fn save_current_as_custom(dir: &Path, sel: &ThemeSelection) -> Result<String, SaveError> {
     if sel.source == PaletteSource::Wallpaper {
-        return Err(SaveError::WallpaperSource);
+        return save_wallpaper_as_custom(dir, sel);
     }
     let generated = resolve(dir, sel);
     let name = allocate_custom_palette_name(dir, "custom");

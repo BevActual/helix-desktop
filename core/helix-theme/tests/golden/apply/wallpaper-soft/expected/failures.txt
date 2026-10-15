@@ -1,0 +1,1 @@
+template failure: gtk3: Error: GTK4 helix.css not found at @ROOT@/cfg/gtk-4.0/helix.css

@@ -6,6 +6,8 @@ publish = false
 description = "Palette math and custom-palette storage. Ports src/theme/ (C++ ThemeService) with output parity."
 
 [dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 serde_json = "1"
 regex = "1"
 toml = "0.8"
+material-colors = { path = "../../third_party/material-colors", default-features = false, features = ["std", "quantize"] }

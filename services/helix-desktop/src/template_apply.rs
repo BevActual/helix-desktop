@@ -42,7 +42,14 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         Some("builtin") | None => PaletteSource::Builtin,
         Some("custom") => PaletteSource::Custom,
         Some("community") => PaletteSource::Community,
-        _ => return None, // wallpaper palettes
+        Some("wallpaper") => PaletteSource::Wallpaper,
+        _ => return None,
+    };
+    // A wallpaper that cannot be turned into a palette is the helper's to handle.
+    let wallpaper = if source == PaletteSource::Wallpaper {
+        Some(crate::wallpaper_source::wallpaper_palette(config)?)
+    } else {
+        None
     };
     let mode = crate::day_night::resolve_mode(config, text("theme.mode").as_deref().unwrap_or("dark"))?;
 
@@ -59,6 +66,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         community_cache: (source == PaletteSource::Community && !community_name.is_empty())
             .then(|| helix_theme::custom::community_palette_cache_path(&state_dir, &community_name)),
         shell_light: false,
+        wallpaper,
     };
     let mut generated = resolve_palette(&palettes_dir, &selection)?;
     apply_resolved_transforms(
@@ -100,7 +108,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
         scheme_type,
-        image_path: None,
+        image_path: Some(crate::wallpaper_source::palette_wallpaper_path(config)),
         config_table: None,
         icon_theme: String::new(),
         builtin_config,

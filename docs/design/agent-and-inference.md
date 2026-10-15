@@ -245,7 +245,7 @@ cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a re
 
 ## Implementation status: helix-assistant
 
-`helix-assistant "<request>"` (`src/assistant/`). Plain English in, one desktop action out.
+`helix-assistant "<request>"` (`services/helix-assistant`, Rust; the logic is `helix-shell-core::agent::assistant_core`). Plain English in, one desktop action out.
 
 1. `Hello` to Agent Surface to learn this client's grants. With none, it asks once (`RequestAccess observe, act`); the shell
    shows the usual approval dialog. With no shell running it stops: a headless session cannot grant itself access.
