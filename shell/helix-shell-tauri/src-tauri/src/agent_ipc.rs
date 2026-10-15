@@ -289,6 +289,35 @@ async fn serve_one(app: AppHandle, mut stream: UnixStream) {
     let _ = stream.shutdown().await;
 }
 
+/// Who, if anyone, answers on the socket.
+enum Probe {
+    Gone,
+    /// helix-desktop's fallback listener (it answers `--help` with `Usage: helix-panel`).
+    Service,
+    Shell,
+}
+
+async fn probe(path: &std::path::Path) -> Probe {
+    let Ok(mut stream) = UnixStream::connect(path).await else {
+        return Probe::Gone;
+    };
+    let ask = async {
+        stream.write_all(b"--help\n").await.ok()?;
+        stream.shutdown().await.ok()?;
+        let mut reply = String::new();
+        stream.read_to_string(&mut reply).await.ok()?;
+        Some(reply)
+    };
+    match tokio::time::timeout(Duration::from_secs(1), ask).await {
+        Ok(Some(reply)) if is_service_help(&reply) => Probe::Service,
+        _ => Probe::Shell,
+    }
+}
+
+fn is_service_help(reply: &str) -> bool {
+    reply.starts_with("Usage: helix-panel")
+}
+
 /// Starts answering on the socket, unless another shell is already doing so.
 pub fn serve(app: AppHandle) {
     let (Some(path), Some(tools)) = (socket_path(), tools_path()) else {
@@ -296,9 +325,16 @@ pub fn serve(app: AppHandle) {
         return;
     };
     tauri::async_runtime::spawn(async move {
-        if UnixStream::connect(&path).await.is_ok() {
-            eprintln!("AGENT-IPC another shell already serves {}", path.display());
-            return;
+        match probe(&path).await {
+            Probe::Gone => {}
+            Probe::Service => {
+                // The desktop service binds this path when it starts before the shell; the shell is the real owner.
+                eprintln!("AGENT-IPC taking {} over from the desktop service", path.display());
+            }
+            Probe::Shell => {
+                eprintln!("AGENT-IPC another shell already serves {}", path.display());
+                return;
+            }
         }
         // Nothing answered: whatever is at the path is a leftover of a shell that has gone.
         let _ = std::fs::remove_file(&path);
@@ -335,4 +371,13 @@ pub fn serve(app: AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod probe_tests {
+    #[test]
+    fn recognises_the_service_help_text() {
+        assert!(super::is_service_help("Usage: helix-panel <command> [args]\n"));
+        assert!(!super::is_service_help("error: unknown command\n"));
+    }
 }
