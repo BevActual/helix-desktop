@@ -25,6 +25,7 @@ below either makes the desktop complete enough to live in, or makes that bet tru
 | Fix the stale ASan section and C++ dependency list in `BUILDING.md` / `CONTRIBUTING.md` | S | They describe `build-asan/helix-assistant` and C++23 |
 | Record the pending budgets (USS/RSS) for Software and System Monitor | S | `software-tauri.md`, `system-monitor-tauri.md` budget tables read _pending_ |
 | Run the soak checklist on the real session now that C++ is gone | M | `rust-desktop-soak.md` |
+| Repair `tools/nested/mobius-nested.sh`: it starts a C++ `helix-inference` from a Meson build that no longer exists, so `mobius-test.sh` cannot run | S | Use the Rust `helix-inference` with its fake backend | `tools/nested/mobius-nested.sh` |
 
 ## 2. Settings (missing pages and ghost settings)
 
@@ -68,7 +69,7 @@ acts on it, and a nested test asserts the exact requests sent.
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
-| **Act loop end to end**: Mobius → Assistant → confirmer → result evidence shown back in the conversation | M | Trace what exists today | `mobius-product.md` priority 5, "Show task progress and the resulting state" |
+| Act loop, next step: keep the finished task in the conversation, show the resulting state, and offer undo where the action can be undone | M | The task card (landed) | `mobius-product.md` priority 5. Today the card is above the composer and is not saved with the chat |
 | Threat model for tier 3 (synthetic input) before any implementation | S | None | `agentic-os.md` marks it phase 2; `trusted-surface.md` |
 | Project knowledge: explicit notes and selected files reused across chats, with visible sources | L | Retrieval measured first | `mobius-product.md` priority 4 |
 | Read-aloud replies with playback and cancel | M | TTS engine choice | `mobius-product.md` |

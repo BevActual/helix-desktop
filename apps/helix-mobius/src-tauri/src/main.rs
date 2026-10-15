@@ -1,6 +1,7 @@
 //! Mobius — Helix’s desktop AI (Talk hub). Talks via `org.helix.Inference` (local) or OpenAI-compat LAN (this process).
 //! Desktop act hands off to the bar Assistant (`Shell1.AssistantSubmit`). Never holds Agent Surface grants.
 
+mod act;
 mod attach;
 mod analysis;
 mod dictate;
@@ -1352,6 +1353,8 @@ async fn chat_act_on_desktop(text: String) -> Result<(), String> {
     }
     let connection = connection().await.map_err(|_| shell_offline())?;
     let proxy = shell_proxy(&connection).await.map_err(|_| shell_offline())?;
+    // Remembered before the hand-over, so the first state the shell reports is already known to be this task.
+    act::remember(trimmed);
     proxy
         .call_method("AssistantSubmit", &(trimmed,))
         .await
@@ -2193,6 +2196,8 @@ fn main() {
             chat_reply_draft,
             chat_reply_save,
             chat_act_on_desktop,
+            act::chat_act_state,
+            act::chat_act_stop,
             agent_desk_glance,
             agent_desk_focus,
             chat_open_shell_panel,
@@ -2241,6 +2246,7 @@ fn main() {
         ])
         .setup(|app| {
             app.manage(web::Research::default());
+            act::watch(app.handle().clone());
             app.manage(agent::Runtime::default());
             let mut fresh = Conversation::new(&new_id(), now()).expect("a fresh id is valid");
             if let Some(turns) = take_bar_handoff() {

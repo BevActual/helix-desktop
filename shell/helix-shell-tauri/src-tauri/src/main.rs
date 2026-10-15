@@ -9,6 +9,7 @@
 //! Assistant is a separate process (`helix-assistant`); this binary never holds Agent Surface
 //! client grants. Confirmer Overlay is opt-in (`HELIX_SHELL_CONFIRMER`).
 
+mod act_feed;
 mod apps;
 mod backlight;
 mod battery;
@@ -185,6 +186,7 @@ fn shell_state(app: &AppHandle) -> Arc<Mutex<ShellState>> {
 
 fn emit_view(app: &AppHandle, view: &AssistantView) {
     eprintln!("ASSISTANT {}", view.phase);
+    act_feed::publish(view);
     let _ = app.emit("assistant-view", view);
     island::publish(app);
 }
@@ -1763,6 +1765,7 @@ fn assistant_submit(app: AppHandle, request: String) -> AssistantView {
 
 /// Hands a request to the assistant session, as typing it in the assistant panel does.
 pub(crate) fn submit_request(app: &AppHandle, request: &str) -> AssistantView {
+    act_feed::note_request(request);
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
     shell.mobius_mode = MobiusMode::Act;
@@ -2135,6 +2138,10 @@ fn main() {
                 if helix_shell_core::shell_polkit_agent_enabled() {
                     polkit_agent::start(handle.clone());
                 }
+            }
+            if !role.forwards_panels() {
+                // This process holds the assistant session (monolith or panels): it says what the assistant is doing.
+                act_feed::serve(handle.clone());
             }
             if role.serves_panels_socket() {
                 panels_bridge::serve(handle.clone(), move |app, req| {

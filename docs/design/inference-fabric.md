@@ -19,6 +19,11 @@ Product structure: `product-structure.md`. Agent Surface: `agentic-os.md`. Agent
 
 Do not merge Mobius, the bar Assistant, and the Agents panel into one process.
 
+**What comes back.** The shell process that holds the assistant session serves `org.helix.Shell.Act1`
+(`protocols/dbus/org.helix.Shell.Act.xml`): `GetState`, `Changed`, and `Stop`. Mobius reads it to show the task it handed over
+(working, waiting for approval, done, or why not). It is read-only apart from `Stop`, which only cancels: approving stays in the shell's
+own approval surface (`trusted-surface.md`), so a page that renders model output can never confirm anything.
+
 ## Hard rules
 
 1. **One hallway for desktop change.** Agent Surface → shell socket. First-party act ends in `helix-assistant`.

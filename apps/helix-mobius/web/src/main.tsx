@@ -1,4 +1,5 @@
 import { ChatTools, type ToolsHandle } from "./tools";
+import { ActTask, type ActHandle, type ActHooks, type ActState } from "./acttask";
 import { createRoot } from "react-dom/client";
 import { ChatList, type ChatItem, type ChatListHandle, type ChatListHooks } from "./chatlist";
 import { AttachChips, SlashMenu, type Attachment, type ChipsHandle, type SlashHandle, type SlashItem } from "./composer";
@@ -28,6 +29,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
 }
 
 (window as unknown as { HelixMobiusReact: unknown }).HelixMobiusReact = {
+  acttask: (host: HTMLElement, hooks: ActHooks) => {
+    const run = handled<ActHandle>(host, (register) => <ActTask register={register} hooks={hooks} />);
+    return { set: (state: ActState | null) => run((h) => h.set(state)) };
+  },
   tools: (host: HTMLElement) => {
     const run = handled<ToolsHandle>(host, (register) => <ChatTools register={register} />);
     return { open: (view: Parameters<ToolsHandle["open"]>[0]) => run((h) => h.open(view)) };
