@@ -30,9 +30,10 @@ Split processes: `helix-shell-strut` (exclusive zone) + `helix-shell-bar` (`HELI
 
 | Area | Location | Notes |
 |------|----------|-------|
-| Desktop service | `src/desktop/`, `helix-service` | D-Bus authority (`org.helix.Desktop`); Rust target `services/helix-desktop` |
-| Inference / assistant | `src/inference/`, `src/assistant/` | Separate processes; target `services/helix-inference`, `services/helix-assistant` |
-| Platform libraries | `src/config`, `theme`, `dbus`, … | Move with each domain cutover |
+| Desktop authority | `services/helix-desktop` | `org.helix.Desktop`; unit `helix-service.service` runs `helix-desktop` |
+| Assistant / inference | `services/helix-assistant`, `services/helix-inference` | D-Bus processes are Rust; llama glue + `helix-transcribe` / `helix-image` workers under `src/inference/` |
+| Theme / template helpers | `src/theme/`, Meson `helix-template-apply`, `helix-theme-palette` | Fallback when `helix-theme` returns unsupported; see `cpp-to-rust.md` |
+| Contract tests | `src/desktop/`, `tests/desktop_service_test.cpp` | Behavioural contract against the Rust binary in CI |
 
 See `product-structure.md` and `cpp-to-rust.md`.
 
@@ -45,14 +46,14 @@ compositor/           helix-niri fork (own Cargo workspace)
 core/                 pure models + desktop-api + shared-ui
 shell/                live session shell (Tauri)
 apps/                 Settings / Software / Monitor / Chat
-services/             wallpaper + idle + helix-desktop (Rust service scaffold)
+services/             helix-desktop, assistant, inference, system-upgrade, wallpaper, idle
 dev/                  nested probes only
 target/               cargo output (fast/release)
 protocols/            D-Bus + IPC contracts (source of truth)
 tools/                switch-shell, nested e2e, helpers
-src/desktop/          helix-service (keep)
-src/assistant/        assistant process (→ services/helix-assistant)
-src/inference/        model runtime (→ services/helix-inference)
+src/desktop/          contract-test fixtures (agent policy, tool schema)
+src/inference/        llama glue + transcribe/image workers (service is services/helix-inference)
+src/theme/            C++ template/palette helpers (fallback for helix-desktop)
 assets/               icons, templates, translations
 docs/design/          architecture + HIG; see README.md; archive/ is retired dumps
 ```

@@ -1941,6 +1941,7 @@ name = "helix-theme"
 version = "0.1.0"
 dependencies = [
  "image",
+ "libc",
  "material-colors",
  "regex",
  "serde_json",
