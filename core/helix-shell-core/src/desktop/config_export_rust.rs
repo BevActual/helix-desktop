@@ -1,21 +1,20 @@
 //! In-process `config_export::serialize` parity (incremental port).
 //!
-//! Today: schema-default export (`config_export_defaults::assemble_default_export`) rebuilt for
-//! dynamic `bar` / `idle.behavior` shapes, then user `config.toml` / `settings.toml` leaves
-//! patched when those paths exist in the export tree. Unknown merged keys fall back to
-//! `helix-config-export` (see `docs/design/config-export-rust.md`).
+//! Milestone B default tree: [`config_export_serialize::serialize_default_config`].
+//! Milestone C effective export: rebuild dynamic `bar` / `idle` / widgets, overlay merged leaves,
+//! then [`config_export_serialize::finalize_serialized_export`]. Future: parse merged TOML into
+//! `Config` and `writeTable` per section instead of leaf patch (see `docs/design/config-export-rust.md`).
 
 use std::sync::OnceLock;
 
 use toml::Value as Toml;
 
-use super::config_export_defaults::assemble_default_export;
-use super::config_export_serialize::{finalize_serialized_export, f32_bits};
+use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
 use super::settings::{ConfigPaths, ConfigStore};
 
 fn default_export_root() -> &'static Toml {
     static ROOT: OnceLock<Toml> = OnceLock::new();
-    ROOT.get_or_init(assemble_default_export)
+    ROOT.get_or_init(serialize_default_config)
 }
 
 fn dot_path_exists(root: &Toml, path: &str) -> bool {

@@ -8,6 +8,7 @@
 
 use toml::Value as Toml;
 
+use super::config_export_defaults::assemble_default_export;
 use super::config_export_key_chord::export_key_chord_spec;
 
 pub(crate) fn f32_bits(value: f64) -> f64 {
@@ -145,6 +146,13 @@ fn strip_false_placement_flip_flags(root: &mut Toml) {
     }
 }
 
+/// `config_export::serialize(makeDefaultConfig())` — milestone B default tree + finalize rules.
+pub fn serialize_default_config() -> Toml {
+    let mut root = assemble_default_export();
+    finalize_serialized_export(&mut root);
+    root
+}
+
 /// Post-process export trees to match `config_export::serialize` shape.
 pub fn finalize_serialized_export(root: &mut Toml) {
     sort_widget_section(root);
@@ -154,4 +162,16 @@ pub fn finalize_serialized_export(root: &mut Toml) {
     normalize_keybinds_export(root);
     strip_empty_wallpaper_default_path(root);
     round_export_floats(root);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialize_default_config_matches_minimal_golden() {
+        let golden = include_str!("../../tests/golden/config_export_minimal.toml");
+        let expected: Toml = golden.parse().expect("golden parse");
+        assert_eq!(serialize_default_config(), expected);
+    }
 }

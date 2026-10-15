@@ -10,6 +10,7 @@ use serde_json::Value;
 use toml::Value as Toml;
 
 use super::config_export_rust;
+use super::config_export_serialize::serialize_default_config;
 use super::settings::{toml_to_json_value, ConfigPaths, ConfigStore};
 
 pub fn configure_export_env(command: &mut Command, paths: &ConfigPaths) {
@@ -90,6 +91,16 @@ pub fn discover_config_export_bin() -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// `config_export::serialize(makeDefaultConfig())` (milestone B).
+pub fn default_export_toml() -> Toml {
+    serialize_default_config()
+}
+
+/// Effective export for merged user config (milestone C: patch overlay today; parse → writeTable later).
+pub fn serialize_effective_export(store: &ConfigStore) -> Option<Toml> {
+    rust_export_from_store(store)
 }
 
 /// In-process Rust exporter (parity target: `tests/golden/config_export_minimal.toml`).
