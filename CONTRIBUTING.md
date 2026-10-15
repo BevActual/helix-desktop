@@ -10,6 +10,35 @@ Design index: [docs/design/README.md](docs/design/README.md).
 
 For dependencies and normal build commands, start with [BUILDING.md](BUILDING.md).
 
+## Git remotes and GitHub CLI
+
+Helix development uses **two** GitHub remotes:
+
+| Remote | Repository | Use |
+|--------|------------|-----|
+| `origin` | [BevActual/helix-desktop](https://github.com/BevActual/helix-desktop) | Push branches; **open pull requests here** (`base` is usually `main`) |
+| `upstream` | [noctalia-dev/noctalia](https://github.com/noctalia-dev/noctalia) | Optional sync with upstream Noctalia; not the PR target for Helix work |
+
+Local `main` is configured to track `upstream/main`, so **`gh pr create` without extra flags can fail** (GraphQL errors about `noctalia-dev:main` vs `BevActual:…`, or “no commits between”).
+
+Fix it once per clone (stores the default repo for this directory):
+
+```sh
+gh repo set-default BevActual/helix-desktop
+```
+
+Or set `GH_REPO` / use the wrapper for every command:
+
+```sh
+tools/gh-pr.sh pr create --base main --head your-branch --title "…" --body "…"
+```
+
+Explicit flags always work:
+
+```sh
+gh pr create --repo BevActual/helix-desktop --base main --head your-branch
+```
+
 ## Design Principles
 
 - Session shell and apps: Rust + Tauri 2 (GTK3 layer-shell / WebKit), shared UI in `core/shared-ui/`.
@@ -285,7 +314,8 @@ Install the source-build dependencies for your distribution using the commands i
 
 ```sh
 git clone https://github.com/BevActual/helix-desktop.git
-cd helix-shell
+cd helix-desktop
+gh repo set-default BevActual/helix-desktop
 ```
 
 Stop the Helix instance started by your compositor, then configure and build ASan:
