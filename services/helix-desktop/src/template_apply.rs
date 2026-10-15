@@ -26,7 +26,9 @@ fn notify_kde_scheme_changed() -> Option<String> {
             &(0i32, 0i32),
         )
     };
-    crate::blocking::run(send).err().map(|error| error.to_string())
+    crate::blocking::run(send)
+        .err()
+        .map(|error| error.to_string())
 }
 
 /// Applies templates in-process when every input is something `helix-theme` reproduces
@@ -46,7 +48,10 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let session_wallpaper = state.wallpaper.clone();
     // A wallpaper that cannot be turned into a palette is the helper's to handle.
     let wallpaper = if source == PaletteSource::Wallpaper {
-        Some(crate::wallpaper_source::wallpaper_palette(config, &session_wallpaper)?)
+        Some(crate::wallpaper_source::wallpaper_palette(
+            config,
+            &session_wallpaper,
+        )?)
     } else {
         None
     };
@@ -61,15 +66,21 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let community_name = text("theme.community_palette").unwrap_or_default();
     let offline = flag("shell.offline_mode");
     if source == PaletteSource::Community
-        && !crate::palette_catalog::ensure_community_palette_cached(&state_dir, &community_name, offline) {
-            return None;
-        }
+        && !crate::palette_catalog::ensure_community_palette_cached(
+            &state_dir,
+            &community_name,
+            offline,
+        )
+    {
+        return None;
+    }
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
         custom_palette: text("theme.custom_palette").unwrap_or_default(),
-        community_cache: (source == PaletteSource::Community && !community_name.is_empty())
-            .then(|| helix_theme::custom::community_palette_cache_path(&state_dir, &community_name)),
+        community_cache: (source == PaletteSource::Community && !community_name.is_empty()).then(
+            || helix_theme::custom::community_palette_cache_path(&state_dir, &community_name),
+        ),
         shell_light,
         wallpaper,
     };
@@ -87,7 +98,12 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         config
             .get_raw_list(id)
             .and_then(|v| v.as_array().cloned())
-            .map(|items| items.iter().filter_map(|i| i.as_str().map(str::to_string)).collect())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|i| i.as_str().map(str::to_string))
+                    .collect()
+            })
             .unwrap_or_default()
     };
 
@@ -101,7 +117,8 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         }
     }
     let user_root = apply::build_user_template_root(&templates_cfg);
-    let user_root = (!user_root.is_empty()).then(|| (user_root, paths.config_dir.join("config.toml")));
+    let user_root =
+        (!user_root.is_empty()).then(|| (user_root, paths.config_dir.join("config.toml")));
 
     let applied_before = state
         .runtime
@@ -115,18 +132,31 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         scheme_type,
         image_path: {
             let path = crate::wallpaper_source::palette_wallpaper_path(config, &session_wallpaper);
-            if path.is_empty() { None } else { Some(path) }
+            if path.is_empty() {
+                None
+            } else {
+                Some(path)
+            }
         },
         config_table: Some(crate::config_export::template_config_json(config)),
         icon_theme: active_icon_theme_name(),
         builtin_config,
-        enable_builtin: config.get("theme.templates.enable_builtin_templates").as_bool().unwrap_or(true),
+        enable_builtin: config
+            .get("theme.templates.enable_builtin_templates")
+            .as_bool()
+            .unwrap_or(true),
         builtin_ids: list("theme.templates.builtin_ids"),
-        enable_community: config.get("theme.templates.enable_community_templates").as_bool().unwrap_or(true),
+        enable_community: config
+            .get("theme.templates.enable_community_templates")
+            .as_bool()
+            .unwrap_or(true),
         community: list("theme.templates.community_ids")
             .into_iter()
             .map(|id| CommunityTemplate {
-                config_path: state_dir.join("community-templates").join(&id).join("template.toml"),
+                config_path: state_dir
+                    .join("community-templates")
+                    .join(&id)
+                    .join("template.toml"),
                 id,
             })
             .collect(),
@@ -174,9 +204,9 @@ pub fn reapply_templates(state: &mut State) -> Result<(), String> {
 
     match apply_in_process(state) {
         Some(result) => result,
-        None => Err(
-            "Template apply is not supported for this theme configuration in-process".into(),
-        ),
+        None => {
+            Err("Template apply is not supported for this theme configuration in-process".into())
+        }
     }
 }
 

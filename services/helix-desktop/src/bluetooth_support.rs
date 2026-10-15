@@ -20,12 +20,6 @@ pub async fn emit_bluetooth_changed(conn: &Connection) {
 
 pub async fn emit_configuration_changed(conn: &Connection) {
     let _ = conn
-        .emit_signal(
-            None::<&str>,
-            OBJECT_PATH,
-            CONFIG_INTERFACE,
-            "Changed",
-            &(),
-        )
+        .emit_signal(None::<&str>, OBJECT_PATH, CONFIG_INTERFACE, "Changed", &())
         .await;
 }

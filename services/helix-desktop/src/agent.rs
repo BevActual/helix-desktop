@@ -86,10 +86,14 @@ fn parse_grant_tiers(names: &[String], allow_blocked_name: bool) -> fdo::Result<
     let mut out = Vec::new();
     for name in names {
         let Some(tier) = RiskTier::parse(name) else {
-            return Err(fdo::Error::InvalidArgs("unknown or ungrantable tier".into()));
+            return Err(fdo::Error::InvalidArgs(
+                "unknown or ungrantable tier".into(),
+            ));
         };
         if tier == RiskTier::Blocked && !allow_blocked_name {
-            return Err(fdo::Error::InvalidArgs("unknown or ungrantable tier".into()));
+            return Err(fdo::Error::InvalidArgs(
+                "unknown or ungrantable tier".into(),
+            ));
         }
         if tier != RiskTier::Blocked {
             out.push(tier);
@@ -250,9 +254,7 @@ impl Agent {
         }
         if state.confirmer.is_none() {
             let operation = state.alloc_operation();
-            let result = denial_json(
-                "access needs approval and no approval dialog is available",
-            );
+            let result = denial_json("access needs approval and no approval dialog is available");
             Self::completed(&emitter, operation, false, &result)
                 .await
                 .ok();
@@ -380,22 +382,10 @@ impl Agent {
                 } else {
                     "allowed"
                 };
-                audit_and_notify(
-                    &mut state,
-                    audit_record(&pending, tier, decision, ""),
-                )
-                .await;
+                audit_and_notify(&mut state, audit_record(&pending, tier, decision, "")).await;
                 drop(state);
-                self.run_shell_action(
-                    &emitter,
-                    operation,
-                    tier,
-                    &client,
-                    &tool,
-                    &argv,
-                    &literal,
-                )
-                .await?;
+                self.run_shell_action(&emitter, operation, tier, &client, &tool, &argv, &literal)
+                    .await?;
                 Ok(operation)
             }
             Verdict::NeedsConfirmation => {
@@ -419,12 +409,7 @@ impl Agent {
                     };
                     audit_and_notify(
                         &mut state,
-                        audit_record(
-                            &pending,
-                            tier,
-                            "denied",
-                            "no confirmer",
-                        ),
+                        audit_record(&pending, tier, "denied", "no confirmer"),
                     )
                     .await;
                     let result = denial_json(
@@ -570,7 +555,8 @@ impl Agent {
                     return Ok(());
                 }
                 // Approving a grant is not a review of any later action: taint stays until an action is confirmed.
-                let granted: Vec<String> = after.iter().map(|tier| tier.name().to_string()).collect();
+                let granted: Vec<String> =
+                    after.iter().map(|tier| tier.name().to_string()).collect();
                 audit_and_notify(
                     &mut state,
                     audit_record(&pending, RiskTier::Confirm, "granted", &granted.join(",")),
@@ -584,27 +570,18 @@ impl Agent {
             }
             ConfirmKind::Action => {
                 state.taint.clear(&pending.client);
-                let tier = parse_tiers(&pending.tiers)?.into_iter().next().unwrap_or(RiskTier::Confirm);
-                audit_and_notify(
-                    &mut state,
-                    audit_record(&pending, tier, "confirmed", ""),
-                )
-                .await;
+                let tier = parse_tiers(&pending.tiers)?
+                    .into_iter()
+                    .next()
+                    .unwrap_or(RiskTier::Confirm);
+                audit_and_notify(&mut state, audit_record(&pending, tier, "confirmed", "")).await;
                 let client = pending.client.clone();
                 let tool = pending.tool.clone();
                 let argv = pending.argv.clone();
                 let literal = pending.literal.clone();
                 drop(state);
-                self.run_shell_action(
-                    &emitter,
-                    operation,
-                    tier,
-                    &client,
-                    &tool,
-                    &argv,
-                    &literal,
-                )
-                .await?;
+                self.run_shell_action(&emitter, operation, tier, &client, &tool, &argv, &literal)
+                    .await?;
             }
         }
         Ok(())
@@ -625,9 +602,7 @@ impl Agent {
         let mut state = self.state.lock().await;
         if let Some(existing) = &state.manager {
             if existing != &peer.client {
-                return Err(fdo::Error::Failed(
-                    "A manager is already registered".into(),
-                ));
+                return Err(fdo::Error::Failed("A manager is already registered".into()));
             }
         }
         state.manager = Some(peer.client.clone());
@@ -672,11 +647,7 @@ impl Agent {
             return Err(fdo::Error::Failed(error));
         }
         let tier_names: Vec<String> = tiers.clone();
-        append_audit(
-            &mut state,
-            grant_change_record(client, "set", &tier_names),
-        )
-        .await;
+        append_audit(&mut state, grant_change_record(client, "set", &tier_names)).await;
         drop(state);
         Self::changed(&emitter).await.ok();
         Ok(())
@@ -695,11 +666,7 @@ impl Agent {
         require_manager(&state, &peer.client)?;
         state.grants.revoke(client);
         state.grants.save().map_err(fdo::Error::Failed)?;
-        append_audit(
-            &mut state,
-            grant_change_record(client, "revoked", &[]),
-        )
-        .await;
+        append_audit(&mut state, grant_change_record(client, "revoked", &[])).await;
         drop(state);
         Self::changed(&emitter).await.ok();
         Ok(())
@@ -791,9 +758,7 @@ impl Agent {
             "trusted"
         };
         let result = action_result_json(trust, ok, &body);
-        Self::completed(emitter, operation, ok, &result)
-            .await
-            .ok();
+        Self::completed(emitter, operation, ok, &result).await.ok();
         Ok(())
     }
 

@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::fdo;
+use zbus::interface;
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedValue;
-use zbus::interface;
 use zbus::Connection;
 
 use crate::agent_support::{cancel_all_pending, finish_pending_denied};
@@ -136,10 +136,7 @@ impl AgentActivity {
         Ok(())
     }
 
-    async fn get_grants(
-        &self,
-        #[zbus(header)] header: Header<'_>,
-    ) -> fdo::Result<Vec<OwnedValue>> {
+    async fn get_grants(&self, #[zbus(header)] header: Header<'_>) -> fdo::Result<Vec<OwnedValue>> {
         let sender = header
             .sender()
             .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?

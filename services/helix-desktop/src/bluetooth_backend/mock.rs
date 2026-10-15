@@ -12,7 +12,9 @@ pub struct MockBackend {
 
 pub fn force_mock() -> bool {
     matches!(
-        std::env::var("HELIX_DESKTOP_MOCK_BLUETOOTH").ok().as_deref(),
+        std::env::var("HELIX_DESKTOP_MOCK_BLUETOOTH")
+            .ok()
+            .as_deref(),
         Some("1") | Some("true") | Some("yes")
     )
 }

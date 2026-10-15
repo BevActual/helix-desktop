@@ -51,7 +51,11 @@ impl WpctlBackend {
         let since = self.last_refresh.elapsed();
         // Leave the flag set while rate limited so the change is read on a later tick.
         let dirty = since >= MIN_EVENT_INTERVAL && self.watch.take_dirty();
-        let interval = if self.available { SAFETY_REFRESH } else { UNAVAILABLE_RETRY };
+        let interval = if self.available {
+            SAFETY_REFRESH
+        } else {
+            UNAVAILABLE_RETRY
+        };
         if dirty || since >= interval {
             self.refresh()
         } else {
@@ -194,11 +198,7 @@ fn parse_get_volume(text: &str) -> Option<VolumeLine> {
     let line = text.lines().find(|line| line.starts_with("Volume:"))?;
     let after = line.strip_prefix("Volume:")?.trim();
     let muted = after.contains("[MUTED]");
-    let number = after
-        .split_whitespace()
-        .next()?
-        .parse::<f64>()
-        .ok()?;
+    let number = after.split_whitespace().next()?.parse::<f64>().ok()?;
     Some(VolumeLine {
         volume: number,
         muted,
@@ -256,11 +256,7 @@ fn parse_volume_line(line: &str, default_id: Option<u32>) -> Option<Node> {
         .and_then(|s| s.strip_suffix(']'))?
         .trim();
     let muted = inner.contains("MUTED");
-    let volume = inner
-        .split_whitespace()
-        .next()?
-        .parse::<f64>()
-        .ok()?;
+    let volume = inner.split_whitespace().next()?.parse::<f64>().ok()?;
     Some(Node {
         id,
         name: description.to_string(),
@@ -339,7 +335,11 @@ fn wpctl_output(args: &[&str]) -> Result<String, String> {
         .map_err(|error| format!("wpctl spawn failed: {error}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("wpctl {} failed: {}", args.join(" "), stderr.trim()));
+        return Err(format!(
+            "wpctl {} failed: {}",
+            args.join(" "),
+            stderr.trim()
+        ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }

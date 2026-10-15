@@ -188,7 +188,8 @@ fn parse_outputs_map(text: &str) -> Result<Vec<ParsedOutput>, String> {
             .unwrap_or((0, 0, 0));
         let logical = object.get("logical").and_then(Value::as_object);
         let enabled = logical.is_some();
-        let (x, y, logical_width, logical_height, scale, transform) = if let Some(logical) = logical {
+        let (x, y, logical_width, logical_height, scale, transform) = if let Some(logical) = logical
+        {
             (
                 logical.get("x").and_then(Value::as_i64).unwrap_or(0),
                 logical.get("y").and_then(Value::as_i64).unwrap_or(0),

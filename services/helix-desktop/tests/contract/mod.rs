@@ -1,7 +1,7 @@
 //! Behavioural contract for `org.helix.Desktop` (one helix-desktop process per test run).
 
-mod bootstrap;
 mod bluetooth;
+mod bootstrap;
 mod configuration;
 mod helpers;
 

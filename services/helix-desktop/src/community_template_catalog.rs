@@ -106,7 +106,9 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let settings = std::env::temp_dir().join(format!("helix-template-catalog-{nanos}")).join("settings.toml");
+        let settings = std::env::temp_dir()
+            .join(format!("helix-template-catalog-{nanos}"))
+            .join("settings.toml");
         std::fs::create_dir_all(settings.parent().unwrap()).unwrap();
         std::fs::write(&settings, "").unwrap();
         assert_eq!(

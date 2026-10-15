@@ -16,12 +16,12 @@ pub async fn resolve_peer(connection: &Connection, sender: &str) -> zbus::fdo::R
     let bus_name = zbus::names::BusName::try_from(sender)
         .map_err(|_| zbus::fdo::Error::InvalidArgs("bad sender name".into()))?;
     let creds = dbus.get_connection_credentials(bus_name).await?;
-    let pid = creds
-        .process_id()
-        .ok_or_else(|| zbus::fdo::Error::Failed("the bus did not report the caller's process".into()))?;
-    let uid = creds
-        .unix_user_id()
-        .ok_or_else(|| zbus::fdo::Error::Failed("the bus did not report the caller's user".into()))?;
+    let pid = creds.process_id().ok_or_else(|| {
+        zbus::fdo::Error::Failed("the bus did not report the caller's process".into())
+    })?;
+    let uid = creds.unix_user_id().ok_or_else(|| {
+        zbus::fdo::Error::Failed("the bus did not report the caller's user".into())
+    })?;
     if uid != unsafe { libc::geteuid() } {
         return Err(zbus::fdo::Error::AccessDenied(
             "callers must run as the same user".into(),

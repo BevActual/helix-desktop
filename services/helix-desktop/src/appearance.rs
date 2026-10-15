@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::fdo;
+use zbus::interface;
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedValue;
-use zbus::interface;
 
 use crate::dbus_value::{json_to_owned, owned_bool, owned_str, owned_to_json};
 use crate::state::State;
@@ -52,7 +52,11 @@ fn finish_palette_save(
             state
                 .config
                 .set("theme.source", serde_json::json!("custom"))
-                .and_then(|()| state.config.set("theme.custom_palette", serde_json::json!(name)))
+                .and_then(|()| {
+                    state
+                        .config
+                        .set("theme.custom_palette", serde_json::json!(name))
+                })
                 .map_err(fdo::Error::Failed)?;
             name
         }
@@ -102,23 +106,24 @@ impl Appearance {
                 .and_then(|value| value.as_str().map(|key| !key.trim().is_empty()))
                 .unwrap_or(false);
         map.insert("wallhaven-key-available".into(), owned_bool(key_available));
-        map.insert(
-            "wallhaven-online".into(),
-            owned_bool(desktop && !offline),
-        );
+        map.insert("wallhaven-online".into(), owned_bool(desktop && !offline));
         let download_directory = if desktop {
-            state.wallhaven_context().download_dir.to_string_lossy().into_owned()
+            state
+                .wallhaven_context()
+                .download_dir
+                .to_string_lossy()
+                .into_owned()
         } else {
             String::new()
         };
-        map.insert("wallhaven-download-directory".into(), owned_str(&download_directory));
+        map.insert(
+            "wallhaven-download-directory".into(),
+            owned_str(&download_directory),
+        );
         map
     }
 
-    async fn reapply(
-        &self,
-        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
-    ) -> fdo::Result<()> {
+    async fn reapply(&self, #[zbus(signal_emitter)] emitter: SignalEmitter<'_>) -> fdo::Result<()> {
         let mut state = self.state.lock().await;
         if state.desktop.is_none() {
             return Err(fdo::Error::InvalidArgs(
@@ -135,13 +140,11 @@ impl Appearance {
         let apply = crate::blocking::run(|| crate::template_apply::reapply_templates(&mut state));
         drop(state);
         if let Err(message) = apply {
-            return Err(fdo::Error::Failed(
-                if message.is_empty() {
-                    "Appearance is not ready".into()
-                } else {
-                    message
-                },
-            ));
+            return Err(fdo::Error::Failed(if message.is_empty() {
+                "Appearance is not ready".into()
+            } else {
+                message
+            }));
         }
         Self::applied(&emitter, &mode, true).await.ok();
         Self::changed(&emitter).await.ok();
@@ -165,8 +168,10 @@ impl Appearance {
         };
         let sync_result = tokio::task::spawn_blocking(move || {
             let palette = crate::palette_catalog::sync_community_catalog(&settings_toml, offline);
-            let templates =
-                crate::community_template_catalog::sync_community_template_catalog(&settings_toml, offline);
+            let templates = crate::community_template_catalog::sync_community_template_catalog(
+                &settings_toml,
+                offline,
+            );
             (palette, templates)
         })
         .await
@@ -322,7 +327,10 @@ impl Appearance {
     ) -> fdo::Result<HashMap<String, OwnedValue>> {
         let sender = sender_name(&header)?;
         let state = self.state.lock().await;
-        let result = state.wallhaven.result(operation, &sender).map_err(wallhaven_error)?;
+        let result = state
+            .wallhaven
+            .result(operation, &sender)
+            .map_err(wallhaven_error)?;
         let mut map = HashMap::new();
         if let Some(object) = result.as_object() {
             for (key, value) in object {
@@ -356,7 +364,10 @@ impl Appearance {
     ) -> fdo::Result<()> {
         let sender = sender_name(&header)?;
         let state = self.state.lock().await;
-        state.wallhaven.cancel(operation, &sender).map_err(wallhaven_error)
+        state
+            .wallhaven
+            .cancel(operation, &sender)
+            .map_err(wallhaven_error)
     }
 
     async fn set_wallhaven_api_key(&self, key: &str) -> fdo::Result<()> {

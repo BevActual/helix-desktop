@@ -60,7 +60,6 @@ pub fn probe() -> bool {
 
 impl NmBackend {
     pub fn new() -> Self {
-        
         Self {
             fields: NetworkFields {
                 available: false,
@@ -164,7 +163,9 @@ impl NmBackend {
             return Ok(());
         }
         if ap.secured && !ap.saved {
-            let password = secret.filter(|text| !text.is_empty()).ok_or_else(|| "Password required".to_string())?;
+            let password = secret
+                .filter(|text| !text.is_empty())
+                .ok_or_else(|| "Password required".to_string())?;
             activate_access_point(&ap, Some(password))?;
             self.wifi_secret = password.to_string();
         } else if ap.saved {
@@ -320,13 +321,15 @@ fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed,
 
         if device_type == NM_DEVICE_TYPE_WIFI {
             if let Ok(wifi_props) = get_all(conn, &path, DEVICE_WIFI_IFACE) {
-                let active_ap = prop_object_path(&wifi_props, "ActiveAccessPoint").unwrap_or_default();
+                let active_ap =
+                    prop_object_path(&wifi_props, "ActiveAccessPoint").unwrap_or_default();
                 let aps = load_access_points(conn, &path, &active_ap, &saved_ssids)?;
                 access_points.extend(aps);
                 let signal = active_ap_strength(conn, &active_ap);
                 let ssid = active_ap_ssid(conn, &active_ap);
                 let connected = state == NM_DEVICE_STATE_ACTIVATED;
-                let resolving = (NM_DEVICE_STATE_PREPARE..NM_DEVICE_STATE_ACTIVATED).contains(&state);
+                let resolving =
+                    (NM_DEVICE_STATE_PREPARE..NM_DEVICE_STATE_ACTIVATED).contains(&state);
                 let candidate = WifiDeviceState {
                     interface,
                     connected,
@@ -356,8 +359,12 @@ fn refresh_state_on_conn(conn: &Connection, scanning: bool) -> Result<Refreshed,
 
     access_points = dedupe_access_points(access_points);
 
-    let wifi_interface = primary_wifi.as_ref().map(|w| w.interface.clone()).unwrap_or_default();
-    let (fields, dns) = if let Some(wifi) = primary_wifi.filter(|w| w.connected || wireless_enabled) {
+    let wifi_interface = primary_wifi
+        .as_ref()
+        .map(|w| w.interface.clone())
+        .unwrap_or_default();
+    let (fields, dns) = if let Some(wifi) = primary_wifi.filter(|w| w.connected || wireless_enabled)
+    {
         if wifi.connected {
             (
                 NetworkFields {
@@ -477,12 +484,17 @@ pub fn bus_owner() -> Option<String> {
                 &(NM_SERVICE,),
             )
             .map_err(|error| error.to_string())?;
-        reply.body().deserialize::<String>().map_err(|error| error.to_string())
+        reply
+            .body()
+            .deserialize::<String>()
+            .map_err(|error| error.to_string())
     })
     .ok()
 }
 
-fn with_connection<R>(operation: impl FnOnce(&Connection) -> Result<R, String>) -> Result<R, String> {
+fn with_connection<R>(
+    operation: impl FnOnce(&Connection) -> Result<R, String>,
+) -> Result<R, String> {
     crate::blocking::run(|| {
         let mut guard = SYSTEM_BUS
             .lock()
@@ -511,7 +523,11 @@ where
         .map_err(|error| error.to_string())
 }
 
-fn get_all(conn: &Connection, path: &str, iface: &str) -> Result<HashMap<String, OwnedValue>, String> {
+fn get_all(
+    conn: &Connection,
+    path: &str,
+    iface: &str,
+) -> Result<HashMap<String, OwnedValue>, String> {
     let reply = nm_call(conn, path, PROPS_IFACE, "GetAll", &(iface,))?;
     reply
         .body()
@@ -853,9 +869,9 @@ fn request_wifi_scan() -> Result<(), String> {
     with_connection(|conn| {
         for device in call_devices(conn)? {
             let props = get_all(conn, &device, DEVICE_IFACE)?;
-        if prop_u32(&props, "DeviceType").unwrap_or(0) != NM_DEVICE_TYPE_WIFI {
-            continue;
-        }
+            if prop_u32(&props, "DeviceType").unwrap_or(0) != NM_DEVICE_TYPE_WIFI {
+                continue;
+            }
             let _ = nm_call(
                 conn,
                 device.as_str(),
@@ -892,7 +908,10 @@ fn activate_enterprise_access_point(
     with_connection(|conn| {
         let mut settings: HashMap<&str, HashMap<&str, ZValue<'_>>> = HashMap::new();
         let mut security = HashMap::new();
-        security.insert("key-mgmt", ZValue::from(key_management_name(ap.key_management)));
+        security.insert(
+            "key-mgmt",
+            ZValue::from(key_management_name(ap.key_management)),
+        );
         settings.insert("802-11-wireless-security", security);
         settings.insert("802-1x", enterprise::eap_settings(credentials));
         let options: HashMap<&str, ZValue<'_>> =
@@ -989,41 +1008,45 @@ fn apply_dns_override(dns_override: &DnsOverride) -> Result<(), String> {
 
 fn activate_access_point(ap: &AccessPoint, psk: Option<&str>) -> Result<(), String> {
     with_connection(|conn| {
-    let mut settings: HashMap<&str, HashMap<&str, ZValue<'_>>> = HashMap::new();
-    if ap.secured {
-        let mut security = HashMap::new();
-        security.insert("key-mgmt", ZValue::from(key_management_name(ap.key_management)));
-        if let Some(password) = psk {
-            security.insert("psk", ZValue::from(password));
+        let mut settings: HashMap<&str, HashMap<&str, ZValue<'_>>> = HashMap::new();
+        if ap.secured {
+            let mut security = HashMap::new();
+            security.insert(
+                "key-mgmt",
+                ZValue::from(key_management_name(ap.key_management)),
+            );
+            if let Some(password) = psk {
+                security.insert("psk", ZValue::from(password));
+            }
+            settings.insert("802-11-wireless-security", security);
         }
-        settings.insert("802-11-wireless-security", security);
-    }
-    let options: HashMap<&str, ZValue<'_>> = HashMap::from([("persist", ZValue::from("memory"))]);
-    let result = nm_call(
-        conn,
-        NM_PATH,
-        NM_IFACE,
-        "AddAndActivateConnection2",
-        &(
-            settings.clone(),
-            ObjectPath::from_str_unchecked(&ap.device_path),
-            ObjectPath::from_str_unchecked(&ap.path),
-            options,
-        ),
-    );
-    if result.is_err() {
-        nm_call(
+        let options: HashMap<&str, ZValue<'_>> =
+            HashMap::from([("persist", ZValue::from("memory"))]);
+        let result = nm_call(
             conn,
             NM_PATH,
             NM_IFACE,
-            "AddAndActivateConnection",
+            "AddAndActivateConnection2",
             &(
                 settings.clone(),
                 ObjectPath::from_str_unchecked(&ap.device_path),
                 ObjectPath::from_str_unchecked(&ap.path),
+                options,
             ),
-        )?;
-    }
+        );
+        if result.is_err() {
+            nm_call(
+                conn,
+                NM_PATH,
+                NM_IFACE,
+                "AddAndActivateConnection",
+                &(
+                    settings.clone(),
+                    ObjectPath::from_str_unchecked(&ap.device_path),
+                    ObjectPath::from_str_unchecked(&ap.path),
+                ),
+            )?;
+        }
         Ok(())
     })
 }
@@ -1044,22 +1067,22 @@ fn deactivate_primary() -> Result<(), String> {
 
 fn delete_saved_ssid(ssid: &str) -> Result<(), String> {
     with_connection(|conn| {
-    let reply = nm_call(conn, SETTINGS_PATH, SETTINGS_IFACE, "ListConnections", &())?;
-    let paths = reply
-        .body()
-        .deserialize::<Vec<OwnedObjectPath>>()
-        .map_err(|error| error.to_string())?;
-    for path in paths {
-        let path_str = path.to_string();
-        let settings = connection_settings(conn, &path_str)?;
-        let candidate = settings
-            .get("802-11-wireless")
-            .and_then(|section| section.get("ssid"))
-            .and_then(prop_value_bytes)
-            .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
-            .unwrap_or_default();
-        if candidate == ssid {
-            nm_call(conn, &path_str, SETTINGS_CONN_IFACE, "Delete", &())?;
+        let reply = nm_call(conn, SETTINGS_PATH, SETTINGS_IFACE, "ListConnections", &())?;
+        let paths = reply
+            .body()
+            .deserialize::<Vec<OwnedObjectPath>>()
+            .map_err(|error| error.to_string())?;
+        for path in paths {
+            let path_str = path.to_string();
+            let settings = connection_settings(conn, &path_str)?;
+            let candidate = settings
+                .get("802-11-wireless")
+                .and_then(|section| section.get("ssid"))
+                .and_then(prop_value_bytes)
+                .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+                .unwrap_or_default();
+            if candidate == ssid {
+                nm_call(conn, &path_str, SETTINGS_CONN_IFACE, "Delete", &())?;
             }
         }
         Ok(())
@@ -1069,7 +1092,7 @@ fn delete_saved_ssid(ssid: &str) -> Result<(), String> {
 fn activate_vpn(path: &str) -> Result<(), String> {
     with_connection(|conn| {
         let device = call_devices(conn)?
-        .into_iter()
+            .into_iter()
             .find(|device| {
                 get_all(conn, device, DEVICE_IFACE)
                     .ok()

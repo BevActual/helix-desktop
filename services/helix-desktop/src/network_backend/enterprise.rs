@@ -67,9 +67,7 @@ fn ca_cert_uri_bytes(path: &str) -> Vec<u8> {
     bytes
 }
 
-pub fn eap_settings(
-    credentials: &EnterpriseCredentials,
-) -> HashMap<&'static str, ZValue<'_>> {
+pub fn eap_settings(credentials: &EnterpriseCredentials) -> HashMap<&'static str, ZValue<'_>> {
     let mut settings = HashMap::new();
     settings.insert("eap", ZValue::from(vec![eap_name(credentials.eap)]));
     settings.insert("identity", ZValue::from(credentials.identity.as_str()));
@@ -90,7 +88,10 @@ pub fn eap_settings(
     if credentials.ca_cert_path.is_empty() {
         settings.insert("system-ca-certs", ZValue::Bool(true));
     } else {
-        settings.insert("ca-cert", ZValue::from(ca_cert_uri_bytes(&credentials.ca_cert_path)));
+        settings.insert(
+            "ca-cert",
+            ZValue::from(ca_cert_uri_bytes(&credentials.ca_cert_path)),
+        );
     }
     settings
 }

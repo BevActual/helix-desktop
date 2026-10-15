@@ -22,7 +22,13 @@ fn main() {
     let skip = std::env::var_os("HELIX_SKIP_FRONTEND").is_some_and(|v| !v.is_empty());
     if !skip && root.join("node_modules").is_dir() {
         let status = Command::new("npm")
-            .args(["run", "build", "--workspace", "helix-settings-web", "--silent"])
+            .args([
+                "run",
+                "build",
+                "--workspace",
+                "helix-settings-web",
+                "--silent",
+            ])
             .current_dir(root)
             .status();
         match status {

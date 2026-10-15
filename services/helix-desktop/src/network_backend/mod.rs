@@ -50,7 +50,11 @@ pub struct NetworkFields {
     pub cellular_available: bool,
 }
 
-fn snapshot_from_parts(fields: &NetworkFields, access_points: &[AccessPoint], vpns: &[Vpn]) -> Value {
+fn snapshot_from_parts(
+    fields: &NetworkFields,
+    access_points: &[AccessPoint],
+    vpns: &[Vpn],
+) -> Value {
     json!({
         "available": fields.available,
         "enabled": fields.enabled,

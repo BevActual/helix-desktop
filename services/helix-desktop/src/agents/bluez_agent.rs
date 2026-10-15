@@ -136,13 +136,8 @@ impl BluezAgent {
 }
 
 pub async fn register(connection: &zbus::Connection) -> zbus::Result<()> {
-    let proxy = zbus::Proxy::new(
-        connection,
-        BLUEZ_BUS,
-        BLUEZ_ROOT,
-        AGENT_MANAGER_INTERFACE,
-    )
-    .await?;
+    let proxy =
+        zbus::Proxy::new(connection, BLUEZ_BUS, BLUEZ_ROOT, AGENT_MANAGER_INTERFACE).await?;
     proxy
         .call::<_, _, ()>("RegisterAgent", &(OBJECT_PATH, CAPABILITY))
         .await?;
@@ -154,13 +149,7 @@ pub async fn register(connection: &zbus::Connection) -> zbus::Result<()> {
 }
 
 pub async fn unregister(connection: &zbus::Connection) {
-    let proxy = zbus::Proxy::new(
-        connection,
-        BLUEZ_BUS,
-        BLUEZ_ROOT,
-        AGENT_MANAGER_INTERFACE,
-    )
-    .await;
+    let proxy = zbus::Proxy::new(connection, BLUEZ_BUS, BLUEZ_ROOT, AGENT_MANAGER_INTERFACE).await;
     if let Ok(proxy) = proxy {
         let _ = proxy
             .call::<_, _, ()>("UnregisterAgent", &(OBJECT_PATH,))

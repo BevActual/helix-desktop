@@ -31,7 +31,9 @@ struct Offer {
 }
 
 fn known_users() -> Vec<User> {
-    std::fs::read_to_string("/etc/passwd").map(|text| system::users_from_passwd(&text)).unwrap_or_default()
+    std::fs::read_to_string("/etc/passwd")
+        .map(|text| system::users_from_passwd(&text))
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -43,14 +45,19 @@ fn greeter_offer() -> Offer {
         .unwrap_or(true);
     Offer {
         users: known_users(),
-        sessions: system::sessions_in(Path::new(SESSIONS)).into_iter().map(|(session, _)| session).collect(),
+        sessions: system::sessions_in(Path::new(SESSIONS))
+            .into_iter()
+            .map(|(session, _)| session)
+            .collect(),
         dark,
     }
 }
 
 fn connect() -> Result<Conversation<UnixStream>, String> {
     let path = std::env::var_os("GREETD_SOCK").ok_or("The login service is not running.")?;
-    UnixStream::connect(path).map(Conversation::new).map_err(|error| format!("Cannot reach the login service: {error}"))
+    UnixStream::connect(path)
+        .map(Conversation::new)
+        .map_err(|error| format!("Cannot reach the login service: {error}"))
 }
 
 fn finish(login: &Login, step: Result<Step, std::io::Error>) -> Result<Step, String> {
@@ -95,7 +102,11 @@ fn greeter_cancel(login: State<Login>) {
 }
 
 #[tauri::command]
-fn greeter_start(app: tauri::AppHandle, login: State<Login>, session: String) -> Result<(), String> {
+fn greeter_start(
+    app: tauri::AppHandle,
+    login: State<Login>,
+    session: String,
+) -> Result<(), String> {
     let (_, cmd) = system::sessions_in(Path::new(SESSIONS))
         .into_iter()
         .find(|(offered, _)| offered.id == session)
@@ -115,7 +126,13 @@ fn greeter_start(app: tauri::AppHandle, login: State<Login>, session: String) ->
 fn main() {
     tauri::Builder::default()
         .manage(Login::default())
-        .invoke_handler(tauri::generate_handler![greeter_offer, greeter_begin, greeter_respond, greeter_cancel, greeter_start])
+        .invoke_handler(tauri::generate_handler![
+            greeter_offer,
+            greeter_begin,
+            greeter_respond,
+            greeter_cancel,
+            greeter_start
+        ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
                 .title("Helix")

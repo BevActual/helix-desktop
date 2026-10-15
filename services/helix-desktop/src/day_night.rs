@@ -21,9 +21,20 @@ fn local_time() -> LocalTime {
 
 fn location(config: &ConfigStore) -> LocationConfig {
     LocationConfig {
-        custom_schedule: config.get("location.custom_schedule").as_bool().unwrap_or(false),
-        sunset: config.get("location.sunset").as_str().unwrap_or("").to_string(),
-        sunrise: config.get("location.sunrise").as_str().unwrap_or("").to_string(),
+        custom_schedule: config
+            .get("location.custom_schedule")
+            .as_bool()
+            .unwrap_or(false),
+        sunset: config
+            .get("location.sunset")
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        sunrise: config
+            .get("location.sunrise")
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
         latitude: config.get("location.latitude").as_f64(),
         longitude: config.get("location.longitude").as_f64(),
     }

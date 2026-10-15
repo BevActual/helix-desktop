@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use serde_json::Value as JsonValue;
 use tokio::sync::Mutex;
 use zbus::fdo;
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
-use serde_json::Value as JsonValue;
 use zbus::zvariant::{OwnedValue, Value};
 use zbus::{interface, Connection};
 
@@ -35,9 +35,7 @@ fn require_setting_access(state: &State, id: &str) -> fdo::Result<()> {
             helix_shell_core::desktop::settings::MOBIUS_ROUTING_MESSAGE.into(),
         ));
     }
-    if state.desktop.is_none()
-        && !helix_shell_core::desktop::settings::is_portable_setting(id)
-    {
+    if state.desktop.is_none() && !helix_shell_core::desktop::settings::is_portable_setting(id) {
         return Err(fdo::Error::InvalidArgs(
             "This setting requires Helix desktop".into(),
         ));
@@ -74,20 +72,16 @@ fn require_desktop(state: &State, sender: &str) -> fdo::Result<()> {
         Some(_) => Err(fdo::Error::AccessDenied(
             "Only the registered shell may perform this action".into(),
         )),
-        None => Err(fdo::Error::Failed(
-            "No Helix desktop is registered".into(),
-        )),
+        None => Err(fdo::Error::Failed("No Helix desktop is registered".into())),
     }
 }
 
 fn json_array_from_owned(items: &[OwnedValue]) -> fdo::Result<JsonValue> {
     let mut out = Vec::with_capacity(items.len());
     for item in items {
-        out.push(
-            owned_to_json(item).ok_or_else(|| {
-                fdo::Error::InvalidArgs("Ordered list values must be JSON-compatible".into())
-            })?,
-        );
+        out.push(owned_to_json(item).ok_or_else(|| {
+            fdo::Error::InvalidArgs("Ordered list values must be JSON-compatible".into())
+        })?);
     }
     Ok(JsonValue::Array(out))
 }
@@ -105,7 +99,8 @@ fn json_equivalent(a: &JsonValue, b: &JsonValue) -> bool {
         }
         (JsonValue::Object(x), JsonValue::Object(y)) => {
             x.len() == y.len()
-                && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| json_equivalent(v, w)))
+                && x.iter()
+                    .all(|(k, v)| y.get(k).is_some_and(|w| json_equivalent(v, w)))
         }
         _ => a == b,
     }
@@ -122,9 +117,8 @@ fn apply_ordered_list_update(
     require_desktop(state, sender)?;
     let display_names = display_output_names(state, true);
     let catalog = state.config.full_catalog(true, &display_names);
-    let entry = ordered_lists::catalog_entry(&catalog, id).ok_or_else(|| {
-        fdo::Error::InvalidArgs("Unknown ordered desktop list".into())
-    })?;
+    let entry = ordered_lists::catalog_entry(&catalog, id)
+        .ok_or_else(|| fdo::Error::InvalidArgs("Unknown ordered desktop list".into()))?;
     let type_name = entry
         .get("type")
         .and_then(|value| value.as_str())
@@ -136,7 +130,8 @@ fn apply_ordered_list_update(
     }
     let expected_json = json_array_from_owned(expected)?;
     let value_json = json_array_from_owned(value)?;
-    let current = ordered_lists::current_value(&state.config, &catalog, id).unwrap_or(JsonValue::Null);
+    let current =
+        ordered_lists::current_value(&state.config, &catalog, id).unwrap_or(JsonValue::Null);
     if !json_equivalent(&current, &expected_json) {
         return Err(fdo::Error::InvalidArgs(
             "The list changed. Refresh and try again".into(),
@@ -162,23 +157,44 @@ fn apply_ordered_list_update(
 fn system_info() -> &'static serde_json::Value {
     static INFO: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
     INFO.get_or_init(|| {
-        let pretty = ["/etc/os-release", "/usr/lib/os-release"].iter().find_map(|path| {
-            std::fs::read_to_string(path).ok()?.lines().find_map(|line| {
-                let value = line.strip_prefix("PRETTY_NAME=")?;
-                Some(value.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
-            })
-        });
+        let pretty = ["/etc/os-release", "/usr/lib/os-release"]
+            .iter()
+            .find_map(|path| {
+                std::fs::read_to_string(path)
+                    .ok()?
+                    .lines()
+                    .find_map(|line| {
+                        let value = line.strip_prefix("PRETTY_NAME=")?;
+                        Some(
+                            value
+                                .trim()
+                                .trim_matches(|c| c == '"' || c == '\'')
+                                .to_string(),
+                        )
+                    })
+            });
         let mut details = serde_json::Map::new();
-        details.insert("os".into(), serde_json::Value::String(pretty.unwrap_or_else(|| "Linux".into())));
+        details.insert(
+            "os".into(),
+            serde_json::Value::String(pretty.unwrap_or_else(|| "Linux".into())),
+        );
         // SAFETY: `uname` fills a plain-data struct; fields are NUL-terminated C strings.
         unsafe {
             let mut name: libc::utsname = std::mem::zeroed();
             if libc::uname(&mut name) == 0 {
                 let text = |field: &[libc::c_char]| {
-                    std::ffi::CStr::from_ptr(field.as_ptr()).to_string_lossy().into_owned()
+                    std::ffi::CStr::from_ptr(field.as_ptr())
+                        .to_string_lossy()
+                        .into_owned()
                 };
-                details.insert("kernel".into(), serde_json::Value::String(text(&name.release)));
-                details.insert("architecture".into(), serde_json::Value::String(text(&name.machine)));
+                details.insert(
+                    "kernel".into(),
+                    serde_json::Value::String(text(&name.release)),
+                );
+                details.insert(
+                    "architecture".into(),
+                    serde_json::Value::String(text(&name.machine)),
+                );
             }
         }
         serde_json::Value::Object(details)
@@ -194,7 +210,10 @@ impl Configuration {
         map.insert("helix-desktop".into(), owned_bool(state.desktop.is_some()));
         map.insert("audio".into(), owned_bool(state.audio.is_available()));
         map.insert("network".into(), owned_bool(state.network.is_available()));
-        map.insert("bluetooth".into(), owned_bool(state.bluetooth.is_available()));
+        map.insert(
+            "bluetooth".into(),
+            owned_bool(state.bluetooth.is_available()),
+        );
         map.insert("implementation".into(), owned_str("rust"));
         if let Ok(marker) = std::env::var("HELIX_DESKTOP_CONTRACT_TEST") {
             map.insert("contract-marker".into(), owned_str(&marker));

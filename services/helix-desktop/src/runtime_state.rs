@@ -35,10 +35,7 @@ impl RuntimeState {
     }
 
     pub fn get(&self, owner: &str, key: &str, kind: &str) -> Result<Value, String> {
-        let entry = self
-            .data
-            .get(owner)
-            .and_then(|keys| keys.get(key));
+        let entry = self.data.get(owner).and_then(|keys| keys.get(key));
         match kind {
             "boolean" => {
                 let present = matches!(entry, Some(Entry::Bool(_)));

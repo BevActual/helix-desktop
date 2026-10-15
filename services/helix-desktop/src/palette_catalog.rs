@@ -404,7 +404,11 @@ pub fn sync_community_catalog(settings_toml: &Path, offline: bool) -> Result<Cat
     } else {
         parsed.get("palettes")
     };
-    if entries.and_then(Value::as_array).map(|list| list.is_empty()).unwrap_or(true) {
+    if entries
+        .and_then(Value::as_array)
+        .map(|list| list.is_empty())
+        .unwrap_or(true)
+    {
         return Err("community palette catalog contained no palettes".into());
     }
     let tmp = path.with_extension("json.tmp");
@@ -449,17 +453,17 @@ mod tests {
             r##"{"palettes":[{"name":"Oxocarbon","md5":"AbCdEf","dark":{"surface":"#161616"}}]}"##,
         )
         .unwrap();
-        assert_eq!(
-            community_palette_catalog_md5(&state, "Oxocarbon"),
-            "abcdef"
-        );
+        assert_eq!(community_palette_catalog_md5(&state, "Oxocarbon"), "abcdef");
         assert!(community_palette_catalog_md5(&state, "Missing").is_empty());
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     fn community_palette_download_url_encodes_name() {
-        std::env::set_var("HELIX_COMMUNITY_PALETTE_URL_BASE", "https://example.com/palettes");
+        std::env::set_var(
+            "HELIX_COMMUNITY_PALETTE_URL_BASE",
+            "https://example.com/palettes",
+        );
         let url = community_palette_download_url("Oxocarbon Dark").expect("url");
         assert_eq!(url, "https://example.com/palettes/Oxocarbon%20Dark");
         std::env::remove_var("HELIX_COMMUNITY_PALETTE_URL_BASE");
@@ -501,7 +505,9 @@ mod tests {
         .unwrap();
         let settings = state.join("settings.toml");
         let previews = load_palette_previews(&config, &settings);
-        assert!(previews.iter().any(|p| p["source"] == "builtin" && p["name"] == "Helix"));
+        assert!(previews
+            .iter()
+            .any(|p| p["source"] == "builtin" && p["name"] == "Helix"));
         let community = previews
             .iter()
             .find(|p| p["source"] == "community" && p["name"] == "Oxocarbon")

@@ -79,7 +79,9 @@ impl BluetoothBackend {
             Inner::Mock(mock::MockBackend::new())
         } else {
             if !bluez::probe() {
-                tracing::info!("BlueZ not on the system bus yet; bluetooth unavailable until it appears");
+                tracing::info!(
+                    "BlueZ not on the system bus yet; bluetooth unavailable until it appears"
+                );
             }
             Inner::Bluez(bluez::BluezBackend::new())
         };

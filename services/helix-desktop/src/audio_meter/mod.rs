@@ -85,10 +85,7 @@ mod tests {
     #[test]
     fn peak_from_f32_samples() {
         let samples = [0.0f32, 0.25f32, -0.5f32, 1.5f32];
-        let bytes: Vec<u8> = samples
-            .iter()
-            .flat_map(|s| s.to_le_bytes())
-            .collect();
+        let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
         let peak = input_peak_from_bytes(&bytes);
         assert!((peak - 1.0).abs() < 1e-6);
     }

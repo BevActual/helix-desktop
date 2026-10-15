@@ -55,7 +55,10 @@ fn has_configured_wallpaper(config: &ConfigStore, wallpaper: Option<&toml::Table
         }
         if w.get("monitors")
             .and_then(|m| m.as_table())
-            .is_some_and(|t| t.values().any(|v| v.as_str().is_some_and(|s| !s.is_empty())))
+            .is_some_and(|t| {
+                t.values()
+                    .any(|v| v.as_str().is_some_and(|s| !s.is_empty()))
+            })
         {
             return true;
         }
@@ -122,7 +125,10 @@ fn mtime_ns(path: &Path) -> i128 {
         .unwrap_or(0)
 }
 
-pub fn wallpaper_palette(config: &ConfigStore, session_wallpaper: &str) -> Option<WallpaperPalette> {
+pub fn wallpaper_palette(
+    config: &ConfigStore,
+    session_wallpaper: &str,
+) -> Option<WallpaperPalette> {
     let path = palette_wallpaper_path(config, session_wallpaper);
     if path.is_empty() {
         return None;
@@ -138,7 +144,8 @@ pub fn wallpaper_palette(config: &ConfigStore, session_wallpaper: &str) -> Optio
     {
         let cache = CACHE.lock().ok()?;
         if let Some(hit) = cache.as_ref() {
-            if mtime != 0 && hit.path == path && hit.scheme == scheme_name && hit.mtime_ns == mtime {
+            if mtime != 0 && hit.path == path && hit.scheme == scheme_name && hit.mtime_ns == mtime
+            {
                 return Some(WallpaperPalette {
                     generated: hit.generated.clone(),
                     path,
@@ -171,7 +178,11 @@ pub fn wallpaper_palette(config: &ConfigStore, session_wallpaper: &str) -> Optio
             });
         }
     }
-    Some(WallpaperPalette { generated, path, scheme: scheme_name })
+    Some(WallpaperPalette {
+        generated,
+        path,
+        scheme: scheme_name,
+    })
 }
 
 #[cfg(test)]

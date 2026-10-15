@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::fdo;
+use zbus::interface;
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{OwnedValue, Value};
-use zbus::interface;
 
 use crate::dbus_value::json_to_owned;
 use crate::desktop_operations::{
@@ -129,10 +129,7 @@ impl Bluetooth {
                 }
                 "connect" => {
                     let path = arg_str(&args, "path")?;
-                    state
-                        .bluetooth
-                        .connect(&path)
-                        .map_err(fdo::Error::Failed)?;
+                    state.bluetooth.connect(&path).map_err(fdo::Error::Failed)?;
                     Ok(ActionPlan {
                         operation,
                         wait: OperationWait::BluetoothConnected { path },
@@ -181,10 +178,7 @@ impl Bluetooth {
                 }
                 "forget" => {
                     let path = arg_str(&args, "path")?;
-                    state
-                        .bluetooth
-                        .forget(&path)
-                        .map_err(fdo::Error::Failed)?;
+                    state.bluetooth.forget(&path).map_err(fdo::Error::Failed)?;
                     Ok(ActionPlan {
                         operation,
                         wait: OperationWait::BluetoothForgotten { path },
@@ -200,10 +194,7 @@ impl Bluetooth {
                         .map_err(fdo::Error::Failed)?;
                     Ok(ActionPlan {
                         operation,
-                        wait: OperationWait::BluetoothTrusted {
-                            path,
-                            trusted,
-                        },
+                        wait: OperationWait::BluetoothTrusted { path, trusted },
                         cancel: None,
                     })
                 }
@@ -246,7 +237,9 @@ impl Bluetooth {
         };
         Self::changed(&emitter).await.ok();
         if finished_now {
-            Self::completed(&emitter, plan.operation, true, "").await.ok();
+            Self::completed(&emitter, plan.operation, true, "")
+                .await
+                .ok();
         }
         Ok(plan.operation)
     }
@@ -298,11 +291,7 @@ impl Bluetooth {
         Ok(())
     }
 
-    async fn cancel(
-        &self,
-        #[zbus(header)] header: Header<'_>,
-        operation: u64,
-    ) -> fdo::Result<()> {
+    async fn cancel(&self, #[zbus(header)] header: Header<'_>, operation: u64) -> fdo::Result<()> {
         let sender = sender_name(&header)?;
         let mut state = self.state.lock().await;
         state

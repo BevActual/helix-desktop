@@ -150,22 +150,25 @@ impl State {
                 snap.get("kind").and_then(|v| v.as_u64()) == Some(2)
                     && snap.get("connected").and_then(Value::as_bool) == Some(true)
             }
-            OperationWait::NetworkCellular { active } => self
-                .network
-                .snapshot()
-                .get("cellular-active")
-                .and_then(Value::as_bool)
-                == Some(*active),
-            OperationWait::NetworkVpn { path, active } => self
-                .network
-                .snapshot()
-                .get("vpns")
-                .and_then(Value::as_array)
-                .and_then(|list| {
-                    list.iter().find(|entry| entry.get("path").and_then(Value::as_str) == Some(path))
-                })
-                .and_then(|entry| entry.get("active").and_then(Value::as_bool))
-                == Some(*active),
+            OperationWait::NetworkCellular { active } => {
+                self.network
+                    .snapshot()
+                    .get("cellular-active")
+                    .and_then(Value::as_bool)
+                    == Some(*active)
+            }
+            OperationWait::NetworkVpn { path, active } => {
+                self.network
+                    .snapshot()
+                    .get("vpns")
+                    .and_then(Value::as_array)
+                    .and_then(|list| {
+                        list.iter()
+                            .find(|entry| entry.get("path").and_then(Value::as_str) == Some(path))
+                    })
+                    .and_then(|entry| entry.get("active").and_then(Value::as_bool))
+                    == Some(*active)
+            }
             OperationWait::BluetoothDiscovering { enabled } => {
                 self.bluetooth
                     .snapshot()
@@ -179,9 +182,11 @@ impl State {
             OperationWait::BluetoothConnected { path } => bluetooth_device(self, path, |device| {
                 device.get("connected").and_then(Value::as_bool) == Some(true)
             }),
-            OperationWait::BluetoothDisconnected { path } => bluetooth_device(self, path, |device| {
-                device.get("connected").and_then(Value::as_bool) == Some(false)
-            }),
+            OperationWait::BluetoothDisconnected { path } => {
+                bluetooth_device(self, path, |device| {
+                    device.get("connected").and_then(Value::as_bool) == Some(false)
+                })
+            }
             OperationWait::BluetoothForgotten { path } => !bluetooth_has_path(self, path),
             OperationWait::BluetoothCancelPair => !self.agents.bt_has_pending(),
             OperationWait::BluetoothTrusted { path, trusted } => {
@@ -225,18 +230,15 @@ fn bluetooth_has_path(state: &State, path: &str) -> bool {
         })
 }
 
-fn bluetooth_device(
-    state: &State,
-    path: &str,
-    predicate: impl FnOnce(&Value) -> bool,
-) -> bool {
+fn bluetooth_device(state: &State, path: &str, predicate: impl FnOnce(&Value) -> bool) -> bool {
     state
         .bluetooth
         .snapshot()
         .get("devices")
         .and_then(Value::as_array)
         .and_then(|list| {
-            list.iter().find(|entry| entry.get("path").and_then(Value::as_str) == Some(path))
+            list.iter()
+                .find(|entry| entry.get("path").and_then(Value::as_str) == Some(path))
         })
         .is_some_and(predicate)
 }
@@ -274,7 +276,11 @@ pub async fn poll_operations(state: &mut State, connection: &Connection) {
 
 /// Fails every pending operation of `interface` (`failOperations`): its backend daemon went away
 /// or was replaced, so none of them can complete.
-pub async fn fail_interface_operations(state: &mut State, connection: &Connection, interface: &str) {
+pub async fn fail_interface_operations(
+    state: &mut State,
+    connection: &Connection,
+    interface: &str,
+) {
     let (failed, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut state.desktop_operations)
         .into_iter()
         .partition(|op| op.interface == interface);
@@ -311,18 +317,15 @@ pub fn clear_operations_for_peer(state: &mut State, unique_name: &str) {
 }
 
 /// When the user cancels a credential/pairing prompt, cancel matching auth operations (C++ `Reply` + cancel).
-pub fn cancel_auth_operations(
-    state: &mut State,
-    interface: &str,
-    sender: &str,
-) -> Vec<u64> {
+pub fn cancel_auth_operations(state: &mut State, interface: &str, sender: &str) -> Vec<u64> {
     let mut cancelled = Vec::new();
     let pending = state.desktop_operations.clone();
     state.desktop_operations.clear();
     for op in pending {
         let authentication =
             op.action == "pair" || op.action == "connect" || op.action == "enterprise";
-        if op.interface == interface && op.sender == sender && authentication && op.cancel.is_some() {
+        if op.interface == interface && op.sender == sender && authentication && op.cancel.is_some()
+        {
             if let Some(cancel) = &op.cancel {
                 state.run_cancel(cancel);
             }
