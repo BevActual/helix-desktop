@@ -36,22 +36,25 @@ action = "lock"
 builtin_ids = ["helix", "qt"]
 EOF
 HELIX_ASSETS_DIR="$ROOT/assets"
-for _candidate in \
-  "$ROOT/_build/helix-template-apply" \
-  "$ROOT/build-debug/helix-template-apply"; do
-  if [[ -z "${HELIX_TEMPLATE_APPLY_BIN:-}" && -x "$_candidate" ]]; then
-    HELIX_TEMPLATE_APPLY_BIN="$_candidate"
-  fi
-done
-export HELIX_TEMPLATE_APPLY_BIN
-for _candidate in \
-  "$ROOT/_build/helix-theme-palette" \
-  "$ROOT/build-debug/helix-theme-palette"; do
-  if [[ -z "${HELIX_THEME_PALETTE_BIN:-}" && -x "$_candidate" ]]; then
-    HELIX_THEME_PALETTE_BIN="$_candidate"
-  fi
-done
-export HELIX_THEME_PALETTE_BIN
+if [[ "${HELIX_DISABLE_CPP_THEME_HELPERS:-}" != "1" ]]; then
+  for _candidate in \
+    "$ROOT/_build/helix-template-apply" \
+    "$ROOT/build-debug/helix-template-apply"; do
+    if [[ -z "${HELIX_TEMPLATE_APPLY_BIN:-}" && -x "$_candidate" ]]; then
+      HELIX_TEMPLATE_APPLY_BIN="$_candidate"
+    fi
+  done
+  for _candidate in \
+    "$ROOT/_build/helix-theme-palette" \
+    "$ROOT/build-debug/helix-theme-palette"; do
+    if [[ -z "${HELIX_THEME_PALETTE_BIN:-}" && -x "$_candidate" ]]; then
+      HELIX_THEME_PALETTE_BIN="$_candidate"
+    fi
+  done
+fi
+export HELIX_TEMPLATE_APPLY_BIN="${HELIX_TEMPLATE_APPLY_BIN:-}"
+export HELIX_THEME_PALETTE_BIN="${HELIX_THEME_PALETTE_BIN:-}"
+export HELIX_DISABLE_CPP_THEME_HELPERS="${HELIX_DISABLE_CPP_THEME_HELPERS:-}"
 "$BIN" &
 PID=$!
 trap 'kill "$PID" 2>/dev/null || true' EXIT

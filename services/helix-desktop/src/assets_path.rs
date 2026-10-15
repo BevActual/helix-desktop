@@ -32,8 +32,20 @@ pub fn builtin_templates_root(assets: &Path) -> PathBuf {
     assets.join("templates")
 }
 
+fn cpp_theme_helpers_disabled() -> bool {
+    env::var("HELIX_DISABLE_CPP_THEME_HELPERS").is_ok_and(|value| {
+        matches!(value.as_str(), "1" | "true" | "yes")
+    })
+}
+
 fn find_meson_helper_bin(env_key: &str, base: &str) -> Option<PathBuf> {
+    if cpp_theme_helpers_disabled() {
+        return None;
+    }
     if let Ok(path) = env::var(env_key) {
+        if matches!(path.as_str(), "0" | "disable" | "disabled") {
+            return None;
+        }
         if !path.is_empty() {
             let candidate = PathBuf::from(path);
             if candidate.is_file() {
