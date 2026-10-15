@@ -225,6 +225,14 @@ fn rust_export_matches_cpp_for_default_and_secondary_bars() {
     );
 }
 
+/// `tools/nested/helix-desktop-config-smoke.sh` config tree (bar name + idle + templates).
+#[test]
+fn rust_export_matches_cpp_for_desktop_config_smoke() {
+    assert_rust_export_matches_cpp(
+        "[bar.main]\nenabled = true\nthickness = 34\n\n[idle.behavior.lock]\ntimeout = 420\nenabled = true\naction = \"lock\"\n\n[theme.templates]\nbuiltin_ids = [\"helix\", \"qt\"]\n",
+    );
+}
+
 #[test]
 fn rust_export_matches_cpp_for_minimal_fixture() {
     let root = unique_temp_dir("minimal");

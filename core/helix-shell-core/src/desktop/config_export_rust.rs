@@ -110,6 +110,55 @@ fn merged_export_is_patchable(store: &ConfigStore) -> bool {
     })
 }
 
+/// When user config names specific idle behaviors, export only those (C++ `idleSchema` / `behavior_order`).
+fn rebuild_idle_from_merged(root: &mut Toml, merged: &Toml) {
+    let merged_behavior = merged
+        .get("idle")
+        .and_then(Toml::as_table)
+        .and_then(|idle| idle.get("behavior"))
+        .and_then(Toml::as_table);
+    let merged_behavior = match merged_behavior {
+        Some(table) => table,
+        None => return,
+    };
+    if merged_behavior.is_empty() {
+        return;
+    }
+    let names: Vec<String> = merged_behavior.keys().cloned().collect();
+
+    let export_idle = match root.get_mut("idle").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    let export_behavior = match export_idle.get_mut("behavior").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    let templates: toml::map::Map<String, Toml> = export_behavior.clone();
+    let fallback = templates
+        .get("lock")
+        .cloned()
+        .unwrap_or(Toml::Table(Default::default()));
+
+    let stale: Vec<String> = export_behavior
+        .keys()
+        .filter(|key| !names.contains(key))
+        .cloned()
+        .collect();
+    for key in stale {
+        export_behavior.remove(&key);
+    }
+    for name in &names {
+        export_behavior
+            .entry(name.clone())
+            .or_insert_with(|| templates.get(name).cloned().unwrap_or_else(|| fallback.clone()));
+    }
+    export_idle.insert(
+        "behavior_order".to_string(),
+        Toml::Array(names.into_iter().map(Toml::String).collect()),
+    );
+}
+
 /// Seed unnamed bars from `bar.default` export defaults (C++ `BarConfig` defaults per name).
 fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
     let merged_bar = match merged.get("bar").and_then(Toml::as_table) {
@@ -212,6 +261,7 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut root = default_export_root().clone();
     let merged = store.merged_user_toml();
     rebuild_bar_from_merged(&mut root, &merged);
+    rebuild_idle_from_merged(&mut root, &merged);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
