@@ -36,8 +36,15 @@ enabled = true
 action = "lock"
 
 # Hook-free built-in templates: exercised in-process by templates-apply below.
+[theme]
+mode = "auto"
+
 [theme.templates]
 builtin_ids = ["helix", "qt"]
+
+[location]
+latitude = 47.6062
+longitude = -122.3321
 EOF
 HELIX_ASSETS_DIR="$ROOT/assets"
 if [[ "${HELIX_DISABLE_CPP_THEME_HELPERS:-}" != "1" ]]; then

@@ -3,7 +3,8 @@
 //! Builtin and custom palette sources with a concrete dark/light shell mode run in-process
 //! through `helix-theme`. Wallpaper sources use in-process generation when the wallpaper decodes;
 //! community when the cache file exists. Unreadable wallpapers, missing community cache, and
-//! `auto` mode fall back to `helix-theme-palette`.
+//! Missing community cache and unreadable wallpaper sources fall back to `helix-theme-palette`.
+//! Builtin/custom sources resolve `theme.mode = auto` in-process via the day/night schedule.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -171,4 +172,56 @@ pub fn set_accent(inputs: &Inputs, hex_color: &str) -> Result<Outcome, String> {
         return run_helper(&args).map(|name| Outcome::Helper(name));
     };
     local_result(save_role_color_as_custom(dir, selection, ColorRole::Primary, parsed), &args)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Inputs;
+    use helix_shell_core::desktop::settings::{ConfigPaths, ConfigStore};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn smoke_shaped_store() -> ConfigStore {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("helix-theme-palette-{nanos}"));
+        fs::create_dir_all(home.join("helix")).unwrap();
+        fs::create_dir_all(home.join("state/helix")).unwrap();
+        fs::write(
+            home.join("helix/config.toml"),
+            r#"[theme]
+source = "builtin"
+builtin = "Helix"
+mode = "auto"
+
+[theme.templates]
+builtin_ids = ["helix", "qt"]
+
+[location]
+latitude = 47.6062
+longitude = -122.3321
+"#,
+        )
+        .unwrap();
+        unsafe {
+            std::env::remove_var("HELIX_CONFIG_HOME");
+            std::env::remove_var("HELIX_STATE_HOME");
+            std::env::remove_var("HELIX_THEME_PALETTE_CMD");
+            std::env::set_var("XDG_CONFIG_HOME", &home);
+            std::env::set_var("XDG_STATE_HOME", home.join("state"));
+        }
+        ConfigStore::load(ConfigPaths::from_env())
+    }
+
+    #[test]
+    fn builtin_auto_mode_stays_in_process() {
+        let store = smoke_shaped_store();
+        let inputs = Inputs::capture(&store, "");
+        assert!(
+            inputs.local.is_some(),
+            "builtin palette with theme.mode=auto should not require helix-theme-palette"
+        );
+    }
 }
