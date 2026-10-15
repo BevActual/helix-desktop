@@ -195,6 +195,11 @@ fn rust_export_matches_cpp_for_calendar_account() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_bar_monitor_override() {
+    assert_rust_export_matches_cpp("[bar.default.monitor.DP-1]\nthickness = 28\n");
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }

@@ -359,6 +359,58 @@ fn sync_bar_radii_from_merged(root: &mut Toml, merged: &Toml) {
     }
 }
 
+/// C++ `barConfigTable` emits each monitor override as a full resolved bar table + `match`.
+fn rebuild_bar_monitors_from_merged(root: &mut Toml, merged: &Toml) {
+    let merged_bar = match merged.get("bar").and_then(Toml::as_table) {
+        Some(table) => table,
+        None => return,
+    };
+    let export_bar = match root.get_mut("bar").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    for bar_name in merged_bar_names(merged) {
+        let merged_monitors = merged_bar
+            .get(&bar_name)
+            .and_then(|bar| bar.get("monitor"))
+            .and_then(Toml::as_table);
+        let merged_monitors = match merged_monitors {
+            Some(table) if !table.is_empty() => table,
+            _ => continue,
+        };
+        let template = export_bar.get(&bar_name).and_then(|bar| {
+            let mut table = bar.as_table()?.clone();
+            table.remove("monitor");
+            Some(Toml::Table(table))
+        });
+        let template = match template {
+            Some(table) => table,
+            None => continue,
+        };
+        let export_bar_table = match export_bar.get_mut(&bar_name).and_then(Toml::as_table_mut) {
+            Some(table) => table,
+            None => continue,
+        };
+        let monitors = export_bar_table
+            .entry("monitor".to_string())
+            .or_insert_with(|| Toml::Table(toml::map::Map::new()));
+        let monitors = monitors.as_table_mut().unwrap();
+        for mon_name in merged_monitors.keys() {
+            monitors
+                .entry(mon_name.clone())
+                .or_insert_with(|| {
+                    let mut seeded = template.clone();
+                    if let Toml::Table(table) = &mut seeded {
+                        table.insert("match".to_string(), Toml::String(mon_name.clone()));
+                        // Monitor overrides only emit `position` when the override sets it.
+                        table.remove("position");
+                    }
+                    seeded
+                });
+        }
+    }
+}
+
 fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
     let merged_bar = match merged.get("bar").and_then(Toml::as_table) {
         Some(table) => table,
@@ -477,6 +529,7 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut root = default_export_root().clone();
     let merged = store.merged_for_config_export();
     rebuild_bar_from_merged(&mut root, &merged);
+    rebuild_bar_monitors_from_merged(&mut root, &merged);
     rebuild_widget_from_merged(&mut root, &merged);
     rebuild_calendar_accounts_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
