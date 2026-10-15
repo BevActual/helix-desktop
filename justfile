@@ -77,10 +77,6 @@ test-install m=mode: (build m)
 install m:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [[ ! -x "build-{{m}}/helix-template-apply" ]]; then
-        echo "error: build-{{m}}/helix-template-apply is missing; run 'just build {{m}}' before installing" >&2
-        exit 1
-    fi
     meson install --no-rebuild -C build-{{m}}
     # The Rust helix-desktop is the org.helix.Desktop owner (the unit and activation file run it).
     just install-rust-desktop {{m}}

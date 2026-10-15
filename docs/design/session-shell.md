@@ -32,7 +32,7 @@ Split processes: `helix-shell-strut` (exclusive zone) + `helix-shell-bar` (`HELI
 |------|----------|-------|
 | Desktop authority | `services/helix-desktop` | `org.helix.Desktop`; unit `helix-service.service` runs `helix-desktop` |
 | Assistant / inference | `services/helix-assistant`, `services/helix-inference` | D-Bus processes are Rust; llama glue + `helix-transcribe` / `helix-image` workers under `src/inference/` |
-| Theme / template helpers | `src/theme/`, Meson `helix-template-apply`, `helix-theme-palette` | Fallback when `helix-theme` returns unsupported; see `cpp-to-rust.md` |
+| Theme / template helpers | `src/theme/`, Meson `helix-template-apply`, `helix-theme-palette` (build-only, not installed) | Fallback when `helix-theme` returns unsupported; see `cpp-to-rust.md` |
 | Contract tests | `src/desktop/`, `tests/desktop_service_test.cpp` | Behavioural contract against the Rust binary in CI |
 
 See `product-structure.md` and `cpp-to-rust.md`.

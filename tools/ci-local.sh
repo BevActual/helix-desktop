@@ -37,8 +37,8 @@ job_rust() {
 job_agent()  { WAYLAND_DISPLAY="wayland-ci-$$" ./tools/nested/helix-desktop-agent-integration.sh; }
 job_config() {
   WAYLAND_DISPLAY="wayland-ci-$$" \
-  HELIX_TEMPLATE_APPLY_BIN="$ROOT/build-debug/helix-template-apply" HELIX_THEME_PALETTE_BIN="$ROOT/build-debug/helix-theme-palette" \
-  HELIX_ASSETS_DIR="$ROOT/assets" ./tools/nested/helix-desktop-config-smoke.sh \
+  HELIX_DISABLE_CPP_THEME_HELPERS=1 HELIX_ASSETS_DIR="$ROOT/assets" \
+  ./tools/nested/helix-desktop-config-smoke.sh \
     && WAYLAND_DISPLAY="wayland-ci-$$" CONTRACT_TIMEOUT=240 ./tools/nested/helix-desktop-cpp-contract.sh
 }
 job_meter()  { WAYLAND_DISPLAY="wayland-ci-$$" ./tools/nested/helix-desktop-audio-meter-integration.sh; }

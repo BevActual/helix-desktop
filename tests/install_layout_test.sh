@@ -21,8 +21,6 @@ prefix=${prefix%/share/dbus-1/services/org.helix.Desktop.service}
 [ -f "$prefix/share/polkit-1/actions/org.helix.Shell.upgrade.policy" ] || fail 'upgrade policy is missing'
 grep -q 'helix-system-upgrade' "$prefix/share/polkit-1/actions/org.helix.Shell.upgrade.policy" || fail 'upgrade policy does not name the helper'
 
-[ -x "$prefix/bin/helix-template-apply" ] || fail 'template apply helper is missing'
-[ -x "$prefix/bin/helix-theme-palette" ] || fail 'theme palette helper is missing'
 grep -q 'bin/helix-desktop' "$prefix/lib/systemd/user/helix-service.service" || fail 'unit does not start helix-desktop'
 grep -q 'bin/helix-desktop' "$prefix/share/dbus-1/services/org.helix.Desktop.service" || fail 'activation does not start helix-desktop'
 [ -f "$prefix/share/dbus-1/services/org.helix.Desktop.service" ] || fail 'D-Bus activation is missing'
