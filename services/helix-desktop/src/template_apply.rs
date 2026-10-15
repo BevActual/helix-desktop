@@ -283,3 +283,90 @@ fn run_builtin_post_hooks(config: &ConfigStore) -> Result<(), String> {
         ))
     }
 }
+
+#[cfg(test)]
+mod apply_integration_tests {
+    use std::fs;
+    use std::path::Path;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::reapply_templates;
+    use crate::state::State;
+
+    fn copy_tree(from: &Path, to: &Path) {
+        for entry in fs::read_dir(from).unwrap().flatten() {
+            let dest = to.join(entry.file_name());
+            if entry.file_type().unwrap().is_dir() {
+                fs::create_dir_all(&dest).unwrap();
+                copy_tree(&entry.path(), &dest);
+            } else {
+                if let Some(parent) = dest.parent() {
+                    fs::create_dir_all(parent).unwrap();
+                }
+                fs::copy(entry.path(), dest).unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn wallpaper_source_applies_in_process_without_cpp_helper() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let scenario = repo.join("core/helix-theme/tests/golden/apply/wallpaper-content");
+        let assets = repo.join("assets");
+        assert!(
+            assets.join("templates/builtin.toml").is_file(),
+            "missing shipped assets for template apply"
+        );
+
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("helix-desktop-wallpaper-apply-{nanos}"));
+        let _ = fs::remove_dir_all(&home);
+        for sub in ["cfg/helix", "state/helix", "data", "cache"] {
+            fs::create_dir_all(home.join(sub)).unwrap();
+        }
+        fs::write(
+            home.join("cfg/helix/config.toml"),
+            r#"[theme]
+source = "wallpaper"
+wallpaper_scheme = "m3-content"
+mode = "dark"
+
+[theme.templates]
+builtin_ids = ["helix", "qt"]
+"#,
+        )
+        .unwrap();
+        if scenario.join("files").is_dir() {
+            copy_tree(&scenario.join("files"), &home.join("cfg"));
+        }
+        if scenario.join("statefiles").is_dir() {
+            copy_tree(&scenario.join("statefiles"), &home.join("state/helix"));
+        }
+
+        unsafe {
+            std::env::remove_var("HELIX_CONFIG_HOME");
+            std::env::remove_var("HELIX_STATE_HOME");
+            std::env::remove_var("HELIX_TEMPLATE_APPLY_CMD");
+            std::env::remove_var("HELIX_TEMPLATE_APPLY_BIN");
+            std::env::set_var("HOME", &home);
+            std::env::set_var("XDG_CONFIG_HOME", home.join("cfg"));
+            std::env::set_var("XDG_STATE_HOME", home.join("state"));
+            std::env::set_var("XDG_DATA_HOME", home.join("data"));
+            std::env::set_var("XDG_CACHE_HOME", home.join("cache"));
+            std::env::set_var("HELIX_ASSETS_DIR", &assets);
+            std::env::set_var("HELIX_DISABLE_CPP_THEME_HELPERS", "1");
+        }
+
+        let mut state = State::new(crate::agents::new_hub());
+        reapply_templates(&mut state).expect("wallpaper-source apply should stay in-process");
+        let theme_out = home.join("cfg/helix/themes/helix.toml");
+        assert!(
+            theme_out.is_file() && fs::metadata(&theme_out).unwrap().len() > 0,
+            "expected helix theme output at {}",
+            theme_out.display()
+        );
+    }
+}

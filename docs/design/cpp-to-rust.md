@@ -63,7 +63,7 @@ wallpaper images, missing community palette when fetch is blocked (offline / no 
 
 ## Next (C++ tail)
 
-1. **Theme C++ tail** — Runtime apply/palette/export are Rust (`helix-theme`, `config_export_*`, smokes with `HELIX_DISABLE_CPP_THEME_HELPERS`). CLI theme helpers are deleted; **`helix-gen-golden-template`** remains for template-engine golden regen. **Remaining:** delete duplicate C++ theme stack in `src/theme/` once unit tests and `desktop_service_test` no longer need it (large `helix_core` slice).
+1. **Theme C++ tail** — Runtime apply/palette/export are Rust (`helix-theme`, `config_export_*`, smokes with `HELIX_DISABLE_CPP_THEME_HELPERS`; `helix-desktop` integration test for `theme.source = wallpaper`). CLI theme helpers are deleted; **`helix-gen-golden-template`** remains for template-engine golden regen. **Remaining:** delete duplicate C++ theme stack in `src/theme/` once unit tests and `desktop_service_test` no longer need it (large `helix_core` slice).
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
 3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.
