@@ -358,9 +358,17 @@ _helix_sources = files(
   'src/system/day_night_schedule.cpp',
   'src/time/time_format.cpp',
   'src/theme/color_roles.cpp',
+  'src/theme/scheme.cpp',
   'src/util/checksum.cpp',
   'src/compositors/compositor_detect.cpp',
-  'src/theme/scheme.cpp',
+  'src/cli/parse.cpp',
+  'src/cli/help.cpp',
+  )
+
+_helix_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp', 'src/desktop_api/peer_identity.cpp')
+
+# C++ theme reference stack (runtime apply is Rust `helix-theme`). Config keeps `scheme` + `color_roles` in `helix_core`.
+_helix_theme_sources = files(
   'src/theme/color.cpp',
   'src/theme/contrast.cpp',
   'src/theme/image_loader.cpp',
@@ -383,11 +391,7 @@ _helix_sources = files(
   'src/theme/firefox_theme/settings.cpp',
   'src/theme/hook_runner.cpp',
   'src/theme/template_engine.cpp',
-  'src/cli/parse.cpp',
-  'src/cli/help.cpp',
-  )
-
-_helix_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp', 'src/desktop_api/peer_identity.cpp')
+)
 
 if sanitize
   _helix_sources += files('src/core/lsan_suppressions.cpp')
@@ -472,8 +476,24 @@ helix_core_lib = static_library('helix_core',
   cpp_args: _helix_cpp_args,
 )
 
-helix_core_dep = declare_dependency(
+helix_theme_lib = static_library('helix_theme',
+  sources: _helix_theme_sources,
   link_with: helix_core_lib,
+  dependencies: _helix_dependencies,
+  include_directories: _helix_inc,
+  cpp_args: _helix_cpp_args,
+)
+
+helix_core_base_dep = declare_dependency(
+  link_with: helix_core_lib,
+  dependencies: _helix_test_dependencies,
+  include_directories: _helix_inc,
+  compile_args: _helix_compile_definitions,
+  sources: _protocol_headers,
+)
+
+helix_core_dep = declare_dependency(
+  link_with: [helix_core_lib, helix_theme_lib],
   dependencies: _helix_test_dependencies,
   include_directories: _helix_inc,
   compile_args: _helix_compile_definitions,
