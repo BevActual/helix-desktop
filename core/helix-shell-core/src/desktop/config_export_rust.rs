@@ -72,6 +72,58 @@ fn collect_leaf_paths(value: &Toml, prefix: &str, out: &mut Vec<String>) {
     }
 }
 
+fn merged_widget_names(merged: &Toml) -> Vec<String> {
+    merged
+        .get("widget")
+        .and_then(Toml::as_table)
+        .map(|widgets| widgets.keys().cloned().collect())
+        .unwrap_or_default()
+}
+
+fn widget_type_name(widget: &Toml, name: &str) -> String {
+    widget
+        .get("type")
+        .and_then(Toml::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| name.to_string())
+}
+
+fn widget_template_for_type(
+    export_widgets: &toml::map::Map<String, Toml>,
+    type_name: &str,
+) -> Toml {
+    for widget in export_widgets.values() {
+        if widget.get("type").and_then(Toml::as_str) == Some(type_name) {
+            return widget.clone();
+        }
+    }
+    let mut table = toml::map::Map::new();
+    table.insert("type".to_string(), Toml::String(type_name.to_string()));
+    Toml::Table(table)
+}
+
+/// User `[widget.<name>]` tables may be absent from the schema-default export (C++ `seedBuiltinWidgets` + parse).
+fn rebuild_widget_from_merged(root: &mut Toml, merged: &Toml) {
+    let merged_widgets = match merged.get("widget").and_then(Toml::as_table) {
+        Some(table) => table,
+        None => return,
+    };
+    if merged_widgets.is_empty() {
+        return;
+    }
+    let export_widgets = match root.get_mut("widget").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    let snapshot = export_widgets.clone();
+    for (name, spec) in merged_widgets {
+        let type_name = widget_type_name(spec, name);
+        export_widgets
+            .entry(name.clone())
+            .or_insert_with(|| widget_template_for_type(&snapshot, &type_name));
+    }
+}
+
 fn merged_bar_names(merged: &Toml) -> Vec<String> {
     merged
         .get("bar")
@@ -100,14 +152,24 @@ fn is_allowed_extra_bar_path(path: &str, merged: &Toml) -> bool {
     merged_bar_names(merged).iter().any(|name| name == parts[1])
 }
 
-/// Merged config may only touch export paths, or extra `bar.<name>` subtrees from user config.
+fn is_merged_widget_path(path: &str, merged: &Toml) -> bool {
+    let parts = path.split('.').collect::<Vec<_>>();
+    if parts.first().map(|s| *s) != Some("widget") || parts.len() < 2 {
+        return false;
+    }
+    merged_widget_names(merged).iter().any(|name| name == parts[1])
+}
+
+/// Merged config may only touch export paths, or extra `bar.<name>` / `widget.<name>` subtrees from user config.
 fn merged_export_is_patchable(store: &ConfigStore) -> bool {
     let merged = store.merged_for_config_export();
     let default = default_export_root();
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     leaves.iter().all(|path| {
-        dot_path_exists(default, path) || is_allowed_extra_bar_path(path, &merged)
+        dot_path_exists(default, path)
+            || is_allowed_extra_bar_path(path, &merged)
+            || is_merged_widget_path(path, &merged)
     })
 }
 
@@ -326,17 +388,19 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut root = default_export_root().clone();
     let merged = store.merged_for_config_export();
     rebuild_bar_from_merged(&mut root, &merged);
+    rebuild_widget_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
-        if !dot_path_exists(&root, &path) {
-            continue;
-        }
-        if let (Some(template), Some(value)) =
-            (dot_path_get(&root, &path), dot_path_get(&merged, &path))
-        {
+        let value = match dot_path_get(&merged, &path) {
+            Some(value) => value,
+            None => continue,
+        };
+        if let Some(template) = dot_path_get(&root, &path) {
             set_dot_path(&mut root, &path, coerce_patch_value(&template, &value));
+        } else if is_allowed_extra_bar_path(&path, &merged) || is_merged_widget_path(&path, &merged) {
+            set_dot_path(&mut root, &path, value);
         }
     }
     sync_bar_radii_from_merged(&mut root, &merged);

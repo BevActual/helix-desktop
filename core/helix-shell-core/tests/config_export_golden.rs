@@ -151,6 +151,21 @@ fn rust_export_matches_cpp_for_legacy_negative_bar_radius() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_legacy_sysmon_show_icon() {
+    assert_rust_export_matches_cpp("[widget.cpu]\nshow_icon = false\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_legacy_workspaces_widget() {
+    assert_rust_export_matches_cpp("[widget.workspaces]\ndisplay = \"none\"\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_custom_named_sysmon_widget() {
+    assert_rust_export_matches_cpp("[widget.my-cpu]\ntype = \"sysmon\"\nstat = \"cpu_usage\"\n");
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }
