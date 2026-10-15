@@ -1,13 +1,37 @@
 #!/usr/bin/env bash
-# Fail if config_export_minimal.toml drifts from helix-config-export (run after C++ schema changes).
+# Fail if Rust default export or frozen parity fixtures drift (C++ check optional).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GOLDEN="$ROOT/core/helix-shell-core/tests/golden/config_export_minimal.toml"
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
-"$ROOT/tools/gen_config_export_golden.sh" "$TMP"
-if ! diff -u "$GOLDEN" "$TMP"; then
-  echo "error: golden drift; rerun tools/gen_config_export_golden.sh" >&2
-  exit 1
+
+cargo test -p helix-shell-core desktop::config_export_defaults::tests::ported_schema_sections_match_golden_export --quiet
+cargo test -p helix-shell-core --test config_export_golden rust_export_matches_golden_without_cpp_helper --quiet
+cargo test -p helix-shell-core --test config_export_golden --quiet
+
+BIN="${HELIX_CONFIG_EXPORT_BIN:-}"
+if [[ -z "$BIN" ]]; then
+  for candidate in \
+    "$ROOT/build-debug/helix-config-export" \
+    "$ROOT/build-fast/helix-config-export" \
+    "$ROOT/_build/helix-config-export"; do
+    if [[ -x "$candidate" ]]; then
+      BIN="$candidate"
+      break
+    fi
+  done
 fi
-echo "config_export_minimal.toml matches helix-config-export"
+
+if [[ -n "$BIN" && -x "$BIN" ]]; then
+  TMP="$(mktemp)"
+  trap 'rm -f "$TMP"' EXIT
+  HELIX_CONFIG_EXPORT_BIN="$BIN" "$ROOT/tools/gen_config_export_golden.sh" "$TMP"
+  if ! diff -u "$GOLDEN" "$TMP"; then
+    echo "error: config_export_minimal.toml drift vs helix-config-export; rerun tools/gen_config_export_golden.sh" >&2
+    exit 1
+  fi
+  echo "config_export_minimal.toml matches helix-config-export"
+else
+  echo "skip helix-config-export minimal golden diff (binary not built)"
+fi
+
+echo "config export golden checks passed"

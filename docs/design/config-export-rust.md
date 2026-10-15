@@ -7,6 +7,7 @@ Theme templates read `config.*` from `config_export::serialize` output (C++ toda
 | Gate | Command / artifact |
 |------|-------------------|
 | Minimal fixture byte match | `cargo test -p helix-shell-core --test config_export_golden` |
+| Parity fixtures (no C++ at test time) | `tests/golden/export_fixtures/*.toml` via `tools/gen_config_export_fixtures.py` |
 | Regenerate golden | `tools/gen_config_export_golden.sh` |
 | Verify golden fresh | `tools/verify_config_export_golden.sh` |
 | Schema read/write inverses | `meson test config_schema_roundtrip` (`tests/config_schema_roundtrip_test.cpp`) |
@@ -24,6 +25,6 @@ Theme templates read `config.*` from `config_export::serialize` output (C++ toda
 2. Port **merge + `normalizeLegacyConfig` + `parseConfigTable`** into Rust (or generate from schema), starting with sections templates touch most (`theme`, `shell`, `bar`). **`mergeConfigWithIncludes`** lives in `desktop/config_merge.rs` and backs `ConfigStore` base config load. **`settings.toml` sidecar migrations** and **`normalizeLegacyConfig`** (`config_settings_migrate.rs`) run in `ConfigStore::merged_for_config_export` before leaf patch; keep `CURRENT_CONFIG_VERSION` aligned with `config_migrations.cpp`.
 3. Port **`writeTable` per section** in the same order as `config_sections.cpp` (`config_export_defaults.rs`: section list + all schema sections plus `bar` / `widget` / placement roots via `assemble_default_export` (golden file remains the C++ drift check in `tools/verify_config_export_golden.sh` and unit tests).
 4. Port **bar/widget placement** emitters from `config_export.cpp` anonymous namespace.
-5. When `config_export_golden` passes **without** `HELIX_CONFIG_EXPORT_BIN`, remove `helix-config-export` from Meson/CI.
+5. When `config_export_golden` passes **without** `HELIX_CONFIG_EXPORT_BIN`, remove `helix-config-export` from Meson/CI. **Done for the arch unit-test job** (frozen fixtures + `assemble_default_export`); smoke/contract jobs still build the binary until template paths drop it.
 
 Until step 5, `just build debug` (or install layout) must ship `helix-config-export` next to `helix-desktop` or under `build-debug/`.

@@ -86,34 +86,30 @@ fn matches_helix_config_export_golden() {
 
 #[test]
 fn rust_export_matches_cpp_for_light_theme() {
-    let Some(bin) = discover_config_export_bin() else {
-        eprintln!("skip rust_export_matches_cpp_for_light_theme: helix-config-export not built");
-        return;
-    };
-    let root = unique_temp_dir("light");
-    let _ = fs::remove_dir_all(&root);
-    let config_dir = root.join("cfg").join("helix");
-    let state_dir = root.join("state").join("helix");
-    fs::create_dir_all(&config_dir).unwrap();
-    fs::create_dir_all(&state_dir).unwrap();
-    fs::write(config_dir.join("config.toml"), "[theme]\nmode = \"light\"\n").unwrap();
-    fs::write(state_dir.join("settings.toml"), "\n").unwrap();
-    let paths = ConfigPaths {
-        config_dir,
-        settings_toml: state_dir.join("settings.toml"),
-    };
-    let store = ConfigStore::load(paths.clone());
-    let rust = rust_export_toml(store.paths()).expect("rust export");
-    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
-    assert_eq!(rust, cpp);
-    let _ = fs::remove_dir_all(root);
+    assert_rust_export_matches_fixture_config("light_theme", "[theme]\nmode = \"light\"\n");
 }
 
-fn assert_rust_export_matches_cpp_files(config_toml: &str, settings_toml: &str) {
-    let Some(bin) = discover_config_export_bin() else {
-        eprintln!("skip assert_rust_export_matches_cpp: helix-config-export not built");
-        return;
-    };
+fn export_fixture_path(fixture_id: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden/export_fixtures")
+        .join(format!("{fixture_id}.toml"))
+}
+
+fn load_export_fixture(fixture_id: &str) -> toml::Value {
+    let text = fs::read_to_string(export_fixture_path(fixture_id)).unwrap_or_else(|err| {
+        panic!(
+            "missing export fixture {fixture_id}: {err}; run tools/gen_config_export_fixtures.py"
+        )
+    });
+    text.parse().expect("fixture parse")
+}
+
+fn assert_rust_export_matches_fixture(
+    fixture_id: &str,
+    config_toml: &str,
+    settings_toml: &str,
+    extra_config_files: &[(&str, &str)],
+) {
     let root = unique_temp_dir("parity");
     let config_dir = root.join("cfg").join("helix");
     let state_dir = root.join("state").join("helix");
@@ -121,246 +117,242 @@ fn assert_rust_export_matches_cpp_files(config_toml: &str, settings_toml: &str) 
     fs::create_dir_all(&state_dir).unwrap();
     fs::write(config_dir.join("config.toml"), config_toml).unwrap();
     fs::write(state_dir.join("settings.toml"), settings_toml).unwrap();
+    for (name, body) in extra_config_files {
+        fs::write(config_dir.join(name), body).unwrap();
+    }
     let paths = ConfigPaths {
         config_dir,
         settings_toml: state_dir.join("settings.toml"),
     };
     let store = ConfigStore::load(paths.clone());
     let rust = rust_export_toml(store.paths()).expect("rust export");
-    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
+    let expected = load_export_fixture(fixture_id);
     assert_eq!(
         rust,
-        cpp,
-        "config:\n{config_toml}\nsettings:\n{settings_toml}"
+        expected,
+        "fixture {fixture_id}\nconfig:\n{config_toml}\nsettings:\n{settings_toml}"
     );
+    if let Some(bin) = discover_config_export_bin() {
+        let cpp =
+            helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
+        assert_eq!(
+            cpp,
+            expected,
+            "fixture {fixture_id} stale vs helix-config-export; rerun tools/gen_config_export_fixtures.py"
+        );
+    }
     let _ = fs::remove_dir_all(root);
 }
 
-fn assert_rust_export_matches_cpp(config_toml: &str) {
-    assert_rust_export_matches_cpp_files(config_toml, "\n");
+fn assert_rust_export_matches_fixture_config(fixture_id: &str, config_toml: &str) {
+    assert_rust_export_matches_fixture(fixture_id, config_toml, "\n", &[]);
 }
 
 #[test]
 fn rust_export_matches_cpp_for_bar_thickness_override() {
-    assert_rust_export_matches_cpp("[bar.default]\nthickness = 40\n");
+    assert_rust_export_matches_fixture_config("bar_thickness_override", "[bar.default]\nthickness = 40\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_negative_bar_radius() {
-    assert_rust_export_matches_cpp("[bar.default]\nradius = -16\n");
+    assert_rust_export_matches_fixture_config("legacy_negative_bar_radius", "[bar.default]\nradius = -16\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_sysmon_show_icon() {
-    assert_rust_export_matches_cpp("[widget.cpu]\nshow_icon = false\n");
+    assert_rust_export_matches_fixture_config("legacy_sysmon_show_icon", "[widget.cpu]\nshow_icon = false\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_workspaces_widget() {
-    assert_rust_export_matches_cpp("[widget.workspaces]\ndisplay = \"none\"\n");
+    assert_rust_export_matches_fixture_config("legacy_workspaces_widget", "[widget.workspaces]\ndisplay = \"none\"\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_custom_named_sysmon_widget() {
-    assert_rust_export_matches_cpp("[widget.my-cpu]\ntype = \"sysmon\"\nstat = \"cpu_usage\"\n");
+    assert_rust_export_matches_fixture_config("custom_named_sysmon_widget", "[widget.my-cpu]\ntype = \"sysmon\"\nstat = \"cpu_usage\"\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_location_schedule() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("legacy_location_schedule", 
         "[location]\nsunset = \"18:00\"\nsunrise = \"06:00\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_plugins_auto_update_bool() {
-    assert_rust_export_matches_cpp("[plugins]\nauto_update = false\n");
+    assert_rust_export_matches_fixture_config("plugins_auto_update_bool", "[plugins]\nauto_update = false\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_theme_builtin_override() {
-    assert_rust_export_matches_cpp("[theme]\nbuiltin = \"Qt\"\n");
+    assert_rust_export_matches_fixture_config("theme_builtin_override", "[theme]\nbuiltin = \"Qt\"\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_with_wallpaper_runtime_state() {
-    assert_rust_export_matches_cpp("[wallpaper]\ndefault = \"/tmp/w.png\"\n");
+    assert_rust_export_matches_fixture_config("wallpaper_runtime_state", "[wallpaper]\ndefault = \"/tmp/w.png\"\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_calendar_account() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("calendar_account", 
         "[calendar.account.work]\ntype = \"ics\"\nserver_url = \"https://caldav.example.com\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_bar_monitor_override() {
-    assert_rust_export_matches_cpp("[bar.default.monitor.DP-1]\nthickness = 28\n");
+    assert_rust_export_matches_fixture_config("bar_monitor_override", "[bar.default.monitor.DP-1]\nthickness = 28\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_bar_dead_zone_command() {
-    assert_rust_export_matches_cpp("[bar.default.dead_zone]\ncommand = \"notify-send hi\"\n");
+    assert_rust_export_matches_fixture_config("legacy_bar_dead_zone_command", "[bar.default.dead_zone]\ncommand = \"notify-send hi\"\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_desktop_widgets_disabled() {
-    assert_rust_export_matches_cpp("[desktop_widgets]\nenabled = false\n");
+    assert_rust_export_matches_fixture_config("desktop_widgets_disabled", "[desktop_widgets]\nenabled = false\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_desktop_widget_placement() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("desktop_widget_placement", 
         "[desktop_widgets]\nwidget_order = [\"clock_main\"]\n\n[desktop_widgets.widget.clock_main]\ntype = \"clock\"\ncx = 960.0\ncy = 540.0\n\n[desktop_widgets.widget.clock_main.settings]\nformat = \"{:%H:%M}\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_lockscreen_widget_placement() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("lockscreen_widget_placement", 
         "[lockscreen_widgets]\nwidget_order = [\"clock_main\"]\n\n[lockscreen_widgets.widget.clock_main]\ntype = \"clock\"\ncx = 100.0\ncy = 200.0\n\n[lockscreen_widgets.widget.clock_main.settings]\nformat = \"{:%H:%M}\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_bar_monitor_match_override() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("bar_monitor_match_override", 
         "[bar.default.monitor.DP-1]\nmatch = \"DP-1\"\nthickness = 28\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_two_desktop_widget_placements() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("two_desktop_widget_placements", 
         "[desktop_widgets]\nwidget_order = [\"a\", \"b\"]\n\n[desktop_widgets.widget.a]\ntype = \"clock\"\n\n[desktop_widgets.widget.b]\ntype = \"date\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_idle_lock_behavior_only() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("idle_lock_behavior_only", 
         "[idle.behavior.lock]\ntimeout = 300\nenabled = true\naction = \"lock\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_nightlight_enabled() {
-    assert_rust_export_matches_cpp("[nightlight]\nenabled = true\n");
+    assert_rust_export_matches_fixture_config("nightlight_enabled", "[nightlight]\nenabled = true\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_two_calendar_accounts() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("two_calendar_accounts", 
         "[calendar.account.zed]\ntype = \"ics\"\nserver_url = \"https://a\"\n\n[calendar.account.alpha]\ntype = \"ics\"\nserver_url = \"https://b\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_placement_widget_table_sort_order() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("placement_widget_table_sort_order", 
         "[desktop_widgets]\nwidget_order = [\"b\", \"a\"]\n\n[desktop_widgets.widget.b]\ntype = \"clock\"\n\n[desktop_widgets.widget.a]\ntype = \"date\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_idle_behavior_order_override() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("idle_behavior_order_override", 
         "[idle]\nbehavior_order = [\"screen-off\", \"lock\"]\n\n[idle.behavior.screen-off]\ntimeout = 200\nenabled = true\naction = \"screen_off\"\n\n[idle.behavior.lock]\ntimeout = 100\nenabled = true\naction = \"lock\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_desktop_widget_flip_x() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("desktop_widget_flip_x", 
         "[desktop_widgets]\nwidget_order = [\"clock_main\"]\n\n[desktop_widgets.widget.clock_main]\ntype = \"clock\"\nflip_x = true\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
-    assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
+    assert_rust_export_matches_fixture_config("bar_thickness_float_literal", "[bar.default]\nthickness = 40.0\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_theme_pure_black_dark() {
-    assert_rust_export_matches_cpp("[theme]\npure_black_dark = true\n");
+    assert_rust_export_matches_fixture_config("theme_pure_black_dark", "[theme]\npure_black_dark = true\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_dock_disabled() {
-    assert_rust_export_matches_cpp("[dock]\nenabled = false\n");
+    assert_rust_export_matches_fixture_config("dock_disabled", "[dock]\nenabled = false\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_settings_theme_override() {
-    assert_rust_export_matches_cpp_files("", "[theme]\nmode = \"light\"\n");
+    assert_rust_export_matches_fixture(
+        "settings_theme_override",
+        "",
+        "[theme]\nmode = \"light\"\n",
+        &[],
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_migrated_settings_sidecar() {
-    assert_rust_export_matches_cpp_files(
+    assert_rust_export_matches_fixture(
+        "migrated_settings_sidecar",
         "",
         "config_version = 14\n[shell]\nlaunch_apps_as_systemd_services = false\n",
+        &[],
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_notification_max_visible() {
-    assert_rust_export_matches_cpp("[notification]\nmax_visible = 5\n");
+    assert_rust_export_matches_fixture_config("notification_max_visible", "[notification]\nmax_visible = 5\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_shell_polkit_agent() {
-    assert_rust_export_matches_cpp("[shell]\npolkit_agent = true\n");
+    assert_rust_export_matches_fixture_config("shell_polkit_agent", "[shell]\npolkit_agent = true\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_bar_start_widgets() {
-    assert_rust_export_matches_cpp("[bar.default]\nstart = [\"clock\", \"date\"]\n");
+    assert_rust_export_matches_fixture_config("bar_start_widgets", "[bar.default]\nstart = [\"clock\", \"date\"]\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_with_config_include() {
-    let Some(bin) = discover_config_export_bin() else {
-        eprintln!("skip rust_export_matches_cpp_with_config_include: helix-config-export not built");
-        return;
-    };
-    let root = unique_temp_dir("include");
-    let config_dir = root.join("cfg").join("helix");
-    fs::create_dir_all(&config_dir).unwrap();
-    let state_dir = root.join("state").join("helix");
-    fs::create_dir_all(&state_dir).unwrap();
-    fs::write(
-        config_dir.join("base.toml"),
-        "[theme]\nmode = \"dark\"\n",
-    )
-    .unwrap();
-    fs::write(
-        config_dir.join("config.toml"),
+    assert_rust_export_matches_fixture(
+        "config_include",
         "include = { files = [\"base.toml\"] }\n\n[theme]\nmode = \"light\"\n",
-    )
-    .unwrap();
-    fs::write(state_dir.join("settings.toml"), "\n").unwrap();
-    let paths = ConfigPaths {
-        config_dir,
-        settings_toml: state_dir.join("settings.toml"),
-    };
-    let store = ConfigStore::load(paths.clone());
-    let rust = rust_export_toml(store.paths()).expect("rust export");
-    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
-    assert_eq!(rust, cpp);
-    let _ = fs::remove_dir_all(root);
+        "\n",
+        &[("base.toml", "[theme]\nmode = \"dark\"\n")],
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_secondary_bar() {
-    assert_rust_export_matches_cpp("[bar.secondary]\nenabled = true\nthickness = 28\n");
+    assert_rust_export_matches_fixture_config("secondary_bar", "[bar.secondary]\nenabled = true\nthickness = 28\n");
 }
 
 #[test]
 fn rust_export_matches_cpp_for_default_and_secondary_bars() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("default_and_secondary_bars", 
         "[bar.default]\nthickness = 40\n\n[bar.secondary]\nenabled = true\nthickness = 28\n",
     );
 }
@@ -368,14 +360,14 @@ fn rust_export_matches_cpp_for_default_and_secondary_bars() {
 /// `tools/nested/helix-desktop-config-smoke.sh` config tree (bar name + idle + templates).
 #[test]
 fn rust_export_matches_cpp_for_explicit_bar_order() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("explicit_bar_order", 
         "[bar]\norder = [\"zed\", \"alpha\"]\n\n[bar.zed]\nenabled = true\n\n[bar.alpha]\nenabled = true\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_desktop_config_smoke() {
-    assert_rust_export_matches_cpp(
+    assert_rust_export_matches_fixture_config("desktop_config_smoke", 
         "[bar.main]\nenabled = true\nthickness = 34\n\n[idle.behavior.lock]\ntimeout = 420\nenabled = true\naction = \"lock\"\n\n[theme.templates]\nbuiltin_ids = [\"helix\", \"qt\"]\n",
     );
 }
@@ -385,18 +377,8 @@ fn rust_export_matches_cpp_for_minimal_fixture() {
     let root = unique_temp_dir("minimal");
     let paths = minimal_fixture(&root);
     let store = ConfigStore::load(paths.clone());
-    if rust_export_toml(store.paths()).is_none() {
-        eprintln!("skip rust_export_matches_cpp: rust_export_toml not implemented");
-        let _ = fs::remove_dir_all(root);
-        return;
-    }
-    let Some(bin) = discover_config_export_bin() else {
-        eprintln!("skip rust_export_matches_cpp: helix-config-export not built");
-        let _ = fs::remove_dir_all(root);
-        return;
-    };
-    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
-    let rust = export_effective_toml(&store, Some(&bin)).expect("export");
-    assert_eq!(rust, cpp);
+    let rust = export_effective_toml(&store, None).expect("rust export");
+    let expected = load_export_fixture("minimal_fixture");
+    assert_eq!(rust, expected);
     let _ = fs::remove_dir_all(root);
 }
