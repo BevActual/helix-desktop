@@ -18,10 +18,14 @@ if [[ -z "${HELIX_DESKTOP_CONFIG_SMOKE_INNER:-}" ]]; then
 fi
 
 export XDG_CONFIG_HOME XDG_STATE_HOME HELIX_ASSETS_DIR
+unset HELIX_CONFIG_HOME HELIX_STATE_HOME
 XDG_CONFIG_HOME="$(mktemp -d)"
 XDG_STATE_HOME="$(mktemp -d)"
 mkdir -p "$XDG_CONFIG_HOME/helix"
 cat >"$XDG_CONFIG_HOME/helix/config.toml" <<'EOF'
+[bar]
+order = ["main"]
+
 [bar.main]
 enabled = true
 thickness = 34

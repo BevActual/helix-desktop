@@ -359,7 +359,69 @@ fn widget_names(store: &ConfigStore) -> Vec<String> {
 
 /// Whether no bar is configured, i.e. the C++ default bar (`default`) is in effect.
 fn uses_default_bar(store: &ConfigStore) -> bool {
-    bar_table(store).map_or(true, |bars| bars.keys().all(|name| name == "order"))
+    let Some(bars) = bar_table(store) else {
+        return true;
+    };
+    if bars.keys().any(|name| *name != "order" && *name != "default") {
+        return false;
+    }
+    if bars.contains_key("default") {
+        return false;
+    }
+    match bars.get("order").and_then(Toml::as_array) {
+        None => true,
+        Some(order) if order.is_empty() => true,
+        Some(order) => order
+            .iter()
+            .all(|item| item.as_str() == Some("default")),
+    }
+}
+
+#[cfg(test)]
+mod bar_names_tests {
+    use super::*;
+    use crate::desktop::settings::{ConfigPaths, ConfigStore};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn config_smoke_shape_resolves_main_bar() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("helix-bar-smoke-{nanos}"));
+        fs::create_dir_all(home.join("helix")).unwrap();
+        fs::create_dir_all(home.join("state/helix")).unwrap();
+        fs::write(
+            home.join("helix/config.toml"),
+            r#"[bar]
+order = ["main"]
+
+[bar.main]
+enabled = true
+thickness = 34
+
+[idle.behavior.lock]
+timeout = 420
+enabled = true
+action = "lock"
+
+[theme.templates]
+builtin_ids = ["helix", "qt"]
+"#,
+        )
+        .unwrap();
+        // SAFETY: single-threaded test; `from_env` prefers HELIX_* over XDG_*.
+        unsafe {
+            std::env::remove_var("HELIX_CONFIG_HOME");
+            std::env::remove_var("HELIX_STATE_HOME");
+            std::env::set_var("XDG_CONFIG_HOME", &home);
+            std::env::set_var("XDG_STATE_HOME", home.join("state"));
+        }
+        let store = ConfigStore::load(ConfigPaths::from_env());
+        assert_eq!(bar_names(&store), vec!["main".to_string()]);
+    }
 }
 
 pub(crate) fn bar_names(store: &ConfigStore) -> Vec<String> {

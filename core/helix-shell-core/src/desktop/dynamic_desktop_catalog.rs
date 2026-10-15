@@ -353,7 +353,7 @@ mod tests {
         fs::create_dir_all(&config_dir).unwrap();
         fs::write(
             config_dir.join("config.toml"),
-            "[bar.main]\nenabled = true\nthickness = 40\n[idle.behavior.lock]\ntimeout = 420\nenabled = true\n",
+            "[bar]\norder = [\"main\"]\n\n[bar.main]\nenabled = true\nthickness = 40\n\n[idle.behavior.lock]\ntimeout = 420\nenabled = true\n",
         )
         .unwrap();
         ConfigStore::load(ConfigPaths {
@@ -369,6 +369,13 @@ mod tests {
         assert!(rows.iter().any(|row| row["id"] == "bar:main:enabled"));
         assert!(rows.iter().any(|row| row["id"] == "idle:lock:timeout"));
         assert_eq!(store.get_json_value("idle:lock:timeout").and_then(|v| v.as_f64()), Some(420.0));
+    }
+
+    #[test]
+    fn bar_names_follow_smoke_config_shape() {
+        use super::super::ordered_catalog::bar_names;
+        let store = store_with_bar();
+        assert_eq!(bar_names(&store), vec!["main".to_string()]);
     }
 }
 
