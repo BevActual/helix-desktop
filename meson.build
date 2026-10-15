@@ -446,7 +446,6 @@ _helix_sources = files(
   'src/system/lock_keys_service.cpp',
   'src/system/distro_info.cpp',
   'src/system/fedora_upgrade.cpp',
-  'src/system/fedora_upgrade_launcher.cpp',
   'src/system/package_kit_service.cpp',
   'src/system/package_spec.cpp',
   'src/system/disk_mounts.cpp',
@@ -663,17 +662,8 @@ install_data(
   install_mode: 'rwxr-xr-x',
 )
 
-executable('helix-system-upgrade',
-  sources: files(
-    'src/system/fedora_upgrade.cpp',
-    'src/system/fedora_upgrade_main.cpp',
-  ),
-  include_directories: include_directories('src'),
-  cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers', '-Wpedantic', '-Wconversion', '-Wshadow'],
-  install: true,
-  install_dir: get_option('libexecdir'),
-)
-
+# helix-system-upgrade (the pkexec helper the polkit policy below points at) is Rust: services/helix-system-upgrade;
+# `just install` puts it in libexecdir.
 helix_upgrade_policy_conf = configuration_data()
 helix_upgrade_policy_conf.set('HELPER_PATH', helix_system_upgrade_path)
 configure_file(
@@ -709,7 +699,6 @@ if build_tests
     'display_config',
     'enterprise_credentials',
     'fcitx_status',
-    'fedora_upgrade',
     'freedesktop_key_file',
     'hook_manager',
     'i18n_language_tag',

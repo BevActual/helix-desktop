@@ -11,7 +11,7 @@ Helix’s session UI is already Rust (Tauri). Remaining C++ owns desktop authori
 | `src/config/`, theme, dbus adapters | service / shared crates | Port with each domain |
 | `helix-assistant` | `services/helix-assistant` | After Agent Surface on Rust Desktop; keep separate from shell |
 | `helix-inference` | `services/helix-inference` | Last; llama.cpp via FFI; sandboxed D-Bus activation |
-| `helix-system-upgrade` | small helper or stay C++ | Low priority |
+| `helix-system-upgrade` | `services/helix-system-upgrade` | **Done.** Same plan logic and tests; `just install` puts it in libexecdir where the polkit policy points |
 | `compositor/` | already Rust (own workspace) | Done |
 | `greeter/` | Tauri scaffold | In progress |
 
