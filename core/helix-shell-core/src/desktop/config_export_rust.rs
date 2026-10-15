@@ -1,6 +1,6 @@
 //! In-process `config_export::serialize` parity (incremental port).
 //!
-//! Today: schema-default export (`tests/golden/config_export_minimal.toml`) rebuilt for
+//! Today: schema-default export (`config_export_defaults::assemble_default_export`) rebuilt for
 //! dynamic `bar` / `idle.behavior` shapes, then user `config.toml` / `settings.toml` leaves
 //! patched when those paths exist in the export tree. Unknown merged keys fall back to
 //! `helix-config-export` (see `docs/design/config-export-rust.md`).
@@ -9,22 +9,13 @@ use std::sync::OnceLock;
 
 use toml::Value as Toml;
 
-use super::config_export_defaults::overlay_ported_schema_defaults;
+use super::config_export_defaults::assemble_default_export;
 use super::config_export_serialize::finalize_serialized_export;
 use super::settings::{ConfigPaths, ConfigStore};
 
-const DEFAULT_EXPORT_TOML: &str =
-    include_str!("../../tests/golden/config_export_minimal.toml");
-
 fn default_export_root() -> &'static Toml {
     static ROOT: OnceLock<Toml> = OnceLock::new();
-    ROOT.get_or_init(|| {
-        let mut root = DEFAULT_EXPORT_TOML
-            .parse()
-            .expect("config_export_minimal.toml must parse");
-        overlay_ported_schema_defaults(&mut root);
-        root
-    })
+    ROOT.get_or_init(assemble_default_export)
 }
 
 fn dot_path_exists(root: &Toml, path: &str) -> bool {

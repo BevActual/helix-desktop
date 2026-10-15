@@ -842,6 +842,216 @@ pub fn write_control_center_defaults() -> Toml {
     Toml::Table(table)
 }
 
+pub fn write_bar_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("order".to_string(), {
+Toml::Array(vec![
+            Toml::String("default".to_string()),
+        ])
+    });
+    table.insert("default".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("auto_hide".to_string(), Toml::Boolean(false));
+        table.insert("background_opacity".to_string(), Toml::Float(0.7200000286102295));
+        table.insert("border".to_string(), Toml::String("outline".to_string()));
+        table.insert("border_width".to_string(), Toml::Float(0.0));
+        table.insert("capsule".to_string(), Toml::Boolean(false));
+        table.insert("capsule_fill".to_string(), Toml::String("surface_variant".to_string()));
+        table.insert("capsule_opacity".to_string(), Toml::Float(0.550000011920929));
+        table.insert("capsule_padding".to_string(), Toml::Float(6.0));
+        table.insert("capsule_thickness".to_string(), Toml::Float(0.7200000286102295));
+        table.insert("center".to_string(), Toml::Array(vec![]));
+        table.insert("concave_edge_corners".to_string(), Toml::Boolean(false));
+        table.insert("contact_shadow".to_string(), Toml::Boolean(false));
+        table.insert("enabled".to_string(), Toml::Boolean(true));
+        table.insert("end".to_string(), {
+Toml::Array(vec![
+                Toml::String("media".to_string()),
+                Toml::String("notifications".to_string()),
+                Toml::String("tray".to_string()),
+                Toml::String("group:status".to_string()),
+            ])
+        });
+        table.insert("font_scale".to_string(), Toml::Float(1.0));
+        table.insert("font_weight".to_string(), Toml::Integer(500));
+        table.insert("hover_highlight".to_string(), Toml::Boolean(true));
+        table.insert("layer".to_string(), Toml::String("top".to_string()));
+        table.insert("margin_edge".to_string(), Toml::Integer(8));
+        table.insert("margin_ends".to_string(), Toml::Integer(12));
+        table.insert("margin_opposite_edge".to_string(), Toml::Integer(0));
+        table.insert("padding".to_string(), Toml::Integer(12));
+        table.insert("panel_overlap".to_string(), Toml::Integer(1));
+        table.insert("position".to_string(), Toml::String("top".to_string()));
+        table.insert("radius".to_string(), Toml::Integer(18));
+        table.insert("radius_bottom_left".to_string(), Toml::Integer(18));
+        table.insert("radius_bottom_right".to_string(), Toml::Integer(18));
+        table.insert("radius_top_left".to_string(), Toml::Integer(18));
+        table.insert("radius_top_right".to_string(), Toml::Integer(18));
+        table.insert("reserve_space".to_string(), Toml::Boolean(true));
+        table.insert("scale".to_string(), Toml::Float(1.0));
+        table.insert("shadow".to_string(), Toml::Boolean(true));
+        table.insert("show_on_workspace_switch".to_string(), Toml::Boolean(true));
+        table.insert("smart_auto_hide".to_string(), Toml::Boolean(false));
+        table.insert("start".to_string(), {
+Toml::Array(vec![
+                Toml::String("clock".to_string()),
+            ])
+        });
+        table.insert("thickness".to_string(), Toml::Integer(34));
+        table.insert("widget_spacing".to_string(), Toml::Integer(8));
+        table.insert("dead_zone".to_string(), {
+            let mut table = toml::map::Map::new();
+            Toml::Table(table)
+        });
+        table.insert("capsule_group".to_string(), {
+Toml::Array(vec![
+                {
+                let mut table = toml::map::Map::new();
+                table.insert("accordion".to_string(), Toml::Boolean(false));
+                table.insert("accordion_direction".to_string(), Toml::String("end".to_string()));
+                table.insert("enabled".to_string(), Toml::Boolean(true));
+                table.insert("fill".to_string(), Toml::String("surface_variant".to_string()));
+                table.insert("id".to_string(), Toml::String("status".to_string()));
+                table.insert("members".to_string(), {
+Toml::Array(vec![
+                        Toml::String("network".to_string()),
+                        Toml::String("bluetooth".to_string()),
+                        Toml::String("volume".to_string()),
+                        Toml::String("battery".to_string()),
+                    ])
+                });
+                table.insert("opacity".to_string(), Toml::Float(0.550000011920929));
+                table.insert("padding".to_string(), Toml::Float(6.0));
+                Toml::Table(table)
+            },
+            ])
+        });
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_widget_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("active_window".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("icon_size".to_string(), Toml::Float(14.0));
+        table.insert("max_length".to_string(), Toml::Float(260.0));
+        table.insert("min_length".to_string(), Toml::Float(80.0));
+        table.insert("title_scroll".to_string(), Toml::String("none".to_string()));
+        table.insert("type".to_string(), Toml::String("active_window".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("cpu".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("stat".to_string(), Toml::String("cpu_usage".to_string()));
+        table.insert("type".to_string(), Toml::String("sysmon".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("date".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("format".to_string(), Toml::String("{:%a %d %b}".to_string()));
+        table.insert("type".to_string(), Toml::String("clock".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("input_volume".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("device".to_string(), Toml::String("input".to_string()));
+        table.insert("type".to_string(), Toml::String("volume".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("keyboard_layout".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("hide_when_single_layout".to_string(), Toml::Boolean(false));
+        table.insert("type".to_string(), Toml::String("keyboard_layout".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("lock_keys".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("display".to_string(), Toml::String("short".to_string()));
+        table.insert("hide_when_off".to_string(), Toml::Boolean(false));
+        table.insert("show_caps_lock".to_string(), Toml::Boolean(true));
+        table.insert("show_num_lock".to_string(), Toml::Boolean(true));
+        table.insert("show_scroll_lock".to_string(), Toml::Boolean(false));
+        table.insert("type".to_string(), Toml::String("lock_keys".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("media".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("art_size".to_string(), Toml::Float(16.0));
+        table.insert("max_length".to_string(), Toml::Float(220.0));
+        table.insert("min_length".to_string(), Toml::Float(80.0));
+        table.insert("title_scroll".to_string(), Toml::String("none".to_string()));
+        table.insert("type".to_string(), Toml::String("media".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("network_rx".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("stat".to_string(), Toml::String("net_rx".to_string()));
+        table.insert("type".to_string(), Toml::String("sysmon".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("network_tx".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("stat".to_string(), Toml::String("net_tx".to_string()));
+        table.insert("type".to_string(), Toml::String("sysmon".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("output_volume".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("device".to_string(), Toml::String("output".to_string()));
+        table.insert("type".to_string(), Toml::String("volume".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("ram".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("stat".to_string(), Toml::String("ram_used".to_string()));
+        table.insert("type".to_string(), Toml::String("sysmon".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("spacer".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("interactive".to_string(), Toml::Boolean(false));
+        table.insert("type".to_string(), Toml::String("spacer".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("temp".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("stat".to_string(), Toml::String("cpu_temp".to_string()));
+        table.insert("type".to_string(), Toml::String("sysmon".to_string()));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_desktop_widgets_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("enabled".to_string(), Toml::Boolean(true));
+    table.insert("schema_version".to_string(), Toml::Integer(2));
+    table.insert("grid".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("cell_size".to_string(), Toml::Integer(16));
+        table.insert("major_interval".to_string(), Toml::Integer(4));
+        table.insert("visible".to_string(), Toml::Boolean(true));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_lockscreen_widgets_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("enabled".to_string(), Toml::Boolean(false));
+    table.insert("schema_version".to_string(), Toml::Integer(2));
+    table.insert("grid".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("cell_size".to_string(), Toml::Integer(16));
+        table.insert("major_interval".to_string(), Toml::Integer(4));
+        table.insert("visible".to_string(), Toml::Boolean(true));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
 const PORTED_SCHEMA_WRITERS: &[(&str, fn() -> Toml)] = &[
     ("storage", write_storage_defaults),
     ("shell", write_shell_defaults),
@@ -869,6 +1079,22 @@ const PORTED_SCHEMA_WRITERS: &[(&str, fn() -> Toml)] = &[
     ("hooks", write_hooks_defaults),
 ];
 
+/// `config_export::serialize` root tables outside `config_sections.cpp`.
+const EXTRA_EXPORT_ROOT_WRITERS: &[(&str, fn() -> Toml)] = &[
+    ("bar", write_bar_defaults),
+    ("widget", write_widget_defaults),
+    ("desktop_widgets", write_desktop_widgets_defaults),
+    ("lockscreen_widgets", write_lockscreen_widgets_defaults),
+];
+
+/// Full schema-default export (`makeDefaultConfig` + `config_export::serialize`).
+pub fn assemble_default_export() -> Toml {
+    let mut root = Toml::Table(toml::map::Map::new());
+    overlay_ported_schema_defaults(&mut root);
+    overlay_extra_export_roots(&mut root);
+    root
+}
+
 /// Replace golden slices with in-Rust `writeTable` defaults as they are ported.
 pub fn overlay_ported_schema_defaults(root: &mut Toml) {
     let root = match root.as_table_mut() {
@@ -876,6 +1102,16 @@ pub fn overlay_ported_schema_defaults(root: &mut Toml) {
         None => return,
     };
     for (name, writer) in PORTED_SCHEMA_WRITERS {
+        root.insert(name.to_string(), writer());
+    }
+}
+
+pub fn overlay_extra_export_roots(root: &mut Toml) {
+    let root = match root.as_table_mut() {
+        Some(table) => table,
+        None => return,
+    };
+    for (name, writer) in EXTRA_EXPORT_ROOT_WRITERS {
         root.insert(name.to_string(), writer());
     }
 }
@@ -901,15 +1137,10 @@ mod tests {
         for (name, writer) in PORTED_SCHEMA_WRITERS {
             assert_section_matches_golden(name, *writer);
         }
-
-        let mut assembled = golden_root();
-        overlay_ported_schema_defaults(&mut assembled);
-        for (name, _) in PORTED_SCHEMA_WRITERS {
-            assert_eq!(
-                assembled.get(name),
-                golden_root().get(name),
-                "overlay {name}"
-            );
+        for (name, writer) in EXTRA_EXPORT_ROOT_WRITERS {
+            assert_section_matches_golden(name, *writer);
         }
+
+        assert_eq!(assemble_default_export(), golden_root());
     }
 }
