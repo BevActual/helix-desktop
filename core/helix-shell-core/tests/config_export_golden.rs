@@ -264,6 +264,20 @@ fn rust_export_matches_cpp_for_placement_widget_table_sort_order() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_idle_behavior_order_override() {
+    assert_rust_export_matches_cpp(
+        "[idle]\nbehavior_order = [\"screen-off\", \"lock\"]\n\n[idle.behavior.screen-off]\ntimeout = 200\nenabled = true\naction = \"screen_off\"\n\n[idle.behavior.lock]\ntimeout = 100\nenabled = true\naction = \"lock\"\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_desktop_widget_flip_x() {
+    assert_rust_export_matches_cpp(
+        "[desktop_widgets]\nwidget_order = [\"clock_main\"]\n\n[desktop_widgets.widget.clock_main]\ntype = \"clock\"\nflip_x = true\n",
+    );
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }

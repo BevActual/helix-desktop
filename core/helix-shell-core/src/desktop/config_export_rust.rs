@@ -349,6 +349,32 @@ fn merged_export_is_patchable(store: &ConfigStore) -> bool {
     })
 }
 
+/// Behavior names in export order: explicit `behavior_order` first, then unlisted behaviors
+/// in merged table order (C++ `idleSchema` finalizer).
+fn merged_idle_behavior_names(merged: &Toml) -> Option<Vec<String>> {
+    let idle = merged.get("idle").and_then(Toml::as_table)?;
+    let behavior = idle.get("behavior").and_then(Toml::as_table)?;
+    if behavior.is_empty() {
+        return None;
+    }
+    let mut names = Vec::new();
+    if let Some(order) = idle.get("behavior_order").and_then(Toml::as_array) {
+        for value in order {
+            if let Some(name) = value.as_str() {
+                if behavior.contains_key(name) {
+                    names.push(name.to_string());
+                }
+            }
+        }
+    }
+    for key in behavior.keys() {
+        if !names.iter().any(|name| name == key) {
+            names.push(key.clone());
+        }
+    }
+    Some(names)
+}
+
 /// When user config names specific idle behaviors, export only those (C++ `idleSchema` / `behavior_order`).
 fn rebuild_idle_from_merged(root: &mut Toml, merged: &Toml) {
     let merged_behavior = merged
@@ -363,7 +389,10 @@ fn rebuild_idle_from_merged(root: &mut Toml, merged: &Toml) {
     if merged_behavior.is_empty() {
         return;
     }
-    let names: Vec<String> = merged_behavior.keys().cloned().collect();
+    let names = merged_idle_behavior_names(merged).unwrap_or_default();
+    if names.is_empty() {
+        return;
+    }
 
     let export_idle = match root.get_mut("idle").and_then(Toml::as_table_mut) {
         Some(table) => table,
