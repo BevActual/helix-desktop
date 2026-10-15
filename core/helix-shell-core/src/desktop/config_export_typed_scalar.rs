@@ -4,8 +4,10 @@ use toml::Value as Toml;
 
 use super::config_export_defaults::{
     write_audio_defaults, write_backdrop_defaults, write_brightness_defaults,
-    write_calendar_defaults, write_hooks_defaults, write_location_defaults,
-    write_nightlight_defaults, write_tailscale_defaults, write_weather_defaults, HOOK_EVENT_KEYS,
+    write_calendar_defaults, write_hooks_defaults, write_hot_corners_defaults,
+    write_idle_defaults, write_location_defaults, write_nightlight_defaults,
+    write_notification_defaults, write_osd_defaults, write_tailscale_defaults,
+    write_weather_defaults, HOOK_EVENT_KEYS,
 };
 use super::config_export_serialize::f32_bits;
 
@@ -617,6 +619,547 @@ pub(crate) fn export_location_section_from_merged(merged: &Toml) -> Toml {
         .unwrap_or_else(|| LocationExport::export_defaults().write_export_table())
 }
 
+const HOT_CORNER_NAMES: &[&str] = &[
+    "bottom_left",
+    "bottom_right",
+    "top_left",
+    "top_right",
+];
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct HotCornerActionExport {
+    action: String,
+    command: String,
+}
+
+impl HotCornerActionExport {
+    fn none() -> Self {
+        Self {
+            action: "none".to_string(),
+            command: String::new(),
+        }
+    }
+
+    fn overlay_merged(&mut self, merged: &Toml) {
+        let table = match merged.as_table() {
+            Some(table) => table,
+            None => return,
+        };
+        if let Some(value) = table.get("action").and_then(Toml::as_str) {
+            self.action = value.to_string();
+        }
+        if let Some(value) = table.get("command").and_then(Toml::as_str) {
+            self.command = value.to_string();
+        }
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert("action".to_string(), Toml::String(self.action.clone()));
+        table.insert("command".to_string(), Toml::String(self.command.clone()));
+        Toml::Table(table)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HotCornersExport {
+    delay_ms: i64,
+    enabled: bool,
+    bottom_left: HotCornerActionExport,
+    bottom_right: HotCornerActionExport,
+    top_left: HotCornerActionExport,
+    top_right: HotCornerActionExport,
+}
+
+impl HotCornersExport {
+    fn export_defaults() -> Self {
+        Self::from_export_table(&write_hot_corners_defaults())
+    }
+
+    fn corner_mut(&mut self, name: &str) -> Option<&mut HotCornerActionExport> {
+        match name {
+            "bottom_left" => Some(&mut self.bottom_left),
+            "bottom_right" => Some(&mut self.bottom_right),
+            "top_left" => Some(&mut self.top_left),
+            "top_right" => Some(&mut self.top_right),
+            _ => None,
+        }
+    }
+
+    fn from_export_table(table: &Toml) -> Self {
+        let table = table.as_table().expect("hot_corners export table");
+        let mut out = Self {
+            delay_ms: table.get("delay_ms").and_then(Toml::as_integer).unwrap_or(0),
+            enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(false),
+            bottom_left: HotCornerActionExport::none(),
+            bottom_right: HotCornerActionExport::none(),
+            top_left: HotCornerActionExport::none(),
+            top_right: HotCornerActionExport::none(),
+        };
+        for name in HOT_CORNER_NAMES {
+            if let Some(corner) = table.get(*name) {
+                out.corner_mut(name)
+                    .expect("hot corner name")
+                    .overlay_merged(corner);
+            }
+        }
+        out
+    }
+
+    fn from_merged_section(merged_section: &Toml) -> Self {
+        let mut out = Self::export_defaults();
+        let table = match merged_section.as_table() {
+            Some(table) => table,
+            None => return out,
+        };
+        if let Some(value) = table.get("delay_ms").and_then(Toml::as_integer) {
+            out.delay_ms = value;
+        }
+        if let Some(value) = table.get("enabled").and_then(Toml::as_bool) {
+            out.enabled = value;
+        }
+        for name in HOT_CORNER_NAMES {
+            if let Some(corner) = table.get(*name) {
+                out.corner_mut(name)
+                    .expect("hot corner name")
+                    .overlay_merged(corner);
+            }
+        }
+        out
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert("delay_ms".to_string(), Toml::Integer(self.delay_ms));
+        table.insert("enabled".to_string(), Toml::Boolean(self.enabled));
+        table.insert(
+            "bottom_left".to_string(),
+            self.bottom_left.write_export_table(),
+        );
+        table.insert(
+            "bottom_right".to_string(),
+            self.bottom_right.write_export_table(),
+        );
+        table.insert("top_left".to_string(), self.top_left.write_export_table());
+        table.insert("top_right".to_string(), self.top_right.write_export_table());
+        Toml::Table(table)
+    }
+}
+
+pub(crate) fn export_hot_corners_section_from_merged(merged: &Toml) -> Toml {
+    merged
+        .get("hot_corners")
+        .map(|section| HotCornersExport::from_merged_section(section).write_export_table())
+        .unwrap_or_else(|| HotCornersExport::export_defaults().write_export_table())
+}
+
+/// `idle.behavior` / `behavior_order` are rebuilt in `config_export_rust` after export.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct IdleExport {
+    pre_action_fade_seconds: f64,
+}
+
+impl IdleExport {
+    fn export_defaults() -> Self {
+        let table = write_idle_defaults();
+        Self {
+            pre_action_fade_seconds: table
+                .get("pre_action_fade_seconds")
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(2.0),
+        }
+    }
+
+    fn from_merged_section(merged_section: &Toml) -> Self {
+        let mut out = Self::export_defaults();
+        if let Some(value) = merged_section
+            .get("pre_action_fade_seconds")
+            .and_then(|v| v.as_float())
+        {
+            out.pre_action_fade_seconds = f32_bits(value);
+        }
+        out
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut out = write_idle_defaults();
+        out.as_table_mut()
+            .expect("idle export table")
+            .insert(
+                "pre_action_fade_seconds".to_string(),
+                Toml::Float(self.pre_action_fade_seconds),
+            );
+        out
+    }
+}
+
+pub(crate) fn export_idle_section_from_merged(merged: &Toml) -> Toml {
+    merged
+        .get("idle")
+        .map(|section| IdleExport::from_merged_section(section).write_export_table())
+        .unwrap_or_else(|| IdleExport::export_defaults().write_export_table())
+}
+
+fn overlay_bool_subtable_from_merged(
+    defaults: &toml::map::Map<String, Toml>,
+    merged: Option<&Toml>,
+) -> toml::map::Map<String, Toml> {
+    let mut out = defaults.clone();
+    let merged_table = match merged.and_then(Toml::as_table) {
+        Some(table) => table,
+        None => return out,
+    };
+    for (key, value) in merged_table {
+        if defaults.contains_key(key) && value.as_bool().is_some() {
+            out.insert(key.clone(), value.clone());
+        }
+    }
+    out
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct NotificationExport {
+    background_opacity: f64,
+    border: bool,
+    collapse_on_dismiss: bool,
+    enable_daemon: bool,
+    filter_replace: bool,
+    history_retention_hours: i64,
+    keep_dismissed_in_history: bool,
+    layer: String,
+    max_visible: i64,
+    monitors: Vec<String>,
+    offset_x: i64,
+    offset_y: i64,
+    position: String,
+    scale: f64,
+    show_actions: bool,
+    show_app_name: bool,
+}
+
+impl NotificationExport {
+    fn export_defaults() -> Self {
+        Self::from_export_table(&write_notification_defaults())
+    }
+
+    fn from_export_table(table: &Toml) -> Self {
+        let table = table.as_table().expect("notification export table");
+        Self {
+            background_opacity: table
+                .get("background_opacity")
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(0.97),
+            border: table.get("border").and_then(Toml::as_bool).unwrap_or(true),
+            collapse_on_dismiss: table
+                .get("collapse_on_dismiss")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            enable_daemon: table
+                .get("enable_daemon")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            filter_replace: table
+                .get("filter_replace")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
+            history_retention_hours: table
+                .get("history_retention_hours")
+                .and_then(Toml::as_integer)
+                .unwrap_or(0),
+            keep_dismissed_in_history: table
+                .get("keep_dismissed_in_history")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            layer: table
+                .get("layer")
+                .and_then(Toml::as_str)
+                .unwrap_or("top")
+                .to_string(),
+            max_visible: table
+                .get("max_visible")
+                .and_then(Toml::as_integer)
+                .unwrap_or(0),
+            monitors: string_array(table.get("monitors")),
+            offset_x: table.get("offset_x").and_then(Toml::as_integer).unwrap_or(20),
+            offset_y: table.get("offset_y").and_then(Toml::as_integer).unwrap_or(8),
+            position: table
+                .get("position")
+                .and_then(Toml::as_str)
+                .unwrap_or("top_right")
+                .to_string(),
+            scale: table
+                .get("scale")
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(1.0),
+            show_actions: table
+                .get("show_actions")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            show_app_name: table
+                .get("show_app_name")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+        }
+    }
+
+    fn from_merged_section(merged_section: &Toml) -> Self {
+        let mut out = Self::export_defaults();
+        let table = match merged_section.as_table() {
+            Some(table) => table,
+            None => return out,
+        };
+        if let Some(value) = table.get("background_opacity").and_then(|v| v.as_float()) {
+            out.background_opacity = f32_bits(value);
+        }
+        if let Some(value) = table.get("border").and_then(Toml::as_bool) {
+            out.border = value;
+        }
+        if let Some(value) = table.get("collapse_on_dismiss").and_then(Toml::as_bool) {
+            out.collapse_on_dismiss = value;
+        }
+        if let Some(value) = table.get("enable_daemon").and_then(Toml::as_bool) {
+            out.enable_daemon = value;
+        }
+        if let Some(value) = table.get("filter_replace").and_then(Toml::as_bool) {
+            out.filter_replace = value;
+        }
+        if let Some(value) = table
+            .get("history_retention_hours")
+            .and_then(Toml::as_integer)
+        {
+            out.history_retention_hours = value;
+        }
+        if let Some(value) = table
+            .get("keep_dismissed_in_history")
+            .and_then(Toml::as_bool)
+        {
+            out.keep_dismissed_in_history = value;
+        }
+        if let Some(value) = table.get("layer").and_then(Toml::as_str) {
+            out.layer = value.to_string();
+        }
+        if let Some(value) = table.get("max_visible").and_then(Toml::as_integer) {
+            out.max_visible = value;
+        }
+        if table.contains_key("monitors") {
+            out.monitors = string_array(table.get("monitors"));
+        }
+        if let Some(value) = table.get("offset_x").and_then(Toml::as_integer) {
+            out.offset_x = value;
+        }
+        if let Some(value) = table.get("offset_y").and_then(Toml::as_integer) {
+            out.offset_y = value;
+        }
+        if let Some(value) = table.get("position").and_then(Toml::as_str) {
+            out.position = value.to_string();
+        }
+        if let Some(value) = table.get("scale").and_then(|v| v.as_float()) {
+            out.scale = f32_bits(value);
+        }
+        if let Some(value) = table.get("show_actions").and_then(Toml::as_bool) {
+            out.show_actions = value;
+        }
+        if let Some(value) = table.get("show_app_name").and_then(Toml::as_bool) {
+            out.show_app_name = value;
+        }
+        out
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert(
+            "background_opacity".to_string(),
+            Toml::Float(self.background_opacity),
+        );
+        table.insert("border".to_string(), Toml::Boolean(self.border));
+        table.insert(
+            "collapse_on_dismiss".to_string(),
+            Toml::Boolean(self.collapse_on_dismiss),
+        );
+        table.insert("enable_daemon".to_string(), Toml::Boolean(self.enable_daemon));
+        table.insert(
+            "filter_replace".to_string(),
+            Toml::Boolean(self.filter_replace),
+        );
+        table.insert(
+            "history_retention_hours".to_string(),
+            Toml::Integer(self.history_retention_hours),
+        );
+        table.insert(
+            "keep_dismissed_in_history".to_string(),
+            Toml::Boolean(self.keep_dismissed_in_history),
+        );
+        table.insert("layer".to_string(), Toml::String(self.layer.clone()));
+        table.insert("max_visible".to_string(), Toml::Integer(self.max_visible));
+        table.insert(
+            "monitors".to_string(),
+            Toml::Array(
+                self.monitors
+                    .iter()
+                    .map(|name| Toml::String(name.clone()))
+                    .collect(),
+            ),
+        );
+        table.insert("offset_x".to_string(), Toml::Integer(self.offset_x));
+        table.insert("offset_y".to_string(), Toml::Integer(self.offset_y));
+        table.insert("position".to_string(), Toml::String(self.position.clone()));
+        table.insert("scale".to_string(), Toml::Float(self.scale));
+        table.insert("show_actions".to_string(), Toml::Boolean(self.show_actions));
+        table.insert("show_app_name".to_string(), Toml::Boolean(self.show_app_name));
+        Toml::Table(table)
+    }
+}
+
+pub(crate) fn export_notification_section_from_merged(merged: &Toml) -> Toml {
+    merged
+        .get("notification")
+        .map(|section| NotificationExport::from_merged_section(section).write_export_table())
+        .unwrap_or_else(|| NotificationExport::export_defaults().write_export_table())
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct OsdExport {
+    background_opacity: f64,
+    border: bool,
+    enabled: bool,
+    monitors: Vec<String>,
+    offset_x: i64,
+    offset_y: i64,
+    orientation: String,
+    position: String,
+    position_vertical: String,
+    scale: f64,
+    kinds: toml::map::Map<String, Toml>,
+}
+
+impl OsdExport {
+    fn export_defaults() -> Self {
+        Self::from_export_table(&write_osd_defaults())
+    }
+
+    fn from_export_table(table: &Toml) -> Self {
+        let table = table.as_table().expect("osd export table");
+        let kinds_defaults = table
+            .get("kinds")
+            .and_then(Toml::as_table)
+            .cloned()
+            .unwrap_or_default();
+        Self {
+            background_opacity: table
+                .get("background_opacity")
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(0.97),
+            border: table.get("border").and_then(Toml::as_bool).unwrap_or(true),
+            enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(true),
+            monitors: string_array(table.get("monitors")),
+            offset_x: table.get("offset_x").and_then(Toml::as_integer).unwrap_or(20),
+            offset_y: table.get("offset_y").and_then(Toml::as_integer).unwrap_or(8),
+            orientation: table
+                .get("orientation")
+                .and_then(Toml::as_str)
+                .unwrap_or("horizontal")
+                .to_string(),
+            position: table
+                .get("position")
+                .and_then(Toml::as_str)
+                .unwrap_or("top_center")
+                .to_string(),
+            position_vertical: table
+                .get("position_vertical")
+                .and_then(Toml::as_str)
+                .unwrap_or("top_center")
+                .to_string(),
+            scale: table
+                .get("scale")
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(1.0),
+            kinds: kinds_defaults,
+        }
+    }
+
+    fn from_merged_section(merged_section: &Toml) -> Self {
+        let mut out = Self::export_defaults();
+        let table = match merged_section.as_table() {
+            Some(table) => table,
+            None => return out,
+        };
+        if let Some(value) = table.get("background_opacity").and_then(|v| v.as_float()) {
+            out.background_opacity = f32_bits(value);
+        }
+        if let Some(value) = table.get("border").and_then(Toml::as_bool) {
+            out.border = value;
+        }
+        if let Some(value) = table.get("enabled").and_then(Toml::as_bool) {
+            out.enabled = value;
+        }
+        if table.contains_key("monitors") {
+            out.monitors = string_array(table.get("monitors"));
+        }
+        if let Some(value) = table.get("offset_x").and_then(Toml::as_integer) {
+            out.offset_x = value;
+        }
+        if let Some(value) = table.get("offset_y").and_then(Toml::as_integer) {
+            out.offset_y = value;
+        }
+        if let Some(value) = table.get("orientation").and_then(Toml::as_str) {
+            out.orientation = value.to_string();
+        }
+        if let Some(value) = table.get("position").and_then(Toml::as_str) {
+            out.position = value.to_string();
+        }
+        if let Some(value) = table.get("position_vertical").and_then(Toml::as_str) {
+            out.position_vertical = value.to_string();
+        }
+        if let Some(value) = table.get("scale").and_then(|v| v.as_float()) {
+            out.scale = f32_bits(value);
+        }
+        out.kinds = overlay_bool_subtable_from_merged(&out.kinds, table.get("kinds"));
+        out
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert(
+            "background_opacity".to_string(),
+            Toml::Float(self.background_opacity),
+        );
+        table.insert("border".to_string(), Toml::Boolean(self.border));
+        table.insert("enabled".to_string(), Toml::Boolean(self.enabled));
+        table.insert(
+            "monitors".to_string(),
+            Toml::Array(
+                self.monitors
+                    .iter()
+                    .map(|name| Toml::String(name.clone()))
+                    .collect(),
+            ),
+        );
+        table.insert("offset_x".to_string(), Toml::Integer(self.offset_x));
+        table.insert("offset_y".to_string(), Toml::Integer(self.offset_y));
+        table.insert("orientation".to_string(), Toml::String(self.orientation.clone()));
+        table.insert("position".to_string(), Toml::String(self.position.clone()));
+        table.insert(
+            "position_vertical".to_string(),
+            Toml::String(self.position_vertical.clone()),
+        );
+        table.insert("scale".to_string(), Toml::Float(self.scale));
+        table.insert("kinds".to_string(), Toml::Table(self.kinds.clone()));
+        Toml::Table(table)
+    }
+}
+
+pub(crate) fn export_osd_section_from_merged(merged: &Toml) -> Toml {
+    merged
+        .get("osd")
+        .map(|section| OsdExport::from_merged_section(section).write_export_table())
+        .unwrap_or_else(|| OsdExport::export_defaults().write_export_table())
+}
+
 pub(crate) fn export_hooks_section_from_merged(merged: &Toml) -> Toml {
     let mut out = write_hooks_defaults();
     let out_table = out.as_table_mut().expect("hooks export table");
@@ -663,6 +1206,22 @@ mod tests {
         assert_eq!(
             BrightnessExport::export_defaults().write_export_table(),
             write_brightness_defaults()
+        );
+        assert_eq!(
+            HotCornersExport::export_defaults().write_export_table(),
+            write_hot_corners_defaults()
+        );
+        assert_eq!(
+            export_idle_section_from_merged(&Toml::Table(toml::map::Map::new())),
+            write_idle_defaults()
+        );
+        assert_eq!(
+            NotificationExport::export_defaults().write_export_table(),
+            write_notification_defaults()
+        );
+        assert_eq!(
+            OsdExport::export_defaults().write_export_table(),
+            write_osd_defaults()
         );
     }
 
