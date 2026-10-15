@@ -1681,6 +1681,7 @@ name = "helix-inference"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "cc",
  "futures-util",
  "image",
  "libc",

@@ -4,6 +4,8 @@
 
 mod backend;
 mod fake;
+#[cfg(helix_llama)]
+mod llama;
 mod pictures;
 mod queue;
 mod routing;
@@ -63,8 +65,15 @@ async fn main() {
             Duration::from_millis(delay),
         ))
     } else {
-        eprintln!("helix-inference: built without an engine; set HELIX_INFERENCE_BACKEND=fake to test");
-        std::process::exit(1);
+        #[cfg(helix_llama)]
+        {
+            Arc::new(llama::LlamaBackend::new(std::path::Path::new(&model_dir)))
+        }
+        #[cfg(not(helix_llama))]
+        {
+            eprintln!("helix-inference: built without an engine; set HELIX_INFERENCE_BACKEND=fake to test");
+            std::process::exit(1);
+        }
     };
 
     // Speech to text: the worker program sits beside this one (or where HELIX_TRANSCRIBE_BIN says).

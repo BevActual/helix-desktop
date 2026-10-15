@@ -371,3 +371,92 @@ fn run(shared: &Arc<Shared>) {
         (shared.on_done)(operation, &outcome);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fake::FakeBackend;
+    use std::sync::mpsc;
+
+    fn message(text: &str) -> Value {
+        json!([{"role": "user", "content": text}])
+    }
+
+    fn request(client: &str, priority: Priority) -> ChatRequest {
+        ChatRequest {
+            client: client.into(),
+            messages: message("hi"),
+            priority,
+            ..ChatRequest::default()
+        }
+    }
+
+    /// A queue whose worker is held on its first request until the returned sender is dropped or signalled.
+    fn held(limits: Limits) -> (InferenceQueue, mpsc::Receiver<(u64, bool)>) {
+        let (done_tx, done_rx) = mpsc::channel();
+        let backend = Arc::new(FakeBackend::new("ok", Duration::from_millis(60)));
+        let queue = InferenceQueue::new(
+            backend,
+            limits,
+            Arc::new(|_, _| {}),
+            Arc::new(move |op, outcome: &Outcome| {
+                let _ = done_tx.send((op, outcome.cancelled));
+            }),
+        );
+        (queue, done_rx)
+    }
+
+    #[test]
+    fn interactive_goes_ahead_of_background() {
+        let (queue, done) = held(Limits::default());
+        let first = queue.submit(request("a", Priority::Interactive)).unwrap(); // starts running
+        std::thread::sleep(Duration::from_millis(20));
+        let background = queue.submit(request("b", Priority::Background)).unwrap();
+        let interactive = queue.submit(request("c", Priority::Interactive)).unwrap();
+        let order: Vec<u64> = (0..3).map(|_| done.recv_timeout(Duration::from_secs(5)).unwrap().0).collect();
+        assert_eq!(order, vec![first, interactive, background]);
+    }
+
+    #[test]
+    fn limits_are_enforced_per_client_and_overall() {
+        let limits = Limits { max_pending: 4, max_per_client: 2, ..Limits::default() };
+        let (queue, _done) = held(limits);
+        assert!(queue.submit(request("a", Priority::Interactive)).is_ok());
+        assert!(queue.submit(request("a", Priority::Interactive)).is_ok());
+        assert_eq!(
+            queue.submit(request("a", Priority::Interactive)).unwrap_err(),
+            "too many requests from this client"
+        );
+        assert!(queue.submit(request("b", Priority::Interactive)).is_ok());
+        assert!(queue.submit(request("c", Priority::Interactive)).is_ok());
+        assert_eq!(queue.submit(request("d", Priority::Interactive)).unwrap_err(), "the inference queue is full");
+    }
+
+    #[test]
+    fn only_the_requester_cancels_and_a_waiting_request_completes_at_once() {
+        let (queue, done) = held(Limits::default());
+        queue.submit(request("a", Priority::Interactive)).unwrap();
+        std::thread::sleep(Duration::from_millis(20));
+        let waiting = queue.submit(request("a", Priority::Background)).unwrap();
+        assert!(!queue.cancel("someone-else", waiting));
+        assert!(queue.cancel("a", waiting));
+        let (operation, cancelled) = done.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(operation, waiting);
+        assert!(cancelled);
+        assert!(!queue.cancel("a", 9999));
+    }
+
+    #[test]
+    fn malformed_and_oversized_requests_are_refused() {
+        let (queue, _done) = held(Limits::default());
+        let mut bad = request("a", Priority::Interactive);
+        bad.messages = json!([]);
+        assert!(queue.submit(bad).is_err());
+        let mut wrong = request("a", Priority::Interactive);
+        wrong.messages = json!([{"role": "user"}]);
+        assert!(queue.submit(wrong).is_err());
+        let mut big = request("a", Priority::Interactive);
+        big.messages = message(&"x".repeat(70 * 1024));
+        assert_eq!(queue.submit(big).unwrap_err(), "the request is too large");
+    }
+}

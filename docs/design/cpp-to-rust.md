@@ -10,7 +10,7 @@ Helix’s session UI is already Rust (Tauri). Remaining C++ owns desktop authori
 | `src/desktop/agent_*`, `tool_schema` | `helix-shell-core::agent` (+ service) | Risk policy, GrantStore, peer identity, Agent Surface Hello/Action/Confirm/manager |
 | `src/config/`, theme, dbus adapters | service / shared crates | Port with each domain |
 | `helix-assistant` | `services/helix-assistant` | After Agent Surface on Rust Desktop; keep separate from shell |
-| `helix-inference` | `services/helix-inference` | Last; llama.cpp via FFI; sandboxed D-Bus activation |
+| `helix-inference` | `services/helix-inference` | **Service done.** The D-Bus service, queue, limits, routing, picture decode and worker wrappers are Rust. The llama.cpp engine glue (`src/inference/llama_backend.cpp`, `schema_grammar.cpp`) stays C++ and is linked through a C shim by the crate's `build.rs` when `third_party/llama-install` exists; the speech/image workers (`helix-transcribe`, `helix-image`) stay C++ processes |
 | `helix-system-upgrade` | small helper or stay C++ | Low priority |
 | `compositor/` | already Rust (own workspace) | Done |
 | `greeter/` | Tauri scaffold | In progress |

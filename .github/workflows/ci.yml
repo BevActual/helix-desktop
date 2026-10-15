@@ -100,7 +100,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build Rust desktop, C++ appearance helpers and the service contract test
         run: |
-          cargo build --profile fast -p helix-desktop
+          cargo build --profile fast -p helix-desktop -p helix-inference
           just configure debug
           meson compile -C build-debug helix-template-apply helix-theme-palette desktop_service_test
       - name: Configuration smoke (Rust desktop)
@@ -115,6 +115,9 @@ jobs:
         env:
           CONTRACT_TIMEOUT: "240"
         run: ./tools/nested/helix-desktop-cpp-contract.sh
+      # The Rust inference service with the scripted engine (the llama.cpp engine is not installed on CI).
+      - name: Inference service integration (Rust)
+        run: meson test -C build-debug --no-rebuild --print-errorlogs inference_service_integration
 
   helix-desktop-audio-meter:
     name: helix-desktop Audio meter

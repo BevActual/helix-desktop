@@ -18,10 +18,12 @@ if [ "${1:-}" = "--uninstall" ]; then
 fi
 STAGE=${1:?usage: install-assistant.sh <staged install dir>}
 S=$STAGE$P
-[ -x "$S/bin/helix-inference" ] && [ -d "$S/lib64/helix" ] || { echo "not a staged install: $STAGE" >&2; exit 1; }
+[ -d "$S/lib64/helix" ] || { echo "not a staged install: $STAGE" >&2; exit 1; }
 BACKUP=$P/share/helix/backup/$(date +%Y%m%d-%H%M%S)
 mkdir -p "$BACKUP"
-install -D -m 0755 "$S/bin/helix-inference" $P/bin/helix-inference
+INFERENCE=${HELIX_INFERENCE_BIN:-$(dirname "$0")/../target/release/helix-inference}   # Rust: cargo build --release -p helix-inference
+[ -x "$INFERENCE" ] || { echo "missing $INFERENCE" >&2; exit 1; }
+install -D -m 0755 "$INFERENCE" $P/bin/helix-inference
 install -D -m 0755 "$S/bin/helix-assistant" $P/bin/helix-assistant
 if [ -x "$S/bin/helix-settings-tauri" ]; then
   [ -e $P/bin/helix-settings ] && cp -p $P/bin/helix-settings "$BACKUP/helix-settings"
