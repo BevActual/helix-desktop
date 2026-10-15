@@ -528,44 +528,235 @@ fn overlay_subtree(defaults: &Toml, merged_shell: Option<&Toml>, key: &str) -> T
     }
 }
 
-fn overlay_shell_root_scalars(
-    out: &mut toml::map::Map<String, Toml>,
-    merged_shell: Option<&Toml>,
-    defaults: &toml::map::Map<String, Toml>,
-) {
-    let merged_table = merged_shell.and_then(Toml::as_table);
-    for (key, default_value) in defaults {
-        if default_value.is_table() {
-            continue;
-        }
-        let merged_value = match merged_table.and_then(|table| table.get(key)) {
-            Some(value) => value,
-            None => continue,
+#[derive(Clone, Debug, PartialEq)]
+struct ShellRootScalarsExport {
+    app_icon_colorize: bool,
+    avatar_path: String,
+    button_borders: bool,
+    card_borders: bool,
+    clipboard_auto_paste: String,
+    clipboard_confirm_clear_history: bool,
+    clipboard_enabled: bool,
+    clipboard_history_max_entries: i64,
+    clipboard_image_action_command: String,
+    clipboard_keep_from_closed_apps: bool,
+    corner_radius_scale: f64,
+    date_format: String,
+    disable_mipmaps: bool,
+    external_ip_enabled: bool,
+    font_family: String,
+    input_borders: bool,
+    launch_apps_as_systemd_services: bool,
+    launch_apps_custom_command: String,
+    niri_overview_type_to_launch_enabled: bool,
+    offline_mode: bool,
+    password_style: String,
+    polkit_agent: bool,
+    popup_borders: bool,
+    popup_shadows: bool,
+    screen_time_enabled: bool,
+    settings_show_advanced: bool,
+    setup_wizard_enabled: bool,
+    shared_gl_context: bool,
+    show_location: bool,
+    telemetry_enabled: bool,
+    time_format: String,
+}
+
+impl ShellRootScalarsExport {
+    fn export_defaults() -> Self {
+        Self::from_scalar_table(shell_scalar_defaults_table())
+    }
+
+    fn shell_scalar_defaults() -> toml::map::Map<String, Toml> {
+        let defaults = write_shell_defaults();
+        let default_table = defaults.as_table().expect("shell defaults");
+        default_table
+            .iter()
+            .filter(|(_, value)| !value.is_table())
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect()
+    }
+
+    fn from_scalar_table(table: toml::map::Map<String, Toml>) -> Self {
+        let get_bool = |key: &str, default: bool| {
+            table.get(key).and_then(Toml::as_bool).unwrap_or(default)
         };
-        out.insert(key.clone(), coerce_patch_value(default_value, merged_value));
+        let get_str = |key: &str, default: &str| {
+            table
+                .get(key)
+                .and_then(Toml::as_str)
+                .unwrap_or(default)
+                .to_string()
+        };
+        let get_i64 = |key: &str, default: i64| {
+            table.get(key).and_then(Toml::as_integer).unwrap_or(default)
+        };
+        let get_f64 = |key: &str, default: f64| {
+            table
+                .get(key)
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(default)
+        };
+        Self {
+            app_icon_colorize: get_bool("app_icon_colorize", false),
+            avatar_path: get_str("avatar_path", ""),
+            button_borders: get_bool("button_borders", true),
+            card_borders: get_bool("card_borders", true),
+            clipboard_auto_paste: get_str("clipboard_auto_paste", "auto"),
+            clipboard_confirm_clear_history: get_bool("clipboard_confirm_clear_history", true),
+            clipboard_enabled: get_bool("clipboard_enabled", true),
+            clipboard_history_max_entries: get_i64("clipboard_history_max_entries", 100),
+            clipboard_image_action_command: get_str("clipboard_image_action_command", ""),
+            clipboard_keep_from_closed_apps: get_bool("clipboard_keep_from_closed_apps", true),
+            corner_radius_scale: get_f64("corner_radius_scale", 1.0),
+            date_format: get_str("date_format", "%A, %x"),
+            disable_mipmaps: get_bool("disable_mipmaps", false),
+            external_ip_enabled: get_bool("external_ip_enabled", false),
+            font_family: get_str("font_family", "sans-serif"),
+            input_borders: get_bool("input_borders", true),
+            launch_apps_as_systemd_services: get_bool("launch_apps_as_systemd_services", true),
+            launch_apps_custom_command: get_str("launch_apps_custom_command", ""),
+            niri_overview_type_to_launch_enabled: get_bool(
+                "niri_overview_type_to_launch_enabled",
+                false,
+            ),
+            offline_mode: get_bool("offline_mode", false),
+            password_style: get_str("password_style", "default"),
+            polkit_agent: get_bool("polkit_agent", false),
+            popup_borders: get_bool("popup_borders", true),
+            popup_shadows: get_bool("popup_shadows", true),
+            screen_time_enabled: get_bool("screen_time_enabled", false),
+            settings_show_advanced: get_bool("settings_show_advanced", true),
+            setup_wizard_enabled: get_bool("setup_wizard_enabled", true),
+            shared_gl_context: get_bool("shared_gl_context", true),
+            show_location: get_bool("show_location", true),
+            telemetry_enabled: get_bool("telemetry_enabled", false),
+            time_format: get_str("time_format", "{:%H:%M}"),
+        }
+    }
+
+    fn from_merged(merged_shell: Option<&Toml>) -> Self {
+        let defaults = write_shell_defaults();
+        let default_table = defaults.as_table().expect("shell defaults");
+        let mut scalars = Self::shell_scalar_defaults();
+        let merged_table = merged_shell.and_then(Toml::as_table);
+        for (key, default_value) in default_table {
+            if default_value.is_table() {
+                continue;
+            }
+            let merged_value = match merged_table.and_then(|table| table.get(key)) {
+                Some(value) => value,
+                None => continue,
+            };
+            scalars.insert(key.clone(), coerce_patch_value(default_value, merged_value));
+        }
+        Self::from_scalar_table(scalars)
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert("app_icon_colorize".to_string(), Toml::Boolean(self.app_icon_colorize));
+        table.insert("avatar_path".to_string(), Toml::String(self.avatar_path.clone()));
+        table.insert("button_borders".to_string(), Toml::Boolean(self.button_borders));
+        table.insert("card_borders".to_string(), Toml::Boolean(self.card_borders));
+        table.insert(
+            "clipboard_auto_paste".to_string(),
+            Toml::String(self.clipboard_auto_paste.clone()),
+        );
+        table.insert(
+            "clipboard_confirm_clear_history".to_string(),
+            Toml::Boolean(self.clipboard_confirm_clear_history),
+        );
+        table.insert("clipboard_enabled".to_string(), Toml::Boolean(self.clipboard_enabled));
+        table.insert(
+            "clipboard_history_max_entries".to_string(),
+            Toml::Integer(self.clipboard_history_max_entries),
+        );
+        table.insert(
+            "clipboard_image_action_command".to_string(),
+            Toml::String(self.clipboard_image_action_command.clone()),
+        );
+        table.insert(
+            "clipboard_keep_from_closed_apps".to_string(),
+            Toml::Boolean(self.clipboard_keep_from_closed_apps),
+        );
+        table.insert(
+            "corner_radius_scale".to_string(),
+            Toml::Float(self.corner_radius_scale),
+        );
+        table.insert("date_format".to_string(), Toml::String(self.date_format.clone()));
+        table.insert("disable_mipmaps".to_string(), Toml::Boolean(self.disable_mipmaps));
+        table.insert(
+            "external_ip_enabled".to_string(),
+            Toml::Boolean(self.external_ip_enabled),
+        );
+        table.insert("font_family".to_string(), Toml::String(self.font_family.clone()));
+        table.insert("input_borders".to_string(), Toml::Boolean(self.input_borders));
+        table.insert(
+            "launch_apps_as_systemd_services".to_string(),
+            Toml::Boolean(self.launch_apps_as_systemd_services),
+        );
+        table.insert(
+            "launch_apps_custom_command".to_string(),
+            Toml::String(self.launch_apps_custom_command.clone()),
+        );
+        table.insert(
+            "niri_overview_type_to_launch_enabled".to_string(),
+            Toml::Boolean(self.niri_overview_type_to_launch_enabled),
+        );
+        table.insert("offline_mode".to_string(), Toml::Boolean(self.offline_mode));
+        table.insert("password_style".to_string(), Toml::String(self.password_style.clone()));
+        table.insert("polkit_agent".to_string(), Toml::Boolean(self.polkit_agent));
+        table.insert("popup_borders".to_string(), Toml::Boolean(self.popup_borders));
+        table.insert("popup_shadows".to_string(), Toml::Boolean(self.popup_shadows));
+        table.insert(
+            "screen_time_enabled".to_string(),
+            Toml::Boolean(self.screen_time_enabled),
+        );
+        table.insert(
+            "settings_show_advanced".to_string(),
+            Toml::Boolean(self.settings_show_advanced),
+        );
+        table.insert(
+            "setup_wizard_enabled".to_string(),
+            Toml::Boolean(self.setup_wizard_enabled),
+        );
+        table.insert("shared_gl_context".to_string(), Toml::Boolean(self.shared_gl_context));
+        table.insert("show_location".to_string(), Toml::Boolean(self.show_location));
+        table.insert("telemetry_enabled".to_string(), Toml::Boolean(self.telemetry_enabled));
+        table.insert("time_format".to_string(), Toml::String(self.time_format.clone()));
+        Toml::Table(table)
     }
 }
 
+fn shell_scalar_defaults_table() -> toml::map::Map<String, Toml> {
+    ShellRootScalarsExport::shell_scalar_defaults()
+}
+
 pub(crate) fn export_shell_section_from_merged(merged: &Toml, default: &Toml) -> Toml {
-    let defaults = write_shell_defaults();
-    let default_table = defaults.as_table().expect("shell defaults table");
     let merged_shell = merged.get("shell");
     let overlay = merged_shell
         .map(|section| merged_overlay_for_parsed_section("shell", section))
         .unwrap_or_else(|| Toml::Table(toml::map::Map::new()));
 
-    let mut out = default_table.clone();
-    overlay_shell_root_scalars(&mut out, merged_shell, default_table);
+    let mut out = ShellRootScalarsExport::from_merged(merged_shell)
+        .write_export_table()
+        .as_table()
+        .expect("shell root scalars")
+        .clone();
 
     out.insert("panel".to_string(), shell_panel_export(merged_shell));
 
+    let shell_defaults = write_shell_defaults();
     for key in OVERLAY_SUBTREE_KEYS {
         let value = match *key {
             "screenshot" => ShellScreenshotExport::from_merged_section(merged_shell).write_export_table(),
             "screen_record" => {
                 ShellScreenRecordExport::from_merged_section(merged_shell).write_export_table()
             }
-            _ => overlay_subtree(&defaults, merged_shell, key),
+            _ => overlay_subtree(&shell_defaults, merged_shell, key),
         };
         out.insert((*key).to_string(), value);
     }
@@ -687,6 +878,28 @@ width = 400
         let via_typed = ShellLauncherExport::from_merged(&merged, &default, &shell_overlay)
             .write_export_table();
         assert_eq!(via_typed, via_merge);
+    }
+
+    #[test]
+    fn root_scalars_match_defaults_and_overlay() {
+        assert_eq!(
+            ShellRootScalarsExport::export_defaults().write_export_table(),
+            Toml::Table(ShellRootScalarsExport::shell_scalar_defaults()),
+        );
+        let merged: Toml = toml::from_str(
+            r#"
+[shell]
+polkit_agent = true
+corner_radius_scale = 1.5
+"#,
+        )
+        .unwrap();
+        let default = serialize_default_config();
+        let filtered =
+            export_filtered_schema_section("shell", &merged, &default, write_shell_defaults);
+        let composed = export_shell_section_from_merged(&merged, &default);
+        assert_eq!(composed.get("polkit_agent"), filtered.get("polkit_agent"));
+        assert_eq!(composed.get("corner_radius_scale"), filtered.get("corner_radius_scale"));
     }
 
     #[test]
