@@ -24,7 +24,8 @@ job_format() {
 }
 job_build() {
   meson setup --reconfigure build-debug >/dev/null \
-    && cargo build --profile fast -p helix-desktop -p helix-assistant -p helix-inference -p helix-system-upgrade --quiet \
+    && cargo build --profile fast --quiet $(for p in helix-desktop helix-assistant helix-inference helix-system-upgrade; do \
+         [[ -d services/$p ]] && printf -- '-p %s ' "$p"; done) \
     && meson setup --reconfigure build-debug >/dev/null \
     && ninja -C build-debug \
     && sh tests/install_layout_test.sh build-debug \
