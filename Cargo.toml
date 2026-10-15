@@ -3,6 +3,16 @@
 resolver = "2"
 members = [
     "core/helix-shell-core",
+    "core/helix-agent",
+    "core/helix-base",
+    "core/helix-chat",
+    "core/helix-compositor",
+    "core/helix-config",
+    "core/helix-config-export",
+    "core/helix-models",
+    "core/helix-monitor-model",
+    "core/helix-shell-model",
+    "core/helix-software-model",
     "core/helix-desktop-api",
     "core/helix-theme",
     "services/helix-wallpaper",
@@ -37,6 +47,16 @@ repository = "https://github.com/BevActual/helix-desktop"
 # Crates that differ on purpose say why next to their own line.
 [workspace.dependencies]
 helix-shell-core = { path = "core/helix-shell-core" }
+helix-agent = { path = "core/helix-agent" }
+helix-base = { path = "core/helix-base" }
+helix-chat = { path = "core/helix-chat" }
+helix-compositor = { path = "core/helix-compositor" }
+helix-config = { path = "core/helix-config" }
+helix-config-export = { path = "core/helix-config-export" }
+helix-models = { path = "core/helix-models" }
+helix-monitor-model = { path = "core/helix-monitor-model" }
+helix-shell-model = { path = "core/helix-shell-model" }
+helix-software-model = { path = "core/helix-software-model" }
 helix-desktop-api = { path = "core/helix-desktop-api" }
 helix-theme = { path = "core/helix-theme" }
 helix-wallpaper = { path = "services/helix-wallpaper" }

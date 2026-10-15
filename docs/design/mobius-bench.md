@@ -54,7 +54,7 @@ cost of the 7B is the cold load: **~14 s** for the first request (the service un
 
 ## What this changed
 
-- The default system prompt is rewritten (`SYSTEM_PROMPT` in `core/helix-shell-core/src/apps/chat.rs`): it says chat cannot change the
+- The default system prompt is rewritten (`SYSTEM_PROMPT` in `core/helix-chat/src/chat.rs`): it says chat cannot change the
   computer, what to say instead, to never write `Act (...)`, and to name risk before destructive commands.
 - The 7B is set for every profile in `~/.local/state/helix/inference-routing.toml` (backup beside it as `…before-7b-20261011`), so one
   model stays loaded and Act no longer runs on the 1.5B. Revert in **Models & routing** (Auto).

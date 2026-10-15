@@ -1,0 +1,12 @@
+[package]
+name = "helix-base"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Small leaf items every Helix core crate shares (display text, panel ids, window facts)."
+
+[dependencies]
+
+[lints]
+workspace = true

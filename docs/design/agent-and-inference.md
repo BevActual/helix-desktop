@@ -293,7 +293,7 @@ It is a thin face over `helix-assistant --json`, which prints one JSON object pe
 - Enter never confirms (focus stays in the input, and a submit while a change is waiting is ignored), Do it is disabled
   for 700 ms after it appears, Escape backs out of a pending request before it closes the panel, and opening the panel
   always starts fresh.
-- The state machine (`core/helix-shell-core/src/apps/assistant.rs`) has no UI in it and is unit tested, including late answers
+- The state machine (`core/helix-agent/src/assistant.rs`) has no UI in it and is unit tested, including late answers
   after cancel, a second yes, malformed output, and display-safety of model text. Mutation-checked.
 - Tried in a nested niri session on a private bus with the real 7B model: typing, "Thinking...", the confirmation, two
   stray Enter presses (nothing ran, audit empty), keyboard-driven Do it (ran through Agent Surface, audited as allowed), the

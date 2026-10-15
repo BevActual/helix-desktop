@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT_DIR = ROOT / "core/helix-shell-core/tests/golden/export_fixtures"
+OUT_DIR = ROOT / "core/helix-config-export/tests/golden/export_fixtures"
 
 CASES: list[tuple[str, str, str, dict[str, str] | None]] = [
     ("bar_thickness_override", "[bar.default]\nthickness = 40\n", "\n", None),

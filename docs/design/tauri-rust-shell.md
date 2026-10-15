@@ -33,7 +33,7 @@ shell keeps running until each replacement is at parity. This document records w
    command takes validated typed arguments.
 4. **Enter never approves; approval is armed after a delay (700 ms); closing/escaping denies.** Port the behaviour and its tests.
 5. **Tests prove behaviour, and are mutation-checked:** break the code, confirm the test fails. Unit-test state machines
-   with no UI in them (see `core/helix-shell-core/src/apps/assistant.rs` and its tests).
+   with no UI in them (see `core/helix-agent/src/assistant.rs` and its tests).
 6. **Layering ratchet.** Pure logic in plain crates with no Tauri dependency; the Tauri crate is a thin face.
 
 ## Target layout
@@ -206,7 +206,7 @@ Tauri clients should follow the same rule: subscribe to `Changed`, never poll.
 ## M5 launcher (done)
 
 The launcher is a second panel on the single surface (`ShellSurface::PANELS = [assistant, launcher]`). Logic is in
-`helix-shell-core/src/launcher.rs` (pure, mutation-checked): desktop entry parsing (only real applications; `NoDisplay`, `Hidden`,
+`core/helix-shell-model/src/launcher.rs` (pure, mutation-checked): desktop entry parsing (only real applications; `NoDisplay`, `Hidden`,
 `OnlyShowIn`/`NotShowIn` respected; translations ignored; names made display-safe), an `Exec` tokenizer that follows the Desktop Entry
 spec and never involves a shell (field codes dropped, quotes and escapes handled, `; && $( )` are just text), and ranking (exact,
 prefix, word start, substring, keywords/generic name, letters in order; shorter names and then alphabetical break ties).
@@ -266,7 +266,7 @@ Layers, each tested on its own:
   booleans; NaN and infinity become null; an id above u32 is never truncated into an id; nested arguments are refused),
   `Desktop::audio_snapshot`, `audio_action` and `watch_audio` (follows `Audio1.Changed`, no polling). Each zbus proxy must be in its
   own module because the macro names signal types after the signal.
-- `helix-shell-core/src/audio.rs`: `Audio::from_snapshot` (unavailable or malformed is "no audio"; unavailable devices are not listed;
+- `core/helix-models/src/audio.rs`: `Audio::from_snapshot` (unavailable or malformed is "no audio"; unavailable devices are not listed;
   names display-safe; volume clamped), `view()`, and the only producers of write requests: `set_volume` (0 to 100, finite, always the
   current output), `set_muted`, `set_default` (the id must be an output in the snapshot just read: not a microphone, a program
   stream, an unplugged device or a forged id). The page never names a device for volume or mute. Mutation-checked (it found that no
@@ -315,7 +315,7 @@ WebKit web view at all. The first panel opened costs about 30 MB that never come
 The second section of the control center panel. Status ("Connected to X", "Connecting…", "Wi-Fi is off", "Network is unavailable"), a Wi-Fi
 on/off button, Scan, Disconnect (only while connected), the visible networks, and VPN rows.
 
-`helix-shell-core/src/network.rs` is the model and the only builder of requests, like audio:
+`core/helix-models/src/network.rs` is the model and the only builder of requests, like audio:
 - One row per network name (the same network is heard from several access points): the joined access point if any, otherwise the
   strongest; saved if any copy is saved. Order: joined, saved, strongest, name. At most 12 rows and 8 VPNs. Names are made display-safe for
   showing but the service is always sent the exact original name (a forget request carries it); the page names a network only by the path
@@ -364,7 +364,7 @@ leaked and clicks missed); with `-1` the pointer test is back to all-pass and a 
 The third section of the control center. Status ("On", "Connected to X", "N devices connected", "Bluetooth is off", blocked by a hardware
 switch), a power button, Scan/Stop, and the device list (battery level where the device reports one).
 
-`helix-shell-core/src/bluetooth.rs` is the model and the only builder of requests, like audio and network:
+`core/helix-models/src/bluetooth.rs` is the model and the only builder of requests, like audio and network:
 - Order: connected, then paired, then the rest, each by name; at most 12; names display-safe (the address stands in for an empty name);
   paths and battery levels validated and clamped.
 - A click connects a paired idle device or disconnects a connected one. Refused, and nothing is sent, for: a device that is not paired

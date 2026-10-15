@@ -1,20 +1,36 @@
-//! State machines the shell UI shows. Nothing here opens a window or a bus connection.
-//!
-//! Modules are grouped by domain (`shell`, `desktop`, `agent`, `apps`). Public paths at the
-//! crate root stay stable (`helix_shell_core::audio`, …) so callers do not churn.
+//! Facade over the Helix core crates. The code lives in `helix-base`, `helix-agent`, `helix-config`, `helix-config-export`,
+//! `helix-models`, `helix-compositor`, `helix-shell-model`, `helix-chat`, `helix-software-model` and `helix-monitor-model`; this crate keeps
+//! the old paths (`helix_shell_core::audio`, `helix_shell_core::desktop::settings`, ...) working. New code should depend on the crate it
+//! uses (docs/design/shell-core-split.md).
 
-pub mod agent;
-pub mod apps;
-
-/// True inside a nested test session (`tools/nested/run.sh` sets `HELIX_NESTED_INNER`). The test session has its own bus and compositor but
-/// shares the real user's systemd and login manager, so anything that would reach those (start or restart a unit, suspend, power off)
-/// must not happen from it.
-pub fn nested_test_session() -> bool {
-    std::env::var_os("HELIX_NESTED_INNER").is_some()
+/// Same paths as before the split; each module now lives in its own crate.
+pub mod agent {
+    pub use helix_agent::{activity, agent_confirm, agent_msg, agent_status, approvals, assistant_core, audit_log, confirm, confirmer, grant_store, grants, peer, risk, shell_ipc, tool_schema};
+    pub use helix_base::{display};
+}
+/// Same paths as before the split; each module now lives in its own crate.
+pub mod apps {
+    pub use helix_agent::{assistant};
+    pub use helix_chat::{chat, markdown, mobius_lab, model_catalog, personas};
+    pub use helix_config::{inference_routing};
+    pub use helix_monitor_model::{monitor};
+    pub use helix_software_model::{software};
 }
 
-pub mod desktop;
-pub mod shell;
+pub use helix_base::nested_test_session;
+
+/// Same paths as before the split; each module now lives in its own crate.
+pub mod desktop {
+    pub use helix_compositor::{capture, compositor_config, compositor_ipc, shortcuts};
+    pub use helix_config::{catalog, color_spec, control_center_shortcuts, dock_prefs, dynamic_desktop_catalog, idle_prefs, keybinds, notification_rules, ordered_catalog, ordered_lists, palette_names, settings};
+    pub use helix_config_export::{config_export};
+    pub use helix_models::{audio, bluetooth, brightness, network, pairing, power, quick, wallhaven};
+}
+/// Same paths as before the split; each module now lives in its own crate.
+pub mod shell {
+    pub use helix_compositor::{agent_desk, niri};
+    pub use helix_shell_model::{bar_surface, bar_visibility, calendar, dbusmenu, desktop_actions, dock, glass, identity, island, launcher, notifications, panel_surface, panels_ipc, quick_insert, shell_surface, surfaces, tray};
+}
 
 pub use agent::activity;
 pub use agent::agent_confirm;

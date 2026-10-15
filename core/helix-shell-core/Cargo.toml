@@ -4,14 +4,21 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Pure Helix shell logic. No Tauri, GTK, or D-Bus."
+description = "Facade over the Helix core crates: keeps helix_shell_core::... paths working while callers move to the crate they use."
 
 [dependencies]
-serde = { workspace = true, features = ["derive"] }
+helix-agent = { workspace = true }
+helix-base = { workspace = true }
+helix-chat = { workspace = true }
+helix-compositor = { workspace = true }
+helix-config = { workspace = true }
+helix-config-export = { workspace = true }
+helix-models = { workspace = true }
+helix-monitor-model = { workspace = true }
+helix-shell-model = { workspace = true }
+helix-software-model = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
-regex = { workspace = true }
-ts-rs = { version = "10", optional = true }
 
 [[bin]]
 name = "helix-rust-config-export"
@@ -19,7 +26,7 @@ path = "src/bin/helix-rust-config-export.rs"
 
 [features]
 # Generates TypeScript types for the views the React apps receive: tools/gen-bindings.sh
-ts = ["dep:ts-rs"]
+ts = ["helix-agent/ts", "helix-compositor/ts", "helix-config/ts", "helix-models/ts", "helix-shell-model/ts"]
 
 [lints]
 workspace = true

@@ -10,8 +10,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GOLDEN = ROOT / "core/helix-shell-core/tests/golden/settings_catalog_defaults.json"
-OUT = ROOT / "core/helix-shell-core/src/desktop/settings_defaults_generated.rs"
+GOLDEN = ROOT / "core/helix-config/tests/golden/settings_catalog_defaults.json"
+OUT = ROOT / "core/helix-config/src/settings_defaults_generated.rs"
 
 
 # Deliberate differences from the C++ config defaults (the C++ shell they described is gone).

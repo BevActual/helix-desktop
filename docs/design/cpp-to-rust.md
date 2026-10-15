@@ -40,15 +40,15 @@ HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 
 ```sh
 cargo test -p helix-theme
-cargo test -p helix-shell-core pristine_catalog_matches_golden
-cargo test -p helix-shell-core --test config_export_golden
+cargo test -p helix-config pristine_catalog_matches_golden
+cargo test -p helix-config-export --test config_export_golden
 cargo test -p helix-desktop --bin helix-desktop in_process
 tools/nested/helix-desktop-configuration-contract.sh   # private dbus-run-session; unset HELIX_STATE_HOME (it overrides XDG_STATE_HOME for settings.toml)
 tools/verify_config_export_golden.sh
 tools/test-integration.sh layering template_undo_signal
 ```
 
-**Scalar catalog:** The C++ `settings_catalog.cpp` was removed; its rows live in Rust as hand-maintained `BOOTSTRAP` plus `settings_bootstrap_extra.rs`, checked against the frozen golden `core/helix-shell-core/tests/golden/settings_catalog_defaults.json`. Ordered types (key-chords, shortcuts, tabs, display lists, templates, transitions, notification rules, bar widget rows) stay in `ordered_lists.rs` / `ordered_catalog.rs`.
+**Scalar catalog:** The C++ `settings_catalog.cpp` was removed; its rows live in Rust as hand-maintained `BOOTSTRAP` plus `settings_bootstrap_extra.rs`, checked against the frozen golden `core/helix-config/tests/golden/settings_catalog_defaults.json`. Ordered types (key-chords, shortcuts, tabs, display lists, templates, transitions, notification rules, bar widget rows) stay in `ordered_lists.rs` / `ordered_catalog.rs`.
 
 **Wallpaper palette source:** `helix-theme::wallpaper` generates palettes from the wallpaper in Rust (112x112 resize, quantize and
 score, the five Material schemes through the vendored `third_party/material-colors`, the five custom HSL schemes), checked against

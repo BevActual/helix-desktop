@@ -32,7 +32,7 @@ Use this list when adding tests. **Do not** revive the old GTK-era 1k-line C++ m
 | Ordered-list CAS (dock pins, bar widgets, keybinds, notification rules) | `contract/configuration.rs` |
 | `CommitOverrides` reject | `contract/configuration.rs` |
 | Persistence across service restart | `contract/configuration.rs` (`run_persistence`) |
-| Full catalog shape / defaults | `cargo test -p helix-shell-core pristine_catalog_matches_golden`, `config_export_golden` |
+| Full catalog shape / defaults | `cargo test -p helix-config pristine_catalog_matches_golden`, `cargo test -p helix-config-export --test config_export_golden` |
 
 ### Agent / policy (not duplicated in `contract/`)
 

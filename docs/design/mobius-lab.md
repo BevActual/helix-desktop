@@ -44,7 +44,7 @@ It appears in the style menu next to the built-ins. Project instructions are sto
 
 ## Adding an experiment
 
-1. A boolean in `Experiments` (`core/helix-shell-core/src/apps/mobius_lab.rs`), default `true`, with a test.
+1. A boolean in `Experiments` (`core/helix-chat/src/mobius_lab.rs`), default `true`, with a test.
 2. A case in `lab_set_experiment` (`apps/helix-mobius/src-tauri/src/main.rs`).
 3. The page reads it from `lab_get` (`lab` in `chat.js` / the React dialogs) and shows the old or new behaviour.
 4. A row in **Experiments** (`web/src/models.tsx`) and a line in the table above.
@@ -52,7 +52,7 @@ It appears in the style menu next to the built-ins. Project instructions are sto
 
 ## Tests
 
-- `cargo test -p helix-shell-core` covers composition order, styles, project instructions, scanning and persona cleaning.
+- `cargo test -p helix-chat` covers composition order, styles, project instructions, scanning and persona cleaning.
 - `tools/nested/ui-suite.sh mobius-lab` drives the chips, menus, sheets and the Experiments switches in the nested compositor and reads
   the composed system prompt from the program log (`HELIX_MOBIUS_LOG_PROMPT=1`, test only).
 

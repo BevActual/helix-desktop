@@ -1,6 +1,6 @@
 # Single-surface experiment (reference only, not built)
 
-Superseded: this design is now the real shell (`../../helix-shell-tauri`, with the state machine in `helix-shell-core/src/shell_surface.rs`).
+Superseded: this design is now the real shell (`../../helix-shell-tauri`, with the state machine in `core/helix-shell-model/src/shell_surface.rs`).
 Kept as the smallest working example of the idea.
 
 One layer-shell surface anchored to all four edges hosts the bar and every panel in a single page, so there is one WebKit

@@ -4,7 +4,7 @@
 # Usage: tools/gen_config_export_golden.sh [output.toml]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="${1:-$ROOT/core/helix-shell-core/tests/golden/config_export_minimal.toml}"
+OUT="${1:-$ROOT/core/helix-config-export/tests/golden/config_export_minimal.toml}"
 BIN="${HELIX_RUST_CONFIG_EXPORT_BIN:-${HELIX_CONFIG_EXPORT_BIN:-}}"
 
 if [[ -z "$BIN" ]]; then
