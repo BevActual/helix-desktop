@@ -7,6 +7,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 | Doc | When you need it |
 |---|---|
 | [product-structure.md](product-structure.md) | How Helix is split (greeter / compositor / shell / apps / services) and how processes relate |
+| [roadmap.md](roadmap.md) | What is open, in what order, and where each gap was found |
 | [session-shell.md](session-shell.md) | Live Tauri shell install, restart rules, retired C++ UI |
 | [cpp-to-rust.md](cpp-to-rust.md) | History of the C++ → Rust cutover (complete); remaining native shims and greeter items |
 | [helix-identity.md](helix-identity.md) | Product names, paths, retired brand leftovers |
