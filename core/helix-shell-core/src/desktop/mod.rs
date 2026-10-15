@@ -9,6 +9,7 @@ pub mod dynamic_desktop_catalog;
 pub mod compositor_config;
 pub mod config_export;
 mod config_export_rust;
+mod config_export_serialize;
 mod config_merge;
 mod config_settings_migrate;
 pub mod compositor_ipc;

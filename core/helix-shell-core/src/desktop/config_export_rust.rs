@@ -9,6 +9,7 @@ use std::sync::OnceLock;
 
 use toml::Value as Toml;
 
+use super::config_export_serialize::finalize_serialized_export;
 use super::settings::{ConfigPaths, ConfigStore};
 
 const DEFAULT_EXPORT_TOML: &str =
@@ -646,6 +647,7 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
         }
     }
     sync_bar_radii_from_merged(&mut root, &merged);
+    finalize_serialized_export(&mut root);
     root
 }
 

@@ -250,6 +250,20 @@ fn rust_export_matches_cpp_for_nightlight_enabled() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_two_calendar_accounts() {
+    assert_rust_export_matches_cpp(
+        "[calendar.account.zed]\ntype = \"ics\"\nserver_url = \"https://a\"\n\n[calendar.account.alpha]\ntype = \"ics\"\nserver_url = \"https://b\"\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_placement_widget_table_sort_order() {
+    assert_rust_export_matches_cpp(
+        "[desktop_widgets]\nwidget_order = [\"b\", \"a\"]\n\n[desktop_widgets.widget.b]\ntype = \"clock\"\n\n[desktop_widgets.widget.a]\ntype = \"date\"\n",
+    );
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }
