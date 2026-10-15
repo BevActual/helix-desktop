@@ -3,9 +3,11 @@
 # If the greeter cannot start or stops with an error, it falls back to greetd's own text login (agreety) so a broken
 # greeter can never leave the machine without a way to sign in.
 set -u
-BIN=${HELIX_GREETER_BIN:-/usr/local/bin/helix-greeter}
+# Defaults follow where this script is installed (<prefix>/bin), so any prefix works.
+HERE=$(cd "$(dirname "$0")" && pwd)
+BIN=${HELIX_GREETER_BIN:-$HERE/helix-greeter}
 NIRI=${HELIX_GREETER_NIRI:-/usr/bin/niri}
-CONFIG=${HELIX_GREETER_NIRI_CONFIG:-/usr/local/share/helix-greeter/niri.kdl}
+CONFIG=${HELIX_GREETER_NIRI_CONFIG:-$HERE/../share/helix-greeter/niri.kdl}
 SESSION=${HELIX_GREETER_SESSION_CMD:-/usr/bin/niri-session}
 FALLBACK=${HELIX_GREETER_FALLBACK:-/usr/bin/agreety}
 

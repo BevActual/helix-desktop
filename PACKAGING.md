@@ -20,14 +20,32 @@ Build and install commands are in [BUILDING.md](BUILDING.md). The packager's usu
 ```sh
 npm ci
 cargo build --release --workspace --locked
-DESTDIR="$RPM_BUILD_ROOT" tools/install.sh --no-build --prefix /usr --profile release
+DESTDIR="$RPM_BUILD_ROOT" tools/install.sh --no-build --require-session --prefix /usr --profile release
 ```
 
-`tools/install.sh` installs the services and their units, D-Bus activation files, polkit policy, icon and agent policy tables. It does
-not yet install the session shell, greeter and apps; a package must also install those binaries (`helix-shell-tauri`, `helix-greeter`,
-`helix-settings`, `helix-mobius`, `helix-software`, `helix-system-monitor`), the `assets/*.desktop` entries and the `tools/systemd/*.in`
-units (their `@SHELL_BIN@`, `@STRUT_BIN@`, `@IDLE_BIN@`, `@WALLPAPER_BIN@` and `@POLKIT_AGENT@` placeholders are filled in by
-`tools/switch-shell.sh`). Moving that into `tools/install.sh` is the next step toward an RPM spec.
+`tools/install.sh` installs everything a package ships except the compositor:
+
+| What | Where (under the prefix) |
+|---|---|
+| desktop service, assistant, inference service, workers | `bin/` |
+| session shell, strut, wallpaper, idle, greeter, Settings, Mobius, Software, System Monitor | `bin/` |
+| `helix-greeter-apply-appearance` (Settings finds it beside itself) | `bin/` |
+| `helix-panel`, `helix-askpass` | `bin/` |
+| `helix-system-upgrade` (the polkit-gated helper) | `libexec/` |
+| systemd user units (service, inference, assistant warm-up, strut, bar, panels, idle, wallpaper) | `lib/systemd/user/` |
+| D-Bus activation files, polkit policy | `share/dbus-1/services/`, `share/polkit-1/actions/` |
+| desktop entries and icons | `share/applications/`, `share/icons/hicolor/scalable/apps/` |
+| theme templates, first-run wallpaper, agent policy tables | `share/helix/` |
+| greeter session script and its compositor config | `bin/helix-greeter-session`, `share/helix-greeter/niri.kdl` |
+| model engine libraries, when built | `lib64/helix/` |
+
+Options: `--prefix`, `--destdir`, `--profile`, `--no-build`, `--services-only` (skip the session half and its web view libraries),
+`--require-session` (fail if any session binary was not built, which is what a package wants), `--uninstall`. It honours
+`CARGO_TARGET_DIR` for the binaries.
+
+Not installed, on purpose: the compositor (`tools/install-trusted-niri.sh`), greetd's configuration (`tools/install-greeter.sh`, which
+edits `/etc/greetd`), and any per-user niri configuration. Units are installed disabled; enabling is per user
+(`systemctl --user enable --now helix-shell-strut helix-shell-bar helix-wallpaper helix-idle`), or with a preset file in the package.
 
 ## Identity
 
