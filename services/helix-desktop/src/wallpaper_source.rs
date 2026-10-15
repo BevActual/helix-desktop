@@ -60,10 +60,7 @@ fn has_configured_wallpaper(config: &ConfigStore, wallpaper: Option<&toml::Table
             return true;
         }
     }
-    config
-        .get("wallpaper.default.path")
-        .as_str()
-        .is_some_and(|p| !p.is_empty())
+    default_wallpaper_from_config(config).is_some()
 }
 
 /// C++ `firstRunWallpaperPath()`: bundled asset until setup completes and no wallpaper is configured.
@@ -83,8 +80,22 @@ fn first_run_bundled_wallpaper(config: &ConfigStore) -> Option<String> {
     Some(bundled.to_string_lossy().into_owned())
 }
 
-/// `getPaletteWallpaperPath()`: first-run bundled, then last, then default (`settings.toml` + config default).
-pub fn palette_wallpaper_path(config: &ConfigStore) -> String {
+fn default_wallpaper_from_config(config: &ConfigStore) -> Option<String> {
+    config
+        .template_config_table()
+        .get("wallpaper")
+        .and_then(|w| w.get("default"))
+        .and_then(|d| d.get("path"))
+        .and_then(|p| p.as_str())
+        .map(expand_user)
+        .filter(|p| !p.is_empty())
+}
+
+/// `getPaletteWallpaperPath()`: session path, first-run bundled, then last, then default.
+pub fn palette_wallpaper_path(config: &ConfigStore, session_wallpaper: &str) -> String {
+    if !session_wallpaper.is_empty() {
+        return expand_user(session_wallpaper);
+    }
     if let Some(bundled) = first_run_bundled_wallpaper(config) {
         return bundled;
     }
@@ -99,12 +110,7 @@ pub fn palette_wallpaper_path(config: &ConfigStore) -> String {
             return path;
         }
     }
-    config
-        .get("wallpaper.default.path")
-        .as_str()
-        .map(expand_user)
-        .filter(|p| !p.is_empty())
-        .unwrap_or_default()
+    default_wallpaper_from_config(config).unwrap_or_default()
 }
 
 fn mtime_ns(path: &Path) -> i128 {
@@ -116,8 +122,8 @@ fn mtime_ns(path: &Path) -> i128 {
         .unwrap_or(0)
 }
 
-pub fn wallpaper_palette(config: &ConfigStore) -> Option<WallpaperPalette> {
-    let path = palette_wallpaper_path(config);
+pub fn wallpaper_palette(config: &ConfigStore, session_wallpaper: &str) -> Option<WallpaperPalette> {
+    let path = palette_wallpaper_path(config, session_wallpaper);
     if path.is_empty() {
         return None;
     }
@@ -192,8 +198,33 @@ mod tests {
         fs::write(&paths.settings_toml, "[wallpaper]\n").unwrap();
 
         let config = ConfigStore::load(paths);
-        let path = palette_wallpaper_path(&config);
+        let path = palette_wallpaper_path(&config, "");
         assert_eq!(path, bundled.to_string_lossy());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn session_wallpaper_overrides_settings() {
+        let root = std::env::temp_dir().join(format!("helix-wp-session-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("state")).unwrap();
+        let paths = ConfigPaths {
+            config_dir: root.join("cfg"),
+            settings_toml: root.join("state/settings.toml"),
+        };
+        fs::create_dir_all(paths.config_dir.join("helix")).unwrap();
+        fs::write(
+            &paths.settings_toml,
+            "[wallpaper]\nlast = { path = \"/from/settings.png\" }\n",
+        )
+        .unwrap();
+        fs::write(root.join("state/.setup-complete"), "").unwrap();
+
+        let config = ConfigStore::load(paths);
+        assert_eq!(
+            palette_wallpaper_path(&config, "/session/wall.png"),
+            "/session/wall.png"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -211,7 +242,7 @@ mod tests {
         fs::write(root.join("state/.setup-complete"), "").unwrap();
 
         let config = ConfigStore::load(paths);
-        assert!(palette_wallpaper_path(&config).is_empty());
+        assert!(palette_wallpaper_path(&config, "").is_empty());
         let _ = fs::remove_dir_all(&root);
     }
 }
