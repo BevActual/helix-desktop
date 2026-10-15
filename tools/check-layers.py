@@ -6,7 +6,7 @@ recorded baseline may only shrink.
   tools/check-layers.py <repo-root> --update-baseline  rewrite the baseline from the current tree
   tools/check-layers.py <repo-root> --list             print current violations
 
-Rules live in tools/layers.toml; known exceptions in tools/layers-baseline.txt (one `crate -> dependency` per line).
+Rules (directories, and the order of crates inside core/) live in tools/layers.toml; known exceptions in tools/layers-baseline.txt (one `crate -> dependency` per line).
 """
 import json
 import os
@@ -21,7 +21,9 @@ def top_dir(rel):
 
 
 def violations(root):
-    rules = tomllib.loads((root / "tools/layers.toml").read_text())["rules"]
+    config = tomllib.loads((root / "tools/layers.toml").read_text())
+    rules = config["rules"]
+    crate_rules = config.get("crates", {})
     out = subprocess.run(
         ["cargo", "metadata", "--format-version", "1", "--no-deps", "--offline"],
         cwd=root, capture_output=True, text=True,
@@ -47,6 +49,12 @@ def violations(root):
             there = where[dep["name"]]
             if top_dir(there) not in allowed:
                 found[f"{package['name']} -> {dep['name']}"] = (here, there)
+            elif top_dir(here) == "core" and top_dir(there) == "core":
+                # Inside core/ the order of crates matters, not just the directory.
+                if package["name"] not in crate_rules:
+                    found[f"{package['name']} has no entry in [crates] of tools/layers.toml"] = (here, there)
+                elif dep["name"] not in crate_rules[package["name"]]:
+                    found[f"{package['name']} -> {dep['name']}"] = (here, there)
     return found
 
 

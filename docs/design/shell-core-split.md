@@ -49,8 +49,8 @@ real builds and tests cost more):
 
 - A new model goes in the crate of the thing it models. If it fits none, ask whether it is shared (then `helix-base`, and only if it
   has no dependencies) or whether it is a new crate.
-- A core crate depends only on `helix-base` and the crates above it in the order given. `tools/check-layers.py` enforces directory
-  direction; keep the crate order by hand until it learns it.
+- A core crate depends only on `helix-base` and the crates above it in the order given. `tools/check-layers.py` enforces both the
+  directory direction and the `[crates]` table in `tools/layers.toml`; a new core crate must be added there.
 - A consumer lists only the crates it uses. If a binary starts needing a crate it did not have, that is a change worth noticing.
 - No D-Bus servers, no UI toolkit, no I/O beyond reading files in these crates. They are the part of Helix that is easy to test.
 

@@ -23,6 +23,19 @@ A crate may depend (by path) only on the directories listed for its own top-leve
 | `greeter/` | `third_party/` | Login is a trust surface; it links nothing from the session |
 | `dev/` | anything | Test tooling |
 
+Inside `core/` the order of crates is checked too, from the `[crates]` table in `tools/layers.toml`:
+
+| Crate | May depend on |
+|---|---|
+| `helix-base`, `helix-theme`, `helix-desktop-api` | none of the others |
+| `helix-agent`, `helix-config`, `helix-models`, `helix-compositor`, `helix-software-model`, `helix-monitor-model` | `helix-base` |
+| `helix-config-export` | `helix-config` |
+| `helix-shell-model` | `helix-base`, `helix-compositor` |
+| `helix-chat` | `helix-base`, `helix-config` |
+
+A new crate in `core/` fails the check until it has a row there, so every new edge between core crates is a deliberate edit to that
+file. See `shell-core-split.md` for what each crate holds.
+
 `compositor/` is its own workspace and is not checked here.
 
 ## Known exceptions
