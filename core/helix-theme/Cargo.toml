@@ -9,3 +9,4 @@ description = "Palette math and custom-palette storage. Ports src/theme/ (C++ Th
 serde_json = "1"
 regex = "1"
 toml = "0.8"
+material-colors = { path = "../../third_party/material-colors", default-features = false, features = ["std", "quantize"] }
