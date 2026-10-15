@@ -16,11 +16,12 @@ use super::config_export_typed_scalar::{
     export_audio_section_from_merged, export_backdrop_section_from_merged,
     export_brightness_section_from_merged, export_calendar_section_from_merged,
     export_hooks_section_from_merged, export_hot_corners_section_from_merged,
-    export_control_center_section_from_merged, export_idle_section_from_merged,
+    export_control_center_section_from_merged, export_dock_section_from_merged,
+    export_idle_section_from_merged, export_keybinds_section_from_merged,
     export_location_section_from_merged, export_lockscreen_section_from_merged,
     export_notification_section_from_merged, export_nightlight_section_from_merged,
     export_osd_section_from_merged, export_system_section_from_merged,
-    export_tailscale_section_from_merged,
+    export_tailscale_section_from_merged, export_wallpaper_section_from_merged,
     export_weather_section_from_merged,
 };
 
@@ -536,6 +537,9 @@ pub(crate) fn export_typed_schema_section(
         "lockscreen" => Some(export_lockscreen_section_from_merged(merged)),
         "system" => Some(export_system_section_from_merged(merged)),
         "control_center" => Some(export_control_center_section_from_merged(merged)),
+        "dock" => Some(export_dock_section_from_merged(merged)),
+        "wallpaper" => Some(export_wallpaper_section_from_merged(merged)),
+        "keybinds" => Some(export_keybinds_section_from_merged(merged)),
         _ => None,
     };
     if let Some(table) = struct_export {

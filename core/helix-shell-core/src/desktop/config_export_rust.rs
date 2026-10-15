@@ -711,7 +711,7 @@ fn strip_table_keys(value: &Toml, keys: &[&str]) -> Toml {
     Toml::Table(out)
 }
 
-fn merged_overlay_for_parsed_section(section: &str, merged_section: &Toml) -> Toml {
+pub(crate) fn merged_overlay_for_parsed_section(section: &str, merged_section: &Toml) -> Toml {
     match section {
         "bar" => {
             let mut table = toml::map::Map::new();

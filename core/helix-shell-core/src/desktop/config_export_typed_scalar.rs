@@ -6,10 +6,12 @@ use super::config_export_defaults::{
     write_audio_defaults, write_backdrop_defaults, write_brightness_defaults,
     write_calendar_defaults, write_hooks_defaults, write_hot_corners_defaults,
     write_idle_defaults, write_location_defaults, write_nightlight_defaults,
-    write_control_center_defaults, write_lockscreen_defaults, write_notification_defaults,
-    write_osd_defaults, write_system_defaults, write_tailscale_defaults, write_weather_defaults,
+    write_control_center_defaults, write_dock_defaults, write_keybinds_defaults,
+    write_lockscreen_defaults, write_notification_defaults, write_osd_defaults,
+    write_system_defaults, write_tailscale_defaults, write_wallpaper_defaults, write_weather_defaults,
     HOOK_EVENT_KEYS,
 };
+use super::config_export_rust::merged_overlay_for_parsed_section;
 use super::config_export_serialize::f32_bits;
 
 fn string_array(value: Option<&Toml>) -> Vec<String> {
@@ -836,7 +838,10 @@ fn export_overlay_section_from_merged(
 ) -> Toml {
     let defaults = write_defaults();
     match merged.get(section) {
-        Some(merged_section) => overlay_known_leaves(&defaults, merged_section),
+        Some(merged_section) => {
+            let overlay = merged_overlay_for_parsed_section(section, merged_section);
+            overlay_known_leaves(&defaults, &overlay)
+        }
         None => defaults,
     }
 }
@@ -1355,6 +1360,18 @@ pub(crate) fn export_control_center_section_from_merged(merged: &Toml) -> Toml {
     export_overlay_section_from_merged("control_center", merged, write_control_center_defaults)
 }
 
+pub(crate) fn export_dock_section_from_merged(merged: &Toml) -> Toml {
+    export_overlay_section_from_merged("dock", merged, write_dock_defaults)
+}
+
+pub(crate) fn export_wallpaper_section_from_merged(merged: &Toml) -> Toml {
+    export_overlay_section_from_merged("wallpaper", merged, write_wallpaper_defaults)
+}
+
+pub(crate) fn export_keybinds_section_from_merged(merged: &Toml) -> Toml {
+    export_overlay_section_from_merged("keybinds", merged, write_keybinds_defaults)
+}
+
 pub(crate) fn export_hooks_section_from_merged(merged: &Toml) -> Toml {
     let mut out = write_hooks_defaults();
     let out_table = out.as_table_mut().expect("hooks export table");
@@ -1430,6 +1447,18 @@ mod tests {
             export_control_center_section_from_merged(&Toml::Table(toml::map::Map::new())),
             write_control_center_defaults()
         );
+        assert_eq!(
+            export_dock_section_from_merged(&Toml::Table(toml::map::Map::new())),
+            write_dock_defaults()
+        );
+        assert_eq!(
+            export_wallpaper_section_from_merged(&Toml::Table(toml::map::Map::new())),
+            write_wallpaper_defaults()
+        );
+        assert_eq!(
+            export_keybinds_section_from_merged(&Toml::Table(toml::map::Map::new())),
+            write_keybinds_defaults()
+        );
     }
 
     #[test]
@@ -1446,6 +1475,20 @@ height = 800
 
 [control_center.network]
 wifi_band = "5ghz"
+
+[dock]
+enabled = false
+icon_size = 64
+
+[wallpaper]
+enabled = false
+default = "/tmp/w.png"
+
+[wallpaper.automation]
+enabled = true
+
+[keybinds]
+copy = ["Ctrl+Shift+c"]
 "#,
         )
         .unwrap();
@@ -1462,6 +1505,23 @@ wifi_band = "5ghz"
             export_control_center_section_from_merged(&merged),
             cc_filtered
         );
+        let dock_filtered =
+            export_filtered_schema_section("dock", &merged, &default, write_dock_defaults);
+        assert_eq!(export_dock_section_from_merged(&merged), dock_filtered);
+        let wallpaper_filtered = export_filtered_schema_section(
+            "wallpaper",
+            &merged,
+            &default,
+            write_wallpaper_defaults,
+        );
+        assert_eq!(export_wallpaper_section_from_merged(&merged), wallpaper_filtered);
+        let keybinds_filtered = export_filtered_schema_section(
+            "keybinds",
+            &merged,
+            &default,
+            write_keybinds_defaults,
+        );
+        assert_eq!(export_keybinds_section_from_merged(&merged), keybinds_filtered);
     }
 
     #[test]
