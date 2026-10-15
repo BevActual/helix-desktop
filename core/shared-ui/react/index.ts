@@ -14,6 +14,8 @@ export type { NetworkView } from "./bindings/NetworkView";
 export type { VpnRow } from "./bindings/VpnRow";
 export type { DeviceRow } from "./bindings/DeviceRow";
 export type { BluetoothView } from "./bindings/BluetoothView";
+export type { AudioView } from "./bindings/AudioView";
+export type { OutputView } from "./bindings/OutputView";
 export type { PairingView } from "./bindings/PairingView";
 export type { GrantsView } from "./bindings/GrantsView";
 export type { ClientView } from "./bindings/ClientView";

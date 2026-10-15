@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A scripted org.helix.Desktop for tests that must not touch real devices (Wi-Fi). It registers the interfaces of
-protocols/dbus/org.helix.Desktop.xml on the session bus it is started on, serves a fixed Network1 world (a joined saved network, an open
+protocols/dbus/org.helix.Desktop.xml on the session bus it is started on, serves a fixed Network1 and Audio1 world (a joined saved network, an open
 one, a secured one never joined, an enterprise one, one VPN), changes that world when actions arrive, emits Changed, and appends every
 action it receives to <state>/fake-network-actions.log as `ACTION <name> <json>`. It refuses what the real service would refuse (joining
 a secured, unsaved network without a secret).
@@ -17,6 +17,7 @@ state_dir = sys.argv[1]
 log_path = os.path.join(state_dir, "fake-network-actions.log")
 bt_log_path = os.path.join(state_dir, "fake-bluetooth-actions.log")
 settings_log_path = os.path.join(state_dir, "fake-settings-actions.log")
+audio_log_path = os.path.join(state_dir, "fake-audio-actions.log")
 settings = {"theme.mode": "dark", "nightlight.enabled": False, "theme.pure_black_dark": False}
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
 
@@ -51,6 +52,37 @@ def network_snapshot():
             "vpn-active": False, "vpn-connected": False, "cellular-active": False, "wired": False, "cellular": False,
             "access-points": aps if world["enabled"] else [],
             "vpns": [{"path": p, "name": v["name"], "active": v["active"]} for p, v in world["vpn"].items()]}
+
+audio = {
+    "sinks": {
+        48: {"description": "Speakers",   "volume": 0.44, "muted": False, "default": True},
+        51: {"description": "Headphones", "volume": 1.0,  "muted": False, "default": False},
+    },
+    "sources": {
+        70: {"description": "Microphone",     "volume": 0.8, "muted": True,  "default": True},
+        71: {"description": "Webcam Microphone", "volume": 0.5, "muted": False, "default": False},
+    },
+}
+
+def audio_snapshot():
+    def nodes(group):
+        return [{"id": node_id, "name": f"node.{node_id}", "description": n["description"], "volume": n["volume"],
+                 "muted": n["muted"], "default": n["default"], "available": True} for node_id, n in group.items()]
+    return {"available": True, "sinks": nodes(audio["sinks"]), "sources": nodes(audio["sources"]), "programs": []}
+
+def audio_action(name, args):
+    node_id = int(args["id"])
+    group = audio["sinks"] if node_id in audio["sinks"] else audio["sources"] if node_id in audio["sources"] else None
+    if group is None: raise Refused(f"unknown node {node_id}")
+    if name == "volume":
+        group[node_id]["volume"] = max(0.0, min(1.5, float(args["value"])))
+    elif name == "mute":
+        group[node_id]["muted"] = bool(args["value"])
+    elif name == "default":
+        for other in group.values(): other["default"] = False
+        group[node_id]["default"] = True
+    else:
+        raise Refused(f"unknown audio action {name}")
 
 bt = {
     "enabled": True, "scanning": False,
@@ -159,6 +191,7 @@ def on_method(conn, sender, path, interface, method, params, invocation):
         if method == "GetSnapshot":
             if short == "Network1": reply = network_snapshot()
             elif short == "Bluetooth1": reply = bluetooth_snapshot()
+            elif short == "Audio1": reply = audio_snapshot()
             else: reply = {"available": False}
             invocation.return_value(GLib.Variant("(a{sv})", (variant(reply).unpack() and {k: variant(v) for k, v in reply.items()},)))
         elif method == "GetSettings" and short == "Configuration1":
@@ -192,6 +225,18 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             next_operation[0] += 1
             invocation.return_value(GLib.Variant("(t)", (next_operation[0],)))
             GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Network1"), False)[1])
+        elif method == "Action" and short == "Audio1":
+            name, args = params.unpack()
+            args = {k: (v if not isinstance(v, GLib.Variant) else v.unpack()) for k, v in args.items()}
+            with open(audio_log_path, "a") as log: log.write(f"ACTION {name} {json.dumps(args, sort_keys=True)}\n")
+            try:
+                audio_action(name, args)
+            except (Refused, KeyError, ValueError) as error:
+                with open(audio_log_path, "a") as log: log.write(f"REFUSED {name} {error}\n")
+                invocation.return_dbus_error("org.helix.Desktop.Error.Failed", str(error)); return
+            next_operation[0] += 1
+            invocation.return_value(GLib.Variant("(t)", (next_operation[0],)))
+            GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Audio1"), False)[1])
         elif method == "Reply" and short == "Bluetooth1":
             response, cancel = params.unpack()
             path = bt["pairing"]

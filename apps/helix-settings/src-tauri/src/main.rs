@@ -9,6 +9,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use helix_desktop_api::{Desktop, Domain};
+use helix_shell_core::audio::{
+    Audio, AudioView, Request as AudioRequest, RequestError as AudioError,
+};
 use helix_shell_core::bluetooth::{
     Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError,
 };
@@ -54,6 +57,7 @@ struct State {
     catalog: Catalog,
     network: Network,
     bluetooth: Bluetooth,
+    audio: Audio,
     picker: Picker,
     pairing: Pairing,
     status: &'static str,
@@ -165,6 +169,23 @@ async fn refresh_network(app: &AppHandle) {
     shared(app).lock().expect("state").network = network;
     eprintln!("SETTINGS network networks={}", view.networks.len());
     let _ = app.emit("network-view", view);
+}
+
+async fn refresh_audio(app: &AppHandle) {
+    let Some(desktop) = current() else { return };
+    let snapshot = desktop
+        .snapshot(Domain::Audio)
+        .await
+        .unwrap_or(serde_json::Value::Null);
+    let audio = Audio::from_snapshot(&snapshot);
+    let view = audio.view();
+    shared(app).lock().expect("state").audio = audio;
+    eprintln!(
+        "SETTINGS audio outputs={} inputs={}",
+        view.outputs.len(),
+        view.inputs.len()
+    );
+    let _ = app.emit("audio-view", view);
 }
 
 async fn refresh_bluetooth(app: &AppHandle) {
@@ -294,6 +315,7 @@ fn follow(
                     match domain {
                         Domain::Network => refresh_network(&app).await,
                         Domain::Bluetooth => refresh_bluetooth(&app).await,
+                        Domain::Audio => refresh_audio(&app).await,
                         Domain::Configuration => refresh_settings(&app).await,
                         _ => {}
                     }
@@ -311,6 +333,17 @@ async fn send_network(request: Result<NetRequest, NetError>) -> Result<(), Strin
         .await
         .map_err(|error| error.to_string())?;
     eprintln!("SETTINGS network {} sent", request.action);
+    Ok(())
+}
+
+async fn send_audio(request: Result<AudioRequest, AudioError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    desktop
+        .action(Domain::Audio, request.action, &request.args)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS audio {} sent", request.action);
     Ok(())
 }
 
@@ -332,6 +365,10 @@ async fn send_bluetooth_operation(request: Result<BtRequest, BtError>) -> Result
 
 fn network_with<T>(app: &AppHandle, build: impl FnOnce(&Network) -> T) -> T {
     build(&shared(app).lock().expect("state").network)
+}
+
+fn audio_with<T>(app: &AppHandle, build: impl FnOnce(&Audio) -> T) -> T {
+    build(&shared(app).lock().expect("state").audio)
 }
 
 fn bluetooth_with<T>(app: &AppHandle, build: impl FnOnce(&Bluetooth) -> T) -> T {
@@ -412,6 +449,35 @@ async fn network_vpn(app: AppHandle, path: String, active: bool) -> Result<(), S
 }
 
 #[tauri::command]
+fn audio_view(app: AppHandle) -> AudioView {
+    audio_with(&app, Audio::view)
+}
+#[tauri::command]
+async fn audio_set_volume(app: AppHandle, percent: f64) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_volume(percent))).await
+}
+#[tauri::command]
+async fn audio_set_muted(app: AppHandle, muted: bool) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_muted(muted))).await
+}
+#[tauri::command]
+async fn audio_set_default(app: AppHandle, id: u32) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_default(id))).await
+}
+#[tauri::command]
+async fn audio_set_input_volume(app: AppHandle, percent: f64) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_input_volume(percent))).await
+}
+#[tauri::command]
+async fn audio_set_input_muted(app: AppHandle, muted: bool) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_input_muted(muted))).await
+}
+#[tauri::command]
+async fn audio_set_default_input(app: AppHandle, id: u32) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_default_input(id))).await
+}
+
+#[tauri::command]
 fn bluetooth_view(app: AppHandle) -> BluetoothView {
     bluetooth_with(&app, Bluetooth::view)
 }
@@ -459,10 +525,12 @@ fn connect(app: AppHandle) {
                     refresh_settings(&app).await;
                     refresh_network(&app).await;
                     refresh_bluetooth(&app).await;
+                    refresh_audio(&app).await;
                     let tasks = [
                         follow(&app, &desktop, Domain::Configuration),
                         follow(&app, &desktop, Domain::Network),
                         follow(&app, &desktop, Domain::Bluetooth),
+                        follow(&app, &desktop, Domain::Audio),
                     ];
                     let prompt_app = app.clone();
                     let prompt_desktop = desktop.clone();
@@ -1544,6 +1612,13 @@ fn main() {
             network_disconnect,
             network_forget,
             network_vpn,
+            audio_view,
+            audio_set_volume,
+            audio_set_muted,
+            audio_set_default,
+            audio_set_input_volume,
+            audio_set_input_muted,
+            audio_set_default_input,
             bluetooth_view,
             bluetooth_set_power,
             bluetooth_scan,
@@ -1568,6 +1643,7 @@ fn main() {
                 pairing: Pairing::default(),
                 network: Network::from_snapshot(&serde_json::Value::Null),
                 bluetooth: Bluetooth::from_snapshot(&serde_json::Value::Null),
+                audio: Audio::from_snapshot(&serde_json::Value::Null),
                 status: "unavailable",
             })));
             let url = match &open_page {

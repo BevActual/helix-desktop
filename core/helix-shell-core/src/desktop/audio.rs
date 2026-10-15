@@ -51,6 +51,7 @@ pub struct Request {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct OutputView {
     pub id: u32,
     pub name: String,
@@ -58,6 +59,7 @@ pub struct OutputView {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct AudioView {
     pub available: bool,
     /// The device the slider controls. `None` when there is no output.

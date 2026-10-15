@@ -8,6 +8,7 @@ import { KeyboardPage } from "./pages/KeyboardPage";
 import { WallpaperPage } from "./pages/WallpaperPage";
 import { NetworkPage } from "./pages/NetworkPage";
 import { BluetoothPage } from "./pages/BluetoothPage";
+import { SoundPage } from "./pages/SoundPage";
 import { AgentsPage } from "./pages/AgentsPage";
 
 export interface MountOptions {
@@ -68,6 +69,7 @@ const custom: Record<string, (props: { register: (handle: PageHandle) => void; o
   wallpaper: ({ register }) => <WallpaperPage register={register} report={report} />,
   network: ({ register }) => <NetworkPage register={register} />,
   bluetooth: ({ register }) => <BluetoothPage register={register} />,
+  sound: ({ register }) => <SoundPage register={register} />,
   agents: ({ register }) => <AgentsPage register={register} />,
 };
 

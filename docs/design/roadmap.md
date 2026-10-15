@@ -33,7 +33,7 @@ Power & lock, Privacy & agents and About. The gaps below come from `settings-aud
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
-| **Sound page**: output and input device, volume, mute, live input level | M | Nothing: `Audio1` has snapshot, actions and the input-meter lease | Audit removed the old page; no replacement exists. The meter lease was built for this |
+| Sound page: live input level meter | S | A `watch_input_level` call in `helix-desktop-api` for the `InputLevel` signal; `Audio1.StartInputMeter` is already there | The page ships without the meter (device choice, volume and mute are done) |
 | **Notifications page**: do-not-disturb schedule, per-app rules, toast count and duration | M | A consumer in `helix_shell_core::notifications`; the Tauri notification server reads none of the old rows | `settings-audit.md` |
 | **Night light**: temperature and schedule | L | A gamma-control client (`wlr-gamma-control` is in `protocols/`); the service only guards the setting today | `settings-audit.md`; `configuration.rs` has guards, no gamma client |
 | **Text size / UI scale** | M | A scale applied by the shell and Settings | `accessibility.ui_scale` has no live consumer except the greeter (it now reads it through the sync helper) |

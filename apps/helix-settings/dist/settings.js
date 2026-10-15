@@ -25,6 +25,7 @@ const PAGES = [
   { name: "displays", title: "Displays", icon: "sun", rows: false },
   { name: "network", title: "Network", icon: "wifi", rows: false },
   { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
+  { name: "sound", title: "Sound", icon: "volume", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
   { name: "dock", title: "Dock", icon: "grid", rows: false },
   { name: "power", title: "Power & lock", icon: "lock", rows: false },
@@ -44,7 +45,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "power" || page.name === "displays") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "power" || page.name === "displays") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;

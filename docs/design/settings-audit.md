@@ -27,6 +27,6 @@ the setting on the live service and seeing which files changed.
 ## Still to build, with their owners
 
 * Night light needs a gamma-control client in the Rust shell (wlr-gamma-control), then rows for temperature and schedule.
-* A Sound page of real controls (output device, volume, input device) belongs on the audio model the control center already uses.
+* ~~A Sound page of real controls~~ — **Done.** Output and input device, volume and mute on the control center's audio model (`apps/helix-settings/web/src/pages/SoundPage.tsx`, `tools/nested/settings-sound-test.sh`). Still missing: a live input level meter.
 * Notification behaviour (how many toasts, where, how long) belongs to `helix_shell_core::notifications`; nothing there is configurable yet.
 * Shell-level accessibility (text size) has no consumer; it needs a scale applied by the shell and by Settings.
