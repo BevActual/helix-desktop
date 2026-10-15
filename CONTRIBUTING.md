@@ -66,6 +66,15 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 
 The approval dialog and the greeter are hand-written HTML/CSS/JS with no build step; the shell is moving to React in slices. Rules and status: `docs/design/frontend-stack.md`.
 
+### Dependencies and lints
+
+Shared dependency versions live once, in `[workspace.dependencies]` in the root `Cargo.toml`. A crate uses
+`serde = { workspace = true }` and adds only its own features. Add a dependency used by two or more crates there; one used by a single
+crate can stay in that crate. Do not give a crate its own version of something the workspace already pins: two majors of one crate
+means two copies compiled. `cargo deny check` (policy in `deny.toml`) checks licences, advisories and duplicates.
+
+Every first-party crate has `[lints] workspace = true`, so lint levels are set in `[workspace.lints]` and are the same everywhere.
+
 ### Build system
 
 Cargo builds everything, and the apps' `build.rs` runs their npm builds. There is no Meson or CMake step. `tools/install.sh` does the

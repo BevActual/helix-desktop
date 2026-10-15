@@ -1,0 +1,6 @@
+# Pins the toolchain for rustup users, so `cargo`, `rustc`, `clippy-driver` and `rustfmt` always come from one install. Mixing a
+# distribution's rustc with a rustup clippy-driver fails with "found crate compiled by an incompatible version of rustc".
+[toolchain]
+channel = "stable"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

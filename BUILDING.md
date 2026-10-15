@@ -33,8 +33,9 @@ PackageKit and fwupd. A missing one shows as an empty or "not available" page, n
 
 Tests also want `python3-gobject`, `dbus-daemon` and, for the audio meter, `pipewire` with its command-line tools.
 
-If `cargo` and `rustc` come from different places (for example Fedora's `rustc` and a rustup `clippy-driver` on one `PATH`), builds fail
-with "found crate compiled by an incompatible version of rustc". Put one toolchain first on `PATH`.
+`rust-toolchain.toml` pins the stable channel with `rustfmt` and `clippy` for rustup users, so all four tools come from one install.
+If `cargo` and `rustc` come from different places (for example Fedora's `rustc` and a rustup `clippy-driver` on one `PATH`), builds
+fail with "found crate compiled by an incompatible version of rustc". Put one toolchain first on `PATH`.
 
 ## Build
 

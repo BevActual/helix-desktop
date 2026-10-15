@@ -36,12 +36,17 @@ extern "C" {
 }
 
 /// Takes ownership of a string the shim allocated.
+///
+/// # Safety
+/// `text` is null, or a NUL-terminated string the shim allocated that nothing else frees.
 unsafe fn take(text: *mut c_char) -> String {
     if text.is_null() {
         return String::new();
     }
-    let owned = CStr::from_ptr(text).to_string_lossy().into_owned();
-    hx_free(text);
+    // SAFETY: not null, and by the contract above a NUL-terminated string owned by the caller until `hx_free`.
+    let owned = unsafe { CStr::from_ptr(text) }.to_string_lossy().into_owned();
+    // SAFETY: `text` came from the shim's allocator and is not used again.
+    unsafe { hx_free(text) };
     owned
 }
 

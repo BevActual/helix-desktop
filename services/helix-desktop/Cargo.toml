@@ -1,8 +1,9 @@
 [package]
 name = "helix-desktop"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Rust org.helix.Desktop service (migrating from C++ helix-service). See docs/design/cpp-to-rust.md."
 
 [[bin]]
@@ -14,22 +15,25 @@ name = "helix-fake-bluez"
 path = "src/bin/helix-fake-bluez.rs"
 
 [dependencies]
-helix-shell-core = { path = "../../core/helix-shell-core" }
-helix-theme = { path = "../../core/helix-theme" }
-libc = "0.2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "0.8"
-ureq = { version = "2", default-features = false, features = ["tls"] }
+helix-shell-core = { workspace = true }
+helix-theme = { workspace = true }
+libc = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+toml = { workspace = true }
+ureq = { workspace = true }
 md5 = "0.7"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync"] }
-zbus = { version = "5", default-features = false, features = ["tokio", "blocking-api"] }
-futures-util = "0.3"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "sync"] }
+zbus = { workspace = true, features = ["tokio", "blocking-api"] }
+futures-util = { workspace = true }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std", "env-filter"] }
 pipewire = { version = "0.10", features = ["v0_3_33"] }
 
 [dev-dependencies]
-helix-desktop-api = { path = "../../core/helix-desktop-api" }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-zbus = { version = "5", default-features = false, features = ["tokio"] }
+helix-desktop-api = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+zbus = { workspace = true, features = ["tokio"] }
+
+[lints]
+workspace = true

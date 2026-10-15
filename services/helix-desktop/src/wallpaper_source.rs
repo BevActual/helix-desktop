@@ -193,6 +193,16 @@ mod tests {
 
     #[test]
     fn first_run_uses_bundled_wallpaper_when_setup_incomplete() {
+        // Other tests rewrite HELIX_ASSETS_DIR under this lock; without it the lookup races them.
+        let _guard = crate::testing::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        unsafe {
+            std::env::set_var(
+                "HELIX_ASSETS_DIR",
+                crate::testing::fixtures::repo_root().join("assets"),
+            );
+        }
         let root = std::env::temp_dir().join(format!("helix-wp-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();

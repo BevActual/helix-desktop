@@ -1,8 +1,9 @@
 [package]
 name = "helix-image"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Local diffusion worker (one request per process)."
 
 [[bin]]
@@ -10,10 +11,13 @@ name = "helix-image"
 path = "src/main.rs"
 
 [build-dependencies]
-cc = "1"
+cc = { workspace = true }
 
 [dependencies]
-serde_json = "1"
-base64 = "0.22"
-image = { version = "0.25", default-features = false, features = ["png"] }
-libc = "0.2"
+serde_json = { workspace = true }
+base64 = { workspace = true }
+image = { workspace = true, features = ["png"] }
+libc = { workspace = true }
+
+[lints]
+workspace = true

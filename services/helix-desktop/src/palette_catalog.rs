@@ -313,7 +313,9 @@ fn download_community_palette(state_dir: &Path, name: &str) -> bool {
     }
     tracing::info!(%url, %name, "fetching community palette");
     let response = match ureq::get(&url)
-        .timeout(std::time::Duration::from_secs(30))
+        .config()
+        .timeout_global(Some(std::time::Duration::from_secs(30)))
+        .build()
         .call()
     {
         Ok(response) => response,
@@ -322,7 +324,7 @@ fn download_community_palette(state_dir: &Path, name: &str) -> bool {
             return false;
         }
     };
-    let body = match response.into_string() {
+    let body = match response.into_body().read_to_string() {
         Ok(body) => body,
         Err(error) => {
             tracing::warn!(%error, %name, "community palette read failed");
@@ -391,11 +393,14 @@ pub fn sync_community_catalog(settings_toml: &Path, offline: bool) -> Result<Cat
     }
     tracing::info!(%url, "fetching community palette catalog");
     let response = ureq::get(&url)
-        .timeout(std::time::Duration::from_secs(15))
+        .config()
+        .timeout_global(Some(std::time::Duration::from_secs(15)))
+        .build()
         .call()
         .map_err(|error| format!("community catalog download failed: {error}"))?;
     let body = response
-        .into_string()
+        .into_body()
+        .read_to_string()
         .map_err(|error| format!("community catalog read failed: {error}"))?;
     let parsed: Value = serde_json::from_str(&body)
         .map_err(|error| format!("community catalog is not valid JSON: {error}"))?;

@@ -70,11 +70,14 @@ pub fn sync_community_template_catalog(
     }
     tracing::info!(%url, "fetching community template catalog");
     let response = ureq::get(&url)
-        .timeout(std::time::Duration::from_secs(30))
+        .config()
+        .timeout_global(Some(std::time::Duration::from_secs(30)))
+        .build()
         .call()
         .map_err(|error| format!("community template catalog download failed: {error}"))?;
     let body = response
-        .into_string()
+        .into_body()
+        .read_to_string()
         .map_err(|error| format!("community template catalog read failed: {error}"))?;
     catalog_has_templates(&body)?;
     let tmp = path.with_extension("json.tmp");

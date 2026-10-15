@@ -586,13 +586,16 @@ impl Fetch for UreqFetch {
         limit: usize,
         cancelled: &AtomicBool,
     ) -> Option<Vec<u8>> {
-        let agent = ureq::AgentBuilder::new().timeout(REQUEST_TIMEOUT).build();
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .timeout_global(Some(REQUEST_TIMEOUT))
+            .build()
+            .into();
         let mut request = agent.get(url);
         for (name, value) in headers {
-            request = request.set(name, value);
+            request = request.header(name, value);
         }
         let response = request.call().ok()?;
-        let mut reader = response.into_reader();
+        let mut reader = response.into_body().into_reader();
         let mut bytes = Vec::new();
         let mut chunk = [0u8; 16 * 1024];
         loop {
