@@ -1,8 +1,9 @@
 //! In-process `config_export::serialize` parity (incremental port).
 //!
-//! Today: schema-default export (`tests/golden/config_export_minimal.toml`) with user
-//! `config.toml` / `settings.toml` leaves patched when those paths exist in the export tree.
-//! Unknown merged keys fall back to `helix-config-export` (see `docs/design/config-export-rust.md`).
+//! Today: schema-default export (`tests/golden/config_export_minimal.toml`) rebuilt for
+//! dynamic `bar` / `idle.behavior` shapes, then user `config.toml` / `settings.toml` leaves
+//! patched when those paths exist in the export tree. Unknown merged keys fall back to
+//! `helix-config-export` (see `docs/design/config-export-rust.md`).
 
 use std::sync::OnceLock;
 

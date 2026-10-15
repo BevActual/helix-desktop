@@ -79,6 +79,7 @@ jobs:
         env:
           HELIX_CONFIG_EXPORT_BIN: ${{ github.workspace }}/build-debug/helix-config-export
         run: |
+          tools/verify_config_export_golden.sh
           cargo test -p helix-shell-core --lib --quiet
           cargo test -p helix-shell-core --test config_export_golden --quiet
       - name: helix-theme (C++ parity goldens)
