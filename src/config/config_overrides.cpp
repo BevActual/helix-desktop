@@ -7,8 +7,7 @@
 #include "core/files/resource_paths.h"
 #include "core/input/key_chord.h"
 #include "core/log.h"
-#include "theme/builtin_palettes.h"
-#include "theme/custom_palettes.h"
+#include "config/theme_palette_validation.h"
 #include "theme/scheme.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
@@ -906,7 +905,7 @@ bool ConfigService::setThemeColorScheme(PaletteSource source, std::string_view v
 
   switch (source) {
   case PaletteSource::Builtin:
-    if (helix::theme::findBuiltinPalette(value) == nullptr) {
+    if (!helix::config::isKnownBuiltinPalette(value)) {
       return false;
     }
     break;
@@ -918,7 +917,7 @@ bool ConfigService::setThemeColorScheme(PaletteSource source, std::string_view v
   case PaletteSource::Community:
     break;
   case PaletteSource::Custom:
-    if (!std::filesystem::exists(helix::theme::customPalettePath(value))) {
+    if (!std::filesystem::exists(helix::config::customPaletteJsonPath(value))) {
       return false;
     }
     break;

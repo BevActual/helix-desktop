@@ -311,6 +311,7 @@ _helix_sources = files(
   'src/config/config_migrations.cpp',
   'src/config/config_origins.cpp',
   'src/config/config_overrides.cpp',
+  'src/config/theme_palette_validation.cpp',
   'src/config/config_service.cpp',
   'src/config/config_types.cpp',
   'src/config/config_validate.cpp',
