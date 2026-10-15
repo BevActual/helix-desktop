@@ -210,6 +210,20 @@ fn rust_export_matches_cpp_for_desktop_widgets_disabled() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_desktop_widget_placement() {
+    assert_rust_export_matches_cpp(
+        "[desktop_widgets]\nwidget_order = [\"clock_main\"]\n\n[desktop_widgets.widget.clock_main]\ntype = \"clock\"\ncx = 960.0\ncy = 540.0\n\n[desktop_widgets.widget.clock_main.settings]\nformat = \"{:%H:%M}\"\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_lockscreen_widget_placement() {
+    assert_rust_export_matches_cpp(
+        "[lockscreen_widgets]\nwidget_order = [\"clock_main\"]\n\n[lockscreen_widgets.widget.clock_main]\ntype = \"clock\"\ncx = 100.0\ncy = 200.0\n\n[lockscreen_widgets.widget.clock_main.settings]\nformat = \"{:%H:%M}\"\n",
+    );
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }

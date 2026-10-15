@@ -210,6 +210,88 @@ fn is_calendar_account_parse_only_path(path: &str) -> bool {
     path.starts_with("calendar.account.") && path.ends_with(".url")
 }
 
+fn is_allowed_placement_widgets_path(section: &str, path: &str, merged: &Toml) -> bool {
+    let order_path = format!("{section}.widget_order");
+    if path == order_path {
+        return merged
+            .get(section)
+            .and_then(|dw| dw.get("widget"))
+            .and_then(Toml::as_table)
+            .is_some_and(|widgets| !widgets.is_empty());
+    }
+    let parts = path.split('.').collect::<Vec<_>>();
+    if parts.len() < 3 || parts[0] != section || parts[1] != "widget" {
+        return false;
+    }
+    merged
+        .get(section)
+        .and_then(|dw| dw.get("widget"))
+        .and_then(Toml::as_table)
+        .is_some_and(|widgets| widgets.contains_key(parts[2]))
+}
+
+fn is_allowed_desktop_widgets_path(path: &str, merged: &Toml) -> bool {
+    is_allowed_placement_widgets_path("desktop_widgets", path, merged)
+}
+
+fn is_allowed_lockscreen_widgets_path(path: &str, merged: &Toml) -> bool {
+    is_allowed_placement_widgets_path("lockscreen_widgets", path, merged)
+}
+
+fn default_placement_widget_table(type_name: &str) -> toml::map::Map<String, Toml> {
+    let mut table = toml::map::Map::new();
+    table.insert("box_height".to_string(), Toml::Float(0.0));
+    table.insert("box_width".to_string(), Toml::Float(0.0));
+    table.insert("cx".to_string(), Toml::Float(0.0));
+    table.insert("cy".to_string(), Toml::Float(0.0));
+    table.insert("enabled".to_string(), Toml::Boolean(true));
+    table.insert("output".to_string(), Toml::String(String::new()));
+    table.insert("placement_height".to_string(), Toml::Float(0.0));
+    table.insert("placement_width".to_string(), Toml::Float(0.0));
+    table.insert("rotation".to_string(), Toml::Float(0.0));
+    table.insert("type".to_string(), Toml::String(type_name.to_string()));
+    table
+}
+
+fn rebuild_placement_widgets_from_merged(section: &str, root: &mut Toml, merged: &Toml) {
+    let merged_section = merged.get(section).and_then(Toml::as_table);
+    let merged_widgets = merged_section
+        .and_then(|dw| dw.get("widget"))
+        .and_then(Toml::as_table);
+    let merged_widgets = match merged_widgets {
+        Some(table) if !table.is_empty() => table,
+        _ => return,
+    };
+    let export_section = match root.get_mut(section).and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    if let Some(order) = merged_section.and_then(|dw| dw.get("widget_order")) {
+        export_section.insert("widget_order".to_string(), order.clone());
+    }
+    let widgets = export_section
+        .entry("widget".to_string())
+        .or_insert_with(|| Toml::Table(toml::map::Map::new()));
+    let widgets = widgets.as_table_mut().unwrap();
+    for (name, spec) in merged_widgets {
+        let type_name = spec
+            .get("type")
+            .and_then(Toml::as_str)
+            .unwrap_or("clock");
+        widgets
+            .entry(name.clone())
+            .or_insert_with(|| Toml::Table(default_placement_widget_table(type_name)));
+    }
+}
+
+fn rebuild_desktop_widgets_from_merged(root: &mut Toml, merged: &Toml) {
+    rebuild_placement_widgets_from_merged("desktop_widgets", root, merged);
+}
+
+fn rebuild_lockscreen_widgets_from_merged(root: &mut Toml, merged: &Toml) {
+    rebuild_placement_widgets_from_merged("lockscreen_widgets", root, merged);
+}
+
 fn rebuild_calendar_accounts_from_merged(root: &mut Toml, merged: &Toml) {
     let merged_accounts = merged
         .get("calendar")
@@ -259,6 +341,8 @@ fn merged_export_is_patchable(store: &ConfigStore) -> bool {
             || is_allowed_extra_bar_path(path, &merged)
             || is_merged_widget_path(path, &merged)
             || is_allowed_calendar_account_path(path, &merged)
+            || is_allowed_desktop_widgets_path(path, &merged)
+            || is_allowed_lockscreen_widgets_path(path, &merged)
     })
 }
 
@@ -532,6 +616,8 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     rebuild_bar_monitors_from_merged(&mut root, &merged);
     rebuild_widget_from_merged(&mut root, &merged);
     rebuild_calendar_accounts_from_merged(&mut root, &merged);
+    rebuild_desktop_widgets_from_merged(&mut root, &merged);
+    rebuild_lockscreen_widgets_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
@@ -551,6 +637,8 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
         } else if is_allowed_extra_bar_path(&path, &merged)
             || is_merged_widget_path(&path, &merged)
             || is_allowed_calendar_account_path(&path, &merged)
+            || is_allowed_desktop_widgets_path(&path, &merged)
+            || is_allowed_lockscreen_widgets_path(&path, &merged)
         {
             set_dot_path(&mut root, &path, value);
         }
