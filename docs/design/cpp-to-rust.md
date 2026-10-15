@@ -36,8 +36,8 @@ HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 **Wallpaper palette source:** `helix-theme::wallpaper` generates palettes from the wallpaper in Rust (112x112 resize, quantize and
 score, the five Material schemes through the vendored `third_party/material-colors`, the five custom HSL schemes), checked against
 60 palettes and 8 resized buffers from the C++ generator and 4 end-to-end template-apply scenarios. The service uses it for template
-apply and the save-palette / set-role / set-accent paths. Still on the C++ helpers: templates that read `config.*` or `icon_theme`,
-the first-run bundled wallpaper, and `theme.source = wallpaper` with a wallpaper the Rust decoders cannot read.
+apply and the save-palette / set-role / set-accent paths. Still on the C++ helpers when in-process apply declines: exotic
+`config_export` shapes for `config.*`, unreadable wallpaper images, or missing community palette when fetch is blocked (offline / no URL base).
 
 **Desktop-only catalog:** After `RegisterDesktop`, `GetSettings` also includes live `bar:<name>:<field>` scalars and `idle:<behavior>:<field>` rows from `config.toml` (`dynamic_desktop_catalog.rs`), matching C++ `settingsCatalog(helixDesktop=true)`. Override paths use `storage_path()` (`bar:*` → `bar.<name>.<field>`, `idle:*` → `idle.behavior.<name>.<field>`). `tools/nested/helix-desktop-config-smoke.sh` seeds a minimal bar + idle config and checks post-desktop rows plus `idle:*` `Update`.
 
