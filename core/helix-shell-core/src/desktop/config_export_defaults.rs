@@ -372,24 +372,500 @@ pub fn write_dock_defaults() -> Toml {
     Toml::Table(table)
 }
 
+pub fn write_shell_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("app_icon_colorize".to_string(), Toml::Boolean(false));
+    table.insert("avatar_path".to_string(), Toml::String("".to_string()));
+    table.insert("button_borders".to_string(), Toml::Boolean(true));
+    table.insert("card_borders".to_string(), Toml::Boolean(true));
+    table.insert("clipboard_auto_paste".to_string(), Toml::String("auto".to_string()));
+    table.insert("clipboard_confirm_clear_history".to_string(), Toml::Boolean(true));
+    table.insert("clipboard_enabled".to_string(), Toml::Boolean(true));
+    table.insert("clipboard_history_max_entries".to_string(), Toml::Integer(100));
+    table.insert("clipboard_image_action_command".to_string(), Toml::String("".to_string()));
+    table.insert("clipboard_keep_from_closed_apps".to_string(), Toml::Boolean(true));
+    table.insert("corner_radius_scale".to_string(), Toml::Float(1.0));
+    table.insert("date_format".to_string(), Toml::String("%A, %x".to_string()));
+    table.insert("disable_mipmaps".to_string(), Toml::Boolean(false));
+    table.insert("external_ip_enabled".to_string(), Toml::Boolean(false));
+    table.insert("font_family".to_string(), Toml::String("sans-serif".to_string()));
+    table.insert("input_borders".to_string(), Toml::Boolean(true));
+    table.insert("launch_apps_as_systemd_services".to_string(), Toml::Boolean(true));
+    table.insert("launch_apps_custom_command".to_string(), Toml::String("".to_string()));
+    table.insert("niri_overview_type_to_launch_enabled".to_string(), Toml::Boolean(false));
+    table.insert("offline_mode".to_string(), Toml::Boolean(false));
+    table.insert("password_style".to_string(), Toml::String("default".to_string()));
+    table.insert("polkit_agent".to_string(), Toml::Boolean(false));
+    table.insert("popup_borders".to_string(), Toml::Boolean(true));
+    table.insert("popup_shadows".to_string(), Toml::Boolean(true));
+    table.insert("screen_time_enabled".to_string(), Toml::Boolean(false));
+    table.insert("settings_show_advanced".to_string(), Toml::Boolean(true));
+    table.insert("setup_wizard_enabled".to_string(), Toml::Boolean(true));
+    table.insert("shared_gl_context".to_string(), Toml::Boolean(true));
+    table.insert("show_location".to_string(), Toml::Boolean(true));
+    table.insert("telemetry_enabled".to_string(), Toml::Boolean(false));
+    table.insert("time_format".to_string(), Toml::String("{:%H:%M}".to_string()));
+    table.insert("animation".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("enabled".to_string(), Toml::Boolean(true));
+        table.insert("speed".to_string(), Toml::Float(1.0));
+        Toml::Table(table)
+    });
+    table.insert("greeter_sync".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("auto_sync".to_string(), Toml::Boolean(false));
+        Toml::Table(table)
+    });
+    table.insert("keyboard_layout".to_string(), {
+        let mut table = toml::map::Map::new();
+        Toml::Table(table)
+    });
+    table.insert("launcher".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("app_grid".to_string(), Toml::Boolean(false));
+        table.insert("auto_paste".to_string(), Toml::String("auto".to_string()));
+        table.insert("categories".to_string(), Toml::Boolean(true));
+        table.insert("compact".to_string(), Toml::Boolean(false));
+        table.insert("fetch_exchange_rates".to_string(), Toml::Boolean(true));
+        table.insert("pinned".to_string(), Toml::Array(vec![]));
+        table.insert("provider_prefix".to_string(), Toml::String("/".to_string()));
+        table.insert("show_app_actions".to_string(), Toml::Boolean(false));
+        table.insert("show_app_origin_indicator".to_string(), Toml::Boolean(true));
+        table.insert("show_icons".to_string(), Toml::Boolean(true));
+        table.insert("sort_by_usage".to_string(), Toml::Boolean(true));
+        table.insert("dmenu".to_string(), {
+            let mut table = toml::map::Map::new();
+            Toml::Table(table)
+        });
+        table.insert("panels".to_string(), {
+            let mut table = toml::map::Map::new();
+            table.insert("ignored".to_string(), {
+Toml::Array(vec![
+                    Toml::String("polkit".to_string()),
+                    Toml::String("setup-wizard".to_string()),
+                    Toml::String("test".to_string()),
+                    Toml::String("launcher".to_string()),
+                ])
+            });
+            Toml::Table(table)
+        });
+        Toml::Table(table)
+    });
+    table.insert("mpris".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("blacklist".to_string(), Toml::Array(vec![]));
+        Toml::Table(table)
+    });
+    table.insert("panel".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("borders".to_string(), Toml::Boolean(true));
+        table.insert("clipboard_placement".to_string(), Toml::String("floating".to_string()));
+        table.insert("clipboard_position".to_string(), Toml::String("center".to_string()));
+        table.insert("control_center_placement".to_string(), Toml::String("floating".to_string()));
+        table.insert("control_center_position".to_string(), Toml::String("auto".to_string()));
+        table.insert("floating_layer".to_string(), Toml::String("overlay".to_string()));
+        table.insert("floating_offset".to_string(), Toml::Integer(8));
+        table.insert("launcher_placement".to_string(), Toml::String("floating".to_string()));
+        table.insert("launcher_position".to_string(), Toml::String("center".to_string()));
+        table.insert("list_item_background".to_string(), Toml::Boolean(false));
+        table.insert("open_near_click_clipboard".to_string(), Toml::Boolean(false));
+        table.insert("open_near_click_control_center".to_string(), Toml::Boolean(true));
+        table.insert("open_near_click_launcher".to_string(), Toml::Boolean(false));
+        table.insert("open_near_click_quick_insert".to_string(), Toml::Boolean(false));
+        table.insert("open_near_click_session".to_string(), Toml::Boolean(false));
+        table.insert("open_near_click_wallpaper".to_string(), Toml::Boolean(false));
+        table.insert("polkit_placement".to_string(), Toml::String("floating".to_string()));
+        table.insert("polkit_position".to_string(), Toml::String("center".to_string()));
+        table.insert("quick_insert_placement".to_string(), Toml::String("floating".to_string()));
+        table.insert("quick_insert_position".to_string(), Toml::String("center".to_string()));
+        table.insert("refraction".to_string(), Toml::Boolean(true));
+        table.insert("session_placement".to_string(), Toml::String("attached".to_string()));
+        table.insert("session_position".to_string(), Toml::String("auto".to_string()));
+        table.insert("shadow".to_string(), Toml::Boolean(true));
+        table.insert("transparency_mode".to_string(), Toml::String("soft".to_string()));
+        table.insert("wallpaper_placement".to_string(), Toml::String("attached".to_string()));
+        table.insert("wallpaper_position".to_string(), Toml::String("auto".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("privacy".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("cam_filter_regex".to_string(), Toml::String("".to_string()));
+        table.insert("mic_filter_regex".to_string(), Toml::String("".to_string()));
+        table.insert("screen_filter_regex".to_string(), Toml::String("".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("screen_corners".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("enabled".to_string(), Toml::Boolean(false));
+        table.insert("size".to_string(), Toml::Integer(32));
+        Toml::Table(table)
+    });
+    table.insert("screen_record".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("audio".to_string(), Toml::Boolean(true));
+        table.insert("directory".to_string(), Toml::String("".to_string()));
+        table.insert("filename_pattern".to_string(), Toml::String("".to_string()));
+        table.insert("replay_duration".to_string(), Toml::Integer(30));
+        table.insert("show_cursor".to_string(), Toml::Boolean(true));
+        Toml::Table(table)
+    });
+    table.insert("screenshot".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("annotate".to_string(), Toml::Boolean(false));
+        table.insert("close_on_copy".to_string(), Toml::Boolean(true));
+        table.insert("close_on_save".to_string(), Toml::Boolean(true));
+        table.insert("confirm_region".to_string(), Toml::Boolean(false));
+        table.insert("copy_to_clipboard".to_string(), Toml::Boolean(true));
+        table.insert("directory".to_string(), Toml::String("".to_string()));
+        table.insert("filename_pattern".to_string(), Toml::String("".to_string()));
+        table.insert("freeze_screen".to_string(), Toml::Boolean(true));
+        table.insert("pipe_command".to_string(), Toml::String("".to_string()));
+        table.insert("pipe_to_command".to_string(), Toml::Boolean(false));
+        table.insert("remember_last_region".to_string(), Toml::Boolean(false));
+        table.insert("save_to_file".to_string(), Toml::Boolean(true));
+        table.insert("show_cursor".to_string(), Toml::Boolean(false));
+        table.insert("skip_annotate_on_copy_save".to_string(), Toml::Boolean(false));
+        Toml::Table(table)
+    });
+    table.insert("session".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("grid".to_string(), Toml::Boolean(false));
+        table.insert("grid_columns".to_string(), Toml::Integer(3));
+        table.insert("show_shortcuts".to_string(), Toml::Boolean(true));
+        table.insert("power".to_string(), {
+            let mut table = toml::map::Map::new();
+            Toml::Table(table)
+        });
+        table.insert("actions".to_string(), {
+Toml::Array(vec![
+                {
+                let mut table = toml::map::Map::new();
+                table.insert("action".to_string(), Toml::String("lock".to_string()));
+                table.insert("command".to_string(), Toml::String("".to_string()));
+                table.insert("countdown_seconds".to_string(), Toml::Float(0.0));
+                table.insert("enabled".to_string(), Toml::Boolean(true));
+                table.insert("glyph".to_string(), Toml::String("".to_string()));
+                table.insert("label".to_string(), Toml::String("".to_string()));
+                table.insert("shortcut".to_string(), Toml::String("1".to_string()));
+                table.insert("variant".to_string(), Toml::String("default".to_string()));
+                Toml::Table(table)
+            },
+                {
+                let mut table = toml::map::Map::new();
+                table.insert("action".to_string(), Toml::String("logout".to_string()));
+                table.insert("command".to_string(), Toml::String("".to_string()));
+                table.insert("countdown_seconds".to_string(), Toml::Float(0.0));
+                table.insert("enabled".to_string(), Toml::Boolean(true));
+                table.insert("glyph".to_string(), Toml::String("".to_string()));
+                table.insert("label".to_string(), Toml::String("".to_string()));
+                table.insert("shortcut".to_string(), Toml::String("2".to_string()));
+                table.insert("variant".to_string(), Toml::String("default".to_string()));
+                Toml::Table(table)
+            },
+                {
+                let mut table = toml::map::Map::new();
+                table.insert("action".to_string(), Toml::String("lock_and_suspend".to_string()));
+                table.insert("command".to_string(), Toml::String("".to_string()));
+                table.insert("countdown_seconds".to_string(), Toml::Float(0.0));
+                table.insert("enabled".to_string(), Toml::Boolean(true));
+                table.insert("glyph".to_string(), Toml::String("".to_string()));
+                table.insert("label".to_string(), Toml::String("".to_string()));
+                table.insert("shortcut".to_string(), Toml::String("3".to_string()));
+                table.insert("variant".to_string(), Toml::String("default".to_string()));
+                Toml::Table(table)
+            },
+                {
+                let mut table = toml::map::Map::new();
+                table.insert("action".to_string(), Toml::String("reboot".to_string()));
+                table.insert("command".to_string(), Toml::String("".to_string()));
+                table.insert("countdown_seconds".to_string(), Toml::Float(0.0));
+                table.insert("enabled".to_string(), Toml::Boolean(true));
+                table.insert("glyph".to_string(), Toml::String("".to_string()));
+                table.insert("label".to_string(), Toml::String("".to_string()));
+                table.insert("shortcut".to_string(), Toml::String("4".to_string()));
+                table.insert("variant".to_string(), Toml::String("default".to_string()));
+                Toml::Table(table)
+            },
+                {
+                let mut table = toml::map::Map::new();
+                table.insert("action".to_string(), Toml::String("shutdown".to_string()));
+                table.insert("command".to_string(), Toml::String("".to_string()));
+                table.insert("countdown_seconds".to_string(), Toml::Float(0.0));
+                table.insert("enabled".to_string(), Toml::Boolean(true));
+                table.insert("glyph".to_string(), Toml::String("".to_string()));
+                table.insert("label".to_string(), Toml::String("".to_string()));
+                table.insert("shortcut".to_string(), Toml::String("5".to_string()));
+                table.insert("variant".to_string(), Toml::String("destructive".to_string()));
+                Toml::Table(table)
+            },
+            ])
+        });
+        Toml::Table(table)
+    });
+    table.insert("shadow".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("alpha".to_string(), Toml::Float(0.550000011920929));
+        table.insert("direction".to_string(), Toml::String("down".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("window_switcher".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("mru".to_string(), Toml::Boolean(false));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_wallpaper_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("directory".to_string(), Toml::String("".to_string()));
+    table.insert("directory_dark".to_string(), Toml::String("".to_string()));
+    table.insert("directory_light".to_string(), Toml::String("".to_string()));
+    table.insert("edge_smoothness".to_string(), Toml::Float(0.30000001192092896));
+    table.insert("enabled".to_string(), Toml::Boolean(true));
+    table.insert("fill_color".to_string(), Toml::String("".to_string()));
+    table.insert("fill_mode".to_string(), Toml::String("crop".to_string()));
+    table.insert("per_monitor_directories".to_string(), Toml::Boolean(false));
+    table.insert("transition".to_string(), {
+Toml::Array(vec![
+            Toml::String("fade".to_string()),
+            Toml::String("wipe".to_string()),
+            Toml::String("disc".to_string()),
+            Toml::String("stripes".to_string()),
+            Toml::String("zoom".to_string()),
+            Toml::String("honeycomb".to_string()),
+        ])
+    });
+    table.insert("transition_duration".to_string(), Toml::Float(1500.0));
+    table.insert("transition_on_startup".to_string(), Toml::Boolean(false));
+    table.insert("automation".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("enabled".to_string(), Toml::Boolean(false));
+        table.insert("interval_seconds".to_string(), Toml::Integer(1800));
+        table.insert("order".to_string(), Toml::String("random".to_string()));
+        table.insert("recursive".to_string(), Toml::Boolean(false));
+        table.insert("source".to_string(), Toml::String("folder".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("daily".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("bing_market".to_string(), Toml::String("".to_string()));
+        table.insert("download_dir".to_string(), Toml::String("".to_string()));
+        table.insert("nasa_api_key".to_string(), Toml::String("".to_string()));
+        table.insert("provider".to_string(), Toml::String("bing".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("video".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("auto_pause".to_string(), Toml::String("full".to_string()));
+        table.insert("directory".to_string(), Toml::String("".to_string()));
+        table.insert("hardware_decode".to_string(), Toml::Boolean(true));
+        table.insert("mpv_options".to_string(), Toml::String("".to_string()));
+        table.insert("mute".to_string(), Toml::Boolean(true));
+        Toml::Table(table)
+    });
+    table.insert("wallhaven".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("api_key".to_string(), Toml::String("".to_string()));
+        table.insert("download_dir".to_string(), Toml::String("".to_string()));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_theme_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("builtin".to_string(), Toml::String("Helix".to_string()));
+    table.insert("community_palette".to_string(), Toml::String("Oxocarbon".to_string()));
+    table.insert("custom_palette".to_string(), Toml::String("".to_string()));
+    table.insert("mode".to_string(), Toml::String("dark".to_string()));
+    table.insert("pure_black_dark".to_string(), Toml::Boolean(false));
+    table.insert("shell_mode".to_string(), Toml::String("follow".to_string()));
+    table.insert("source".to_string(), Toml::String("builtin".to_string()));
+    table.insert("wallpaper_scheme".to_string(), Toml::String("m3-content".to_string()));
+    table.insert("niri_layout".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("blur".to_string(), Toml::Boolean(false));
+        table.insert("blur_noise".to_string(), Toml::Float(0.029999999329447746));
+        table.insert("blur_offset".to_string(), Toml::Float(3.0));
+        table.insert("blur_passes".to_string(), Toml::Integer(2));
+        table.insert("border".to_string(), Toml::Boolean(false));
+        table.insert("focus_ring".to_string(), Toml::Boolean(false));
+        table.insert("overview".to_string(), Toml::String("none".to_string()));
+        Toml::Table(table)
+    });
+    table.insert("templates".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("builtin_ids".to_string(), Toml::Array(vec![]));
+        table.insert("community_ids".to_string(), Toml::Array(vec![]));
+        table.insert("enable_builtin_templates".to_string(), Toml::Boolean(true));
+        table.insert("enable_community_templates".to_string(), Toml::Boolean(true));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_osd_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("background_opacity".to_string(), Toml::Float(0.9700000286102295));
+    table.insert("border".to_string(), Toml::Boolean(true));
+    table.insert("enabled".to_string(), Toml::Boolean(true));
+    table.insert("monitors".to_string(), Toml::Array(vec![]));
+    table.insert("offset_x".to_string(), Toml::Integer(20));
+    table.insert("offset_y".to_string(), Toml::Integer(8));
+    table.insert("orientation".to_string(), Toml::String("horizontal".to_string()));
+    table.insert("position".to_string(), Toml::String("top_center".to_string()));
+    table.insert("position_vertical".to_string(), Toml::String("top_center".to_string()));
+    table.insert("scale".to_string(), Toml::Float(1.0));
+    table.insert("kinds".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("bluetooth".to_string(), Toml::Boolean(true));
+        table.insert("brightness".to_string(), Toml::Boolean(true));
+        table.insert("caffeine".to_string(), Toml::Boolean(true));
+        table.insert("dnd".to_string(), Toml::Boolean(true));
+        table.insert("keyboard_backlight".to_string(), Toml::Boolean(true));
+        table.insert("keyboard_layout".to_string(), Toml::Boolean(true));
+        table.insert("lock_keys".to_string(), Toml::Boolean(true));
+        table.insert("media".to_string(), Toml::Boolean(true));
+        table.insert("nightlight".to_string(), Toml::Boolean(true));
+        table.insert("power_profile".to_string(), Toml::Boolean(true));
+        table.insert("privacy".to_string(), Toml::Boolean(true));
+        table.insert("volume".to_string(), Toml::Boolean(true));
+        table.insert("volume_input".to_string(), Toml::Boolean(true));
+        table.insert("volume_output".to_string(), Toml::Boolean(true));
+        table.insert("wifi".to_string(), Toml::Boolean(true));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_system_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("monitor".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("cpu_freq_activity_threshold".to_string(), Toml::Float(2.5));
+        table.insert("cpu_freq_critical_threshold".to_string(), Toml::Float(4.5));
+        table.insert("cpu_poll_seconds".to_string(), Toml::Float(2.0));
+        table.insert("cpu_temp_activity_threshold".to_string(), Toml::Float(60.0));
+        table.insert("cpu_temp_critical_threshold".to_string(), Toml::Float(85.0));
+        table.insert("cpu_temp_sensor_path".to_string(), Toml::String("".to_string()));
+        table.insert("cpu_usage_activity_threshold".to_string(), Toml::Float(50.0));
+        table.insert("cpu_usage_critical_threshold".to_string(), Toml::Float(90.0));
+        table.insert("disk_free_activity_threshold".to_string(), Toml::Float(80.0));
+        table.insert("disk_free_critical_threshold".to_string(), Toml::Float(95.0));
+        table.insert("disk_free_pct_activity_threshold".to_string(), Toml::Float(80.0));
+        table.insert("disk_free_pct_critical_threshold".to_string(), Toml::Float(95.0));
+        table.insert("disk_poll_seconds".to_string(), Toml::Float(10.0));
+        table.insert("disk_used_activity_threshold".to_string(), Toml::Float(80.0));
+        table.insert("disk_used_critical_threshold".to_string(), Toml::Float(95.0));
+        table.insert("disk_used_pct_activity_threshold".to_string(), Toml::Float(80.0));
+        table.insert("disk_used_pct_critical_threshold".to_string(), Toml::Float(95.0));
+        table.insert("enabled".to_string(), Toml::Boolean(true));
+        table.insert("gpu_poll_seconds".to_string(), Toml::Float(5.0));
+        table.insert("gpu_temp_activity_threshold".to_string(), Toml::Float(60.0));
+        table.insert("gpu_temp_critical_threshold".to_string(), Toml::Float(85.0));
+        table.insert("gpu_usage_activity_threshold".to_string(), Toml::Float(50.0));
+        table.insert("gpu_usage_critical_threshold".to_string(), Toml::Float(95.0));
+        table.insert("gpu_vram_activity_threshold".to_string(), Toml::Float(50.0));
+        table.insert("gpu_vram_critical_threshold".to_string(), Toml::Float(90.0));
+        table.insert("memory_poll_seconds".to_string(), Toml::Float(2.0));
+        table.insert("net_rx_activity_threshold".to_string(), Toml::Float(1.0));
+        table.insert("net_rx_critical_threshold".to_string(), Toml::Float(50.0));
+        table.insert("net_tx_activity_threshold".to_string(), Toml::Float(1.0));
+        table.insert("net_tx_critical_threshold".to_string(), Toml::Float(50.0));
+        table.insert("network_poll_seconds".to_string(), Toml::Float(3.0));
+        table.insert("ram_pct_activity_threshold".to_string(), Toml::Float(60.0));
+        table.insert("ram_pct_critical_threshold".to_string(), Toml::Float(90.0));
+        table.insert("swap_pct_activity_threshold".to_string(), Toml::Float(20.0));
+        table.insert("swap_pct_critical_threshold".to_string(), Toml::Float(80.0));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
+pub fn write_control_center_defaults() -> Toml {
+    let mut table = toml::map::Map::new();
+    table.insert("height".to_string(), Toml::Integer(700));
+    table.insert("hidden_tabs".to_string(), Toml::Array(vec![]));
+    table.insert("shortcuts".to_string(), Toml::Array(vec![]));
+    table.insert("show_session_button".to_string(), Toml::Boolean(true));
+    table.insert("sidebar".to_string(), Toml::String("compact".to_string()));
+    table.insert("sidebar_section".to_string(), Toml::String("compact".to_string()));
+    table.insert("width".to_string(), Toml::Integer(700));
+    table.insert("ai_usage".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("claude".to_string(), Toml::String("auto".to_string()));
+        table.insert("codex".to_string(), Toml::String("auto".to_string()));
+        table.insert("copilot".to_string(), Toml::String("auto".to_string()));
+        table.insert("cursor".to_string(), Toml::String("auto".to_string()));
+        table.insert("deepseek".to_string(), Toml::String("auto".to_string()));
+        table.insert("gemini".to_string(), Toml::String("auto".to_string()));
+        table.insert("gemini_daily_limit".to_string(), Toml::Integer(1000));
+        table.insert("localai".to_string(), Toml::String("auto".to_string()));
+        table.insert("localai_host".to_string(), Toml::String("".to_string()));
+        table.insert("localai_model".to_string(), Toml::String("".to_string()));
+        table.insert("ollama".to_string(), Toml::String("auto".to_string()));
+        table.insert("ollama_host".to_string(), Toml::String("".to_string()));
+        table.insert("ollama_model".to_string(), Toml::String("".to_string()));
+        table.insert("qwen".to_string(), Toml::String("auto".to_string()));
+        table.insert("qwen_daily_limit".to_string(), Toml::Integer(2000));
+        table.insert("refresh_seconds".to_string(), Toml::Integer(120));
+        table.insert("warn_percent".to_string(), Toml::Integer(90));
+        table.insert("warn_reset_minutes".to_string(), Toml::Integer(30));
+        Toml::Table(table)
+    });
+    table.insert("bluetooth".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("discovery_seconds".to_string(), Toml::Integer(10));
+        table.insert("hide_unnamed".to_string(), Toml::Boolean(false));
+        Toml::Table(table)
+    });
+    table.insert("calendar".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("show_events_card".to_string(), Toml::Boolean(true));
+        table.insert("show_week_numbers".to_string(), Toml::Boolean(false));
+        Toml::Table(table)
+    });
+    table.insert("clock".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("timezones".to_string(), Toml::Array(vec![]));
+        Toml::Table(table)
+    });
+    table.insert("network".to_string(), {
+        let mut table = toml::map::Map::new();
+        table.insert("custom_dns".to_string(), Toml::String("".to_string()));
+        table.insert("hidden_ssids".to_string(), Toml::Array(vec![]));
+        table.insert("nextdns_id".to_string(), Toml::String("".to_string()));
+        table.insert("wifi_band".to_string(), Toml::String("all".to_string()));
+        Toml::Table(table)
+    });
+    Toml::Table(table)
+}
+
 const PORTED_SCHEMA_WRITERS: &[(&str, fn() -> Toml)] = &[
     ("storage", write_storage_defaults),
+    ("shell", write_shell_defaults),
     ("accessibility", write_accessibility_defaults),
+    ("wallpaper", write_wallpaper_defaults),
+    ("theme", write_theme_defaults),
     ("backdrop", write_backdrop_defaults),
     ("lockscreen", write_lockscreen_defaults),
     ("notification", write_notification_defaults),
-    ("audio", write_audio_defaults),
-    ("battery", write_battery_defaults),
-    ("brightness", write_brightness_defaults),
-    ("calendar", write_calendar_defaults),
-    ("tailscale", write_tailscale_defaults),
+    ("osd", write_osd_defaults),
+    ("system", write_system_defaults),
     ("weather", write_weather_defaults),
+    ("tailscale", write_tailscale_defaults),
+    ("calendar", write_calendar_defaults),
+    ("audio", write_audio_defaults),
+    ("brightness", write_brightness_defaults),
+    ("battery", write_battery_defaults),
     ("nightlight", write_nightlight_defaults),
     ("location", write_location_defaults),
     ("idle", write_idle_defaults),
     ("keybinds", write_keybinds_defaults),
     ("dock", write_dock_defaults),
     ("hot_corners", write_hot_corners_defaults),
+    ("control_center", write_control_center_defaults),
     ("hooks", write_hooks_defaults),
 ];
 
