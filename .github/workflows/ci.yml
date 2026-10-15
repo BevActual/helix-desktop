@@ -100,9 +100,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build Rust desktop, C++ appearance helpers and the service contract test
         run: |
-          cargo build --profile fast -p helix-desktop -p helix-assistant
+          cargo build --profile fast -p helix-desktop -p helix-assistant -p helix-inference
           just configure debug
-          meson compile -C build-debug helix-template-apply helix-theme-palette desktop_service_test helix-inference
+          meson compile -C build-debug helix-template-apply helix-theme-palette desktop_service_test
       - name: Configuration smoke (Rust desktop)
         env:
           HELIX_TEMPLATE_APPLY_BIN: ${{ github.workspace }}/build-debug/helix-template-apply
@@ -118,6 +118,8 @@ jobs:
       # The Rust assistant against the Rust service and the C++ inference service (scripted replies).
       - name: Assistant integration (Rust assistant + desktop)
         run: meson test -C build-debug --no-rebuild --print-errorlogs assistant_integration
+      # inference_service_integration (~100 s) runs under `just test`/meson locally; on the CI container it was
+      # SIGKILLed at ~85 s, so it is not a CI gate until that is understood. The crate is still compiled above.
 
   helix-desktop-audio-meter:
     name: helix-desktop Audio meter

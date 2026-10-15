@@ -844,23 +844,8 @@ configure_file(input: 'assets/services/helix-service.service.in',
 # The model runtime: its own process, its own bus name (org.helix.Inference), sandboxed by its unit.
 image_worker_sources = files('src/inference/image_generator.cpp', 'src/inference/image_input.cpp')
 image_png_dep = dependency('libpng')
-helix_inference_introspection_h = custom_target('helix-inference-introspection',
-  input: 'protocols/dbus/org.helix.Inference.xml',
-  output: 'helix_inference_introspection.h',
-  command: [find_program('python3'), files('tools/scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'inferenceIntrospectionXml'],
-)
-helix_inference = executable('helix-inference',
-  sources: [files('src/inference/service_main.cpp', 'src/inference/inference_service.cpp', 'src/inference/inference_queue.cpp',
-    'src/inference/schema_grammar.cpp', 'src/inference/routing.cpp', 'src/inference/image_input.cpp',
-    'src/inference/transcriber.cpp', 'src/inference/image_generator.cpp'), helix_inference_introspection_h]
-    + (llama_dep.found() ? files('src/inference/llama_backend.cpp') : []),
-  dependencies: [helix_core_dep, dependency('threads'), image_png_dep] + (llama_dep.found() ? [llama_dep] : []),
-  build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
-  install_rpath: get_option('prefix') / 'lib64' / 'helix',  # installed: the private copy made below
-  cpp_args: _helix_cpp_args,
-  install: true,
-  install_tag: 'inference',
-)
+# helix-inference (the D-Bus service) is Rust: services/helix-inference. The engine glue it links (llama_backend.cpp,
+# schema_grammar.cpp) is compiled by that crate's build.rs; the C++ files below remain for their unit tests.
 if llama_dep.found()
   meson.add_install_script(find_program('python3'), files('tools/scripts/install_engine.py'), llama_prefix / 'lib64', 'lib64/helix', install_tag: 'inference')
 endif
@@ -993,6 +978,11 @@ if build_tests
       _helix_assistant_rust = meson.project_source_root() / 'target' / 'debug' / 'helix-assistant'
     endif
     _have_rust_assistant = run_command('test', '-x', _helix_assistant_rust, check: false).returncode() == 0
+    _helix_inference_rust = meson.project_source_root() / 'target' / 'fast' / 'helix-inference'
+    if run_command('test', '-x', _helix_inference_rust, check: false).returncode() != 0
+      _helix_inference_rust = meson.project_source_root() / 'target' / 'debug' / 'helix-inference'
+    endif
+    _have_rust_inference = run_command('test', '-x', _helix_inference_rust, check: false).returncode() == 0
     helix_service = _helix_desktop_rust  # Rust org.helix.Desktop (cargo build -p helix-desktop [--profile fast])
     _have_rust_desktop = run_command('test', '-x', _helix_desktop_rust, check: false).returncode() == 0
     if _have_rust_desktop
@@ -1000,12 +990,14 @@ if build_tests
     endif
     meter_python = find_program('python3')
     if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
-      test('inference_service_integration', helix_dbus_session,
-        args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', helix_inference], timeout: 120)
+      if _have_rust_inference
+        test('inference_service_integration', helix_dbus_session,
+          args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', _helix_inference_rust], timeout: 120)
+      endif
       if _have_rust_desktop
-        if _have_rust_assistant
+        if _have_rust_assistant and _have_rust_inference
           test('assistant_integration', helix_dbus_session,
-            args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', _helix_assistant_rust, helix_service, helix_inference,
+            args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', _helix_assistant_rust, helix_service, _helix_inference_rust,
               meson.project_source_root()], timeout: 120)
         endif
         test('desktop_agent_manager_integration', helix_dbus_session,
