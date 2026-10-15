@@ -201,7 +201,6 @@ assets/             Icons, fonts, sounds, templates, translations, unit files
 tests/              Python integration tests, fixtures, eval
 tools/              Install, nested e2e, layering check, generators
 dev/                Nested probes and test tooling
-nix/                Nix package, module, and dev shell definitions
 third_party/        Vendored crates and libraries
 docs/design/        Architecture + HIG (see README.md); archive/ is retired
 ```
