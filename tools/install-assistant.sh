@@ -24,7 +24,9 @@ mkdir -p "$BACKUP"
 INFERENCE=${HELIX_INFERENCE_BIN:-$(dirname "$0")/../target/release/helix-inference}   # Rust: cargo build --release -p helix-inference
 [ -x "$INFERENCE" ] || { echo "missing $INFERENCE" >&2; exit 1; }
 install -D -m 0755 "$INFERENCE" $P/bin/helix-inference
-install -D -m 0755 "$S/bin/helix-assistant" $P/bin/helix-assistant
+ASSISTANT=${HELIX_ASSISTANT_BIN:-$(dirname "$0")/../target/release/helix-assistant}   # Rust: cargo build --release -p helix-assistant
+[ -x "$ASSISTANT" ] || { echo "missing $ASSISTANT" >&2; exit 1; }
+install -D -m 0755 "$ASSISTANT" $P/bin/helix-assistant
 if [ -x "$S/bin/helix-settings-tauri" ]; then
   [ -e $P/bin/helix-settings ] && cp -p $P/bin/helix-settings "$BACKUP/helix-settings"
   install -D -m 0755 "$S/bin/helix-settings-tauri" $P/bin/helix-settings.new && mv -f $P/bin/helix-settings.new $P/bin/helix-settings

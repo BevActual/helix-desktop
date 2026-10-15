@@ -90,7 +90,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `helix-settings` etc. | Desktop clients | `apps/` |
 | **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-mobius/` |
 | `helix-wallpaper`, `helix-idle` | helpers | `services/` |
-| `helix-assistant` | Agent Surface client; never in the shell | `src/assistant/` → **`services/helix-assistant`** |
+| `helix-assistant` | Agent Surface client; never in the shell | `services/helix-assistant` (ported from `src/assistant/`) |
 | `helix-inference` | `org.helix.Inference` fabric | `src/inference/` → **`services/helix-inference`** |
 | Helix MCP server | MCP → Agent Surface for MCP-capable apps/agents | `tools/helix-agent/` |
 

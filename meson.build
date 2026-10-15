@@ -428,7 +428,6 @@ _helix_sources = files(
   'src/core/files/directory_scanner.cpp',
   'src/desktop_api/display_text.cpp',
   'src/desktop/agent_confirmation_queue.cpp',
-  'src/assistant/assistant_session.cpp',
   'src/config/widgets/widget_settings_registry.cpp',
   'src/system/app_identity.cpp',
   'src/net/wallhaven_client.cpp',
@@ -830,19 +829,7 @@ helix_assistant_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bi
 configure_file(input: 'assets/services/helix-assistant-warm.service.in',
   output: 'helix-assistant-warm.service', configuration: helix_assistant_config,
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
-helix_assistant = executable('helix-assistant',
-  sources: files('src/assistant/assistant_main.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/shell_tools.cpp',
-    'src/inference/routing.cpp'),
-  dependencies: helix_core_dep,
-  cpp_args: _helix_cpp_args,
-  install: true,
-)
-helix_assistant_unit = executable('assistant_core_test',
-  sources: files('tests/assistant_core_test.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-  dependencies: helix_core_dep,
-  cpp_args: _helix_cpp_args,
-)
-test('assistant_core', helix_assistant_unit, args: [meson.project_source_root()])
+# helix-assistant is Rust (services/helix-assistant); `just install` installs it next to these units.
 install_data('protocols/ipc/msg-risk.toml', install_dir: get_option('datadir') / 'helix')
 install_data('protocols/ipc/tool-hints.toml', install_dir: get_option('datadir') / 'helix')
 helix_service_config = configuration_data()
@@ -967,12 +954,6 @@ if build_tests
     _model_path_7b = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"', check: false).stdout().strip()
     test('inference_llama_7b', helix_llama_test, is_parallel: false, timeout: 900, args: [meson.project_source_root(), _model_path_7b])
   endif
-  helix_assistant_session_unit = executable('assistant_session_test',
-    sources: files('tests/assistant_session_test.cpp', 'src/assistant/assistant_session.cpp', 'src/desktop_api/display_text.cpp'),
-    dependencies: helix_core_dep,
-    cpp_args: _helix_cpp_args,
-  )
-  test('assistant_session', helix_assistant_session_unit)
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/desktop/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
     dependencies: helix_core_dep,
@@ -992,6 +973,11 @@ if build_tests
     else
       _helix_desktop_rust = _helix_desktop_rust_debug
     endif
+    _helix_assistant_rust = meson.project_source_root() / 'target' / 'fast' / 'helix-assistant'
+    if run_command('test', '-x', _helix_assistant_rust, check: false).returncode() != 0
+      _helix_assistant_rust = meson.project_source_root() / 'target' / 'debug' / 'helix-assistant'
+    endif
+    _have_rust_assistant = run_command('test', '-x', _helix_assistant_rust, check: false).returncode() == 0
     _helix_inference_rust = meson.project_source_root() / 'target' / 'fast' / 'helix-inference'
     if run_command('test', '-x', _helix_inference_rust, check: false).returncode() != 0
       _helix_inference_rust = meson.project_source_root() / 'target' / 'debug' / 'helix-inference'
@@ -1008,10 +994,12 @@ if build_tests
         test('inference_service_integration', helix_dbus_session,
           args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', _helix_inference_rust], timeout: 120)
       endif
-      if _have_rust_desktop and _have_rust_inference
-        test('assistant_integration', helix_dbus_session,
-          args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', helix_assistant, helix_service, _helix_inference_rust,
-            meson.project_source_root()], timeout: 120)
+      if _have_rust_desktop
+        if _have_rust_assistant and _have_rust_inference
+          test('assistant_integration', helix_dbus_session,
+            args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', _helix_assistant_rust, helix_service, _helix_inference_rust,
+              meson.project_source_root()], timeout: 120)
+        endif
         test('desktop_agent_manager_integration', helix_dbus_session,
           args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_manager_integration.py',
             helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
@@ -1045,7 +1033,7 @@ if build_tests
         ['HELIX_TEMPLATE_APPLY_BIN', 'helix-template-apply'],
         ['HELIX_THEME_PALETTE_BIN', 'helix-theme-palette'],
       ]
-        foreach _build_dir : ['_build', 'build-debug']
+        foreach _build_dir : ['build-debug']
           _helper_bin = meson.project_source_root() / _build_dir / _helper[1]
           if run_command('test', '-x', _helper_bin, check: false).returncode() == 0
             _config_smoke_env += [_helper[0] + '=' + _helper_bin]
