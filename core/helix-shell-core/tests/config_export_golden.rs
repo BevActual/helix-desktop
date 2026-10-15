@@ -183,6 +183,18 @@ fn rust_export_matches_cpp_for_theme_builtin_override() {
 }
 
 #[test]
+fn rust_export_matches_cpp_with_wallpaper_runtime_state() {
+    assert_rust_export_matches_cpp("[wallpaper]\ndefault = \"/tmp/w.png\"\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_calendar_account() {
+    assert_rust_export_matches_cpp(
+        "[calendar.account.work]\ntype = \"ics\"\nserver_url = \"https://caldav.example.com\"\n",
+    );
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }

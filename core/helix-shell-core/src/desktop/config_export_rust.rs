@@ -164,6 +164,76 @@ fn is_merged_leaf_exported(path: &str, default: &Toml) -> bool {
     export_includes_section(default, section)
 }
 
+/// App-managed wallpaper keys kept in `config.toml` but omitted from `config_export::serialize`.
+fn is_wallpaper_runtime_merged_path(path: &str) -> bool {
+    matches!(
+        path,
+        "wallpaper.default"
+            | "wallpaper.last"
+            | "wallpaper.monitors"
+            | "wallpaper.favorite"
+    )
+}
+
+fn is_allowed_calendar_account_path(path: &str, merged: &Toml) -> bool {
+    let parts = path.split('.').collect::<Vec<_>>();
+    if parts.len() < 3 || parts[0] != "calendar" || parts[1] != "account" {
+        return false;
+    }
+    merged
+        .get("calendar")
+        .and_then(|calendar| calendar.get("account"))
+        .and_then(Toml::as_table)
+        .is_some_and(|accounts| accounts.contains_key(parts[2]))
+}
+
+fn default_calendar_account_export_table() -> toml::map::Map<String, Toml> {
+    let mut table = toml::map::Map::new();
+    table.insert("calendars".to_string(), Toml::Array(vec![]));
+    table.insert("color".to_string(), Toml::String(String::new()));
+    table.insert(
+        "credential_source".to_string(),
+        Toml::String("secret-service".to_string()),
+    );
+    table.insert("name".to_string(), Toml::String(String::new()));
+    table.insert("password_file".to_string(), Toml::String(String::new()));
+    table.insert("path".to_string(), Toml::String(String::new()));
+    table.insert("provider".to_string(), Toml::String(String::new()));
+    table.insert("server_url".to_string(), Toml::String(String::new()));
+    table.insert("type".to_string(), Toml::String(String::new()));
+    table.insert("username".to_string(), Toml::String(String::new()));
+    table
+}
+
+/// Legacy `url` keys in `[calendar.account.*]` are rejected/ignored at parse (use `server_url`).
+fn is_calendar_account_parse_only_path(path: &str) -> bool {
+    path.starts_with("calendar.account.") && path.ends_with(".url")
+}
+
+fn rebuild_calendar_accounts_from_merged(root: &mut Toml, merged: &Toml) {
+    let merged_accounts = merged
+        .get("calendar")
+        .and_then(|calendar| calendar.get("account"))
+        .and_then(Toml::as_table);
+    let merged_accounts = match merged_accounts {
+        Some(table) if !table.is_empty() => table,
+        _ => return,
+    };
+    let calendar = match root.get_mut("calendar").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    let accounts = calendar
+        .entry("account".to_string())
+        .or_insert_with(|| Toml::Table(toml::map::Map::new()));
+    let accounts = accounts.as_table_mut().unwrap();
+    for name in merged_accounts.keys() {
+        accounts
+            .entry(name.clone())
+            .or_insert_with(|| Toml::Table(default_calendar_account_export_table()));
+    }
+}
+
 fn is_merged_widget_path(path: &str, merged: &Toml) -> bool {
     let parts = path.split('.').collect::<Vec<_>>();
     if parts.first().map(|s| *s) != Some("widget") || parts.len() < 2 {
@@ -182,9 +252,13 @@ fn merged_export_is_patchable(store: &ConfigStore) -> bool {
         if !is_merged_leaf_exported(path, default) {
             return true;
         }
+        if is_wallpaper_runtime_merged_path(path) || is_calendar_account_parse_only_path(path) {
+            return true;
+        }
         dot_path_exists(default, path)
             || is_allowed_extra_bar_path(path, &merged)
             || is_merged_widget_path(path, &merged)
+            || is_allowed_calendar_account_path(path, &merged)
     })
 }
 
@@ -404,11 +478,15 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let merged = store.merged_for_config_export();
     rebuild_bar_from_merged(&mut root, &merged);
     rebuild_widget_from_merged(&mut root, &merged);
+    rebuild_calendar_accounts_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
-        if !is_merged_leaf_exported(&path, default_export_root()) {
+        if !is_merged_leaf_exported(&path, default_export_root())
+            || is_wallpaper_runtime_merged_path(&path)
+            || is_calendar_account_parse_only_path(&path)
+        {
             continue;
         }
         let value = match dot_path_get(&merged, &path) {
@@ -417,7 +495,10 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
         };
         if let Some(template) = dot_path_get(&root, &path) {
             set_dot_path(&mut root, &path, coerce_patch_value(&template, &value));
-        } else if is_allowed_extra_bar_path(&path, &merged) || is_merged_widget_path(&path, &merged) {
+        } else if is_allowed_extra_bar_path(&path, &merged)
+            || is_merged_widget_path(&path, &merged)
+            || is_allowed_calendar_account_path(&path, &merged)
+        {
             set_dot_path(&mut root, &path, value);
         }
     }
