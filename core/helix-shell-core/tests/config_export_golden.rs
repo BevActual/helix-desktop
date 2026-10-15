@@ -166,6 +166,23 @@ fn rust_export_matches_cpp_for_custom_named_sysmon_widget() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_legacy_location_schedule() {
+    assert_rust_export_matches_cpp(
+        "[location]\nsunset = \"18:00\"\nsunrise = \"06:00\"\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_plugins_auto_update_bool() {
+    assert_rust_export_matches_cpp("[plugins]\nauto_update = false\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_theme_builtin_override() {
+    assert_rust_export_matches_cpp("[theme]\nbuiltin = \"Qt\"\n");
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }

@@ -152,6 +152,18 @@ fn is_allowed_extra_bar_path(path: &str, merged: &Toml) -> bool {
     merged_bar_names(merged).iter().any(|name| name == parts[1])
 }
 
+/// Top-level tables that `config_export::serialize` never emits (C++ drops them at parse).
+fn export_includes_section(default: &Toml, section: &str) -> bool {
+    default
+        .as_table()
+        .is_some_and(|root| root.contains_key(section))
+}
+
+fn is_merged_leaf_exported(path: &str, default: &Toml) -> bool {
+    let section = path.split('.').next().unwrap_or("");
+    export_includes_section(default, section)
+}
+
 fn is_merged_widget_path(path: &str, merged: &Toml) -> bool {
     let parts = path.split('.').collect::<Vec<_>>();
     if parts.first().map(|s| *s) != Some("widget") || parts.len() < 2 {
@@ -167,6 +179,9 @@ fn merged_export_is_patchable(store: &ConfigStore) -> bool {
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     leaves.iter().all(|path| {
+        if !is_merged_leaf_exported(path, default) {
+            return true;
+        }
         dot_path_exists(default, path)
             || is_allowed_extra_bar_path(path, &merged)
             || is_merged_widget_path(path, &merged)
@@ -393,6 +408,9 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
+        if !is_merged_leaf_exported(&path, default_export_root()) {
+            continue;
+        }
         let value = match dot_path_get(&merged, &path) {
             Some(value) => value,
             None => continue,
