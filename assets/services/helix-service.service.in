@@ -4,6 +4,6 @@ Description=Helix desktop services
 [Service]
 Type=dbus
 BusName=org.helix.Desktop
-ExecStart=@HELIX_BINDIR@/helix-service-launch
+ExecStart=@HELIX_BINDIR@/helix-desktop
 Restart=on-failure
 RestartSec=2

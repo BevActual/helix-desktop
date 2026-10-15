@@ -46,6 +46,8 @@ def serve():
             data = b""
             while chunk := conn.recv(4096):
                 data += chunk
+            if not data:  # a liveness probe: connect and close, like the shell's own "is someone serving" check
+                continue
             line = data.decode()
             received.append(line)
             command = line.split("\x1e", 1)[-1]

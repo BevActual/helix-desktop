@@ -24,8 +24,7 @@ mkdir -p "${XDG_STATE_HOME}/backlight"; printf "50\n" > "${XDG_STATE_HOME}/backl
 export HELIX_BACKLIGHT_DIR="${XDG_STATE_HOME}/backlight"
 export HELIX_SURFACE_CONTROL="${XDG_STATE_HOME}/surface-control"
 export HELIX_UI_LAYOUT_LOG="${XDG_STATE_HOME}/layout.json"   # where the page reports its named controls (tests click by name)
-# C++ meson build by default; set HELIX_SERVICE_BIN to target/debug/helix-desktop for the Rust scaffold.
-SERVICE="${HELIX_SERVICE_BIN:-$BUILD/helix-service}"
+SERVICE="${HELIX_SERVICE_BIN:-$ROOT/target/fast/helix-desktop}"
 SHELL_BIN="${HELIX_SHELL_BIN:-$(newest_shell_bin)}"
 "$SERVICE" > "${XDG_STATE_HOME}/helix-service.log" 2>&1 &
 echo $! > "${XDG_STATE_HOME}/helix-service.pid"

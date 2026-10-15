@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate settings_defaults_generated.rs from the C++ pristine-config catalog golden.
 
-The golden comes from tools/regen-settings-defaults.sh (real C++ config defaults), so the Rust
+The golden was captured from the real C++ config defaults before that code was removed, so the Rust
 bootstrap catalog stops guessing scalar defaults. List-valued rows are handled by their own
 catalog code. Use `--check` in CI to verify the checked-in file is current.
 """

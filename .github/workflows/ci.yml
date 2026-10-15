@@ -73,8 +73,6 @@ jobs:
         run: cargo test -p helix-shell-core --lib --quiet
       - name: helix-theme (C++ parity goldens)
         run: cargo test -p helix-theme --quiet
-      - name: Settings bootstrap parity
-        run: python3 tools/gen-rust-settings-bootstrap.py --check
 
   helix-desktop-agent:
     name: helix-desktop Agent Surface

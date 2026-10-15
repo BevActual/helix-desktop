@@ -22,18 +22,18 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    # Default targets needed for `meson install` (service, template apply, assistant, inference, upgrade helper).
-    meson compile -C build-{{m}} helix-service helix-template-apply helix-theme-palette helix-assistant helix-inference helix-system-upgrade
+    # Default targets needed for `meson install` (template apply, assistant, inference, upgrade helper).
+    meson compile -C build-{{m}} helix-template-apply helix-theme-palette helix-assistant helix-inference helix-system-upgrade
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
     mkdir -p build-{{m}}/helix-tmp
-    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-template-apply helix-theme-palette helix-assistant helix-inference -j {{jobs}}
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-template-apply helix-theme-palette helix-assistant helix-inference -j {{jobs}}
 
 # Legacy GTK Settings only (needs -Ddesktop_apps=enabled). Prefer: (cargo build -p helix-settings)
 build-settings m=mode jobs="2": (_ensure-configured m)
     mkdir -p build-{{m}}/helix-tmp
-    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-settings -j {{jobs}}
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-settings -j {{jobs}}
 
 _ensure-configured m=mode:
     #!/usr/bin/env bash
@@ -52,8 +52,8 @@ _ensure-configured m=mode:
         meson configure "build-{{m}}" "${args[@]}"
     fi
 
-run m=mode: (build m)
-    ./build-{{m}}/helix-service
+run m=mode:
+    cargo run -p helix-desktop
 
 # Build and run the unit tests, enabling their targets when auto mode omits them.
 test m=mode *args: (_ensure-configured m)
@@ -75,13 +75,12 @@ test-install m=mode: (build m)
 install m:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [[ ! -x "build-{{m}}/helix-service" ]]; then
-        echo "error: build-{{m}}/helix-service is missing; run 'just build {{m}}' before installing" >&2
+    if [[ ! -x "build-{{m}}/helix-template-apply" ]]; then
+        echo "error: build-{{m}}/helix-template-apply is missing; run 'just build {{m}}' before installing" >&2
         exit 1
     fi
     meson install --no-rebuild -C build-{{m}}
-    # The Rust desktop service is the default org.helix.Desktop owner; helix-service-launch falls
-    # back to the C++ helix-service when it is missing (HELIX_SERVICE=cpp forces C++).
+    # The Rust helix-desktop is the org.helix.Desktop owner (the unit and activation file run it).
     just install-rust-desktop {{m}}
 
 # Build and install the Rust org.helix.Desktop service next to the meson-installed binaries.
@@ -89,8 +88,8 @@ install-rust-desktop m:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v cargo >/dev/null; then
-        echo "warning: cargo not found; helix-desktop not installed, helix-service-launch will use the C++ service" >&2
-        exit 0
+        echo "error: cargo not found; helix-desktop (org.helix.Desktop) cannot be installed" >&2
+        exit 1
     fi
     cargo build --release -p helix-desktop
     prefix=$(meson introspect "build-{{m}}" --buildoptions | python3 -c 'import json,sys; o={x["name"]:x["value"] for x in json.load(sys.stdin)}; print(o["prefix"] + "/" + o["bindir"])')

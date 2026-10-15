@@ -137,8 +137,8 @@ The **session shell and apps** are Rust/Tauri (`shell/`, `apps/`); see
 [docs/design/rust-workspace.md](docs/design/rust-workspace.md). Shared app controls
 follow GTK4/libadwaita grammar ([docs/design/helix-hig.md](docs/design/helix-hig.md)).
 
-The section below is for the **live C++ desktop authority** (`helix-service`) and
-related Meson targets until Rust cutover. GLES/EGL appear where C++ helpers still
+The section below is for the C++ helpers and Meson targets that remain next to the
+Rust `helix-desktop` authority. GLES/EGL appear where C++ helpers still
 need them — not as the session UI stack.
 
 ### Build-time (required)
@@ -226,7 +226,7 @@ Report Helix Shell issues at https://github.com/BevActual/helix-desktop/issues.
 
 ## Helix desktop service and Settings
 
-Install the live `helix-service` binary (or the Rust `helix-desktop` binary when cut over),
+Install the Rust `helix-desktop` binary,
 `org.helix.Desktop.service` D-Bus activation file and matching systemd user unit together with
 the shell. They must share the same prefix. The service is activated on demand; no globally
 enabled user unit is required. See [`docs/design/cpp-to-rust.md`](docs/design/cpp-to-rust.md).

@@ -13,7 +13,7 @@ For dependencies and normal build commands, start with [BUILDING.md](BUILDING.md
 ## Design Principles
 
 - Session shell and apps: Rust + Tauri 2 (GTK3 layer-shell / WebKit), shared UI in `core/shared-ui/`.
-- Desktop authority: `org.helix.Desktop` (C++ `helix-service` today; migrating to Rust — see `docs/design/cpp-to-rust.md`).
+- Desktop authority: `org.helix.Desktop` (Rust `helix-desktop`; see `docs/design/cpp-to-rust.md`).
 - Applications and Controls: GTK4/libadwaita grammar for look; Fedora + helix-niri is the shell target.
 - Contracts in `protocols/` (D-Bus + IPC) are the boundary; do not invent parallel APIs.
 
@@ -297,7 +297,7 @@ just configure asan && just build asan
 Start the ASan binary in the foreground and save its output:
 
 ```sh
-ASAN_OPTIONS=log_path=/tmp/helix-asan ./build-asan/helix-service 2>&1 | tee helix-asan-terminal.log
+ASAN_OPTIONS=log_path=/tmp/helix-asan ./build-asan/helix-assistant 2>&1 | tee helix-asan-terminal.log
 ```
 
 Reproduce the crash once. If Helix does not exit, press `Ctrl+C`. Attach both `helix-asan-terminal.log` and every

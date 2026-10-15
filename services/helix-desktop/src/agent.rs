@@ -167,16 +167,35 @@ impl Agent {
             "tiers".into(),
             OwnedValue::try_from(Value::from(tiers)).expect("tiers"),
         );
+        session.insert("confirmer".into(), owned_bool(state.confirmer.is_some()));
         Ok(session)
     }
 
-    async fn get_snapshot(&self) -> HashMap<String, OwnedValue> {
+    async fn get_snapshot(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+    ) -> fdo::Result<HashMap<String, OwnedValue>> {
+        let sender = sender_name(&header)?;
+        let peer = resolve_peer(connection, &sender).await?;
         let state = self.state.lock().await;
+        let tiers: Vec<String> = state
+            .grants
+            .tiers_for(&peer.client)
+            .into_iter()
+            .map(|tier| tier.name().to_string())
+            .collect();
         let mut map = HashMap::new();
         map.insert("implementation".into(), owned_str("rust"));
+        map.insert("available".into(), owned_bool(true));
+        map.insert("client".into(), owned_str(&peer.client));
+        map.insert(
+            "tiers".into(),
+            OwnedValue::try_from(Value::from(tiers)).expect("tiers"),
+        );
         map.insert("pending".into(), owned_u64(state.pending.len() as u64));
         map.insert("confirmer".into(), owned_bool(state.confirmer.is_some()));
-        map
+        Ok(map)
     }
 
     async fn list_tools(&self) -> Vec<OwnedValue> {
@@ -550,7 +569,7 @@ impl Agent {
                         .ok();
                     return Ok(());
                 }
-                state.taint.clear(&pending.client);
+                // Approving a grant is not a review of any later action: taint stays until an action is confirmed.
                 let granted: Vec<String> = after.iter().map(|tier| tier.name().to_string()).collect();
                 audit_and_notify(
                     &mut state,

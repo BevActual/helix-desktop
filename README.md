@@ -70,7 +70,7 @@ return as first-party features or as a new extension mechanism.
 
 **Session shell and apps (live path):** see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
 
-**Desktop authority:** Meson builds live C++ `helix-service` (+ assistant/inference). Rust scaffold: `cargo build -p helix-desktop`. Details: [BUILDING.md](BUILDING.md), [docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md).
+**Desktop authority:** The Rust `helix-desktop` (`cargo build -p helix-desktop`) owns `org.helix.Desktop`; Meson builds the assistant/inference/helpers. Details: [BUILDING.md](BUILDING.md), [docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md).
 
 ## Configuration
 
@@ -95,5 +95,5 @@ Distro packaging notes (description, deps, install layout, Meson options) live i
 ### Native desktop applications
 
 Helix Settings, Software, and System Monitor are Tauri apps under `apps/`.
-Settings talks to `helix-service`; System Monitor reads local Linux resources without the shell.
+Settings talks to `helix-desktop`; System Monitor reads local Linux resources without the shell.
 See `docs/design/desktop-service.md` and `docs/design/rust-workspace.md`.

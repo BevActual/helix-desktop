@@ -43,7 +43,7 @@ Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite
 | `dev/` | Nested probes only |
 | `protocols/` | D-Bus / IPC contracts |
 | `tools/` | Dev install, nested tests, Helix MCP server (`helix-agent`), helpers |
-| `src/desktop/` | `helix-service` (keep) |
+| `src/desktop/` | shared agent policy / tool schema (the service itself is Rust: `services/helix-desktop`) |
 | `src/assistant/`, `src/inference/` | Assistant + model runtime (target: `services/helix-*`) |
 | `src/` (platform) | config, theme, dbus, wayland, … (migrating with domains) |
 | `assets/` | Branding, templates, translations |
