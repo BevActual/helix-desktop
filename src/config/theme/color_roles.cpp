@@ -1,4 +1,4 @@
-#include "theme/color_roles.h"
+#include "config/theme/color_roles.h"
 
 #include "util/string_utils.h"
 

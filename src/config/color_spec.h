@@ -1,6 +1,6 @@
 #pragma once
 
-#include "theme/color_roles.h"
+#include "config/theme/color_roles.h"
 
 #include <string>
 #include <string_view>

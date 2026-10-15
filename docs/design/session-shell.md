@@ -32,7 +32,7 @@ Split processes: `helix-shell-strut` (exclusive zone) + `helix-shell-bar` (`HELI
 |------|----------|-------|
 | Desktop authority | `services/helix-desktop` | `org.helix.Desktop`; unit `helix-service.service` runs `helix-desktop` |
 | Assistant / inference | `services/helix-assistant`, `services/helix-inference` | D-Bus processes are Rust; llama glue + `helix-transcribe` / `helix-image` workers under `src/inference/` |
-| Theme C++ reference | `src/theme/` (legacy) | Rust `helix-theme` owns runtime and template golden regen; see `cpp-to-rust.md` |
+| Theme | `core/helix-theme` + `helix-desktop` | C++ `src/theme/` removed; see `cpp-to-rust.md` |
 | Contract tests | `src/desktop/`, `tests/desktop_service_test.cpp` | Behavioural contract against the Rust binary in CI |
 
 See `product-structure.md` and `cpp-to-rust.md`.
@@ -53,7 +53,6 @@ protocols/            D-Bus + IPC contracts (source of truth)
 tools/                switch-shell, nested e2e, helpers
 src/desktop/          contract-test fixtures (agent policy, tool schema)
 src/inference/        llama glue + transcribe/image workers (service is services/helix-inference)
-src/theme/            C++ template/palette helpers (fallback for helix-desktop)
 assets/               icons, templates, translations
 docs/design/          architecture + HIG; see README.md; archive/ is retired dumps
 ```

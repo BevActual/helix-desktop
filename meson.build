@@ -357,8 +357,8 @@ _helix_sources = files(
   'src/system/icon_resolver.cpp',
   'src/system/day_night_schedule.cpp',
   'src/time/time_format.cpp',
-  'src/theme/color_roles.cpp',
-  'src/theme/scheme.cpp',
+  'src/config/theme/color_roles.cpp',
+  'src/config/theme/scheme.cpp',
   'src/util/checksum.cpp',
   'src/compositors/compositor_detect.cpp',
   'src/cli/parse.cpp',
@@ -366,32 +366,6 @@ _helix_sources = files(
   )
 
 _helix_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp', 'src/desktop_api/peer_identity.cpp')
-
-# C++ theme reference stack (runtime apply is Rust `helix-theme`). Config keeps `scheme` + `color_roles` in `helix_core`.
-_helix_theme_sources = files(
-  'src/theme/color.cpp',
-  'src/theme/contrast.cpp',
-  'src/theme/image_loader.cpp',
-  'src/theme/palette_generator.cpp',
-  'src/theme/palette_transform.cpp',
-  'src/theme/m3_schemes.cpp',
-  'src/theme/custom_schemes.cpp',
-  'src/theme/builtin_palettes.cpp',
-  'src/theme/community_palettes.cpp',
-  'src/theme/community_templates.cpp',
-  'src/theme/custom_palettes.cpp',
-  'src/theme/fixed_palette.cpp',
-  'src/theme/template_apply_service.cpp',
-  'src/theme/runtime_palette.cpp',
-  'src/theme/theme_service.cpp',
-  'src/theme/kde_color_scheme.cpp',
-  'src/theme/firefox_theme/css.cpp',
-  'src/theme/firefox_theme/firefox_theme.cpp',
-  'src/theme/firefox_theme/native_messaging.cpp',
-  'src/theme/firefox_theme/settings.cpp',
-  'src/theme/hook_runner.cpp',
-  'src/theme/template_engine.cpp',
-)
 
 if sanitize
   _helix_sources += files('src/core/lsan_suppressions.cpp')
@@ -488,17 +462,6 @@ helix_core_base_dep = declare_dependency(
 
 # Inference workers and desktop contract tests link core only; runtime theme is Rust (`helix-theme`).
 helix_core_dep = helix_core_base_dep
-
-if get_option('theme_cpp_reference')
-  helix_theme_lib = static_library('helix_theme',
-    sources: _helix_theme_sources,
-    link_with: helix_core_lib,
-    dependencies: _helix_dependencies,
-    include_directories: _helix_inc,
-    cpp_args: _helix_cpp_args,
-  )
-  alias_target('helix_theme', helix_theme_lib)
-endif
 
 # C++ session binary is still built (tests / reference). Install only when explicitly enabled —
 # the live session shell is Tauri (`tools/switch-shell.sh install`).

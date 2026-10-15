@@ -22,7 +22,7 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    # Meson: `helix_core` only (pass `-Dtheme_cpp_reference=true` to build legacy `src/theme/`).
+    # Meson: `helix_core` only (wallpaper scheme validation in `src/config/theme/`).
     meson compile -C build-{{m}} helix_core_base
     cargo build -p helix-shell-core --bin helix-rust-config-export
 

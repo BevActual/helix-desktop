@@ -32,7 +32,7 @@ The baseline went from 106 to **10**. Moves, in the order they were made:
 - `desktop_api/`: the client library for the desktop service (protocol, client, display text, route table, network proxy).
 - `core/`: `poll_source.h` and `color.h` (27 modules reached up for them), `motion_durations.h`, `style_defaults.h`,
   `image_decoder` and `image_orientation`, `input/keybind_action.h`, `input/text_input_client.h`.
-- `theme/color_roles`: `ColorRole`, `ColorSpec`, `Palette` and the role/token helpers (plain data).
+- `config/theme/color_roles`: `ColorRole`, `ColorSpec`, `Palette` and the role/token helpers (plain data).
 - `config/`: widget gesture and action parsing, launcher provider names.
 - `net/wallhaven_client`.
 - `render/surface/`: `Surface`, `LayerSurface`, `PopupSurface`, `Subsurface`, `ToplevelSurface` (windowing glue that

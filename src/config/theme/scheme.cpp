@@ -1,4 +1,4 @@
-#include "theme/scheme.h"
+#include "config/theme/scheme.h"
 
 namespace helix::theme {
 

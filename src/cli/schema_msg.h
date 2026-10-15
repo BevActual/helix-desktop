@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cli/schema.h"
-#include "theme/scheme.h"
+#include "config/theme/scheme.h"
 
 #include <array>
 #include <string_view>

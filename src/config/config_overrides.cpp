@@ -8,7 +8,7 @@
 #include "core/input/key_chord.h"
 #include "core/log.h"
 #include "config/theme_palette_validation.h"
-#include "theme/scheme.h"
+#include "config/theme/scheme.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 

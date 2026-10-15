@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate golden files from the C++ reference (src/theme). Run from the repo root.
+# Legacy C++ golden regen removed with src/theme/. Use `cargo test -p helix-theme` goldens instead.
 set -euo pipefail
-out=$(mktemp -d)
-trap 'rm -rf "$out"' EXIT
-g="g++ -std=c++23 -O1 -I src"
-$g core/helix-theme/tools/gen_golden.cpp src/theme/color.cpp src/theme/contrast.cpp -o "$out/color"
-"$out/color" > core/helix-theme/tests/golden/color_contrast.tsv
-$g core/helix-theme/tools/gen_golden_palette.cpp src/theme/fixed_palette.cpp src/theme/color.cpp \
-  src/theme/contrast.cpp src/theme/color_roles.cpp -o "$out/palette"
-"$out/palette" > core/helix-theme/tests/golden/palette_expand.tsv
-$g core/helix-theme/tools/gen_builtin_palettes.cpp src/theme/builtin_palettes.cpp src/theme/fixed_palette.cpp \
-  src/theme/color.cpp src/theme/contrast.cpp src/theme/color_roles.cpp -o "$out/builtin"
-"$out/builtin" > core/helix-theme/data/builtin_palettes.json
-# HCT / tonal palettes: links the in-tree material_color_utilities sources.
-mcu=third_party/material_color_utilities
-g++ -std=c++23 -O1 -I "$mcu" core/helix-theme/tools/gen_golden_hct.cpp $(find "$mcu/cpp/cam" "$mcu/cpp/palettes" "$mcu/cpp/utils" -name '*.cc') -o "$out/hct"
-"$out/hct" > core/helix-theme/tests/golden/hct.tsv
-# Day/night schedule (shims localtime_r; includes system/day_night_schedule.cpp directly).
-g++ -std=c++23 -O1 -I src core/helix-theme/tools/gen_golden_schedule.cpp -o "$out/schedule"
-"$out/schedule" > core/helix-theme/tests/golden/schedule.tsv
+echo "regen_golden.sh: C++ theme reference removed; parity is checked by 'cargo test -p helix-theme'." >&2
+exit 1

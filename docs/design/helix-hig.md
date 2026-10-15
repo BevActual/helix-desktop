@@ -88,7 +88,7 @@ Rules:
 ## Color
 
 Colors come from the palette (`src/ui/palette.h`); use roles, never literal colors, outside
-`src/theme/`.
+theme/palette code (`core/helix-theme`, `src/config/theme/`).
 
 - **One accent.** `Primary` is the only accent: selection, the checked state, progress, and
   the keyboard focus ring (`focusRingColorSpec()`). `OnPrimary` sits on it.
