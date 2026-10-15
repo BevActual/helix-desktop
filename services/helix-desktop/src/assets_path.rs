@@ -32,7 +32,7 @@ pub fn builtin_templates_root(assets: &Path) -> PathBuf {
     assets.join("templates")
 }
 
-fn cpp_theme_helpers_disabled() -> bool {
+pub(crate) fn cpp_theme_helpers_disabled() -> bool {
     env::var("HELIX_DISABLE_CPP_THEME_HELPERS").is_ok_and(|value| {
         matches!(value.as_str(), "1" | "true" | "yes")
     })

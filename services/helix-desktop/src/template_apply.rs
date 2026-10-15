@@ -177,6 +177,15 @@ pub fn reapply_templates(state: &mut State) -> Result<(), String> {
 
     // Like a successful helper run, an in-process apply does not reload niri itself; the
     // templates' own hooks do that.
+    if crate::assets_path::cpp_theme_helpers_disabled() {
+        return match apply_in_process(state) {
+            Some(result) => result,
+            None => Err(
+                "Template apply is not supported for this theme configuration in-process".into(),
+            ),
+        };
+    }
+
     if let Some(result) = apply_in_process(state) {
         return result;
     }
