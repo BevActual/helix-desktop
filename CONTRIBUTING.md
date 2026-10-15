@@ -12,7 +12,7 @@ For dependencies and normal build commands, start with [BUILDING.md](BUILDING.md
 
 ## Git remotes and GitHub CLI
 
-**[BevActual/helix-desktop](https://github.com/BevActual/helix-desktop)** is the product repository. It is **not** a GitHub fork of Noctalia; PRs and releases happen here only (`base` is usually `main`).
+**[BevActual/helix-desktop](https://github.com/BevActual/helix-desktop)** is the product repository. It is **not** a GitHub fork of Noctalia; PRs and releases happen here only. **Default branch is `main`** (use `gh repo set-default BevActual/helix-desktop` and `tools/git-helix-origin.sh` if `git pull` still tracks an old branch).
 
 Clone and work against `origin`:
 
