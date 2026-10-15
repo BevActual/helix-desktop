@@ -9,6 +9,7 @@ use std::sync::OnceLock;
 
 use toml::Value as Toml;
 
+use super::config_export_defaults::overlay_ported_schema_defaults;
 use super::config_export_serialize::finalize_serialized_export;
 use super::settings::{ConfigPaths, ConfigStore};
 
@@ -18,9 +19,11 @@ const DEFAULT_EXPORT_TOML: &str =
 fn default_export_root() -> &'static Toml {
     static ROOT: OnceLock<Toml> = OnceLock::new();
     ROOT.get_or_init(|| {
-        DEFAULT_EXPORT_TOML
+        let mut root = DEFAULT_EXPORT_TOML
             .parse()
-            .expect("config_export_minimal.toml must parse")
+            .expect("config_export_minimal.toml must parse");
+        overlay_ported_schema_defaults(&mut root);
+        root
     })
 }
 
