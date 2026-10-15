@@ -62,8 +62,10 @@ fn local_selection(config: &ConfigStore, session_wallpaper: &str) -> Option<(The
     let effective = if shell_mode == "follow" { mode } else { shell_mode };
     let shell_light = crate::day_night::resolve_mode(config, &effective)? == "light";
     if source == PaletteSource::Community {
-        let cache = community_cache(config, source)?;
-        if !cache.is_file() {
+        let name = text("theme.community_palette").unwrap_or_default();
+        let state_dir = config.paths().settings_toml.parent()?;
+        let offline = config.get("shell.offline_mode").as_bool().unwrap_or(false);
+        if !crate::palette_catalog::ensure_community_palette_cached(state_dir, &name, offline) {
             return None;
         }
     }
@@ -108,7 +110,7 @@ fn run_helper(args: &[&str]) -> Result<Option<String>, String> {
 
     let bin = helix_theme_palette_bin()
         .ok_or_else(|| "Palette could not be saved".to_string())?;
-    tracing::info!(bin = %bin, args = ?args, "theme palette: using helix-theme-palette");
+    tracing::info!(bin = %bin.display(), args = ?args, "theme palette: using helix-theme-palette");
     let output = Command::new(&bin)
         .args(args)
         .output()

@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
+use helix_theme::custom::{community_palette_cache_path, parse_palette_json, url_encode};
+
 use crate::palette_previews::builtin_palette_previews;
 
 const MAX_COMMUNITY: usize = 100;
@@ -232,6 +234,90 @@ pub enum CatalogSync {
     Fetched,
 }
 
+/// `communityPaletteDownloadUrl` — no default host (opt-in via env).
+pub fn community_palette_download_url(name: &str) -> Option<String> {
+    let base = std::env::var("HELIX_COMMUNITY_PALETTE_URL_BASE")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())?;
+    let base = base.trim_end_matches('/');
+    Some(format!("{base}/{encoded}", encoded = url_encode(name)))
+}
+
+fn community_palette_cache_valid(path: &Path) -> bool {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|text| parse_palette_json(&text))
+        .is_some()
+}
+
+/// Ensure a community palette JSON exists under the state dir (download on miss when allowed).
+/// Matches C++ `startCommunityDownload` for the blocking helper paths (`helix-theme-palette`, etc.).
+pub fn ensure_community_palette_cached(state_dir: &Path, name: &str, offline: bool) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let path = community_palette_cache_path(state_dir, name);
+    if community_palette_cache_valid(&path) {
+        return true;
+    }
+    if path.is_file() {
+        let _ = fs::remove_file(&path);
+    }
+    if offline {
+        tracing::info!(%name, "community palette cache miss; offline mode — not fetching");
+        return false;
+    }
+    let url = match community_palette_download_url(name) {
+        Some(url) => url,
+        None => {
+            tracing::warn!(
+                %name,
+                "community palette cache miss; HELIX_COMMUNITY_PALETTE_URL_BASE unset"
+            );
+            return false;
+        }
+    };
+    if let Some(parent) = path.parent() {
+        if let Err(error) = fs::create_dir_all(parent) {
+            tracing::warn!(%error, %name, "community palette cache dir create failed");
+            return false;
+        }
+    }
+    tracing::info!(%url, %name, "fetching community palette");
+    let response = match ureq::get(&url)
+        .timeout(std::time::Duration::from_secs(30))
+        .call()
+    {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::warn!(%error, %name, "community palette download failed");
+            return false;
+        }
+    };
+    let body = match response.into_string() {
+        Ok(body) => body,
+        Err(error) => {
+            tracing::warn!(%error, %name, "community palette read failed");
+            return false;
+        }
+    };
+    let tmp = path.with_extension("json.tmp");
+    if fs::write(&tmp, body.as_bytes()).is_err() {
+        return false;
+    }
+    if !community_palette_cache_valid(&tmp) {
+        let _ = fs::remove_file(&tmp);
+        tracing::warn!(%name, "community palette downloaded but failed to parse; removed cache");
+        return false;
+    }
+    if fs::rename(&tmp, &path).is_err() {
+        let _ = fs::remove_file(&tmp);
+        return false;
+    }
+    true
+}
+
 /// Download the community catalog when `HELIX_COMMUNITY_PALETTE_CATALOG_URL` is set.
 /// Matches C++: no default host; offline mode blocks the request.
 pub fn sync_community_catalog(settings_toml: &Path, offline: bool) -> Result<CatalogSync, String> {
@@ -285,6 +371,31 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("helix-palette-catalog-{nanos}"))
+    }
+
+    #[test]
+    fn community_palette_download_url_encodes_name() {
+        std::env::set_var("HELIX_COMMUNITY_PALETTE_URL_BASE", "https://example.com/palettes");
+        let url = community_palette_download_url("Oxocarbon Dark").expect("url");
+        assert_eq!(url, "https://example.com/palettes/Oxocarbon%20Dark");
+        std::env::remove_var("HELIX_COMMUNITY_PALETTE_URL_BASE");
+        assert!(community_palette_download_url("x").is_none());
+    }
+
+    #[test]
+    fn ensure_community_palette_uses_valid_cache_without_fetch() {
+        let root = temp_root();
+        let state = root.join("state");
+        fs::create_dir_all(state.join("community-palettes")).unwrap();
+        let path = community_palette_cache_path(&state, "Cached");
+        let json = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../core/helix-theme/tests/golden/apply/community-source/statefiles/community-palettes/Oxo%20lab.json"),
+        )
+        .expect("golden community palette");
+        fs::write(&path, json).unwrap();
+        assert!(ensure_community_palette_cached(&state, "Cached", false));
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

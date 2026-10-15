@@ -62,7 +62,7 @@ the first-run bundled wallpaper, and `theme.source = wallpaper` with a wallpaper
 
 ## Next (C++ tail)
 
-1. **Theme helpers** — in-process apply has merged config, icon theme, Firefox post-action, session/settings/config wallpaper paths (`wallpaper_source`), and structured `info`/`warn` when falling back to C++ helpers. Community palette without cache and exotic `config_export` shapes still use the helpers; then drop `helix-template-apply` / `helix-theme-palette` from Meson.
+1. **Theme helpers** — in-process apply has merged config, icon theme, Firefox post-action, session/settings/config wallpaper paths (`wallpaper_source`), blocking community palette fetch when `HELIX_COMMUNITY_PALETTE_URL_BASE` is set (`palette_catalog::ensure_community_palette_cached`), and structured `info`/`warn` when falling back to C++ helpers. Remaining gaps: catalog-md5 stale refresh, exotic `config_export` shapes — then drop `helix-template-apply` / `helix-theme-palette` from Meson.
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
 3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.

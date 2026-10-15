@@ -61,12 +61,9 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let palettes_dir = paths.config_dir.join("palettes");
     let state_dir = paths.settings_toml.parent()?.to_path_buf();
     let community_name = text("theme.community_palette").unwrap_or_default();
+    let offline = flag("shell.offline_mode");
     if source == PaletteSource::Community {
-        if community_name.is_empty() {
-            return None;
-        }
-        let cache = helix_theme::custom::community_palette_cache_path(&state_dir, &community_name);
-        if !cache.is_file() {
+        if !crate::palette_catalog::ensure_community_palette_cached(&state_dir, &community_name, offline) {
             return None;
         }
     }
