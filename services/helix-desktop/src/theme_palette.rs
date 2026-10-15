@@ -136,7 +136,9 @@ pub fn save_palette(inputs: &Inputs, source: &str) -> Result<Outcome, String> {
     }
     let args = ["save-palette", source];
     match (&inputs.local, source) {
-        (Some((selection, dir)), "current") => local_result(save_current_as_custom(dir, selection), &args),
+        (Some((selection, dir)), "current" | "wallpaper") => {
+            local_result(save_current_as_custom(dir, selection), &args)
+        }
         _ => helper_named(&args),
     }
 }

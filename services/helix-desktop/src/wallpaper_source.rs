@@ -8,6 +8,8 @@ use helix_shell_core::desktop::settings::ConfigStore;
 use helix_theme::custom::{GeneratedPalette, WallpaperPalette};
 use helix_theme::wallpaper::{generate, load_and_resize, Scheme};
 
+use crate::assets_path::helix_assets_dir;
+
 struct Cached {
     path: String,
     scheme: String,
@@ -26,24 +28,83 @@ fn expand_user(path: &str) -> String {
     }
 }
 
-/// `getPaletteWallpaperPath()`: the last wallpaper set, else the default. Empty when none is configured (including the
-/// first-run bundled wallpaper, which the helper handles).
+fn settings_wallpaper_table(config: &ConfigStore) -> Option<toml::Table> {
+    let text = std::fs::read_to_string(&config.paths().settings_toml).ok()?;
+    let table = text.parse::<toml::Table>().ok()?;
+    table.get("wallpaper").and_then(|w| w.as_table()).cloned()
+}
+
+fn path_from_wallpaper_section(section: &toml::Table) -> Option<String> {
+    section
+        .get("path")
+        .and_then(toml::Value::as_str)
+        .map(expand_user)
+        .filter(|p| !p.is_empty())
+}
+
+/// Mirrors C++ `hasConfiguredWallpaper()`.
+fn has_configured_wallpaper(config: &ConfigStore, wallpaper: Option<&toml::Table>) -> bool {
+    if let Some(w) = wallpaper {
+        let read = |key: &str| {
+            w.get(key)
+                .and_then(|v| v.as_table())
+                .and_then(path_from_wallpaper_section)
+        };
+        if read("last").is_some() || read("default").is_some() {
+            return true;
+        }
+        if w.get("monitors")
+            .and_then(|m| m.as_table())
+            .is_some_and(|t| t.values().any(|v| v.as_str().is_some_and(|s| !s.is_empty())))
+        {
+            return true;
+        }
+    }
+    config
+        .get("wallpaper.default.path")
+        .as_str()
+        .is_some_and(|p| !p.is_empty())
+}
+
+/// C++ `firstRunWallpaperPath()`: bundled asset until setup completes and no wallpaper is configured.
+fn first_run_bundled_wallpaper(config: &ConfigStore) -> Option<String> {
+    let state_dir = config.paths().settings_toml.parent()?;
+    let marker = state_dir.join(".setup-complete");
+    if marker.is_file() {
+        return None;
+    }
+    let wallpaper = settings_wallpaper_table(config);
+    if has_configured_wallpaper(config, wallpaper.as_ref()) {
+        return None;
+    }
+    let bundled = helix_assets_dir()
+        .map(|assets| assets.join("helix-wallpaper.png"))
+        .filter(|path| path.is_file())?;
+    Some(bundled.to_string_lossy().into_owned())
+}
+
+/// `getPaletteWallpaperPath()`: first-run bundled, then last, then default (`settings.toml` + config default).
 pub fn palette_wallpaper_path(config: &ConfigStore) -> String {
-    let Ok(text) = std::fs::read_to_string(&config.paths().settings_toml) else {
-        return String::new();
-    };
-    let Ok(table) = text.parse::<toml::Table>() else {
-        return String::new();
-    };
-    let read = |which: &str| {
-        table
-            .get("wallpaper")
-            .and_then(|w| w.get(which))
-            .and_then(|w| w.get("path"))
-            .and_then(toml::Value::as_str)
-            .map(expand_user)
-    };
-    read("last").or_else(|| read("default")).unwrap_or_default()
+    if let Some(bundled) = first_run_bundled_wallpaper(config) {
+        return bundled;
+    }
+    if let Some(wallpaper) = settings_wallpaper_table(config) {
+        let read = |key: &str| {
+            wallpaper
+                .get(key)
+                .and_then(|v| v.as_table())
+                .and_then(path_from_wallpaper_section)
+        };
+        if let Some(path) = read("last").or_else(|| read("default")) {
+            return path;
+        }
+    }
+    config
+        .get("wallpaper.default.path")
+        .as_str()
+        .map(expand_user)
+        .filter(|p| !p.is_empty())
+        .unwrap_or_default()
 }
 
 fn mtime_ns(path: &Path) -> i128 {
@@ -105,4 +166,52 @@ pub fn wallpaper_palette(config: &ConfigStore) -> Option<WallpaperPalette> {
         }
     }
     Some(WallpaperPalette { generated, path, scheme: scheme_name })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use helix_shell_core::desktop::settings::ConfigPaths;
+    use std::fs;
+
+    #[test]
+    fn first_run_uses_bundled_wallpaper_when_setup_incomplete() {
+        let root = std::env::temp_dir().join(format!("helix-wp-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let assets = helix_assets_dir().expect("assets in tree");
+        let bundled = assets.join("helix-wallpaper.png");
+        assert!(bundled.is_file(), "missing helix-wallpaper.png in assets");
+
+        let paths = ConfigPaths {
+            config_dir: root.join("cfg"),
+            settings_toml: root.join("state/settings.toml"),
+        };
+        fs::create_dir_all(paths.config_dir.join("helix")).unwrap();
+        fs::create_dir_all(paths.settings_toml.parent().unwrap()).unwrap();
+        fs::write(&paths.settings_toml, "[wallpaper]\n").unwrap();
+
+        let config = ConfigStore::load(paths);
+        let path = palette_wallpaper_path(&config);
+        assert_eq!(path, bundled.to_string_lossy());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn setup_marker_skips_bundled_wallpaper() {
+        let root = std::env::temp_dir().join(format!("helix-wp-marker-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("state")).unwrap();
+        let paths = ConfigPaths {
+            config_dir: root.join("cfg"),
+            settings_toml: root.join("state/settings.toml"),
+        };
+        fs::create_dir_all(paths.config_dir.join("helix")).unwrap();
+        fs::write(&paths.settings_toml, "").unwrap();
+        fs::write(root.join("state/.setup-complete"), "").unwrap();
+
+        let config = ConfigStore::load(paths);
+        assert!(palette_wallpaper_path(&config).is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
 }
