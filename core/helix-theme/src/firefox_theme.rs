@@ -156,9 +156,11 @@ fn resolve_host_executable() -> Option<PathBuf> {
         }
     }
     if let Ok(bindir) = std::env::var("HELIX_BINDIR") {
-        let p = PathBuf::from(bindir).join("helix-template-apply");
-        if p.is_file() {
-            return Some(p);
+        for name in ["helix-desktop", "helix-template-apply"] {
+            let p = PathBuf::from(&bindir).join(name);
+            if p.is_file() {
+                return Some(p);
+            }
         }
     }
     if let Ok(path) = std::env::current_exe() {
@@ -171,7 +173,10 @@ fn resolve_host_executable() -> Option<PathBuf> {
 
 fn path_looks_like_helix_host(path: &Path) -> bool {
     match path.file_name().and_then(|n| n.to_str()) {
-        Some("helix-shell") | Some("helix-pywalfox") | Some("helix-template-apply") => true,
+        Some("helix-shell")
+        | Some("helix-pywalfox")
+        | Some("helix-desktop")
+        | Some("helix-template-apply") => true,
         _ => false,
     }
 }
