@@ -824,6 +824,35 @@ fn apply_pending_sidecar_migrations(root: &mut Toml, stored_version: i32) -> i32
     applied
 }
 
+/// Same transforms as C++ `normalizeLegacyConfig` on merged config (excludes sidecar-only
+/// `launch_apps_as_systemd_services` migration).
+const LEGACY_NORMALIZE: &[MigrateFn] = &[
+    migrate_negative_bar_radii,
+    migrate_custom_schedule,
+    migrate_widget_actions,
+    migrate_widget_gesture_settings,
+    migrate_remaining_widget_gestures,
+    migrate_custom_button_commands,
+    migrate_dead_zone_actions,
+    migrate_lockscreen_login_box_deprecated_settings,
+    migrate_sysmon_presentation_settings,
+    migrate_keyboard_layout_show_glyph,
+    migrate_workspaces_display_settings,
+    migrate_keyboard_layout_custom_labels,
+    migrate_plugin_auto_update_mode,
+    migrate_calendar_event_formats,
+    migrate_calendar_timezones_to_clock,
+    migrate_control_center_shortcut_labels,
+    migrate_retired_control_center_services,
+];
+
+/// C++ `normalizeLegacyConfig` (mutates merged export input; diagnostics are not collected).
+pub fn normalize_legacy_config(root: &mut Toml) {
+    for apply in LEGACY_NORMALIZE {
+        apply(root);
+    }
+}
+
 /// Apply C++ sidecar migrations to a parsed `settings.toml` root table.
 pub fn prepare_settings_sidecar(sidecar: Toml) -> Toml {
     let Toml::Table(table) = sidecar else {

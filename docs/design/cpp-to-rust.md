@@ -63,7 +63,7 @@ wallpaper images, missing community palette when fetch is blocked (offline / no 
 
 ## Next (C++ tail)
 
-1. **Theme helpers** — `export_effective_toml` tries in-process export first (`config_export_rust.rs`: `config_merge` includes, default golden + bar/idle rebuild + leaf patch; 17+ parity tests + `tools/verify_config_export_golden.sh` in CI), then `helix-config-export` when needed (`config_export.rs`). Gate: full `config_export::serialize` in Rust without the embedded golden. Then drop `helix-config-export`, then `helix-template-apply` / `helix-theme-palette` when smokes stay green without them.
+1. **Theme helpers** — `export_effective_toml` tries in-process export first (`config_export_rust.rs`: `config_merge` includes, sidecar migrations + `normalizeLegacyConfig`, default golden + bar/idle rebuild + leaf patch + bar radius corner sync; 19+ parity tests + `tools/verify_config_export_golden.sh` in CI), then `helix-config-export` when needed (`config_export.rs`). Gate: full `config_export::serialize` in Rust without the embedded golden. Then drop `helix-config-export`, then `helix-template-apply` / `helix-theme-palette` when smokes stay green without them.
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
 3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.

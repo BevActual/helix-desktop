@@ -161,6 +161,53 @@ fn rebuild_idle_from_merged(root: &mut Toml, merged: &Toml) {
 }
 
 /// Seed unnamed bars from `bar.default` export defaults (C++ `BarConfig` defaults per name).
+const BAR_RADIUS_CORNER_KEYS: [&str; 4] = [
+    "radius_top_left",
+    "radius_top_right",
+    "radius_bottom_left",
+    "radius_bottom_right",
+];
+
+/// C++ `BarConfig` applies a single user `radius` to every corner on export.
+fn sync_bar_radii_from_merged(root: &mut Toml, merged: &Toml) {
+    let merged_bar = match merged.get("bar").and_then(Toml::as_table) {
+        Some(table) => table,
+        None => return,
+    };
+    let export_bar = match root.get_mut("bar").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    for (name, merged_entry) in merged_bar {
+        if name == "order" {
+            continue;
+        }
+        let merged_table = match merged_entry.as_table() {
+            Some(table) => table,
+            None => continue,
+        };
+        let base = merged_table.get("radius").and_then(Toml::as_integer);
+        if base.is_none() {
+            continue;
+        }
+        let user_set_corner = BAR_RADIUS_CORNER_KEYS
+            .iter()
+            .any(|key| merged_table.contains_key(*key));
+        if user_set_corner {
+            continue;
+        }
+        let export_table = match export_bar.get_mut(name).and_then(Toml::as_table_mut) {
+            Some(table) => table,
+            None => continue,
+        };
+        let base = base.unwrap();
+        export_table.insert("radius".to_string(), Toml::Integer(base));
+        for key in BAR_RADIUS_CORNER_KEYS {
+            export_table.insert(key.to_string(), Toml::Integer(base));
+        }
+    }
+}
+
 fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
     let merged_bar = match merged.get("bar").and_then(Toml::as_table) {
         Some(table) => table,
@@ -292,6 +339,7 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
             set_dot_path(&mut root, &path, coerce_patch_value(&template, &value));
         }
     }
+    sync_bar_radii_from_merged(&mut root, &merged);
     root
 }
 
