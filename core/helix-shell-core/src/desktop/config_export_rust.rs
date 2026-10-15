@@ -340,11 +340,14 @@ mod tests {
     }
 }
 
-/// Effective export when the merged user config is bootstrap-patchable; else `None`.
-pub fn rust_export_toml(paths: &ConfigPaths) -> Option<Toml> {
-    let store = ConfigStore::load(paths.clone());
-    if !merged_export_is_patchable(&store) {
+/// Effective export when the merged user config is patchable; else `None`.
+pub fn rust_export_from_store(store: &ConfigStore) -> Option<Toml> {
+    if !merged_export_is_patchable(store) {
         return None;
     }
-    Some(patch_default_export(&store))
+    Some(patch_default_export(store))
+}
+
+pub fn rust_export_toml(paths: &ConfigPaths) -> Option<Toml> {
+    rust_export_from_store(&ConfigStore::load(paths.clone()))
 }

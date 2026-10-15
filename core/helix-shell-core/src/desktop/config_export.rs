@@ -63,6 +63,11 @@ pub fn rust_export_toml(paths: &ConfigPaths) -> Option<Toml> {
     config_export_rust::rust_export_toml(paths)
 }
 
+/// Like [`rust_export_toml`] but uses an already-loaded [`ConfigStore`].
+pub fn rust_export_from_store(store: &ConfigStore) -> Option<Toml> {
+    config_export_rust::rust_export_from_store(store)
+}
+
 /// Run `helix-config-export` and parse stdout as TOML.
 pub fn cpp_export_toml(paths: &ConfigPaths, bin: &Path) -> Option<Toml> {
     let mut command = Command::new(bin);
@@ -77,7 +82,7 @@ pub fn cpp_export_toml(paths: &ConfigPaths, bin: &Path) -> Option<Toml> {
 
 /// Effective export TOML: Rust (when implemented), then C++ helper, else `None`.
 pub fn export_effective_toml(store: &ConfigStore, export_bin: Option<&Path>) -> Option<Toml> {
-    if let Some(root) = rust_export_toml(store.paths()) {
+    if let Some(root) = rust_export_from_store(store) {
         return Some(root);
     }
     if let Some(bin) = export_bin {
