@@ -1,6 +1,6 @@
 # C++ → Rust migration
 
-Helix’s session UI is already Rust (Tauri). Remaining C++ owns desktop authority and helpers. This doc is the cutover map.
+Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`services/helix-desktop`). Remaining C++ is theme helpers, inference engine glue, and contract-test fixtures. This doc is the cutover map and backlog.
 
 ## Inventory
 
@@ -41,7 +41,7 @@ the first-run bundled wallpaper, and `theme.source = wallpaper` with a wallpaper
 
 **Desktop-only catalog:** After `RegisterDesktop`, `GetSettings` also includes live `bar:<name>:<field>` scalars and `idle:<behavior>:<field>` rows from `config.toml` (`dynamic_desktop_catalog.rs`), matching C++ `settingsCatalog(helixDesktop=true)`. Override paths use `storage_path()` (`bar:*` → `bar.<name>.<field>`, `idle:*` → `idle.behavior.<name>.<field>`). `tools/nested/helix-desktop-config-smoke.sh` seeds a minimal bar + idle config and checks post-desktop rows plus `idle:*` `Update`.
 
-**Soak before the flip:** `rust-desktop-soak.md` (`tools/soak/`) runs the live session on the Rust service and diffs snapshots against C++.
+**Session soak:** `rust-desktop-soak.md` (`tools/soak/`) is a hardware checklist for NM/BlueZ/PW/niri with the live shell; use it after large desktop changes.
 
 ## Order
 
@@ -58,4 +58,12 @@ the first-run bundled wallpaper, and `theme.source = wallpaper` with a wallpaper
 11. ~~Community/custom palette-previews~~ + ~~opt-in catalog HTTP sync~~ (`HELIX_COMMUNITY_PALETTE_CATALOG_URL`)
 12. ~~UpdateApplicationList for dock/launcher pins~~ (remaining ordered-list catalog rows still stub)
 13. Real backends (PW/NM/BlueZ/niri) · ~~Configuration1 `Update`/`Reset` guards~~ · ~~community template catalog sync~~ (`HELIX_COMMUNITY_TEMPLATE_CATALOG_URL` via `RefreshPalettes`) · ~~**Appearance1 `Reapply`** + **`templates-apply` msg IPC**~~ (`msg_ipc.rs`; **`helix-template-apply`** via `HELIX_TEMPLATE_APPLY_BIN`; override `HELIX_TEMPLATE_APPLY_CMD`) · ~~**Appearance1 `SavePalette` / `SetRole` / `SetAccent`**~~ (`theme_palette.rs`: in-process via `core/helix-theme` for builtin/custom sources in dark/light mode, with C++ goldens under `core/helix-theme/tests/golden/`; falls back to **`helix-theme-palette`** via `HELIX_THEME_PALETTE_BIN` / `HELIX_THEME_PALETTE_CMD` for wallpaper/community sources and `auto` mode) · ~~system-bus agent unregister on shutdown~~ · ~~display-list options from live compositor inventory~~ · ~~config smoke Meson helper parity in CI~~ · ~~in-process template apply~~ (`core/helix-theme`: render, plan/execute, HCT, palette transforms, custom colors; C++ goldens in `core/helix-theme/tests/golden/`; falls back to **`helix-template-apply`** for wallpaper/community palette sources, `auto` mode, `post_action` (KDE/Firefox), templates reading `config.*`/`image`) · full in-process theme apply (no C++ helper) · ~~Wallhaven~~ (`services/helix-desktop/src/wallhaven.rs`: bounded per-client search/thumbnail/download jobs, host-restricted URLs, C++ client goldens) · remaining domain cutovers
-14. ~~Assistant~~ (Rust: `services/helix-assistant`), ~~inference service~~ (Rust: `services/helix-inference`; engine glue stays C++)
+14. ~~Assistant~~ (Rust: `services/helix-assistant`), ~~inference service~~ (Rust: `services/helix-inference`; engine glue stays C++), ~~system-upgrade~~ (Rust: `services/helix-system-upgrade`)
+
+## Next (C++ tail)
+
+1. **Theme helpers** — Close `helix-theme::apply` `Outcome::Unsupported` gaps (templates reading `config.*` / `icon_theme`, bundled first-run wallpaper, unreadable wallpaper decoders) so `helix-template-apply` and `helix-theme-palette` can leave Meson.
+2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
+3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
+4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.
+5. **`src/` rename** — When Meson only builds helpers + tests, rename `src/` to `cpp/` (one mechanical commit).

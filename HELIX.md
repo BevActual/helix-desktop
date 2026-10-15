@@ -28,7 +28,7 @@ cd compositor && cargo build --release
 cargo build --profile fast -p helix-greeter
 ```
 
-Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite** (`docs/design/frontend-stack.md`; shared UI in `core/shared-ui/`, components in `core/shared-ui/react/`); the shell moves in slices. Only the approval dialog and the greeter stay hand-written. Desktop authority: C++ `helix-service` today, Rust scaffold `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
+Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite** (`docs/design/frontend-stack.md`; shared UI in `core/shared-ui/`, components in `core/shared-ui/react/`); the shell moves in slices. Only the approval dialog and the greeter stay hand-written. Desktop authority: Rust **`helix-desktop`** in `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
 
 ## Repository map
 
@@ -39,7 +39,7 @@ Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite
 | `core/` | Pure core, desktop API client, shared-ui |
 | `shell/` | Live session shell (Tauri) |
 | `apps/` | Settings, Software, Monitor, Mobius (`helix-mobius`) |
-| `services/` | `helix-desktop` (Rust Desktop scaffold), wallpaper, idle |
+| `services/` | `helix-desktop`, assistant, inference, system-upgrade, wallpaper, idle |
 | `dev/` | Nested probes only |
 | `protocols/` | D-Bus / IPC contracts |
 | `tools/` | Dev install, nested tests, Helix MCP server (`helix-agent`), helpers |
