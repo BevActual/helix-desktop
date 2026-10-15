@@ -1,6 +1,6 @@
 #!/bin/sh
-# Installs the model runtime and the assistant into /usr/local from a staged `meson install --destdir` tree.
-#   meson install -C build-debug --destdir "$STAGE" --no-rebuild && sudo tools/install-assistant.sh "$STAGE"
+# Installs the model runtime and the assistant into /usr/local from a staged `tools/install.sh --destdir` tree.
+#   tools/install.sh --destdir "$STAGE" && sudo tools/install-assistant.sh "$STAGE"
 # Only these pieces are touched (the shell and the other apps are left alone): helix-inference,
 # helix-assistant, the Tauri Settings app when staged as bin/helix-settings-tauri (it becomes /usr/local/bin/helix-settings; the one it
 # replaces is backed up), the engine libraries in /usr/local/lib64/helix, the policy and hints files, the two D-Bus service

@@ -5,7 +5,7 @@ The engine (llama.cpp and ggml) is built by hand into third_party/llama-install 
 under <prefix>/lib64/helix where only helix-inference looks for it (via its install rpath). Only the libraries the service links
 against are copied; the engine's command-line tools and development files are not. Symlinks stay symlinks.
 
-Usage (meson install script): install_engine.py <engine lib dir> <destination, relative to the install prefix>
+Usage: install_engine.py <engine lib dir> <destination, relative to the install prefix>   (PREFIX and DESTDIR from the environment, as tools/install.sh sets them)
 """
 import os
 import pathlib
@@ -15,7 +15,7 @@ import sys
 
 source, relative = pathlib.Path(sys.argv[1]), sys.argv[2]
 destdir = os.environ.get("DESTDIR", "")
-prefix = os.environ["MESON_INSTALL_PREFIX"]
+prefix = os.environ.get("PREFIX") or "/usr/local"
 target = pathlib.Path(destdir + prefix) / relative if not destdir else pathlib.Path(destdir) / prefix.lstrip("/") / relative
 target.mkdir(parents=True, exist_ok=True)
 

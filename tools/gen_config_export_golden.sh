@@ -10,8 +10,7 @@ BIN="${HELIX_RUST_CONFIG_EXPORT_BIN:-${HELIX_CONFIG_EXPORT_BIN:-}}"
 if [[ -z "$BIN" ]]; then
   for candidate in \
     "$ROOT/target/debug/helix-rust-config-export" \
-    "$ROOT/target/fast/helix-rust-config-export" \
-    "$ROOT/build-debug/helix-rust-config-export"; do
+    "$ROOT/target/fast/helix-rust-config-export"; do
     if [[ -x "$candidate" ]]; then
       BIN="$candidate"
       break

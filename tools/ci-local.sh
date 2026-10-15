@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the checks .github/workflows/ci.yml runs, on this machine, so a PR can be verified without CI minutes.
 # Usage: tools/ci-local.sh [job ...]   jobs: i18n format build rust agent config meter  (default: all)
-# It uses the existing build-debug tree and installs nothing. The nested smokes pick their own WAYLAND_DISPLAY so they never
+# It builds into target/ and installs nothing. The nested smokes pick their own WAYLAND_DISPLAY so they never
 # touch a live session's sockets.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,13 +31,9 @@ job_format() {
   clang-format --dry-run -Werror "${files[@]}"
 }
 job_build() {
-  meson setup --reconfigure build-debug >/dev/null \
-    && cargo build --profile fast --quiet $(for p in helix-desktop helix-assistant helix-inference helix-system-upgrade; do \
-         [[ -d services/$p ]] && printf -- '-p %s ' "$p"; done) \
-    && meson setup --reconfigure build-debug >/dev/null \
-    && ninja -C build-debug \
-    && sh tests/install_layout_test.sh build-debug \
-    && WAYLAND_DISPLAY="wayland-ci-$$" meson test -C build-debug --no-rebuild --print-errorlogs
+  cargo build --profile fast --quiet -p helix-desktop -p helix-assistant -p helix-inference -p helix-system-upgrade \
+    && sh tests/install_layout_test.sh fast \
+    && WAYLAND_DISPLAY="wayland-ci-$$" tools/test-integration.sh
 }
 job_rust() {
   cargo test -p helix-shell-core --lib --quiet && cargo test -p helix-theme --quiet && cargo test -p helix-desktop --quiet

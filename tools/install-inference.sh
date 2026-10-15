@@ -5,7 +5,6 @@
 # The previous binaries are kept next to the new ones as *.helix-previous.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-BUILD=${HELIX_BUILD_DIR:-$ROOT/build-debug}
 PROFILE=${HELIX_CARGO_PROFILE:-release}
 TARGET="$ROOT/target/$PROFILE"
 INFERENCE=${HELIX_INFERENCE_BIN:-$TARGET/helix-inference}
@@ -28,9 +27,12 @@ fi
 for f in helix-inference helix-transcribe; do
   [ -f "/usr/local/bin/$f" ] && cp -p "/usr/local/bin/$f" "/usr/local/bin/$f.helix-previous"
 done
-# Engine shared libs + optional Meson helix-image when present.
-if [ -f "$BUILD/build.ninja" ]; then
-  meson install -C "$BUILD" --no-rebuild --tags inference 2>/dev/null || true
+# Engine shared libs (built by hand into third_party/llama-install), when present.
+if [ -e "$ROOT/third_party/llama-install/lib64/libllama.so" ]; then
+  PREFIX=/usr/local python3 "$ROOT/tools/scripts/install_engine.py" "$ROOT/third_party/llama-install/lib64" lib64/helix
+fi
+if [ -x "$TARGET/helix-image" ]; then
+  install -D -m 0755 "$TARGET/helix-image" /usr/local/bin/helix-image
 fi
 install -D -m 0755 "$INFERENCE" /usr/local/bin/helix-inference.new && mv -f /usr/local/bin/helix-inference.new /usr/local/bin/helix-inference
 install -D -m 0755 "$TRANSCRIBE" /usr/local/bin/helix-transcribe.new && mv -f /usr/local/bin/helix-transcribe.new /usr/local/bin/helix-transcribe

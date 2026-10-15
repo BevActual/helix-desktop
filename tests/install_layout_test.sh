@@ -1,8 +1,10 @@
 #!/bin/sh
-
+# Stages tools/install.sh into a temporary directory and checks the installed layout.
+#   tests/install_layout_test.sh [profile]     (profile: release or fast; the binaries must already be built)
 set -eu
 
-build_dir=$1
+profile=${1:-fast}
+root=$(cd "$(dirname "$0")/.." && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 
@@ -11,36 +13,31 @@ fail() {
   exit 1
 }
 
-meson install --no-rebuild --destdir "$stage" -C "$build_dir" --quiet
+"$root/tools/install.sh" --no-build --profile "$profile" --prefix /usr --destdir "$stage" >/dev/null
 
-prefix=$(find "$stage" -type f -path '*/share/dbus-1/services/org.helix.Desktop.service' -print -quit)
-[ -n "$prefix" ] || fail 'installed D-Bus activation file is missing'
-prefix=${prefix%/share/dbus-1/services/org.helix.Desktop.service}
+prefix=$stage/usr
+
+[ -x "$prefix/bin/helix-desktop" ] || fail 'helix-desktop is missing'
+[ -x "$prefix/bin/helix-assistant" ] || fail 'helix-assistant is missing'
+[ -x "$prefix/bin/helix-inference" ] || fail 'helix-inference is missing'
+[ -x "$prefix/libexec/helix-system-upgrade" ] || fail 'helix-system-upgrade is missing'
 
 [ -f "$prefix/share/icons/hicolor/scalable/apps/helix.svg" ] || fail 'application icon is missing'
 [ -f "$prefix/share/polkit-1/actions/org.helix.Shell.upgrade.policy" ] || fail 'upgrade policy is missing'
-grep -q 'helix-system-upgrade' "$prefix/share/polkit-1/actions/org.helix.Shell.upgrade.policy" || fail 'upgrade policy does not name the helper'
+grep -q '/usr/libexec/helix-system-upgrade' "$prefix/share/polkit-1/actions/org.helix.Shell.upgrade.policy" || fail 'upgrade policy does not name the helper'
 
-grep -q 'bin/helix-desktop' "$prefix/lib/systemd/user/helix-service.service" || fail 'unit does not start helix-desktop'
-grep -q 'bin/helix-desktop' "$prefix/share/dbus-1/services/org.helix.Desktop.service" || fail 'activation does not start helix-desktop'
 [ -f "$prefix/share/dbus-1/services/org.helix.Desktop.service" ] || fail 'D-Bus activation is missing'
 [ -f "$prefix/lib/systemd/user/helix-service.service" ] || fail 'systemd user unit is missing'
+grep -q '/usr/bin/helix-desktop' "$prefix/lib/systemd/user/helix-service.service" || fail 'unit does not start helix-desktop'
+grep -q '/usr/bin/helix-desktop' "$prefix/share/dbus-1/services/org.helix.Desktop.service" || fail 'activation does not start helix-desktop'
+grep -q '/usr/bin/helix-inference' "$prefix/lib/systemd/user/helix-inference.service" || fail 'unit does not start helix-inference'
 
 [ -f "$prefix/share/helix/msg-risk.toml" ] || fail 'msg-risk protocol file is missing'
 [ -f "$prefix/share/helix/tool-hints.toml" ] || fail 'tool-hints protocol file is missing'
 
-if [ -x "$prefix/bin/helix-settings" ]; then
-  [ -f "$prefix/share/applications/org.helix.Settings.desktop" ] || fail 'Settings desktop entry is missing'
-  [ -x "$prefix/bin/helix-system-monitor" ] || fail 'System Monitor is missing'
-  [ -f "$prefix/share/applications/org.helix.SystemMonitor.desktop" ] || fail 'System Monitor desktop entry is missing'
-  [ -f "$prefix/share/icons/hicolor/scalable/apps/org.helix.SystemMonitor.svg" ] || fail 'System Monitor icon is missing'
-  "$prefix/bin/helix-system-monitor" --snapshot > /dev/null || fail 'System Monitor could not read local resources'
-  for app in Software Phone; do
-    case "$app" in Software) executable=helix-software ;; Phone) executable=helix-phone ;; esac
-    [ -x "$prefix/bin/$executable" ] || fail "$app application is missing"
-    [ -f "$prefix/share/applications/org.helix.$app.desktop" ] || fail "$app desktop entry is missing"
-    "$prefix/bin/$executable" --help > /dev/null || fail "$app command-line entry could not start"
-  done
+# A staged install must not leave a template placeholder behind.
+if grep -rn '@HELIX_BINDIR@\|@HELPER_PATH@' "$prefix" >/dev/null 2>&1; then
+  fail 'a template placeholder was not substituted'
 fi
 
 printf '%s\n' 'install_layout_test: OK'

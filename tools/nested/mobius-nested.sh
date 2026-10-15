@@ -1,7 +1,7 @@
 #!/bin/bash
-# Started by run.sh: the real helix-inference with its scripted (fake) backend on the private bus, then Mobius (AI hub).
+# Started by run.sh: the Rust helix-inference with its scripted (fake) backend on the private bus, then Mobius (AI hub).
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-BUILD=${HELIX_BUILD_DIR:-$(ls -d "$ROOT/build-debug" "$ROOT/build-native-clean" 2>/dev/null | head -1)}   # the meson build that has the C++ service
+INFERENCE=${HELIX_INFERENCE_BIN:-$(ls -t "$ROOT/target/fast/helix-inference" "$ROOT/target/release/helix-inference" "$ROOT/target/debug/helix-inference" 2>/dev/null | head -1)}   # the Rust service, run with its scripted backend
 BIN=${HELIX_MOBIUS_BIN:-$(ls -t "$ROOT/target/fast/helix-mobius" "$ROOT/target/release/helix-mobius" 2>/dev/null | head -1)}
 export HELIX_UI_LAYOUT_LOG="$XDG_STATE_HOME/layout.json"
 # A recording to play as the microphone (HELIX_NESTED_SEED_AUDIO=1): one second of a tone, raw 16 kHz 16-bit mono.
@@ -37,7 +37,7 @@ HELIX_INFERENCE_BACKEND=fake HELIX_FAKE_REPLY="${HELIX_FAKE_REPLY:-Sure. Here is
 
 \`\`\`sh
 crontab -e
-\`\`\`}" HELIX_FAKE_DELAY_MS="${HELIX_FAKE_DELAY_MS:-250}" "$BUILD/helix-inference" > "$XDG_STATE_HOME/helix-inference.log" 2>&1 &
+\`\`\`}" HELIX_FAKE_DELAY_MS="${HELIX_FAKE_DELAY_MS:-250}" "$INFERENCE" > "$XDG_STATE_HOME/helix-inference.log" 2>&1 &
 echo $! > "$XDG_STATE_HOME/helix-service.pid"
 sleep 1
 echo $$ > "$XDG_STATE_HOME/shell.pid"

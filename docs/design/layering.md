@@ -1,6 +1,6 @@
 # Source layering
 
-Dependency direction between workspace crates is checked by `tools/check-layers.py` (meson test `layering`). It reads
+Dependency direction between workspace crates is checked by `tools/check-layers.py` (`tools/test-integration.sh layering`). It reads
 `cargo metadata`, applies the rules in `tools/layers.toml`, and compares against `tools/layers-baseline.txt`: a new
 violation fails, and a baseline entry that has been fixed must be removed.
 

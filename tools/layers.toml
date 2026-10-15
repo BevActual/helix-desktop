@@ -1,5 +1,5 @@
 # Dependency-direction rules for the Cargo workspace, checked by tools/check-layers.py
-# (meson test `layering`). Keys are top-level directories; values are the directories a crate
+# (`tools/test-integration.sh layering`). Keys are top-level directories; values are the directories a crate
 # there may depend on (path dependencies inside this workspace). A crate may always depend on
 # its own directory's siblings only where its own directory is listed.
 #

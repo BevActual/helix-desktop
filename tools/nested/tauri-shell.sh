@@ -3,7 +3,6 @@
 # The service pid is recorded so the nested script can stop it by pid. This never touches the real session.
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-BUILD=${HELIX_BUILD_DIR:-$(ls -d "$ROOT/build-debug" "$ROOT/build-native-clean" 2>/dev/null | head -1)}   # the meson build that has the C++ service
 # Unless HELIX_SHELL_BIN says otherwise, run whichever build (fast or release) was made last, so a test never silently runs a stale binary.
 newest_shell_bin() { ls -t "$ROOT/target/fast/helix-shell-tauri" "$ROOT/target/release/helix-shell-tauri" 2>/dev/null | head -1; }
 export PIPEWIRE_REMOTE="${PIPEWIRE_REMOTE:-helix-nested-no-audio}"
