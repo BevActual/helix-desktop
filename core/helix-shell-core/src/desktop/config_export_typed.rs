@@ -5,7 +5,13 @@
 
 use toml::Value as Toml;
 
-use super::config_export_defaults::write_storage_defaults;
+use super::config_export_defaults::{
+    write_accessibility_defaults, write_audio_defaults, write_backdrop_defaults,
+    write_battery_defaults, write_brightness_defaults, write_location_defaults,
+    write_nightlight_defaults, write_storage_defaults, write_tailscale_defaults,
+    write_weather_defaults,
+};
+use super::config_export_rust::export_flat_schema_section;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct StorageExport {
@@ -61,17 +67,41 @@ impl StorageExport {
     }
 }
 
-pub(crate) fn export_storage_section_from_merged(merged: &Toml) -> Toml {
-    let merged_section = merged
+fn export_storage_section_from_merged(merged: &Toml) -> Toml {
+    merged
         .get("storage")
         .map(|section| StorageExport::from_merged_section(section).write_export_table())
-        .unwrap_or_else(|| StorageExport::export_defaults().write_export_table());
-    merged_section
+        .unwrap_or_else(|| StorageExport::export_defaults().write_export_table())
+}
+
+/// Ported schema sections (flat or explicit struct). `None` → merge path in `config_export_rust`.
+pub(crate) fn export_typed_schema_section(
+    section: &str,
+    merged: &Toml,
+    default: &Toml,
+) -> Option<Toml> {
+    if section == "storage" {
+        return Some(export_storage_section_from_merged(merged));
+    }
+    let writer = match section {
+        "accessibility" => write_accessibility_defaults,
+        "audio" => write_audio_defaults,
+        "backdrop" => write_backdrop_defaults,
+        "battery" => write_battery_defaults,
+        "brightness" => write_brightness_defaults,
+        "location" => write_location_defaults,
+        "nightlight" => write_nightlight_defaults,
+        "tailscale" => write_tailscale_defaults,
+        "weather" => write_weather_defaults,
+        _ => return None,
+    };
+    Some(export_flat_schema_section(section, merged, default, writer))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::config_export_serialize::serialize_default_config;
 
     #[test]
     fn storage_export_defaults_match_writer() {
@@ -98,5 +128,28 @@ key_file = "/etc/helix.key"
             table.get("key_file").and_then(Toml::as_str),
             Some("/etc/helix.key")
         );
+    }
+
+    #[test]
+    fn flat_typed_sections_match_default_writers_without_merged_overlay() {
+        let default = serialize_default_config();
+        let empty = Toml::Table(toml::map::Map::new());
+        let cases: [(&str, fn() -> Toml)] = [
+            ("accessibility", write_accessibility_defaults),
+            ("audio", write_audio_defaults),
+            ("backdrop", write_backdrop_defaults),
+            ("battery", write_battery_defaults),
+            ("brightness", write_brightness_defaults),
+            ("location", write_location_defaults),
+            ("nightlight", write_nightlight_defaults),
+            ("storage", write_storage_defaults),
+            ("tailscale", write_tailscale_defaults),
+            ("weather", write_weather_defaults),
+        ];
+        for (section, writer) in cases {
+            let got = export_typed_schema_section(section, &empty, &default)
+                .unwrap_or_else(|| panic!("section {section} should be typed"));
+            assert_eq!(got, writer(), "section {section}");
+        }
     }
 }
