@@ -67,36 +67,17 @@ wayland_client_dep  = dependency('wayland-client')
 wayland_protos_dep  = dependency('wayland-protocols')
 #egl_dep             = dependency('egl')
 #glesv2_dep          = dependency('glesv2')
-wayland_egl_dep     = dependency('wayland-egl')
-freetype2_dep       = dependency('freetype2')
-fontconfig_dep      = dependency('fontconfig')
-cairo_dep           = dependency('cairo')
-cairo_ft_dep        = dependency('cairo-ft')
-pango_dep           = dependency('pango')
-pangocairo_dep      = dependency('pangocairo')
-pangoft2_dep        = dependency('pangoft2')
-harfbuzz_dep        = dependency('harfbuzz')
-librsvg_dep         = dependency('librsvg-2.0')
 xkbcommon_dep       = dependency('xkbcommon')
 glib_dep            = dependency('glib-2.0')
 gobject_dep         = dependency('gobject-2.0')
 gio_dep             = dependency('gio-2.0')
-libsecret_dep       = dependency('libsecret-1', version: '>=0.20')
-libsodium_dep       = dependency('libsodium', version: '>=1.0.18')
-polkit_agent_dep    = dependency('polkit-agent-1')
-polkit_gobject_dep  = dependency('polkit-gobject-1')
 # PipeWire/SPA headers use GCC extensions that trigger -Wpedantic/-Wconversion;
 # mark as system so the compiler suppresses those warnings.
 pipewire_dep        = dependency('libpipewire-0.3', include_type: 'system')
-wireplumber_dep     = dependency('wireplumber-0.5', include_type: 'system')
 curl_dep            = dependency('libcurl')
 libqalculate_dep    = dependency('libqalculate')
-libxml2_dep         = dependency('libxml-2.0')
 nlohmann_dep        = dependency('nlohmann_json')
 tomlplusplus_dep    = dependency('tomlplusplus')
-libical_dep         = dependency('libical')
-cups_dep            = dependency('cups')
-pam_dep             = cc.find_library('pam')
 dl_dep              = cpp.find_library('dl', required: false)
 
 jemalloc_option = get_option('jemalloc')
@@ -116,21 +97,7 @@ if is_glibc
   endif
 endif
 
-egl_dep = dependency('egl', required: false)
-gles2_dep = dependency('glesv2', required: false)
 
-
-if not egl_dep.found()
-  egl_dep = dependency('wayland-egl', required: false)
-endif
-
-if not egl_dep.found()
-  egl_dep = dependency('epoxy')
-endif
-
-if not gles2_dep.found()
-  gles2_dep = dependency('epoxy')
-endif
 
 
 # ── Vendored: fzy matcher (C fuzzy scoring) ──────────────────────────────────
@@ -458,35 +425,14 @@ _helix_inc = [
 _helix_system_dependencies = [
   sdbus_cpp_dep,
   wayland_client_dep,
-  egl_dep,
-  gles2_dep,
-  wayland_egl_dep,
-  freetype2_dep,
-  fontconfig_dep,
-  cairo_dep,
-  cairo_ft_dep,
-  pango_dep,
-  pangocairo_dep,
-  pangoft2_dep,
-  harfbuzz_dep,
-  librsvg_dep,
   xkbcommon_dep,
   glib_dep,
   gobject_dep,
   gio_dep,
-  libsecret_dep,
-  libsodium_dep,
-  polkit_agent_dep,
-  polkit_gobject_dep,
   pipewire_dep,
-  wireplumber_dep,
   curl_dep,
   libqalculate_dep,
-  pam_dep,
   nlohmann_dep,
-  libxml2_dep,
-  libical_dep,
-  cups_dep,
   tomlplusplus_dep,
   libwebp_dep,
   libwebpdemux_dep,
@@ -496,9 +442,7 @@ _helix_system_dependencies = [
 ] + jemalloc_deps + (dl_dep.found() ? [dl_dep] : [])
 
 _helix_dependencies = _helix_system_dependencies + [
-  fzy_dep,
   mcu_dep,
-  qrcodegen_dep,
 ]
 
 _helix_test_dependencies = _helix_system_dependencies + [
