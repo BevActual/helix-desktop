@@ -308,9 +308,43 @@ mod apply_integration_tests {
         }
     }
 
+    fn temp_home(tag: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("helix-desktop-{tag}-{nanos}"));
+        let _ = fs::remove_dir_all(&home);
+        for sub in ["cfg/helix", "state/helix", "data", "cache"] {
+            fs::create_dir_all(home.join(sub)).unwrap();
+        }
+        home
+    }
+
+    fn apply_test_env(home: &Path, assets: &Path) {
+        unsafe {
+            std::env::remove_var("HELIX_CONFIG_HOME");
+            std::env::remove_var("HELIX_STATE_HOME");
+            std::env::remove_var("HELIX_TEMPLATE_APPLY_CMD");
+            std::env::remove_var("HELIX_TEMPLATE_APPLY_BIN");
+            std::env::set_var("HOME", home);
+            std::env::set_var("XDG_CONFIG_HOME", home.join("cfg"));
+            std::env::set_var("XDG_STATE_HOME", home.join("state"));
+            std::env::set_var("XDG_DATA_HOME", home.join("data"));
+            std::env::set_var("XDG_CACHE_HOME", home.join("cache"));
+            std::env::set_var("HELIX_ASSETS_DIR", assets);
+            std::env::set_var("HELIX_DISABLE_CPP_THEME_HELPERS", "1");
+        }
+    }
+
+    fn repo_root() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    }
+
     #[test]
     fn wallpaper_source_applies_in_process_without_cpp_helper() {
-        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let _guard = crate::testing::ENV_LOCK.lock().unwrap();
+        let repo = repo_root();
         let scenario = repo.join("core/helix-theme/tests/golden/apply/wallpaper-content");
         let assets = repo.join("assets");
         assert!(
@@ -318,15 +352,7 @@ mod apply_integration_tests {
             "missing shipped assets for template apply"
         );
 
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let home = std::env::temp_dir().join(format!("helix-desktop-wallpaper-apply-{nanos}"));
-        let _ = fs::remove_dir_all(&home);
-        for sub in ["cfg/helix", "state/helix", "data", "cache"] {
-            fs::create_dir_all(home.join(sub)).unwrap();
-        }
+        let home = temp_home("wallpaper-apply");
         fs::write(
             home.join("cfg/helix/config.toml"),
             r#"[theme]
@@ -346,19 +372,7 @@ builtin_ids = ["helix", "qt"]
             copy_tree(&scenario.join("statefiles"), &home.join("state/helix"));
         }
 
-        unsafe {
-            std::env::remove_var("HELIX_CONFIG_HOME");
-            std::env::remove_var("HELIX_STATE_HOME");
-            std::env::remove_var("HELIX_TEMPLATE_APPLY_CMD");
-            std::env::remove_var("HELIX_TEMPLATE_APPLY_BIN");
-            std::env::set_var("HOME", &home);
-            std::env::set_var("XDG_CONFIG_HOME", home.join("cfg"));
-            std::env::set_var("XDG_STATE_HOME", home.join("state"));
-            std::env::set_var("XDG_DATA_HOME", home.join("data"));
-            std::env::set_var("XDG_CACHE_HOME", home.join("cache"));
-            std::env::set_var("HELIX_ASSETS_DIR", &assets);
-            std::env::set_var("HELIX_DISABLE_CPP_THEME_HELPERS", "1");
-        }
+        apply_test_env(&home, &assets);
 
         let mut state = State::new(crate::agents::new_hub());
         reapply_templates(&mut state).expect("wallpaper-source apply should stay in-process");
@@ -368,5 +382,39 @@ builtin_ids = ["helix", "qt"]
             "expected helix theme output at {}",
             theme_out.display()
         );
+    }
+
+    #[test]
+    fn community_source_applies_in_process_without_cpp_helper() {
+        let _guard = crate::testing::ENV_LOCK.lock().unwrap();
+        let repo = repo_root();
+        let scenario = repo.join("core/helix-theme/tests/golden/apply/community-source");
+        let assets = repo.join("assets");
+        assert!(assets.join("templates/builtin.toml").is_file());
+
+        let home = temp_home("community-apply");
+        fs::write(
+            home.join("cfg/helix/config.toml"),
+            r#"[theme]
+source = "community"
+community_palette = "Oxo lab"
+mode = "dark"
+
+[theme.templates]
+builtin_ids = ["helix", "qt"]
+"#,
+        )
+        .unwrap();
+        let cache_src = scenario.join("statefiles/community-palettes");
+        if cache_src.is_dir() {
+            copy_tree(&cache_src, &home.join("state/helix/community-palettes"));
+        }
+
+        apply_test_env(&home, &assets);
+
+        let mut state = State::new(crate::agents::new_hub());
+        reapply_templates(&mut state).expect("community-source apply should stay in-process");
+        let theme_out = home.join("cfg/helix/themes/helix.toml");
+        assert!(theme_out.is_file() && fs::metadata(&theme_out).unwrap().len() > 0);
     }
 }

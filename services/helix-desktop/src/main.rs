@@ -37,6 +37,8 @@ mod palette_previews;
 mod peer;
 mod runtime_state;
 mod state;
+#[cfg(test)]
+mod testing;
 
 use std::sync::Arc;
 

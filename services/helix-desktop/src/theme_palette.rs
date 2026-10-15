@@ -217,11 +217,57 @@ longitude = -122.3321
 
     #[test]
     fn builtin_auto_mode_stays_in_process() {
+        let _guard = crate::testing::ENV_LOCK.lock().unwrap();
         let store = smoke_shaped_store();
         let inputs = Inputs::capture(&store, "");
         assert!(
             inputs.local.is_some(),
             "builtin palette with theme.mode=auto should not require helix-theme-palette"
+        );
+    }
+
+    #[test]
+    fn community_palette_with_cache_stays_in_process() {
+        let _guard = crate::testing::ENV_LOCK.lock().unwrap();
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let palette_src = repo.join(
+            "core/helix-theme/tests/golden/apply/community-source/statefiles/community-palettes/Oxo%20lab.json",
+        );
+        assert!(palette_src.is_file(), "missing community palette golden fixture");
+
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("helix-theme-palette-community-{nanos}"));
+        fs::create_dir_all(home.join("helix")).unwrap();
+        fs::create_dir_all(home.join("state/helix/community-palettes")).unwrap();
+        fs::copy(
+            &palette_src,
+            home.join("state/helix/community-palettes/Oxo%20lab.json"),
+        )
+        .unwrap();
+        fs::write(
+            home.join("helix/config.toml"),
+            r#"[theme]
+source = "community"
+community_palette = "Oxo lab"
+mode = "dark"
+"#,
+        )
+        .unwrap();
+        unsafe {
+            std::env::remove_var("HELIX_CONFIG_HOME");
+            std::env::remove_var("HELIX_STATE_HOME");
+            std::env::remove_var("HELIX_THEME_PALETTE_CMD");
+            std::env::set_var("XDG_CONFIG_HOME", &home);
+            std::env::set_var("XDG_STATE_HOME", home.join("state"));
+        }
+        let store = ConfigStore::load(ConfigPaths::from_env());
+        let inputs = Inputs::capture(&store, "");
+        assert!(
+            inputs.local.is_some(),
+            "cached community palette should not require helix-theme-palette"
         );
     }
 }
