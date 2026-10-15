@@ -71,11 +71,14 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 
 | System | Builds | Install / run |
 |---|---|---|
-| **Cargo** (workspace root) | Session services, Tauri apps/shell, `helix-inference` + `helix-transcribe` + `helix-image`, theme, config export | `just install-rust-desktop`, `just build-inference`, `tools/install-inference.sh` |
-| **Meson** | Units, polkit policy, assets, llama engine install tag. No compiled platform C++ | `meson install` |
-| **compositor/** | Own Cargo workspace (niri fork) | Separate |
+| **Cargo** (workspace root) | Everything Helix: session services, Tauri apps and shell, greeter, `helix-inference` + `helix-transcribe` + `helix-image`, theme, config export | `just build`, `just install`, `tools/switch-shell.sh install`, `tools/install-inference.sh` |
+| **npm** (workspace root) | The React frontends, run by each app's `build.rs` | with Cargo |
+| **compositor/** | Own Cargo workspace (niri fork) | `tools/install-trusted-niri.sh` |
 
-Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Dependency direction between crates is checked by `tools/check-layers.py` (`layering.md`).
+There is no Meson or CMake step. `tools/install.sh` installs the services, units, policy and assets (with `PREFIX` and `DESTDIR`);
+`tools/test-integration.sh` runs the integration tests against `target/fast` or `target/debug`.
+
+Rule: new binaries and tests land in Cargo. Dependency direction between crates is checked by `tools/check-layers.py` (`layering.md`).
 
 ## How it should function
 
@@ -100,7 +103,7 @@ Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Depen
 | **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-mobius/` |
 | `helix-wallpaper`, `helix-idle` | helpers | `services/` |
 | `helix-assistant` | Agent Surface client; never in the shell | `services/helix-assistant` |
-| `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (+ `helix-transcribe` bin; interim native/ llama; Meson `helix-image` until ported) |
+| `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (+ `helix-transcribe` bin; llama glue under `native/`) |
 | `helix-system-upgrade` | polkit-gated `dnf` plan helper | `services/helix-system-upgrade` |
 | Helix MCP server | MCP → Agent Surface for MCP-capable apps/agents | `tools/helix-agent/` |
 

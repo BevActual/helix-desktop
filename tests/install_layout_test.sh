@@ -35,6 +35,10 @@ grep -q '/usr/bin/helix-inference' "$prefix/lib/systemd/user/helix-inference.ser
 [ -f "$prefix/share/helix/msg-risk.toml" ] || fail 'msg-risk protocol file is missing'
 [ -f "$prefix/share/helix/tool-hints.toml" ] || fail 'tool-hints protocol file is missing'
 
+# The service finds its assets by walking up from its executable to <prefix>/share/helix.
+[ -f "$prefix/share/helix/templates/builtin.toml" ] || fail 'theme templates are missing (the service reads share/helix/templates)'
+[ -f "$prefix/share/helix/helix-wallpaper.png" ] || fail 'first-run wallpaper is missing'
+
 # A staged install must not leave a template placeholder behind.
 if grep -rn '@HELIX_BINDIR@\|@HELPER_PATH@' "$prefix" >/dev/null 2>&1; then
   fail 'a template placeholder was not substituted'

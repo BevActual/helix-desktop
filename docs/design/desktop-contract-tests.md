@@ -48,7 +48,7 @@ Use this list when adding tests. **Do not** revive the old GTK-era 1k-line C++ m
 3. `tools/nested/helix-desktop-agent-integration.sh`
 4. Nested UI: `qs`, `net`, `bt`, `cc`, `settings` (via `ui-suite.sh`)
 
-Meson also runs `helix_desktop_config_smoke` and `helix_desktop_configuration_contract` when `target/fast/helix-desktop` exists.
+`tools/test-integration.sh` (also `just test-integration`) runs `helix_desktop_config_smoke` and `helix_desktop_configuration_contract` when `target/fast/helix-desktop` exists.
 
 ## Legacy (do not port)
 
@@ -86,4 +86,4 @@ Seed: `harness::HELIX_TEST_CONFIG_TOML` (`theme.mode` only).
 - `helix-desktop` dead-code cleanup (agent hub, audio meter, NM constants, day_night test-only helper)
 - C++ agent tree deleted (`cpp/desktop/`); agent Meson tests removed (Rust `helix-shell-core::agent`)
 - C++ inference unit tests deleted (queue/routing/image/schema/llama harness)
-- `helix-transcribe` is Cargo; llama glue under `services/helix-inference/native/`; Meson keeps only `helix-image`
+- `helix-transcribe` and `helix-image` are Cargo; llama glue under `services/helix-inference/native/`

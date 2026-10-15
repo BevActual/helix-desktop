@@ -1,43 +1,43 @@
 ---
 title: Running Helix
-description: Start Helix Shell with helix-niri. The command is still helix.
+description: How a Helix session starts, and how to restart parts of it.
 sidebar:
-  order: 3
+  order: 2
 ---
 
-:::tip[Supported session]
-Helix’s sole supported product surface is **Fedora + helix-niri**. See [Niri](/helix/compositor-settings/niri/) for compositor setup.
-:::
+A Helix session is **greetd → helix-greeter → helix-niri + the shell**. With the greeter installed, you log in on the Helix login
+screen and the session starts on its own. Without it, start `niri-session` (or your compositor's session) from any display manager; the
+shell's systemd user units come up with the graphical session once they are installed.
 
-### Autostart with helix-niri
-
-This is the recommended method. The command is still `helix-shell` / `helix` depending on your install layout; the examples below use `helix`.
-
-Add the following line to the end of your configuration file, typically `~/.config/niri/config.kdl`:
-
-```ini
-spawn-at-startup "helix"
-```
-
-If your session expects the startup command to return after the shell has initialized, run Helix Shell in daemon mode:
+## Install and start
 
 ```bash
-helix --daemon
+tools/switch-shell.sh install      # links the binaries and units; starts the shell only if it is not already running
+tools/switch-shell.sh status       # what is running
 ```
 
-Daemon mode returns after the shell has initialized. The optional polkit authentication agent starts asynchronously after the UI is up.
+`install` never restarts a live shell, so it is safe to run while you work.
 
----
+## Restart parts of the session
 
-### Manual launch for debugging
+The shell is split into small processes, so most changes need only one of them restarted:
 
 ```bash
-helix
+tools/switch-shell.sh restart-panels   # panels and the launcher only; the bar stays up
+tools/switch-shell.sh restart-bar      # the bar; windows keep their space
+tools/switch-shell.sh restart          # bar and panels
 ```
 
-### Logs
+`restart-strut` also restarts the process that reserves the top of the screen, which makes windows jump; avoid it with applications
+open.
 
-Helix writes its main log to `$XDG_CACHE_HOME/helix/helix.log`. If
-`XDG_CACHE_HOME` is unset, the fallback path is
-`~/.cache/helix/helix.log`. The previous file is retained as
-`helix.log.1` when the current log reaches 1 MiB.
+## Settings, apps and agents
+
+Open **Settings** from the bar or the launcher. Appearance, wallpaper, network, Bluetooth, sound, keyboard, dock, power and the
+privacy and agent controls are all there. **Mobius** is the AI hub; anything an agent wants to change on your desktop asks for your
+approval first, in a dialog the shell draws.
+
+## Compositor
+
+helix-niri is the compositor Helix is built and tested with: `cd compositor && cargo build --release`, then
+`tools/install-trusted-niri.sh`. Its configuration is described under [Compositor](/helix/compositor-settings/).

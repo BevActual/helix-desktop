@@ -18,19 +18,11 @@ ROOT = Path(__file__).resolve().parent
 ALLOWLIST_PATH = ROOT / "allowlist.toml"
 RISK_POLICY_PATH = ROOT.parents[1] / "protocols" / "ipc" / "msg-risk.toml"
 
-# Prefer the built helix next to a common build dir, else PATH.
+# HELIX_SHELL, else helix-shell on PATH.
 def _helix_bin() -> str:
     env = os.environ.get("HELIX_SHELL")
     if env:
         return env
-    repo = ROOT.parents[1]
-    for candidate in (
-        repo / "build-debug" / "helix-shell",
-        repo / "build-native-clean" / "helix-shell",
-        repo / "build" / "helix-shell",
-    ):
-        if candidate.is_file() and os.access(candidate, os.X_OK):
-            return str(candidate)
     found = shutil.which("helix-shell")
     if found:
         return found

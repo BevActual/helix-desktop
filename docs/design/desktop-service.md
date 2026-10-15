@@ -172,13 +172,9 @@ battery-state and language controls remain pending, as do live suspend/lid check
 
 ## Development and validation
 
-Build with `meson compile -C build-debug helix-service helix-settings helix`.
-GTK4 >= 4.12 and libadwaita >= 1.7 development files are required for Settings;
-`-Ddesktop_apps=enabled` makes missing dependencies an error. The development
-shell launches its sibling service; installed builds use D-Bus activation and the
-systemd user unit. Run `helix-settings --page appearance` (also `desktop-dock`,
-`sound`, `network`, `bluetooth`, `notifications`, `accessibility`, `about`). The application is single-instance. Search
-filters setting metadata across available pages and devices on the active page. `--inspect-layout` prints diagnostic allocation data.
+Build with `cargo build --profile fast -p helix-desktop -p helix-settings` (`BUILDING.md`). Installed builds use D-Bus activation and the
+systemd user unit. Run `helix-settings --page appearance` (also `wallpaper`, `accessibility`, `displays`, `network`, `bluetooth`, `sound`,
+`keyboard`, `dock`, `power`, `agents`, `about`). The application is single-instance. Search filters setting metadata across the pages.
 
 Protocol and service tests run on a private session bus without real hardware.
 The service test checks missing backends, strict validation, persistence, restart,
@@ -186,7 +182,7 @@ external edits, desktop capability gating, bar preferences and stale commits.
 An optional private PipeWire integration test uses a silent virtual source,
 verifying live levels, explicit stop, lease expiry, client loss, startup recovery and
 daemon restart without inspecting real hardware. Historical GTK tab routing is archived in
-`docs/design/archive/desktop-migration.json` (no meson gate). The initial five pages do not replace Control Center.
+`docs/design/archive/desktop-migration.json` (no gate). The initial five pages do not replace Control Center.
 
 ## Remaining migration work
 

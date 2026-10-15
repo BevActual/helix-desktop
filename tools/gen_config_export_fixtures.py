@@ -187,7 +187,6 @@ def find_bin() -> Path:
     for candidate in (
         ROOT / "target/debug/helix-rust-config-export",
         ROOT / "target/fast/helix-rust-config-export",
-        ROOT / "build-debug/helix-rust-config-export",
     ):
         if candidate.is_file():
             return candidate

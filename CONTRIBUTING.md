@@ -66,9 +66,11 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 
 The approval dialog and the greeter are hand-written HTML/CSS/JS with no build step; the shell is moving to React in slices. Rules and status: `docs/design/frontend-stack.md`.
 
-### Meson
+### Build system
 
-Meson installs units, policies, and assets. It does not compile platform C++. Session services, config, theme, and inference workers are Cargo.
+Cargo builds everything, and the apps' `build.rs` runs their npm builds. There is no Meson or CMake step. `tools/install.sh` does the
+system install and `tools/test-integration.sh` runs the integration tests; `just` only names the common commands (see
+[BUILDING.md](BUILDING.md)).
 
 | Layer | Library |
 |-------|---------|
@@ -78,54 +80,29 @@ Meson installs units, policies, and assets. It does not compile platform C++. Se
 
 ## Runtime Assets
 
-`meson install` installs the binary and shipped assets separately using the normal prefix layout:
+`tools/install.sh` installs the services and the assets they read under the install prefix:
 
 ```text
-/usr/local/bin/helix
-/usr/local/share/helix/assets/...
+/usr/local/bin/helix-desktop
+/usr/local/share/helix/templates/...
+/usr/local/share/helix/helix-wallpaper.png
 ```
 
-With a different Meson `prefix`/`datadir`, the same structure is preserved under that prefix.
-
-Helix Shell needs the `assets/` tree at runtime. Copying only the bare `helix-shell` binary is not enough.
-
-Portable bundle layouts are also supported:
-
-```text
-bundle/
-  helix
-  assets/
-```
-
-```text
-bundle/
-  bin/helix
-  share/helix/assets/
-```
-
-Runtime asset lookup order:
+The desktop service finds its assets root in this order:
 
 1. `HELIX_ASSETS_DIR`
-2. `assets/` next to the executable
-3. `assets/` one level above the executable
-4. install-style `../share/helix/assets` relative to the executable
-5. the compiled install path from Meson (`<prefix>/<datadir>/helix/assets`)
-6. the source-tree `assets/` directory as a development fallback
+2. for each parent directory of the executable, `assets/`, then `share/helix/`
 
-An asset root is only accepted if it contains the expected shipped files such as `emoji.json`, `fonts/helix-tabler.ttf`,
-`templates/builtin.toml`, and `translations/en.json`.
+A root is accepted only if it contains `templates/builtin.toml`. From a source checkout the repository's `assets/` is found by walking up
+from `target/fast/helix-desktop`, so no setting is needed while developing.
 
 ## Code Style
 
-This project uses [clang-format](https://clang.llvm.org/docs/ClangFormat.html) for formatting. Run `just format`
-before committing.
+Rust: format the files you touch with `cargo fmt`, and keep `cargo clippy --workspace --all-targets -- -D warnings` clean. The tree is
+not yet formatted as a whole, so avoid reformatting files you are not changing. TypeScript: `npm run typecheck` and `npm run lint`.
+C++ engine shims under `services/*/native`: `just format`.
 
-For editor integration, `just configure` creates a root `compile_commands.json` symlink to the selected Meson build
-directory. Run `just configure`, `just configure release`, or `just configure asan` for the build mode you want clangd
-to use.
-
-The repo also includes `lefthook.yml`. Run `lefthook install` to install the pre-commit hook; it runs `just format`
-before commits and refreshes the git index for tracked formatting changes.
+The repo includes `lefthook.yml`. Run `lefthook install` to install the pre-commit hook; it runs `just format` before commits.
 
 Do not use em dashes (—) or double hyphens (--) as sentence punctuation, in code, comments, documentation, or commit
 messages. Use a comma, colon, semicolon, or parentheses instead.
@@ -219,31 +196,8 @@ hardware checklist in `docs/design/rust-desktop-soak.md` show how.
 When reporting a crash, include the complete terminal output from the process if it is available. Do not paste only
 `Segmentation fault`; that line does not contain a useful stack trace or the error context.
 
-### ASan crash reports
+### Memory errors in the native shims
 
-AddressSanitizer (ASan) can find memory errors that a normal build reports only as a crash. It requires a temporary
-source build; it does not replace the Helix package you already use.
-
-Install the source-build dependencies for your distribution using the commands in
-[BUILDING.md](BUILDING.md#dependencies), then clone the repository:
-
-```sh
-git clone https://github.com/BevActual/helix-desktop.git
-cd helix-desktop
-```
-
-Stop the Helix instance started by your compositor, then configure and build ASan:
-
-```sh
-just configure asan && just build asan
-```
-
-Start the ASan binary in the foreground and save its output:
-
-```sh
-ASAN_OPTIONS=log_path=/tmp/helix-asan ./build-asan/helix-assistant 2>&1 | tee helix-asan-terminal.log
-```
-
-Reproduce the crash once. If Helix does not exit, press `Ctrl+C`. Attach both `helix-asan-terminal.log` and every
-`/tmp/helix-asan.*` file to the GitHub issue. The files in `/tmp` preserve the ASan report if the crash takes down
-the terminal. If the build or startup fails, attach that complete output instead.
+The only C and C++ in the tree are the model engine shims under `services/*/native/`. To chase a memory error in one, build the service
+with the engine present and run it under your debugger or a sanitizer of your choice, then attach the complete terminal output to the
+issue. Rust code does not need a sanitizer for memory safety; a panic prints a backtrace with `RUST_BACKTRACE=1`.

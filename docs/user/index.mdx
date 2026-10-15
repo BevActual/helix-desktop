@@ -5,36 +5,79 @@ sidebar:
   order: 0
 ---
 
-Helix is a niri-first desktop: **greetd → helix-greeter → helix-niri + Helix Shell**. This tree holds Helix Shell, the greeter (`greeter/`), and the compositor (`compositor/`), with Control Center, first-party services, and a configuration model built for that desktop. The command and config paths stay `helix-shell`. **Fedora + helix-niri are the sole supported product surface.**
+Helix is a niri-first desktop: **greetd → helix-greeter → helix-niri + Helix Shell**. This tree holds the session shell, the greeter (`greeter/`), the compositor (`compositor/`), the apps (Settings, Mobius, Software, System Monitor) and the desktop service. **Fedora + helix-niri are the sole supported product surface.**
 
 If you are setting up Helix for the first time, start with [Installation](/helix/getting-started/installation/), then [Running Helix](/helix/getting-started/running-the-shell/) for compositor startup and keybind setup. Once the shell is installed, [How configuration works](/helix/configuration/) explains where settings live and which file wins when the GUI and your config both set the same option.
 
-:::caution[Coming from Helix v4?]
-- Helix Shell (and Helix v5) install separately and do not replace v4.
-- v4 settings are not migrated, but both versions can coexist on most distributions.
-- Update any compositor keybinds that launch `helix-shell` commands.
+:::caution[Some of these pages are being rewritten]
+Helix moved from a native, TOML-configured shell to Tauri apps managed through Settings. Pages that describe `[bar.*]`, widget, dock and
+shell options from the previous shell no longer apply and are being replaced. Prefer **Settings** for anything you can set there.
 :::
 
 ## Topics
 
-- **[Helix](/helix/helix/)** - How Helix Shell, helix-niri, and helix-greeter fit together.
-- **[Installation](/helix/getting-started/installation/)** - Package options, distro-specific commands, and manual install steps.
-- **[Running Helix](/helix/getting-started/running-the-shell/)** - Start the shell, run it from your compositor, and wire up keybinds.
-- **[How configuration works](/helix/configuration/)** - Config files, GUI-managed overrides, load order, and hot reload.
-- **[Greeter installation](/greeter/)** - Install helix-greeter (binaries stay `helix-greeter`), configure greetd, and sync your login screen with Helix.
-- **[Shell](/helix/configuration/shell/)** - Global UI scale, fonts, animations, shadows, OSD, lock screen, and keybinds.
-- **[Hooks](/helix/automation/hooks/)** - Advanced event-driven automation.
-- **[Launcher](/helix/launcher/)** - Application search, calculator, emoji picker, wallpaper browser, and [Quick Insert](/helix/launcher/quick-insert/).
-- **[Control Center](/helix/control-center/)** - Home tab, sidebar, shortcuts, and screen time.
-- **[Bars](/helix/bar/)** - Top, bottom, left, and right bars, including per-monitor changes.
-- **[Widgets](/helix/bar/widgets/)** - The clock, tray, volume, workspaces, media, and other things you place inside a bar.
-- **[Dock](/helix/dock/)** - Optional app dock, pinned apps, running apps, and auto-hide.
-- **[Desktop widgets](/helix/desktop/widgets/)** - On-desktop widgets, edit mode, and state file layout.
-- **[Wallpaper & backdrop](/helix/desktop/wallpaper/)** - Wallpaper folders, automation, per-monitor choices, and overview backdrop.
-- **[Theme](/helix/theming/)** - Built-in themes, wallpaper colors, and dark/light mode.
-- **[Palette](/helix/theming/palette/)** - Color roles, custom palette files, and terminal colors.
-- **[App Theming](/helix/theming/app-theming/)** - Generated themes for terminals, editors, browsers, and other apps.
-- **Services** - [Audio](/helix/services/audio/), [Brightness](/helix/services/brightness/), [Calendar](/helix/services/calendar/), [Idle](/helix/services/idle/), [Night Light](/helix/services/night-light/), [Notifications](/helix/services/notifications/), and [Weather](/helix/services/weather/).
-- **[IPC](/helix/ipc/)** - Commands for keybinds, scripts, automation, and hooks.
-- **[Plugins](/helix/plugins/)** - Install and configure plugins: custom bar widgets, shortcuts, and services in Luau.
+### Getting started
 
+- **[FAQ](/helix/getting-started/faq/)** - Frequently asked questions for Helix Shell.
+- **[Installation](/helix/getting-started/installation/)** - Build and install Helix from the Helix Desktop source repository.
+- **[Running Helix](/helix/getting-started/running-the-shell/)** - Start Helix Shell with helix-niri. The command is still helix.
+- **[Uninstall](/helix/getting-started/uninstall/)** - How to uninstall Helix and clean up configuration files.
+
+### Configuration
+
+- **[Date format tokens](/helix/configuration/date-format-tokens/)** - Time and date format tokens used by clock widgets and other date-format settings.
+- **[How configuration works](/helix/configuration/)** - Where Helix reads config from, how files are merged, and when GUI settings win.
+- **[Secret Service & keyrings](/helix/configuration/secret-service/)** - How Helix stores durable secrets through the desktop Secret Service, why a keyring can stay locked after login, and how to fix it.
+- **[Shell](/helix/configuration/shell/)** - Global shell settings, animation, shadow, MPRIS filtering, OSD, lock screen, and keybinds in Helix.
+
+### Theming
+
+- **[App Theming](/helix/theming/app-theming/)** - Built-in, community, and user templates for applying Helix colors to other apps.
+- **[Theme](/helix/theming/)** - Theme mode and palette source configuration.
+- **[Palette](/helix/theming/palette/)** - Color roles, custom palette files, and terminal colors.
+- **[Template Reference](/helix/theming/templates/)** - Template syntax, color tokens, filters, TOML entries, hooks, and CLI rendering.
+
+### Wallpaper and desktop
+
+- **[Wallpaper & Backdrop](/helix/desktop/wallpaper/)** - Wallpaper fill modes, automation, per-monitor directories, and niri's backdrop.
+
+### Launcher
+
+- **[Launcher](/helix/launcher/)** - Searching applications, calculating expressions, and picking emojis or wallpapers.
+- **[Quick Insert](/helix/launcher/quick-insert/)** - Insert emoji, recent screenshots, or clipboard history into the focused app.
+
+### Control Center
+
+- **[Control Center](/helix/control-center/)** - Quick desktop controls and native Settings navigation.
+- **[Shortcuts](/helix/control-center/shortcuts/)** - Optional Home pin list and its configuration.
+
+### Services
+
+- **[Audio](/helix/services/audio/)** - Audio service settings, sound effects, and volume behavior.
+- **[Battery](/helix/services/battery/)** - Battery warning thresholds and per-device battery configuration.
+- **[Brightness](/helix/services/brightness/)** - Brightness backends and per-monitor overrides.
+- **[Calendar](/helix/services/calendar/)** - Calendar account setup for CalDAV, iCloud, Google Calendar, ICS, and local vdir directories.
+- **[Idle](/helix/services/idle/)** - Idle behaviors, native actions, and pre-action fade.
+- **[Location](/helix/services/location/)** - Location resolution for weather, night light, and automatic theme mode.
+- **[Night Light](/helix/services/night-light/)** - Night light color temperature scheduling.
+- **[Notifications](/helix/services/notifications/)** - Notification daemon, toast placement, and filtering settings.
+- **[System Monitor](/helix/services/system-monitor/)** - System monitor sampling intervals and metric groups.
+- **[Weather](/helix/services/weather/)** - Weather service configuration and location requirements.
+
+### Automation
+
+- **[Hooks](/helix/automation/hooks/)** - Advanced event hooks for running shell commands and Helix IPC commands.
+
+### IPC
+
+- **[IPC & Keybinds](/helix/ipc/)** - Commands you can run with helix-panel for keybinds, scripts, and automation.
+- **[Media & UI](/helix/ipc/media-and-ui/)** - IPC commands for notifications, clipboard, media, wallpaper, theme, screenshots, screen recording, Tailscale, and AI usage.
+- **[IPC Command Sections](/helix/ipc/shell-and-ui/)** - Compatibility hub for the split v5 IPC command references.
+- **[Shell](/helix/ipc/shell/)** - IPC commands for shell status, logging, config reload, settings, window switcher, and session actions.
+- **[Surfaces](/helix/ipc/surfaces/)** - IPC commands for bar, bar widgets, workspace alerts, panels, dock, desktop widgets, and lockscreen widgets.
+- **[System Controls](/helix/ipc/system-controls/)** - IPC commands for OSDs, volume, microphone, brightness, keyboard backlight, night light, Wi-Fi, Bluetooth, EasyEffects, caffeine, and power profile.
+
+### Compositor
+
+- **[Compositor](/helix/compositor-settings/)** - Helix targets helix-niri. Other compositor pages are unsupported historical notes.
+- **[Niri](/helix/compositor-settings/niri/)** - Configure Niri for the best experience with Helix.

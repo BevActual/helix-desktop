@@ -2,7 +2,7 @@
 # Mobius against this machine's REAL inference service and models (heavy: loads a GGUF). Nothing is written outside the scratch chats.
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BIN=${HELIX_MOBIUS_BIN:-$(ls -t "$ROOT/target/fast/helix-mobius" "$ROOT/target/release/helix-mobius" 2>/dev/null | head -1)}
-INFERENCE=${HELIX_INFERENCE_BIN:-$(ls /usr/local/bin/helix-inference "$ROOT"/build-debug/helix-inference "$ROOT"/build-native-clean/helix-inference 2>/dev/null | head -1)}
+INFERENCE=${HELIX_INFERENCE_BIN:-$(ls /usr/local/bin/helix-inference "$ROOT"/target/fast/helix-inference "$ROOT"/target/release/helix-inference 2>/dev/null | head -1)}
 REAL_HOME=$(getent passwd "$(id -u)" | cut -d: -f6)
 export HELIX_UI_LAYOUT_LOG="$XDG_STATE_HOME/layout.json"
 # The inference service reads models from the real data directory; everything else stays private.

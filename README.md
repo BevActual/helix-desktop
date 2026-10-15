@@ -72,7 +72,8 @@ return as first-party features or as a new extension mechanism.
 
 **Session shell and apps (live path):** see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
 
-**Desktop authority:** The Rust `helix-desktop` (`cargo build -p helix-desktop`) owns `org.helix.Desktop`; Meson builds the assistant/inference/helpers. Details: [BUILDING.md](BUILDING.md), [docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md).
+**Everything else:** Cargo builds the whole workspace (`just build`), `just test` runs the tests, and `just install` installs the services.
+Dependencies, profiles and install options are in [BUILDING.md](BUILDING.md). The Rust `helix-desktop` owns `org.helix.Desktop`.
 
 ## Configuration
 
@@ -91,8 +92,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Packaging
 
-Distro packaging notes (description, deps, install layout, Meson options) live in
-[PACKAGING.md](PACKAGING.md).
+Packaging notes (description, runtime dependencies, install layout) live in [PACKAGING.md](PACKAGING.md).
 
 ### Native desktop applications
 

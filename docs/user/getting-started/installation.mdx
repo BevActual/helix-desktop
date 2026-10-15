@@ -1,40 +1,57 @@
 ---
 title: Installation
-description: Build and install Helix from the Helix Desktop source repository.
+description: Build Helix from source and install it on Fedora.
 sidebar:
   order: 1
 ---
 
-Helix is currently distributed from the [Helix Desktop source repository](https://github.com/BevActual/helix-desktop). Install from this repository to get Helix features.
+Helix is built from the [Helix Desktop source repository](https://github.com/BevActual/helix-desktop). Fedora with helix-niri is the
+supported target. Packages for other distributions are not provided.
 
-The installed executable, desktop entry, and configuration paths still use `helix-shell` for compatibility. If upstream Helix is also installed, check which `helix-shell` executable your `PATH` selects before starting a session. The two builds use the same configuration and runtime paths.
+## Build
 
-## Build from source
-
-Install the build dependencies for your distribution from [BUILDING.md](https://github.com/BevActual/helix-desktop/blob/main/BUILDING.md). You also need a Wayland compositor, fonts, and a running PipeWire daemon for audio features. Optional runtime services are listed in [PACKAGING.md](https://github.com/BevActual/helix-desktop/blob/main/PACKAGING.md).
+Install the build dependencies, then build the workspace. The package list, profiles and optional pieces are in
+[BUILDING.md](https://github.com/BevActual/helix-desktop/blob/main/BUILDING.md).
 
 ```bash
 git clone https://github.com/BevActual/helix-desktop.git
 cd helix-desktop
-just configure release "$HOME/.local"
 just build release
-just install release
 ```
 
-This installs the shell and its required assets under `~/.local`. Ensure `~/.local/bin` is on your `PATH`, then use `command -v helix` to check which build will start. To try the executable directly, run `~/.local/bin/helix --version`. The command name in the version output remains `helix-shell`.
+The compositor is a separate workspace:
 
-Start the shell through your [compositor's startup configuration](/helix/getting-started/running-the-shell/). The intended compositor is in-tree at `compositor/` (build with `cd compositor && cargo build --release`); stock niri and other supported Wayland compositors can also run the shell. The login greeter is in-tree at `greeter/` (`cargo build -p helix-greeter`).
+```bash
+cd compositor && cargo build --release
+```
+
+## Install
+
+Install the session shell and apps for your user (no root needed):
+
+```bash
+tools/switch-shell.sh install
+```
+
+Install the system services (desktop service, assistant, inference service, systemd user units, D-Bus activation, polkit policy):
+
+```bash
+just install            # /usr/local; use `just install /usr` for another prefix
+```
+
+The login screen is installed with `tools/install-greeter.sh` and the compositor with `tools/install-trusted-niri.sh`. See
+[Running Helix](/helix/getting-started/running-the-shell/) to start a session.
 
 ## Update or remove
-
-From the Helix Desktop checkout, update and reinstall with:
 
 ```bash
 git pull
 just build release
-just install release
+tools/switch-shell.sh install
+just install
 ```
 
-To remove files installed by this build, run `just uninstall release` from the same checkout and build directory. Your personal configuration and state remain under the `helix-shell` XDG directories; see [Uninstall](/helix/getting-started/uninstall/) before removing them.
+`just uninstall` removes what `just install` put under the prefix. Your configuration and state stay under `~/.config/helix`,
+`~/.local/state/helix` and `~/.local/share/helix`; see [Uninstall](/helix/getting-started/uninstall/) before removing them.
 
-For build options, troubleshooting, and system-wide installation, see [BUILDING.md](https://github.com/BevActual/helix-desktop/blob/main/BUILDING.md). Report issues in the [Helix issue tracker](https://github.com/BevActual/helix-desktop/issues).
+Report issues in the [Helix issue tracker](https://github.com/BevActual/helix-desktop/issues).

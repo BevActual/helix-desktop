@@ -5,8 +5,8 @@ Status: living design + implementation notes. Wire contracts for Agent Surface /
 sections below mark what ships versus what is still open.
 Product homes: `services/helix-assistant` and `services/helix-inference` (Rust).
 Speech worker is Cargo (`helix-transcribe`). Interim llama lives under
-`services/helix-inference/native/`; Meson still builds optional `helix-image`
-(`cpp/inference/image_*`) until that worker is Rust (`cpp-to-rust.md`).
+`services/helix-inference/native/`; `helix-image` is a Cargo crate over a C engine shim
+under `services/helix-image/native/` (`cpp-to-rust.md`).
 
 ## Why a second design
 
@@ -274,7 +274,7 @@ measurements). `helix-assistant --warm` loads it and primes its prompt cache wit
 request takes about 0.7 s instead of 25 s (measured live). `assets/services/helix-assistant-warm.service.in` runs it at
 login; it is not installed or enabled by default, and the model is freed again after the idle timeout (300 s).
 
-Packaging: `meson install` puts the engine's runtime libraries in a private `<prefix>/lib64/helix` (`tools/scripts/install_engine.py`)
+Packaging: `tools/install.sh` puts the engine's runtime libraries in a private `<prefix>/lib64/helix` (`tools/scripts/install_engine.py`)
 and gives `helix-inference` an install rpath to it, so nothing system-wide changes and the repo's `third_party/` is
 not needed at run time. `tools/install-assistant.sh <staged tree>` installs only the model runtime, the assistant and
 `helix-service` (backing up the old one), restarts nothing, and has `--uninstall`. Installed on the development machine

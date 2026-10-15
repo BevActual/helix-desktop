@@ -40,8 +40,8 @@ if [ "$UNINSTALL" = 1 ]; then
         "$D$UNITDIR"/helix-service.service "$D$UNITDIR"/helix-inference.service "$D$UNITDIR"/helix-assistant-warm.service \
         "$D$DATADIR"/dbus-1/services/org.helix.Desktop.service "$D$DATADIR"/dbus-1/services/org.helix.Inference.service \
         "$D$DATADIR"/polkit-1/actions/org.helix.Shell.upgrade.policy "$D$DATADIR"/icons/hicolor/scalable/apps/helix.svg \
-        "$D$DATADIR"/helix/msg-risk.toml "$D$DATADIR"/helix/tool-hints.toml
-  rm -rf "$D$PREFIX/lib64/helix"
+        "$D$DATADIR"/helix/msg-risk.toml "$D$DATADIR"/helix/tool-hints.toml "$D$DATADIR"/helix/helix-wallpaper.png
+  rm -rf "$D$PREFIX/lib64/helix" "$D$DATADIR/helix/templates"
   rmdir "$D$DATADIR/helix" 2>/dev/null || true
   echo "removed from ${D}${PREFIX}"
   exit 0
@@ -84,6 +84,12 @@ subst "$ROOT/assets/polkit/org.helix.Shell.upgrade.policy.in" "$D$DATADIR/polkit
 
 install -Dm644 "$ROOT/assets/helix.svg" "$D$DATADIR/icons/hicolor/scalable/apps/helix.svg"
 install -Dm644 "$ROOT/protocols/ipc/msg-risk.toml"  "$D$DATADIR/helix/msg-risk.toml"
+# What the service reads from its assets root (<prefix>/share/helix is found by walking up from the executable):
+# the theme templates and the wallpaper a first run starts with.
+mkdir -p "$D$DATADIR/helix"
+cp -r "$ROOT/assets/templates" "$D$DATADIR/helix/"
+find "$D$DATADIR/helix/templates" -type d -exec chmod 0755 {} + -o -type f -exec chmod 0644 {} +
+install -Dm644 "$ROOT/assets/helix-wallpaper.png" "$D$DATADIR/helix/helix-wallpaper.png"
 install -Dm644 "$ROOT/protocols/ipc/tool-hints.toml" "$D$DATADIR/helix/tool-hints.toml"
 
 # The model engine's shared libraries, when it was built into third_party/llama-install.
