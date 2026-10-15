@@ -14,18 +14,25 @@ below either makes the desktop complete enough to live in, or makes that bet tru
 
 ## 1. Foundations (do first, all small)
 
+Done on 2026-10-15: the C++ cutover, the Cargo-only build (`tools/install.sh`, `tools/test-integration.sh`, no Meson), removal of the
+Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layering check. What is left:
+
 | Item | Size | Evidence / where |
 |---|---|---|
-| Merge the greeter-sync and docs branch | S | `land-greeter-sync-and-doc-reset` |
-| Retire C++ dev tooling as one change: `lefthook.yml`, `justfile` (`format`, `lint`, `fix`, `_clang_tidy`), `ci.yml` clang-format/tidy jobs, PR template + `enforce-pr-template.py` + its tests, `tools/ci-local.sh`, CONTRIBUTING formatting section | S | All still name `cpp/`. **Check required status-check names in branch protection before removing CI jobs.** |
-| Decide Rust formatting: one repo-wide `cargo fmt` commit plus a CI check, or no policy | S | Tree outside the touched files is not rustfmt-clean (hundreds of diffs in `core/`, Mobius) |
-| Pin the toolchain (`rust-toolchain.toml` or document rustup-first `PATH`) | S | Fedora `rustc` + rustup `clippy-driver` on one `PATH` fails with "incompatible version of rustc" |
-| One local gate: `tools/check-all.sh` stops saying "C++ tests"; layering + clippy + tests + contracts in one entry | S | `tools/check-all.sh` |
+| Merge the `land-greeter-sync-and-doc-reset` branch | S | Greeter appearance sync, Sound page, Act task card, build and docs reset |
+| Retire the C++ formatting checks as one change: the `format` job in `ci.yml`, the PR template checkbox and `enforce-pr-template.py` + its tests, `tools/ci-local.sh`'s format job | S | They still ask for `just format` with clang-format over a `cpp/` tree. **Check required status-check names in branch protection before removing CI jobs.** |
+| Decide Rust formatting: one repo-wide `cargo fmt` commit plus a CI check, or no policy | S | The tree outside touched files is not rustfmt-clean (hundreds of diffs in `core/`, Mobius) |
+| Pin the toolchain (`rust-toolchain.toml`) | S | Fedora `rustc` with a rustup `clippy-driver` on one `PATH` fails with "incompatible version of rustc" |
+| Make `tools/install.sh` install the session shell, greeter and apps, then write the RPM spec over it | M | `PACKAGING.md`: today a package must add those binaries, desktop entries and `tools/systemd` units by hand |
+| Move CI to a Fedora container and install the real dependency list from `BUILDING.md` | M | CI builds on Arch with a list trimmed from the C++ one, so it is not the platform we ship on |
+| Audit the remaining `docs/user` pages (configuration, services, launcher, control-center, theming, ipc) against what the Tauri shell does, rewrite or retire each | M | Most still describe the previous TOML-configured shell; the overview says so |
 | Remove the `helix-settings -> helix-wallpaper` layering exception | S | `tools/layers-baseline.txt` |
-| Fix the stale ASan section and C++ dependency list in `BUILDING.md` / `CONTRIBUTING.md` | S | They describe `build-asan/helix-assistant` and C++23 |
 | Record the pending budgets (USS/RSS) for Software and System Monitor | S | `software-tauri.md`, `system-monitor-tauri.md` budget tables read _pending_ |
 | Run the soak checklist on the real session now that C++ is gone | M | `rust-desktop-soak.md` |
-| Repair `tools/nested/mobius-nested.sh`: it starts a C++ `helix-inference` from a Meson build that no longer exists, so `mobius-test.sh` cannot run | S | Use the Rust `helix-inference` with its fake backend | `tools/nested/mobius-nested.sh` |
+| Run `mobius-test.sh` again (it now starts the Rust inference service) and fix what has rotted | S | `tools/nested/mobius-nested.sh` |
+| Decide on `third_party/wuffs` and `third_party/material_color_utilities`: build the image-decode plan on Wuffs or remove it; keep the C++ reference only while the HCT goldens need regenerating | S | Neither is built today |
+| Find out why `inference_service_integration` is SIGKILLed after about 85 s (it also happened here and took the calling shell with it), then make it a CI gate | S | `tools/test-integration.sh inference_service_integration`; the note in `ci.yml` |
+| Local disk: `target/` is 100 GB and `build-native-clean/` 2 GB of stale artifacts | S | `cargo clean`, or `cargo sweep` to keep the current toolchain's output |
 
 ## 2. Settings (missing pages and ghost settings)
 

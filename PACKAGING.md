@@ -4,7 +4,7 @@ Notes for packagers. The supported target is Fedora with helix-niri; other distr
 
 ## Package description
 
-> Helix — a Wayland desktop built on the niri compositor, with a shell, login screen and apps that people and AI agents share.
+> Helix: a Wayland desktop built on the niri compositor, with a shell, login screen and apps that people and AI agents share.
 
 ## Source layout and build
 
