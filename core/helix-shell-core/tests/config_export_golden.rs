@@ -166,6 +166,14 @@ fn rust_export_matches_cpp_for_settings_theme_override() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_migrated_settings_sidecar() {
+    assert_rust_export_matches_cpp_files(
+        "",
+        "config_version = 14\n[shell]\nlaunch_apps_as_systemd_services = false\n",
+    );
+}
+
+#[test]
 fn rust_export_matches_cpp_for_notification_max_visible() {
     assert_rust_export_matches_cpp("[notification]\nmax_visible = 5\n");
 }

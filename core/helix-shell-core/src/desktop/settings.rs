@@ -2748,6 +2748,20 @@ impl ConfigStore {
         merge_toml_values(self.base.clone(), self.overrides.clone())
     }
 
+    /// Like [`merged_user_toml`] but applies `settings.toml` migrations and drops `config_version`
+    /// (C++ `mergeUserConfigSources` + pre-`normalizeLegacyConfig` merge).
+    pub(crate) fn merged_for_config_export(&self) -> Toml {
+        let overrides =
+            super::config_settings_migrate::prepare_settings_sidecar(self.overrides.clone());
+        let merged = merge_toml_values(self.base.clone(), overrides);
+        if let Toml::Table(mut table) = merged {
+            table.remove(super::config_settings_migrate::CONFIG_VERSION_KEY);
+            Toml::Table(table)
+        } else {
+            merged
+        }
+    }
+
     pub fn get(&self, id: &str) -> Value {
         let def = match find_def(id) {
             Some(def) => def,

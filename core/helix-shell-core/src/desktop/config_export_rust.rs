@@ -102,7 +102,7 @@ fn is_allowed_extra_bar_path(path: &str, merged: &Toml) -> bool {
 
 /// Merged config may only touch export paths, or extra `bar.<name>` subtrees from user config.
 fn merged_export_is_patchable(store: &ConfigStore) -> bool {
-    let merged = store.merged_user_toml();
+    let merged = store.merged_for_config_export();
     let default = default_export_root();
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
@@ -277,7 +277,7 @@ fn set_dot_path(root: &mut Toml, path: &str, value: Toml) {
 
 fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut root = default_export_root().clone();
-    let merged = store.merged_user_toml();
+    let merged = store.merged_for_config_export();
     rebuild_bar_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
     let mut leaves = Vec::new();

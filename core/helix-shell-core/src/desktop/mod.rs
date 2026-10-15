@@ -10,6 +10,7 @@ pub mod compositor_config;
 pub mod config_export;
 mod config_export_rust;
 mod config_merge;
+mod config_settings_migrate;
 pub mod compositor_ipc;
 pub mod control_center_shortcuts;
 pub mod dock_prefs;
