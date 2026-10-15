@@ -8,6 +8,7 @@ pub mod color;
 pub mod contrast;
 pub mod custom;
 pub mod custom_schemes;
+pub mod firefox_theme;
 pub mod hct;
 pub mod kde;
 pub mod palette;

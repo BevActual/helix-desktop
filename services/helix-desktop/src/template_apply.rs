@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 use helix_shell_core::desktop::compositor_ipc;
+use helix_shell_core::desktop::settings::active_icon_theme_name;
 use helix_shell_core::ConfigStore;
 use helix_theme::apply::{self, ApplyInputs, CommunityTemplate, Outcome};
 use helix_theme::custom::{resolve_palette, PaletteSource, ThemeSelection};
@@ -109,8 +110,8 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         default_mode: mode.to_string(),
         scheme_type,
         image_path: Some(crate::wallpaper_source::palette_wallpaper_path(config)),
-        config_table: None,
-        icon_theme: String::new(),
+        config_table: Some(config.template_config_table()),
+        icon_theme: active_icon_theme_name(),
         builtin_config,
         enable_builtin: config.get("theme.templates.enable_builtin_templates").as_bool().unwrap_or(true),
         builtin_ids: list("theme.templates.builtin_ids"),

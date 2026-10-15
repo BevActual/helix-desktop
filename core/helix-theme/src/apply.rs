@@ -594,11 +594,6 @@ impl Planner<'_> {
 
         let mut plans = Vec::new();
         for entry in &entries {
-            if entry.post_action == "firefox-theme" {
-                self.unsupported
-                    .get_or_insert_with(|| format!("post_action 'firefox-theme' (template {})", entry.name));
-            }
-
             let mut closest = String::new();
             if !entry.compare_to.is_empty() && !entry.colors_to_compare.is_empty() {
                 let opts = self.options(config_path, "");
@@ -809,6 +804,7 @@ fn execute_entries(
     hooks: &HookRunner,
     failures: &mut BTreeMap<String, String>,
     notify_kde: Option<fn() -> Option<String>>,
+    default_mode: &str,
 ) -> bool {
     let mut ok = true;
     for plan in plans {
@@ -844,7 +840,7 @@ fn execute_entries(
         let wants_post = (plan.has_outputs && outputs_ok)
             || (!plan.has_outputs && (plan.post_hook.is_some() || !plan.post_action.is_empty()));
         if wants_post {
-            if !run_post_action(&plan, notify_kde, &mut report) {
+            if !run_post_action(&plan, notify_kde, default_mode, &mut report) {
                 ok = false;
             }
             if !plan.hook_async && plan.post_hook.is_some() {
@@ -868,10 +864,28 @@ fn execute_entries(
 fn run_post_action(
     plan: &EntryPlan,
     notify_kde: Option<fn() -> Option<String>>,
+    default_mode: &str,
     report: &mut impl FnMut(&str, &str),
 ) -> bool {
     if plan.post_action.is_empty() {
         return true;
+    }
+    if plan.post_action == "firefox-theme" {
+        let [output] = plan.outputs_for_action.as_slice() else {
+            return false;
+        };
+        return match crate::firefox_theme::apply(output, default_mode) {
+            Ok(result) => {
+                if let Some(warning) = result.warning {
+                    tracing_warn(&plan.name, &warning);
+                }
+                true
+            }
+            Err(message) => {
+                report(&plan.name, if message.is_empty() { "post action failed" } else { &message });
+                false
+            }
+        };
     }
     if plan.post_action != "kde-color-scheme" {
         report(&plan.name, "unknown post action");
@@ -1012,7 +1026,8 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
 
     let hooks = HookRunner::new();
     for (label, entry_plans, parsed) in plans {
-        let ok = execute_entries(entry_plans, &hooks, &mut failures, inputs.notify_kde) && parsed;
+        let ok =
+            execute_entries(entry_plans, &hooks, &mut failures, inputs.notify_kde, &inputs.default_mode) && parsed;
         if !ok {
             // `TemplateApplyService` records one aggregate failure per failed config.
             match label.as_str() {

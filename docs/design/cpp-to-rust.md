@@ -62,7 +62,7 @@ the first-run bundled wallpaper, and `theme.source = wallpaper` with a wallpaper
 
 ## Next (C++ tail)
 
-1. **Theme helpers** — Close `helix-theme::apply` `Outcome::Unsupported` gaps (templates reading `config.*` / `icon_theme`, bundled first-run wallpaper, unreadable wallpaper decoders) so `helix-template-apply` and `helix-theme-palette` can leave Meson.
+1. **Theme helpers** — `helix-desktop` now passes merged config + icon theme into in-process apply; `firefox-theme` post-action is Rust. Remaining gaps: bundled first-run wallpaper, templates that need exact C++ `config_export` shape, unreadable wallpaper decoders — then drop `helix-template-apply` / `helix-theme-palette` from Meson.
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
 3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.

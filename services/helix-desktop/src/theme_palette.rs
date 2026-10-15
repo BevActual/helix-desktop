@@ -1,9 +1,8 @@
 //! Custom palette mutations (ThemeService `saveCurrentPaletteAsCustom` / `saveRoleColorAsCustom`).
 //!
 //! Builtin and custom palette sources with a concrete dark/light shell mode run in-process
-//! through `helix-theme`. Everything the crate does not cover yet (wallpaper and community
-//! sources, `auto` mode which needs the day/night schedule) falls back to the C++
-//! `helix-theme-palette` helper.
+//! through `helix-theme`. Wallpaper and community sources use in-process generation when
+//! the wallpaper decodes; `auto` mode and unreadable wallpapers fall back to `helix-theme-palette`.
 
 use std::path::PathBuf;
 use std::process::Command;

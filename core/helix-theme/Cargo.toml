@@ -7,6 +7,7 @@ description = "Palette math and custom-palette storage. Ports src/theme/ (C++ Th
 
 [dependencies]
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+libc = "0.2"
 serde_json = "1"
 regex = "1"
 toml = "0.8"
