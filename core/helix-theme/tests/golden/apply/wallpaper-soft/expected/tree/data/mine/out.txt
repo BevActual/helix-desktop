@@ -1,0 +1,3 @@
+palette #75d77e #1a231b
+image @ROOT@/cfg/wp.png
+scheme {{scheme_type}}

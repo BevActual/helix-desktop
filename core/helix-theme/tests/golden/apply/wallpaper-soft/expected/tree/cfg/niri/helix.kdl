@@ -1,0 +1,3 @@
+// Palette-driven niri colors are written to helix-layout.kdl by
+// Control Center → Theme. This include stays so existing configs keep
+// `include "helix.kdl"` after a template apply.

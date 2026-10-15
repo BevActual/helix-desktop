@@ -6,7 +6,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use helix_theme::apply::{apply, build_user_template_root, ApplyInputs, CommunityTemplate, Outcome};
-use helix_theme::custom::{community_palette_cache_path, resolve_palette, PaletteSource, ThemeSelection};
+use helix_theme::custom::{
+    community_palette_cache_path, resolve_palette, PaletteSource, ThemeSelection, WallpaperPalette,
+};
+use helix_theme::wallpaper::{generate, load_and_resize, Scheme};
 use helix_theme::template::make_theme_data;
 use helix_theme::transform::apply_resolved_transforms;
 use toml::{Table, Value};
@@ -75,8 +78,31 @@ fn run_scenario(scenario: &Path, root: &Path) {
         "builtin" => PaletteSource::Builtin,
         "custom" => PaletteSource::Custom,
         "community" => PaletteSource::Community,
+        "wallpaper" => PaletteSource::Wallpaper,
         other => panic!("{name}: unsupported source {other}"),
     };
+    // The wallpaper the palette comes from: `[wallpaper.last] path` in the state's settings.toml (a leading ~ is HOME).
+    let wallpaper_path = fs::read_to_string(root.join("state/helix/settings.toml"))
+        .ok()
+        .and_then(|s| s.parse::<Table>().ok())
+        .and_then(|t| {
+            let path = t.get("wallpaper")?.get("last")?.get("path")?.as_str()?.to_string();
+            Some(match path.strip_prefix("~/") {
+                Some(rest) => root.join(rest).to_string_lossy().into_owned(),
+                None => path,
+            })
+        })
+        .unwrap_or_default();
+    let wallpaper = (source == PaletteSource::Wallpaper).then(|| {
+        let scheme_name = theme.get("wallpaper_scheme").and_then(Value::as_str).unwrap_or("m3-content");
+        let scheme = Scheme::parse(scheme_name).unwrap_or(Scheme::Content);
+        let rgb = load_and_resize(Path::new(&wallpaper_path), scheme).expect("wallpaper loads");
+        WallpaperPalette {
+            generated: generate(&rgb, scheme).expect("wallpaper palette"),
+            path: wallpaper_path.clone(),
+            scheme: scheme_name.to_string(),
+        }
+    });
     let community = theme.get("community_palette").and_then(Value::as_str).unwrap_or("Oxocarbon");
     let selection = ThemeSelection {
         source,
@@ -85,6 +111,7 @@ fn run_scenario(scenario: &Path, root: &Path) {
         community_cache: (source == PaletteSource::Community && !community.is_empty())
             .then(|| community_palette_cache_path(&root.join("state/helix"), community)),
         shell_light: false,
+        wallpaper,
     };
     let mut generated = resolve_palette(&root.join("cfg/helix/palettes"), &selection).unwrap();
     let high_contrast = config
@@ -118,7 +145,7 @@ fn run_scenario(scenario: &Path, root: &Path) {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
         scheme_type,
-        image_path: Some(String::new()),
+        image_path: Some(wallpaper_path.clone()),
         config_table: None,
         icon_theme: String::new(),
         builtin_config: Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/templates/builtin.toml"),
@@ -174,6 +201,10 @@ fn run_scenario(scenario: &Path, root: &Path) {
     assert_eq!(got_files, want_files, "{name} file tree");
 
     for rel in &want_files {
+        if rel.ends_with("settings.toml") {
+            // An input here (the wallpaper path); the C++ run re-serialises it, which is not what is being compared.
+            continue;
+        }
         if rel.ends_with("state.toml") {
             // C++ writes its own TOML layout; compare the persisted value instead.
             let ids = |p: &Path| {
@@ -188,9 +219,13 @@ fn run_scenario(scenario: &Path, root: &Path) {
             assert_eq!(ids(&root.join(rel)), ids(&expected.join("tree").join(rel)), "{name} applied ids");
             continue;
         }
-        let want = fs::read_to_string(expected.join("tree").join(rel)).unwrap();
-        let got = fs::read_to_string(root.join(rel)).unwrap().replace(&root_str, "@ROOT@");
-        assert_eq!(got, want, "{name}: {}", rel.display());
+        let want = fs::read(expected.join("tree").join(rel)).unwrap();
+        let mut got = fs::read(root.join(rel)).unwrap();
+        // Text files carry the scratch root in them; binary ones (a copied wallpaper) are compared as they are.
+        if let Ok(text) = String::from_utf8(got.clone()) {
+            got = text.replace(&root_str, "@ROOT@").into_bytes();
+        }
+        assert!(got == want, "{name}: {} differs", rel.display());
     }
 }
 
@@ -206,5 +241,5 @@ fn matches_cpp_template_apply() {
         count += 1;
     }
     let _ = fs::remove_dir_all(&root);
-    assert_eq!(count, 19);
+    assert_eq!(count, 23);
 }
