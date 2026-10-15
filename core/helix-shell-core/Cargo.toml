@@ -12,6 +12,10 @@ toml = "0.8"
 regex = "1"
 ts-rs = { version = "10", optional = true }
 
+[[bin]]
+name = "helix-rust-config-export"
+path = "src/bin/helix-rust-config-export.rs"
+
 [features]
 # Generates TypeScript types for the views the React apps receive: tools/gen-bindings.sh
 ts = ["dep:ts-rs"]

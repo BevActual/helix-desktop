@@ -23,12 +23,14 @@ configure m=mode install_prefix=prefix:
 
 build m=mode: (_ensure-configured m)
     # Default targets needed for `meson install` (template apply, assistant, inference, upgrade helper).
-    meson compile -C build-{{m}} helix-template-apply helix-theme-palette helix-config-export
+    meson compile -C build-{{m}} helix-template-apply helix-theme-palette
+    cargo build -p helix-shell-core --bin helix-rust-config-export
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
     mkdir -p build-{{m}}/helix-tmp
-    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-template-apply helix-theme-palette helix-config-export -j {{jobs}}
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-template-apply helix-theme-palette -j {{jobs}}
+    cargo build -p helix-shell-core --bin helix-rust-config-export
 
 # Legacy GTK Settings only (needs -Ddesktop_apps=enabled). Prefer: (cargo build -p helix-settings)
 build-settings m=mode jobs="2": (_ensure-configured m)

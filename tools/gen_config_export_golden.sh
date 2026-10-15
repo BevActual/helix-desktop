@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Capture helix-config-export default effective export for Rust parity (schema defaults + minimal fixture).
-# Regenerate when C++ config_export::serialize defaults change.
+# Capture default effective export for Rust parity (schema defaults + minimal fixture).
+# Regenerate when config_export defaults or serialize finalize rules change.
 # Usage: tools/gen_config_export_golden.sh [output.toml]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -9,6 +9,9 @@ BIN="${HELIX_CONFIG_EXPORT_BIN:-}"
 
 if [[ -z "$BIN" ]]; then
   for candidate in \
+    "$ROOT/target/debug/helix-rust-config-export" \
+    "$ROOT/target/fast/helix-rust-config-export" \
+    "$ROOT/build-debug/helix-rust-config-export" \
     "$ROOT/build-debug/helix-config-export" \
     "$ROOT/build-fast/helix-config-export" \
     "$ROOT/_build/helix-config-export"; do
@@ -20,7 +23,7 @@ if [[ -z "$BIN" ]]; then
 fi
 
 if [[ -z "$BIN" || ! -x "$BIN" ]]; then
-  echo "error: build helix-config-export first (just build debug) or set HELIX_CONFIG_EXPORT_BIN" >&2
+  echo "error: build helix-rust-config-export (cargo build -p helix-shell-core --bin helix-rust-config-export) or set HELIX_CONFIG_EXPORT_BIN" >&2
   exit 1
 fi
 

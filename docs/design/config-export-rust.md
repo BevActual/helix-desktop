@@ -1,6 +1,6 @@
 # Rust `config_export` port
 
-Theme templates read `config.*` from `config_export::serialize` output (C++ today via `helix-config-export`).
+Theme templates read `config.*` from `config_export::serialize` output (Rust in-process; `helix-rust-config-export` for fixture regeneration).
 
 ## Parity gates
 
@@ -25,6 +25,6 @@ Theme templates read `config.*` from `config_export::serialize` output (C++ toda
 2. Port **merge + `normalizeLegacyConfig` + `parseConfigTable`** into Rust (or generate from schema), starting with sections templates touch most (`theme`, `shell`, `bar`). **`mergeConfigWithIncludes`** lives in `desktop/config_merge.rs` and backs `ConfigStore` base config load. **`settings.toml` sidecar migrations** and **`normalizeLegacyConfig`** (`config_settings_migrate.rs`) run in `ConfigStore::merged_for_config_export` before leaf patch; keep `CURRENT_CONFIG_VERSION` aligned with `config_migrations.cpp`.
 3. Port **`writeTable` per section** in the same order as `config_sections.cpp` (`config_export_defaults.rs`: section list + all schema sections plus `bar` / `widget` / placement roots via `assemble_default_export` (golden file remains the C++ drift check in `tools/verify_config_export_golden.sh` and unit tests).
 4. Port **bar/widget placement** emitters from `config_export.cpp` anonymous namespace.
-5. When `config_export_golden` passes **without** `HELIX_CONFIG_EXPORT_BIN`, remove `helix-config-export` from Meson/CI. **Done for arch unit tests and config smoke** (frozen fixtures + in-process export; no runtime `discover_config_export_bin` fallback in `export_effective_toml`). Keep the Meson target for fixture/golden regeneration until maintainers drop it.
+5. When `config_export_golden` passes **without** `HELIX_CONFIG_EXPORT_BIN`, remove C++ export from Meson/CI. **Done:** frozen fixtures, in-process runtime export, `helix-rust-config-export` (`cargo build -p helix-shell-core --bin helix-rust-config-export`) for `tools/gen_config_export_*`; C++ `helix-config-export` target removed from Meson. Optional: keep `src/config/config_export_main.cpp` only until `parseConfigTable` → serialize replaces leaf-patch.
 
-Until step 5, `just build debug` (or install layout) must ship `helix-config-export` next to `helix-desktop` or under `build-debug/`.
+`just build` compiles `helix-rust-config-export` via Cargo alongside Meson theme helpers.

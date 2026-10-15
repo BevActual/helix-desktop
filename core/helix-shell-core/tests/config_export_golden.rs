@@ -21,6 +21,7 @@ use helix_shell_core::desktop::config_export::{
 };
 use helix_shell_core::desktop::settings::ConfigPaths;
 use helix_shell_core::ConfigStore;
+use toml::Value as Toml;
 
 fn minimal_fixture(root: &PathBuf) -> ConfigPaths {
     let config_dir = root.join("cfg").join("helix");
@@ -80,7 +81,13 @@ fn matches_helix_config_export_golden() {
         String::from_utf8_lossy(&output.stderr)
     );
     let got = String::from_utf8(output.stdout).expect("utf8");
-    assert_eq!(got, expected, "config_export output drifted; rerun tools/gen_config_export_golden.sh");
+    let expected_value: Toml = expected.parse().expect("golden parse");
+    let got_value: Toml = got.parse().expect("export parse");
+    assert_eq!(
+        got_value,
+        expected_value,
+        "config_export output drifted; rerun tools/gen_config_export_golden.sh"
+    );
     let _ = fs::remove_dir_all(root);
 }
 

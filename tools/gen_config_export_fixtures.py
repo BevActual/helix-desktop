@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture helix-config-export effective export per parity fixture (regenerate when C++ serialize changes)."""
+"""Capture effective config export per parity fixture (Rust exporter default; C++ optional)."""
 from __future__ import annotations
 
 import os
@@ -184,13 +184,20 @@ def find_bin() -> Path:
         if candidate.is_file():
             return candidate
     for candidate in (
+        ROOT / "target/debug/helix-rust-config-export",
+        ROOT / "target/fast/helix-rust-config-export",
+        ROOT / "build-debug/helix-rust-config-export",
         ROOT / "build-debug/helix-config-export",
         ROOT / "build-fast/helix-config-export",
         ROOT / "_build/helix-config-export",
     ):
         if candidate.is_file():
             return candidate
-    sys.exit("error: build helix-config-export or set HELIX_CONFIG_EXPORT_BIN")
+    sys.exit(
+        "error: build helix-rust-config-export "
+        "(cargo build -p helix-shell-core --bin helix-rust-config-export) "
+        "or set HELIX_CONFIG_EXPORT_BIN"
+    )
 
 
 def export_case(bin_path: Path, config: str, settings: str, extra: dict[str, str] | None) -> str:
