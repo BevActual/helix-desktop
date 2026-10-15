@@ -3440,7 +3440,8 @@ pub fn active_icon_theme_name() -> String {
     "Adwaita".to_string()
 }
 
-fn toml_to_json_value(value: &Toml) -> Value {
+/// JSON for theme templates and other TOML-backed APIs (integers stay integers).
+pub fn toml_to_json_value(value: &Toml) -> Value {
     match value {
         Toml::Boolean(flag) => Value::Bool(*flag),
         Toml::Integer(number) => Value::from(*number),

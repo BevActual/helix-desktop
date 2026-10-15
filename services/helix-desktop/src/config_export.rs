@@ -2,29 +2,12 @@
 
 use std::process::Command;
 
+use helix_shell_core::desktop::settings::toml_to_json_value;
 use helix_shell_core::ConfigStore;
 use serde_json::Value;
 use toml::Value as Toml;
 
 use crate::assets_path::helix_config_export_bin;
-
-fn toml_to_json(value: &Toml) -> Value {
-    match value {
-        Toml::Boolean(flag) => Value::Bool(*flag),
-        Toml::Integer(number) => Value::from(*number),
-        Toml::Float(number) => Value::from(*number),
-        Toml::String(text) => Value::String(text.clone()),
-        Toml::Array(items) => Value::Array(items.iter().map(toml_to_json).collect()),
-        Toml::Table(table) => {
-            let mut object = serde_json::Map::new();
-            for (key, item) in table {
-                object.insert(key.clone(), toml_to_json(item));
-            }
-            Value::Object(object)
-        }
-        Toml::Datetime(datetime) => Value::String(datetime.to_string()),
-    }
-}
 
 fn configure_export_env(command: &mut Command, store: &ConfigStore) {
     let paths = store.paths();
@@ -54,7 +37,7 @@ fn try_cpp_export(store: &ConfigStore) -> Option<Value> {
     }
     let text = String::from_utf8(output.stdout).ok()?;
     let root: Toml = text.parse().ok()?;
-    Some(toml_to_json(&root))
+    Some(toml_to_json_value(&root))
 }
 
 /// `config_export::serialize` when `helix-config-export` is available; else merged TOML JSON.
@@ -64,4 +47,72 @@ pub fn template_config_json(store: &ConfigStore) -> Value {
         return json;
     }
     store.template_config_table()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use helix_shell_core::desktop::settings::ConfigPaths;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root() -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("helix-config-export-{nanos}"))
+    }
+
+    fn export_bin() -> Option<PathBuf> {
+        if let Ok(path) = std::env::var("HELIX_CONFIG_EXPORT_BIN") {
+            let candidate = PathBuf::from(path);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        let candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build-debug/helix-config-export");
+        candidate.is_file().then_some(candidate)
+    }
+
+    #[test]
+    fn schema_export_adds_bar_root_when_helper_present() {
+        let Some(bin) = export_bin() else {
+            eprintln!("skip schema_export_adds_bar_root: helix-config-export not built");
+            return;
+        };
+        let root = temp_root();
+        let config_dir = root.join("cfg").join("helix");
+        let state_dir = root.join("state").join("helix");
+        fs::create_dir_all(&config_dir).unwrap();
+        fs::create_dir_all(&state_dir).unwrap();
+        fs::write(
+            config_dir.join("config.toml"),
+            "[theme]\nmode = \"dark\"\n",
+        )
+        .unwrap();
+        fs::write(state_dir.join("settings.toml"), "").unwrap();
+
+        std::env::set_var("HELIX_CONFIG_EXPORT_BIN", bin);
+        std::env::set_var("XDG_CONFIG_HOME", root.join("cfg"));
+        std::env::set_var("XDG_STATE_HOME", root.join("state"));
+
+        let store = ConfigStore::load(ConfigPaths {
+            config_dir,
+            settings_toml: state_dir.join("settings.toml"),
+        });
+        let exported = template_config_json(&store);
+        assert!(exported.get("theme").is_some());
+        assert!(
+            exported.get("bar").is_some(),
+            "config_export::serialize always emits [bar]"
+        );
+        let merged = store.template_config_table();
+        assert!(
+            merged.get("bar").is_none(),
+            "merged TOML should not invent [bar] without config"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
 }

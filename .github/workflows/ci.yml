@@ -102,11 +102,12 @@ jobs:
         run: |
           cargo build --profile fast -p helix-desktop -p helix-assistant -p helix-inference
           just configure debug
-          meson compile -C build-debug helix-template-apply helix-theme-palette desktop_service_test
+          meson compile -C build-debug helix-template-apply helix-theme-palette helix-config-export desktop_service_test
       - name: Configuration smoke (Rust desktop)
         env:
           HELIX_TEMPLATE_APPLY_BIN: ${{ github.workspace }}/build-debug/helix-template-apply
           HELIX_THEME_PALETTE_BIN: ${{ github.workspace }}/build-debug/helix-theme-palette
+          HELIX_CONFIG_EXPORT_BIN: ${{ github.workspace }}/build-debug/helix-config-export
           HELIX_ASSETS_DIR: ${{ github.workspace }}/assets
         run: ./tools/nested/helix-desktop-config-smoke.sh
       # tests/desktop_service_test.cpp is the C++ service's behavioural contract; it takes the

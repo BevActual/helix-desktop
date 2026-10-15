@@ -62,7 +62,7 @@ wallpaper images, missing community palette when fetch is blocked (offline / no 
 
 ## Next (C++ tail)
 
-1. **Theme helpers** — in-process apply uses `helix-config-export` for `config.*` when the binary is present (`config_export.rs`), plus icon theme, Firefox post-action, wallpaper paths, and community palette fetch/refresh. Remaining: pure-Rust `config_export` (drop `helix-config-export`), then remove `helix-template-apply` / `helix-theme-palette` from Meson when CI no longer needs them.
+1. **Theme helpers** — in-process apply uses `helix-config-export` for `config.*` when the binary is present (`config_export.rs`; built via `just build` / CI alongside `helix-template-apply`). Parity target for a pure-Rust exporter: `tests/config_schema_roundtrip_test.cpp` (`config_export::serialize` vs merged TOML). Then drop `helix-config-export`, then `helix-template-apply` / `helix-theme-palette` when smokes stay green without them.
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
 3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.
