@@ -1,25 +1,24 @@
 //! In-process `config_export::serialize` parity (incremental port).
 //!
 //! Milestone B default tree: [`config_export_serialize::serialize_default_config`].
-//! Milestone C effective export: rebuild dynamic `bar` / `idle` / widgets, overlay merged leaves,
-//! then [`config_export_serialize::finalize_serialized_export`]. Future: parse merged TOML into
-//! `Config` and `writeTable` per section instead of leaf patch (see `docs/design/config-export-rust.md`).
+//! Milestone C effective export: `merge_export_subtree` per `SCHEMA_EXPORT_SECTIONS` + `bar`,
+//! dynamic calendar/idle/bar/shell-provider passes, extra `widget` / placement roots, residual leaf
+//! patch, then [`config_export_serialize::finalize_serialized_export`]. Future: typed
+//! `parseConfigTable` + `writeTable` (see `docs/design/config-export-rust.md`).
 
 use std::sync::OnceLock;
 
 use toml::Value as Toml;
 
-use super::config_export_defaults::{write_bar_defaults, write_shell_defaults, write_theme_defaults};
+use super::config_export_defaults::{
+    schema_section_default_writer, write_bar_defaults, SCHEMA_EXPORT_SECTIONS,
+};
 use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
 use super::settings::{ConfigPaths, ConfigStore};
 
-/// Milestone C: rebuilt from defaults + merged overlay before the global leaf pass.
-const PARSED_EXPORT_SECTIONS: &[&str] = &["theme", "shell", "bar"];
-
 fn is_parsed_export_section_path(path: &str) -> bool {
-    PARSED_EXPORT_SECTIONS
-        .iter()
-        .any(|section| path == *section || path.starts_with(&format!("{section}.")))
+    let section = path.split('.').next().unwrap_or("");
+    section == "bar" || SCHEMA_EXPORT_SECTIONS.contains(&section)
 }
 
 fn default_export_root() -> &'static Toml {
@@ -653,6 +652,71 @@ fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
     );
 }
 
+/// Overlay merged config onto export defaults (C++ `parseConfigTable` + `writeTable` shape at the TOML layer).
+fn merge_export_subtree(template: &Toml, patch: &Toml) -> Toml {
+    match (template, patch) {
+        (Toml::Table(template_table), Toml::Table(patch_table)) => {
+            if patch_table.is_empty() {
+                return template.clone();
+            }
+            let mut out = template_table.clone();
+            for (key, patch_value) in patch_table {
+                let merged = match out.get(key) {
+                    Some(template_value) => merge_export_subtree(template_value, patch_value),
+                    None => patch_value.clone(),
+                };
+                out.insert(key.clone(), merged);
+            }
+            Toml::Table(out)
+        }
+        _ => coerce_patch_value(template, patch),
+    }
+}
+
+fn strip_table_keys(value: &Toml, keys: &[&str]) -> Toml {
+    let table = match value.as_table() {
+        Some(table) => table,
+        None => return value.clone(),
+    };
+    let mut out = table.clone();
+    for key in keys {
+        out.remove(*key);
+    }
+    Toml::Table(out)
+}
+
+fn merged_overlay_for_parsed_section(section: &str, merged_section: &Toml) -> Toml {
+    match section {
+        "bar" => {
+            let mut table = toml::map::Map::new();
+            if let Some(default) = merged_section.get("default") {
+                let mut default_overlay = default.clone();
+                if let Toml::Table(bar_default) = &mut default_overlay {
+                    bar_default.remove("monitor");
+                }
+                table.insert("default".to_string(), default_overlay);
+            }
+            Toml::Table(table)
+        }
+        "wallpaper" => strip_table_keys(
+            merged_section,
+            &["default", "last", "monitors", "favorite"],
+        ),
+        "calendar" => strip_table_keys(merged_section, &["account"]),
+        "idle" => strip_table_keys(merged_section, &["behavior", "behavior_order"]),
+        "shell" => {
+            let mut shell = merged_section.clone();
+            if let Toml::Table(table) = &mut shell {
+                if let Some(launcher) = table.get_mut("launcher").and_then(Toml::as_table_mut) {
+                    launcher.remove("providers");
+                }
+            }
+            shell
+        }
+        _ => merged_section.clone(),
+    }
+}
+
 /// Match C++ `writeTable` scalar kinds using the default-export node at `path` as the template.
 fn coerce_patch_value(template: &Toml, patch: &Toml) -> Toml {
     match (template, patch) {
@@ -723,72 +787,60 @@ fn apply_merged_export_leaf(
     false
 }
 
-fn apply_merged_export_leaf_in_section(
-    section_root: &mut Toml,
+fn rebuild_parsed_export_section(
+    root_table: &mut toml::map::Map<String, Toml>,
     section: &str,
-    full_path: &str,
+    writer: fn() -> Toml,
     merged: &Toml,
     default: &Toml,
-) -> bool {
-    let prefix = format!("{section}.");
-    if !full_path.starts_with(&prefix) {
-        return false;
-    }
-    let relative = full_path.strip_prefix(&prefix).unwrap();
-    if !is_merged_leaf_exported(full_path, default)
-        || is_wallpaper_runtime_merged_path(full_path)
-        || is_calendar_account_parse_only_path(full_path)
-    {
-        return false;
-    }
-    let value = match dot_path_get(merged, full_path) {
-        Some(value) => value,
-        None => return false,
+) {
+    let default_section = dot_path_get(default, section).unwrap_or_else(writer);
+    let section_root = match merged.get(section) {
+        Some(merged_section) => {
+            let overlay = merged_overlay_for_parsed_section(section, merged_section);
+            merge_export_subtree(&default_section, &overlay)
+        }
+        None => default_section,
     };
-    if let Some(template) = dot_path_get(section_root, relative)
-        .or_else(|| dot_path_get(default, full_path))
-    {
-        set_dot_path(section_root, relative, coerce_patch_value(&template, &value));
-        return true;
-    }
-    if is_allowed_merged_extra_leaf(full_path, merged, default)
-        || (section == "bar" && is_allowed_extra_bar_path(full_path, merged))
-    {
-        set_dot_path(section_root, relative, value);
-        return true;
-    }
-    false
-}
-
-fn default_writer_for_parsed_section(section: &str) -> Option<fn() -> Toml> {
-    match section {
-        "theme" => Some(write_theme_defaults),
-        "shell" => Some(write_shell_defaults),
-        "bar" => Some(write_bar_defaults),
-        _ => None,
-    }
+    root_table.insert(section.to_string(), section_root);
 }
 
 fn rebuild_parsed_sections_from_merged(root: &mut Toml, merged: &Toml, default: &Toml) {
-    let mut leaves = Vec::new();
-    collect_leaf_paths(merged, "", &mut leaves);
     let root_table = match root.as_table_mut() {
         Some(table) => table,
         None => return,
     };
-    for section in PARSED_EXPORT_SECTIONS {
-        let writer = match default_writer_for_parsed_section(section) {
+    for section in SCHEMA_EXPORT_SECTIONS {
+        let writer = match schema_section_default_writer(section) {
             Some(writer) => writer,
             None => continue,
         };
-        let mut section_root = dot_path_get(default, section).unwrap_or_else(|| writer());
-        for path in &leaves {
-            if *section == "bar" && !is_bar_default_leaf_for_parsed_section(path) {
-                continue;
-            }
-            apply_merged_export_leaf_in_section(&mut section_root, section, path, merged, default);
+        rebuild_parsed_export_section(root_table, section, writer, merged, default);
+    }
+    rebuild_parsed_export_section(root_table, "bar", write_bar_defaults, merged, default);
+}
+
+fn apply_deferred_parsed_section_leaves_from_merged(
+    root: &mut Toml,
+    merged: &Toml,
+    default: &Toml,
+) {
+    let mut leaves = Vec::new();
+    collect_leaf_paths(merged, "", &mut leaves);
+    for path in leaves {
+        if path.starts_with("calendar.account.")
+            && !is_calendar_account_parse_only_path(&path)
+        {
+            apply_merged_export_leaf(root, &path, merged, default);
+            continue;
         }
-        root_table.insert(section.to_string(), section_root);
+        if path == "idle.behavior_order" || path.starts_with("idle.behavior.") {
+            apply_merged_export_leaf(root, &path, merged, default);
+            continue;
+        }
+        if path.starts_with("shell.launcher.providers.") {
+            apply_merged_export_leaf(root, &path, merged, default);
+        }
     }
 }
 
@@ -844,16 +896,17 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut root = default.clone();
     let merged = store.merged_for_config_export();
     rebuild_widget_from_merged(&mut root, &merged);
-    rebuild_calendar_accounts_from_merged(&mut root, &merged);
     rebuild_desktop_widgets_from_merged(&mut root, &merged);
     rebuild_lockscreen_widgets_from_merged(&mut root, &merged);
-    rebuild_idle_from_merged(&mut root, &merged);
     rebuild_parsed_sections_from_merged(&mut root, &merged, default);
+    rebuild_calendar_accounts_from_merged(&mut root, &merged);
+    rebuild_idle_from_merged(&mut root, &merged);
     rebuild_bar_from_merged(&mut root, &merged);
     apply_dynamic_bar_leaves_from_merged(&mut root, &merged, default);
     rebuild_bar_monitors_from_merged(&mut root, &merged);
     apply_bar_monitor_leaves_from_merged(&mut root, &merged, default);
     rebuild_launcher_providers_from_merged(&mut root, &merged);
+    apply_deferred_parsed_section_leaves_from_merged(&mut root, &merged, default);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
@@ -870,6 +923,19 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn merge_export_subtree_keeps_defaults_for_empty_section_table() {
+        let mut defaults = toml::map::Map::new();
+        defaults.insert(
+            "on_shutdown".to_string(),
+            Toml::Array(vec![Toml::String("cmd".to_string())]),
+        );
+        defaults.insert("on_startup".to_string(), Toml::Array(vec![]));
+        let defaults = Toml::Table(defaults);
+        let merged = Toml::Table(toml::map::Map::new());
+        assert_eq!(merge_export_subtree(&defaults, &merged), defaults);
+    }
 
     #[test]
     fn coerce_matches_export_scalar_kinds() {

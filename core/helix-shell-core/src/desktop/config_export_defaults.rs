@@ -1052,7 +1052,7 @@ pub fn write_lockscreen_widgets_defaults() -> Toml {
     Toml::Table(table)
 }
 
-const PORTED_SCHEMA_WRITERS: &[(&str, fn() -> Toml)] = &[
+pub(crate) const PORTED_SCHEMA_WRITERS: &[(&str, fn() -> Toml)] = &[
     ("storage", write_storage_defaults),
     ("shell", write_shell_defaults),
     ("accessibility", write_accessibility_defaults),
@@ -1078,6 +1078,13 @@ const PORTED_SCHEMA_WRITERS: &[(&str, fn() -> Toml)] = &[
     ("control_center", write_control_center_defaults),
     ("hooks", write_hooks_defaults),
 ];
+
+pub(crate) fn schema_section_default_writer(section: &str) -> Option<fn() -> Toml> {
+    PORTED_SCHEMA_WRITERS
+        .iter()
+        .find(|(name, _)| *name == section)
+        .map(|(_, writer)| *writer)
+}
 
 /// `config_export::serialize` root tables outside `config_sections.cpp`.
 const EXTRA_EXPORT_ROOT_WRITERS: &[(&str, fn() -> Toml)] = &[
