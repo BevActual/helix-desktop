@@ -200,6 +200,16 @@ fn rust_export_matches_cpp_for_bar_monitor_override() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_legacy_bar_dead_zone_command() {
+    assert_rust_export_matches_cpp("[bar.default.dead_zone]\ncommand = \"notify-send hi\"\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_desktop_widgets_disabled() {
+    assert_rust_export_matches_cpp("[desktop_widgets]\nenabled = false\n");
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }
