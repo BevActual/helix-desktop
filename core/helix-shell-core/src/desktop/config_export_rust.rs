@@ -9,8 +9,18 @@ use std::sync::OnceLock;
 
 use toml::Value as Toml;
 
+use super::config_export_defaults::write_theme_defaults;
 use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
 use super::settings::{ConfigPaths, ConfigStore};
+
+/// Milestone C: rebuilt from defaults + merged overlay before the global leaf pass.
+const PARSED_EXPORT_SECTIONS: &[&str] = &["theme"];
+
+fn is_parsed_export_section_path(path: &str) -> bool {
+    PARSED_EXPORT_SECTIONS
+        .iter()
+        .any(|section| path == *section || path.starts_with(&format!("{section}.")))
+}
 
 fn default_export_root() -> &'static Toml {
     static ROOT: OnceLock<Toml> = OnceLock::new();
@@ -671,6 +681,86 @@ fn coerce_patch_value(template: &Toml, patch: &Toml) -> Toml {
     }
 }
 
+fn apply_merged_export_leaf(
+    root: &mut Toml,
+    path: &str,
+    merged: &Toml,
+    default: &Toml,
+) -> bool {
+    if !is_merged_leaf_exported(path, default)
+        || is_wallpaper_runtime_merged_path(path)
+        || is_calendar_account_parse_only_path(path)
+    {
+        return false;
+    }
+    let value = match dot_path_get(merged, path) {
+        Some(value) => value,
+        None => return false,
+    };
+    if let Some(template) = dot_path_get(root, path) {
+        set_dot_path(root, path, coerce_patch_value(&template, &value));
+        return true;
+    }
+    if is_allowed_extra_bar_path(path, merged)
+        || is_merged_widget_path(path, merged)
+        || is_allowed_calendar_account_path(path, merged)
+        || is_allowed_desktop_widgets_path(path, merged)
+        || is_allowed_lockscreen_widgets_path(path, merged)
+        || is_allowed_merged_extra_leaf(path, merged, default)
+    {
+        set_dot_path(root, path, value);
+        return true;
+    }
+    false
+}
+
+fn apply_merged_export_leaf_in_section(
+    section_root: &mut Toml,
+    section: &str,
+    full_path: &str,
+    merged: &Toml,
+    default: &Toml,
+) -> bool {
+    let prefix = format!("{section}.");
+    if !full_path.starts_with(&prefix) {
+        return false;
+    }
+    let relative = full_path.strip_prefix(&prefix).unwrap();
+    if !is_merged_leaf_exported(full_path, default)
+        || is_wallpaper_runtime_merged_path(full_path)
+        || is_calendar_account_parse_only_path(full_path)
+    {
+        return false;
+    }
+    let value = match dot_path_get(merged, full_path) {
+        Some(value) => value,
+        None => return false,
+    };
+    if let Some(template) = dot_path_get(section_root, relative)
+        .or_else(|| dot_path_get(default, full_path))
+    {
+        set_dot_path(section_root, relative, coerce_patch_value(&template, &value));
+        return true;
+    }
+    if is_allowed_merged_extra_leaf(full_path, merged, default) {
+        set_dot_path(section_root, relative, value);
+        return true;
+    }
+    false
+}
+
+fn rebuild_parsed_sections_from_merged(root: &mut Toml, merged: &Toml, default: &Toml) {
+    let mut theme = write_theme_defaults();
+    let mut leaves = Vec::new();
+    collect_leaf_paths(merged, "", &mut leaves);
+    for path in leaves {
+        apply_merged_export_leaf_in_section(&mut theme, "theme", &path, merged, default);
+    }
+    if let Some(table) = root.as_table_mut() {
+        table.insert("theme".to_string(), theme);
+    }
+}
+
 fn set_dot_path(root: &mut Toml, path: &str, value: Toml) {
     let parts: Vec<&str> = path.split('.').collect();
     if parts.is_empty() {
@@ -704,30 +794,14 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     rebuild_desktop_widgets_from_merged(&mut root, &merged);
     rebuild_lockscreen_widgets_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
+    rebuild_parsed_sections_from_merged(&mut root, &merged, default);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
-        if !is_merged_leaf_exported(&path, default)
-            || is_wallpaper_runtime_merged_path(&path)
-            || is_calendar_account_parse_only_path(&path)
-        {
+        if is_parsed_export_section_path(&path) {
             continue;
         }
-        let value = match dot_path_get(&merged, &path) {
-            Some(value) => value,
-            None => continue,
-        };
-        if let Some(template) = dot_path_get(&root, &path) {
-            set_dot_path(&mut root, &path, coerce_patch_value(&template, &value));
-        } else if is_allowed_extra_bar_path(&path, &merged)
-            || is_merged_widget_path(&path, &merged)
-            || is_allowed_calendar_account_path(&path, &merged)
-            || is_allowed_desktop_widgets_path(&path, &merged)
-            || is_allowed_lockscreen_widgets_path(&path, &merged)
-            || is_allowed_merged_extra_leaf(&path, &merged, default)
-        {
-            set_dot_path(&mut root, &path, value);
-        }
+        apply_merged_export_leaf(&mut root, &path, &merged, default);
     }
     sync_bar_radii_from_merged(&mut root, &merged);
     finalize_serialized_export(&mut root);
