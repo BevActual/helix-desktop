@@ -1,4 +1,5 @@
-//! Effective config for theme templates (`config.*`). Uses `helix-config-export` when available.
+//! Effective config for theme templates (`config.*`). Rust export is default; `helix-config-export` is
+//! opt-in via [`export_effective_toml`]’s `export_bin` (or `HELIX_CONFIG_EXPORT_BIN` for tests/tools).
 //! Pure-Rust `config_export::serialize` is tracked in `docs/design/config-export-rust.md`.
 
 use std::path::{Path, PathBuf};
@@ -80,16 +81,12 @@ pub fn cpp_export_toml(paths: &ConfigPaths, bin: &Path) -> Option<Toml> {
     text.parse().ok()
 }
 
-/// Effective export TOML: Rust (when implemented), then C++ helper, else `None`.
+/// Effective export TOML: in-process Rust when patchable; else C++ only when `export_bin` is set.
 pub fn export_effective_toml(store: &ConfigStore, export_bin: Option<&Path>) -> Option<Toml> {
     if let Some(root) = rust_export_from_store(store) {
         return Some(root);
     }
-    if let Some(bin) = export_bin {
-        return cpp_export_toml(store.paths(), bin);
-    }
-    let discovered = discover_config_export_bin()?;
-    cpp_export_toml(store.paths(), &discovered)
+    export_bin.and_then(|bin| cpp_export_toml(store.paths(), bin))
 }
 
 /// `config_export::serialize` JSON when export succeeds; else merged TOML JSON.
