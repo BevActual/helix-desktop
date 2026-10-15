@@ -602,15 +602,9 @@ if run_command('test', '-e', llama_prefix / 'lib64/libllama.so', check: false).r
 endif
 
 # Helpers and adaptive applications. The org.helix.Desktop service itself is Rust (services/helix-desktop).
-# Built for golden regeneration and local fallback discovery; not shipped in the install prefix.
-executable('helix-template-apply',
-  sources: files('src/theme/template_apply_main.cpp'),
-  dependencies: helix_core_dep,
-  cpp_args: _helix_cpp_args,
-  install: false,
-)
-executable('helix-theme-palette',
-  sources: files('src/theme/theme_palette_main.cpp'),
+# C++ TemplateEngine driver for regenerating template goldens only (runtime apply is Rust `helix-theme`).
+executable('helix-gen-golden-template',
+  sources: files('core/helix-theme/tools/gen_golden_template.cpp'),
   dependencies: helix_core_dep,
   cpp_args: _helix_cpp_args,
   install: false,

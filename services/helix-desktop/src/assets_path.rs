@@ -78,12 +78,12 @@ fn find_meson_helper_bin(env_key: &str, base: &str) -> Option<PathBuf> {
     None
 }
 
-/// C++ `helix-template-apply` (TemplateEngine) helper for Rust `helix-desktop`.
+/// Legacy C++ `helix-template-apply` path (removed from Meson; optional local override only).
 pub fn helix_template_apply_bin() -> Option<PathBuf> {
     find_meson_helper_bin("HELIX_TEMPLATE_APPLY_BIN", "helix-template-apply")
 }
 
-/// C++ `helix-theme-palette` helper for Rust `Appearance1` palette mutations.
+/// Legacy C++ `helix-theme-palette` path (removed from Meson; optional local override only).
 pub fn helix_theme_palette_bin() -> Option<PathBuf> {
     find_meson_helper_bin("HELIX_THEME_PALETTE_BIN", "helix-theme-palette")
 }
