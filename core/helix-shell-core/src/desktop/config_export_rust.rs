@@ -71,13 +71,87 @@ fn collect_leaf_paths(value: &Toml, prefix: &str, out: &mut Vec<String>) {
     }
 }
 
-/// Merged config may only contain leaves that already exist in the default export tree.
+fn merged_bar_names(merged: &Toml) -> Vec<String> {
+    merged
+        .get("bar")
+        .and_then(Toml::as_table)
+        .map(|bar| {
+            bar.keys()
+                .filter(|key| *key != "order")
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+/// Extra `[bar.<name>]` tables are allowed before `config_export::serialize` runs in C++.
+fn is_allowed_extra_bar_path(path: &str, merged: &Toml) -> bool {
+    let parts = path.split('.').collect::<Vec<_>>();
+    if parts.first().map(|s| *s) != Some("bar") {
+        return false;
+    }
+    if parts.len() == 2 && parts[1] == "order" {
+        return true;
+    }
+    if parts.len() < 3 {
+        return false;
+    }
+    merged_bar_names(merged).iter().any(|name| name == parts[1])
+}
+
+/// Merged config may only touch export paths, or extra `bar.<name>` subtrees from user config.
 fn merged_export_is_patchable(store: &ConfigStore) -> bool {
     let merged = store.merged_user_toml();
     let default = default_export_root();
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
-    leaves.iter().all(|path| dot_path_exists(default, path))
+    leaves.iter().all(|path| {
+        dot_path_exists(default, path) || is_allowed_extra_bar_path(path, &merged)
+    })
+}
+
+/// Seed unnamed bars from `bar.default` export defaults (C++ `BarConfig` defaults per name).
+fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
+    let merged_bar = match merged.get("bar").and_then(Toml::as_table) {
+        Some(table) => table,
+        None => return,
+    };
+    let mut names: Vec<String> = merged_bar
+        .keys()
+        .filter(|key| *key != "order")
+        .cloned()
+        .collect();
+    if names.is_empty() {
+        return;
+    }
+    names.sort();
+
+    let export_bar = match root.get_mut("bar").and_then(Toml::as_table_mut) {
+        Some(table) => table,
+        None => return,
+    };
+    let template = export_bar
+        .get("default")
+        .cloned()
+        .unwrap_or(Toml::Table(Default::default()));
+
+    let stale: Vec<String> = export_bar
+        .keys()
+        .filter(|key| *key != "order" && !names.contains(key))
+        .cloned()
+        .collect();
+    for key in stale {
+        export_bar.remove(&key);
+    }
+    for name in &names {
+        export_bar
+            .entry(name.clone())
+            .or_insert_with(|| template.clone());
+    }
+    export_bar.insert(
+        "order".to_string(),
+        Toml::Array(names.into_iter().map(Toml::String).collect()),
+    );
 }
 
 /// Match C++ `writeTable` scalar kinds using the default-export node at `path` as the template.
@@ -137,6 +211,7 @@ fn set_dot_path(root: &mut Toml, path: &str, value: Toml) {
 fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut root = default_export_root().clone();
     let merged = store.merged_user_toml();
+    rebuild_bar_from_merged(&mut root, &merged);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {

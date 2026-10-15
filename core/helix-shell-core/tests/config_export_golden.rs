@@ -214,30 +214,15 @@ fn rust_export_matches_cpp_with_config_include() {
 }
 
 #[test]
-fn rust_export_none_when_extra_bar_name() {
-    let root = unique_temp_dir("extra-bar");
-    let config_dir = root.join("cfg").join("helix");
-    let state_dir = root.join("state").join("helix");
-    fs::create_dir_all(&config_dir).unwrap();
-    fs::create_dir_all(&state_dir).unwrap();
-    fs::write(
-        config_dir.join("config.toml"),
-        "[bar.secondary]\nenabled = true\nthickness = 28\n",
-    )
-    .unwrap();
-    fs::write(state_dir.join("settings.toml"), "\n").unwrap();
-    let paths = ConfigPaths {
-        config_dir,
-        settings_toml: state_dir.join("settings.toml"),
-    };
-    assert!(rust_export_toml(&paths).is_none());
-    let Some(bin) = discover_config_export_bin() else {
-        let _ = fs::remove_dir_all(root);
-        return;
-    };
-    let store = ConfigStore::load(paths.clone());
-    assert!(export_effective_toml(&store, Some(&bin)).is_some());
-    let _ = fs::remove_dir_all(root);
+fn rust_export_matches_cpp_for_secondary_bar() {
+    assert_rust_export_matches_cpp("[bar.secondary]\nenabled = true\nthickness = 28\n");
+}
+
+#[test]
+fn rust_export_matches_cpp_for_default_and_secondary_bars() {
+    assert_rust_export_matches_cpp(
+        "[bar.default]\nthickness = 40\n\n[bar.secondary]\nenabled = true\nthickness = 28\n",
+    );
 }
 
 #[test]
