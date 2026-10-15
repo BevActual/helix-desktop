@@ -1,8 +1,9 @@
 //! Custom palette mutations (ThemeService `saveCurrentPaletteAsCustom` / `saveRoleColorAsCustom`).
 //!
 //! Builtin and custom palette sources with a concrete dark/light shell mode run in-process
-//! through `helix-theme`. Wallpaper and community sources use in-process generation when
-//! the wallpaper decodes; `auto` mode and unreadable wallpapers fall back to `helix-theme-palette`.
+//! through `helix-theme`. Wallpaper sources use in-process generation when the wallpaper decodes;
+//! community when the cache file exists. Unreadable wallpapers, missing community cache, and
+//! `auto` mode fall back to `helix-theme-palette`.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -30,12 +31,14 @@ pub enum Outcome {
 }
 
 impl Inputs {
-    pub fn capture(config: &ConfigStore) -> Self {
-        Self { local: local_selection(config) }
+    pub fn capture(config: &ConfigStore, session_wallpaper: &str) -> Self {
+        Self {
+            local: local_selection(config, session_wallpaper),
+        }
     }
 }
 
-fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
+fn local_selection(config: &ConfigStore, session_wallpaper: &str) -> Option<(ThemeSelection, PathBuf)> {
     // The explicit command override is a test hook for the helper; honor it as before.
     if std::env::var("HELIX_THEME_PALETTE_CMD").is_ok_and(|cmd| !cmd.trim().is_empty()) {
         return None;
@@ -50,7 +53,7 @@ fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
     };
     // A wallpaper that cannot be turned into a palette is the helper's to handle.
     let wallpaper = if source == PaletteSource::Wallpaper {
-        Some(crate::wallpaper_source::wallpaper_palette(config)?)
+        Some(crate::wallpaper_source::wallpaper_palette(config, session_wallpaper)?)
     } else {
         None
     };
@@ -58,6 +61,14 @@ fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
     let shell_mode = text("theme.shell_mode").unwrap_or_else(|| "follow".into());
     let effective = if shell_mode == "follow" { mode } else { shell_mode };
     let shell_light = crate::day_night::resolve_mode(config, &effective)? == "light";
+    if source == PaletteSource::Community {
+        let name = text("theme.community_palette").unwrap_or_default();
+        let state_dir = config.paths().settings_toml.parent()?;
+        let offline = config.get("shell.offline_mode").as_bool().unwrap_or(false);
+        if !crate::palette_catalog::ensure_community_palette_cached(state_dir, &name, offline) {
+            return None;
+        }
+    }
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
@@ -99,6 +110,7 @@ fn run_helper(args: &[&str]) -> Result<Option<String>, String> {
 
     let bin = helix_theme_palette_bin()
         .ok_or_else(|| "Palette could not be saved".to_string())?;
+    tracing::info!(bin = %bin.display(), args = ?args, "theme palette: using helix-theme-palette");
     let output = Command::new(&bin)
         .args(args)
         .output()
@@ -136,7 +148,9 @@ pub fn save_palette(inputs: &Inputs, source: &str) -> Result<Outcome, String> {
     }
     let args = ["save-palette", source];
     match (&inputs.local, source) {
-        (Some((selection, dir)), "current") => local_result(save_current_as_custom(dir, selection), &args),
+        (Some((selection, dir)), "current" | "wallpaper") => {
+            local_result(save_current_as_custom(dir, selection), &args)
+        }
         _ => helper_named(&args),
     }
 }

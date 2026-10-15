@@ -195,7 +195,7 @@ impl Appearance {
                 "Appearance exports require Helix desktop".into(),
             ));
         }
-        let inputs = crate::theme_palette::Inputs::capture(&state.config);
+        let inputs = crate::theme_palette::Inputs::capture(&state.config, &state.wallpaper);
         drop(state);
         let source = name.to_string();
         let outcome = tokio::task::spawn_blocking(move || {
@@ -226,7 +226,7 @@ impl Appearance {
         }
         helix_shell_core::desktop::color_spec::validate_accent_hex(value)
             .map_err(fdo::Error::InvalidArgs)?;
-        let inputs = crate::theme_palette::Inputs::capture(&state.config);
+        let inputs = crate::theme_palette::Inputs::capture(&state.config, &state.wallpaper);
         drop(state);
         let hex_color = value.to_string();
         let outcome = tokio::task::spawn_blocking(move || {
@@ -256,7 +256,7 @@ impl Appearance {
         }
         helix_shell_core::desktop::color_spec::validate_accent_hex(color)
             .map_err(fdo::Error::InvalidArgs)?;
-        let inputs = crate::theme_palette::Inputs::capture(&state.config);
+        let inputs = crate::theme_palette::Inputs::capture(&state.config, &state.wallpaper);
         drop(state);
         let hex_color = color.to_string();
         let outcome = tokio::task::spawn_blocking(move || {

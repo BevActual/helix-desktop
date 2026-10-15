@@ -46,9 +46,10 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         Some("wallpaper") => PaletteSource::Wallpaper,
         _ => return None,
     };
+    let session_wallpaper = state.wallpaper.clone();
     // A wallpaper that cannot be turned into a palette is the helper's to handle.
     let wallpaper = if source == PaletteSource::Wallpaper {
-        Some(crate::wallpaper_source::wallpaper_palette(config)?)
+        Some(crate::wallpaper_source::wallpaper_palette(config, &session_wallpaper)?)
     } else {
         None
     };
@@ -60,6 +61,12 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let palettes_dir = paths.config_dir.join("palettes");
     let state_dir = paths.settings_toml.parent()?.to_path_buf();
     let community_name = text("theme.community_palette").unwrap_or_default();
+    let offline = flag("shell.offline_mode");
+    if source == PaletteSource::Community {
+        if !crate::palette_catalog::ensure_community_palette_cached(&state_dir, &community_name, offline) {
+            return None;
+        }
+    }
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
@@ -109,7 +116,10 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
         scheme_type,
-        image_path: Some(crate::wallpaper_source::palette_wallpaper_path(config)),
+        image_path: {
+            let path = crate::wallpaper_source::palette_wallpaper_path(config, &session_wallpaper);
+            if path.is_empty() { None } else { Some(path) }
+        },
         config_table: Some(config.template_config_table()),
         icon_theme: active_icon_theme_name(),
         builtin_config,
@@ -130,7 +140,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
 
     match apply::apply(&inputs) {
         Outcome::Unsupported(why) => {
-            tracing::debug!(%why, "in-process template apply unsupported; using helper");
+            tracing::info!(%why, "template apply: in-process unsupported; using helix-template-apply");
             None
         }
         Outcome::Applied(report) => {
@@ -173,8 +183,15 @@ pub fn reapply_templates(state: &mut State) -> Result<(), String> {
 
     let config = &state.config;
     if run_cpp_template_apply()? {
+        tracing::info!("template apply: completed via helix-template-apply");
         state.runtime.reload();
         return Ok(());
+    }
+
+    if helix_template_apply_bin().is_none() {
+        tracing::warn!(
+            "template apply: helix-template-apply not found after in-process path declined; running builtin post-hooks only"
+        );
     }
 
     if std::env::var_os("NIRI_SOCKET").is_some() {
