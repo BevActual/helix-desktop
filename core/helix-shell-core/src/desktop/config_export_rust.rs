@@ -11,7 +11,8 @@ use std::sync::OnceLock;
 use toml::Value as Toml;
 
 use super::config_export_defaults::{
-    schema_section_default_writer, write_bar_defaults, SCHEMA_EXPORT_SECTIONS,
+    schema_section_default_writer, write_bar_defaults, EXTRA_EXPORT_ROOT_WRITERS,
+    SCHEMA_EXPORT_SECTIONS,
 };
 use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
 use super::settings::{ConfigPaths, ConfigStore};
@@ -891,14 +892,29 @@ fn set_dot_path(root: &mut Toml, path: &str, value: Toml) {
     table.insert(parts[parts.len() - 1].to_string(), value);
 }
 
+fn seed_non_bar_extra_export_roots(root: &mut Toml, default: &Toml) {
+    let root_table = match root.as_table_mut() {
+        Some(table) => table,
+        None => return,
+    };
+    for (name, writer) in EXTRA_EXPORT_ROOT_WRITERS {
+        if *name == "bar" {
+            continue;
+        }
+        let section = dot_path_get(default, name).unwrap_or_else(writer);
+        root_table.insert(name.to_string(), section);
+    }
+}
+
 fn patch_default_export(store: &ConfigStore) -> Toml {
     let default = default_export_root();
-    let mut root = default.clone();
     let merged = store.merged_for_config_export();
+    let mut root = Toml::Table(toml::map::Map::new());
+    rebuild_parsed_sections_from_merged(&mut root, &merged, default);
+    seed_non_bar_extra_export_roots(&mut root, default);
     rebuild_widget_from_merged(&mut root, &merged);
     rebuild_desktop_widgets_from_merged(&mut root, &merged);
     rebuild_lockscreen_widgets_from_merged(&mut root, &merged);
-    rebuild_parsed_sections_from_merged(&mut root, &merged, default);
     rebuild_calendar_accounts_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
     rebuild_bar_from_merged(&mut root, &merged);

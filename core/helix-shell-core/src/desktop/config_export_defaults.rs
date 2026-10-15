@@ -1087,7 +1087,7 @@ pub(crate) fn schema_section_default_writer(section: &str) -> Option<fn() -> Tom
 }
 
 /// `config_export::serialize` root tables outside `config_sections.cpp`.
-const EXTRA_EXPORT_ROOT_WRITERS: &[(&str, fn() -> Toml)] = &[
+pub(crate) const EXTRA_EXPORT_ROOT_WRITERS: &[(&str, fn() -> Toml)] = &[
     ("bar", write_bar_defaults),
     ("widget", write_widget_defaults),
     ("desktop_widgets", write_desktop_widgets_defaults),
