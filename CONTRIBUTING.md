@@ -10,6 +10,32 @@ Design index: [docs/design/README.md](docs/design/README.md).
 
 For dependencies and normal build commands, start with [BUILDING.md](BUILDING.md).
 
+## Git remotes and GitHub CLI
+
+**[BevActual/helix-desktop](https://github.com/BevActual/helix-desktop)** is the product repository. It is **not** a GitHub fork of Noctalia; PRs and releases happen here only (`base` is usually `main`).
+
+Clone and work against `origin`:
+
+```sh
+git clone https://github.com/BevActual/helix-desktop.git
+cd helix-desktop
+gh repo set-default BevActual/helix-desktop
+```
+
+Older clones may still have `upstream` → `noctalia-dev/noctalia` and `main` tracking that remote. That breaks **`gh pr create`** (wrong base repo). Fix once:
+
+```sh
+tools/git-helix-origin.sh
+```
+
+Or manually: `git config branch.main.remote origin`, `git fetch origin`, `git checkout main && git pull`, and remove the legacy `upstream` remote if you do not need Noctalia history.
+
+For `gh` without changing remotes, use `tools/gh-pr.sh` or:
+
+```sh
+gh pr create --repo BevActual/helix-desktop --base main --head your-branch
+```
+
 ## Design Principles
 
 - Session shell and apps: Rust + Tauri 2 (GTK3 layer-shell / WebKit), shared UI in `core/shared-ui/`.
@@ -285,7 +311,7 @@ Install the source-build dependencies for your distribution using the commands i
 
 ```sh
 git clone https://github.com/BevActual/helix-desktop.git
-cd helix-shell
+cd helix-desktop
 ```
 
 Stop the Helix instance started by your compositor, then configure and build ASan:
