@@ -4,6 +4,7 @@
 //! and shell offline mode is off.
 
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
@@ -24,6 +25,7 @@ struct ModePreview {
 #[derive(Clone, Debug)]
 struct AvailablePalette {
     name: String,
+    md5: String,
     dark: ModePreview,
     light: ModePreview,
 }
@@ -140,8 +142,14 @@ fn parse_community_catalog(path: &Path) -> Vec<AvailablePalette> {
         if name.is_empty() {
             continue;
         }
+        let md5 = item
+            .get("md5")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
         out.push(AvailablePalette {
             name,
+            md5,
             dark: mode_preview_from_catalog(item, "dark"),
             light: mode_preview_from_catalog(item, "light"),
         });
@@ -182,6 +190,7 @@ fn load_custom(config_dir: &Path) -> Vec<AvailablePalette> {
             .unwrap_or_else(|| dark.clone());
         out.push(AvailablePalette {
             name: name.to_string(),
+            md5: String::new(),
             dark,
             light,
         });
@@ -251,29 +260,47 @@ fn community_palette_cache_valid(path: &Path) -> bool {
         .is_some()
 }
 
-/// Ensure a community palette JSON exists under the state dir (download on miss when allowed).
-/// Matches C++ `startCommunityDownload` for the blocking helper paths (`helix-theme-palette`, etc.).
-pub fn ensure_community_palette_cached(state_dir: &Path, name: &str, offline: bool) -> bool {
-    if name.is_empty() {
+/// `communityPaletteCatalogMd5` — empty when the catalog has no checksum for this palette.
+pub fn community_palette_catalog_md5(state_dir: &Path, name: &str) -> String {
+    parse_community_catalog(&community_catalog_path(state_dir))
+        .into_iter()
+        .find(|palette| palette.name == name)
+        .map(|palette| palette.md5.trim().to_ascii_lowercase())
+        .unwrap_or_default()
+}
+
+fn file_md5_hex(path: &Path) -> Option<String> {
+    let mut file = fs::File::open(path).ok()?;
+    let mut hasher = md5::Context::new();
+    let mut buffer = [0u8; 8192];
+    while let Ok(read) = file.read(&mut buffer) {
+        if read == 0 {
+            break;
+        }
+        hasher.consume(&buffer[..read]);
+    }
+    Some(format!("{:x}", hasher.compute()))
+}
+
+fn community_palette_cache_stale(state_dir: &Path, name: &str, cache_path: &Path) -> bool {
+    let expected = community_palette_catalog_md5(state_dir, name);
+    if expected.is_empty() {
         return false;
     }
+    match file_md5_hex(cache_path) {
+        Some(actual) => actual.to_ascii_lowercase() != expected,
+        None => true,
+    }
+}
+
+fn download_community_palette(state_dir: &Path, name: &str) -> bool {
     let path = community_palette_cache_path(state_dir, name);
-    if community_palette_cache_valid(&path) {
-        return true;
-    }
-    if path.is_file() {
-        let _ = fs::remove_file(&path);
-    }
-    if offline {
-        tracing::info!(%name, "community palette cache miss; offline mode — not fetching");
-        return false;
-    }
     let url = match community_palette_download_url(name) {
         Some(url) => url,
         None => {
             tracing::warn!(
                 %name,
-                "community palette cache miss; HELIX_COMMUNITY_PALETTE_URL_BASE unset"
+                "community palette fetch skipped; HELIX_COMMUNITY_PALETTE_URL_BASE unset"
             );
             return false;
         }
@@ -316,6 +343,32 @@ pub fn ensure_community_palette_cached(state_dir: &Path, name: &str, offline: bo
         return false;
     }
     true
+}
+
+/// Ensure a community palette JSON exists under the state dir (download on miss when allowed).
+/// Matches C++ `startCommunityDownload` for the blocking helper paths (`helix-theme-palette`, etc.).
+pub fn ensure_community_palette_cached(state_dir: &Path, name: &str, offline: bool) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let path = community_palette_cache_path(state_dir, name);
+    if community_palette_cache_valid(&path) {
+        if !offline && community_palette_cache_stale(state_dir, name, &path) {
+            tracing::info!(%name, "community palette cache stale per catalog md5; refreshing");
+            if !download_community_palette(state_dir, name) {
+                tracing::info!(%name, "community palette refresh failed; using cached copy");
+            }
+        }
+        return true;
+    }
+    if path.is_file() {
+        let _ = fs::remove_file(&path);
+    }
+    if offline {
+        tracing::info!(%name, "community palette cache miss; offline mode — not fetching");
+        return false;
+    }
+    download_community_palette(state_dir, name)
 }
 
 /// Download the community catalog when `HELIX_COMMUNITY_PALETTE_CATALOG_URL` is set.
@@ -371,6 +424,37 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("helix-palette-catalog-{nanos}"))
+    }
+
+    #[test]
+    fn file_md5_hex_matches_known_digest() {
+        let root = temp_root();
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("payload.bin");
+        fs::write(&path, b"hello").unwrap();
+        assert_eq!(
+            file_md5_hex(&path).as_deref(),
+            Some("5d41402abc4b2a76b9719d911017c592")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn community_palette_catalog_md5_reads_catalog_entry() {
+        let root = temp_root();
+        let state = root.join("state");
+        fs::create_dir_all(state.join("community-palettes/.catalog")).unwrap();
+        fs::write(
+            state.join("community-palettes/.catalog/palettes.json"),
+            r##"{"palettes":[{"name":"Oxocarbon","md5":"AbCdEf","dark":{"surface":"#161616"}}]}"##,
+        )
+        .unwrap();
+        assert_eq!(
+            community_palette_catalog_md5(&state, "Oxocarbon"),
+            "abcdef"
+        );
+        assert!(community_palette_catalog_md5(&state, "Missing").is_empty());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
