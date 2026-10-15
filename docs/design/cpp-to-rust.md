@@ -1,6 +1,6 @@
 # C++ → Rust migration
 
-Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`services/helix-desktop`). Remaining C++ is theme helpers, inference engine glue, and contract-test fixtures. This doc is the cutover map and backlog.
+Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`services/helix-desktop`). Remaining C++ is **`helix_core` config validation** (incl. `src/config/theme/` scheme tokens), **inference workers + llama glue**, and **`desktop_service_test` fixtures**. Runtime theme is Rust (`helix-theme`). This doc is the cutover map and backlog.
 
 ## Inventory
 
@@ -8,7 +8,7 @@ Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`
 |---|---|---|
 | `helix-service` | `services/helix-desktop` (bin `helix-desktop`) | **Done.** Rust owns `org.helix.Desktop`; the C++ service was removed. Only `agent_policy`, `agent_confirmation_queue`, `notification_rules`, `shell_tools`, `tool_schema` remain in `src/desktop/` (shared with assistant/inference and the contract test) |
 | `src/desktop/agent_*`, `tool_schema` | `helix-shell-core::agent` (+ service) | Risk policy, GrantStore, peer identity, Agent Surface Hello/Action/Confirm/manager |
-| `src/config/`, theme, dbus adapters | service / shared crates | Port with each domain |
+| `src/config/` (+ `config/theme` validation only) | `helix-shell-core` / service | Config merge + export largely Rust; C++ keeps schema parse/validate until fully ported |
 | `helix-assistant` | `services/helix-assistant` | **Done.** Rust; reply/step logic and the tool schema live in `helix-shell-core::agent` (`assistant_core`, `tool_schema`), checked against C++ goldens. `just install` installs the binary |
 | `helix-inference` | `services/helix-inference` | **Service done.** The D-Bus service, queue, limits, routing, picture decode and worker wrappers are Rust. The llama.cpp engine glue (`src/inference/llama_backend.cpp`, `schema_grammar.cpp`) stays C++ and is linked through a C shim by the crate's `build.rs` when `third_party/llama-install` exists; the speech/image workers (`helix-transcribe`, `helix-image`) stay C++ processes |
 | `helix-system-upgrade` | `services/helix-system-upgrade` | **Done.** Same plan logic and tests; `just install` puts it in libexecdir where the polkit policy points |
@@ -30,15 +30,27 @@ cargo build --profile fast -p helix-desktop
 HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 ```
 
-**CI vs Meson:** GitHub Actions runs Rust nested smokes (`helix-desktop-config`, `helix-desktop-audio-meter`, agent integration). The **helix-desktop Configuration1** job and Meson `helix_desktop_config_smoke` run `tools/nested/helix-desktop-config-smoke.sh` with **`HELIX_DISABLE_CPP_THEME_HELPERS=1`** so `templates-apply` and **`Appearance1.SetAccent`** exercise in-process `helix-theme` only (built-in template ids in the smoke config). Runtime template apply and palette mutations are **Rust-only** (`helix-theme` / `helix-desktop`); the old **`helix-template-apply`** / **`helix-theme-palette`** CLI helpers are removed. Template golden regen uses **`cargo run -p helix-theme --bin gen-golden-template`** (`tools/regen_golden_template.sh`). **`helix-rust-config-export`** (Cargo) regenerates golden/fixture TOML; C++ `helix-config-export` is no longer built by Meson (optional local build for parity spot-checks). **Build (debug)** still runs full `just build`, install layout, and `meson test` (including `helix_desktop_config_smoke` when `target/fast/helix-desktop` exists). Meson builds `desktop_service_test` (C++, the behavioural contract) and runs it, plus the assistant/agent integration tests, against `target/fast|debug/helix-desktop` when that binary exists.
+**CI vs Meson:** GitHub Actions runs Rust nested smokes (`helix-desktop-config`, `helix-desktop-audio-meter`, agent integration). The **helix-desktop Configuration1** job runs `helix-desktop-config-smoke.sh`, **`helix-desktop-configuration-contract.sh`**, and the C++ `desktop_service_test` harness; Meson `helix_desktop_config_smoke` / `helix_desktop_configuration_contract` mirror the Rust smokes when `target/fast/helix-desktop` exists. Smokes use `tools/nested/helix-desktop-config-smoke.sh` with **`HELIX_DISABLE_CPP_THEME_HELPERS=1`** (default in the script) so `templates-apply` and **`Appearance1.SetAccent`** use in-process `helix-theme` only. Meson no longer builds **`helix-template-apply`** / **`helix-theme-palette`**; optional `HELIX_*_BIN` / `HELIX_*_CMD` overrides exist for local debugging when helpers are not disabled. Template golden regen: **`cargo run -p helix-theme --bin gen-golden-template`** (`tools/regen_golden_template.sh`). **`helix-rust-config-export`** (Cargo) regenerates export golden/fixture TOML. **Build (debug)** runs `just build`, install layout, and `meson test` (including `helix_desktop_config_smoke` when `target/fast/helix-desktop` exists). Meson builds **`desktop_service_test`** (C++ behavioural contract) and assistant/agent integration tests against `target/fast|debug/helix-desktop` when present.
+
+**Verification (desktop migration smoke):**
+
+```sh
+cargo test -p helix-theme
+cargo test -p helix-shell-core pristine_catalog_matches_cpp
+cargo test -p helix-shell-core --test config_export_golden
+cargo test -p helix-desktop --bin helix-desktop in_process
+tools/nested/helix-desktop-configuration-contract.sh   # private dbus-run-session; unset HELIX_STATE_HOME (it overrides XDG_STATE_HOME for settings.toml)
+tools/verify_config_export_golden.sh
+meson compile -C build-debug helix_core_base
+```
 
 **Scalar catalog:** The C++ `settings_catalog.cpp` was removed; its rows live in Rust as hand-maintained `BOOTSTRAP` plus `settings_bootstrap_extra.rs`, checked against the frozen golden `core/helix-shell-core/tests/golden/settings_catalog_defaults.json`. Ordered types (key-chords, shortcuts, tabs, display lists, templates, transitions, notification rules, bar widget rows) stay in `ordered_lists.rs` / `ordered_catalog.rs`.
 
 **Wallpaper palette source:** `helix-theme::wallpaper` generates palettes from the wallpaper in Rust (112x112 resize, quantize and
 score, the five Material schemes through the vendored `third_party/material-colors`, the five custom HSL schemes), checked against
-60 palettes and 8 resized buffers from the C++ generator and 4 end-to-end template-apply scenarios. The service uses it for template
-apply and the save-palette / set-role / set-accent paths. Still on the C++ helpers when in-process apply declines: unreadable
-wallpaper images, missing community palette when fetch is blocked (offline / no URL base), or merged-config export gaps for `config.*`.
+frozen goldens (60 palettes, 8 resized buffers, 4 template-apply scenarios). The service uses it for template apply and
+save-palette / set-role / set-accent. Edge cases that cannot resolve in-process (unreadable wallpaper, missing community cache when
+offline, etc.) error unless a legacy **`HELIX_THEME_PALETTE_BIN`** override is installed and helpers are not disabled.
 
 **Desktop-only catalog:** After `RegisterDesktop`, `GetSettings` also includes live `bar:<name>:<field>` scalars and `idle:<behavior>:<field>` rows from `config.toml` (`dynamic_desktop_catalog.rs`), matching C++ `settingsCatalog(helixDesktop=true)`. Override paths use `storage_path()` (`bar:*` → `bar.<name>.<field>`, `idle:*` → `idle.behavior.<name>.<field>`). `tools/nested/helix-desktop-config-smoke.sh` seeds a minimal bar + idle config and checks post-desktop rows plus `idle:*` `Update`.
 
@@ -57,14 +69,14 @@ wallpaper images, missing community palette when fetch is blocked (offline / no 
 9. ~~Configuration1 RegisterCapabilities + Get/Set/ClearState + catalog growth~~ · **`UpdateOrderedList`** + **`CommitOverrides`** with ordered-list catalog parity (**application-list**, **key-chords**, **tab-list**, **shortcut-list**, **notification-rules**, **display-list**, **template-list**, **transition-list**, **widget-list** / `bar:*`); monitor pickers take live compositor output names; community template list options read `state/community-templates/catalog.json` + cache dirs; bootstrap scalar catalog ~320+ rows (hand + generated) plus desktop **bar** / **idle** extensions; validation aligned with C++ for hooks, palettes, nightlight pairing, Mobius `ai.*` mirror keys
 10. ~~AgentSurfaceActivity1~~ (desktop-only kill switch, pending, grants view)
 11. ~~Community/custom palette-previews~~ + ~~opt-in catalog HTTP sync~~ (`HELIX_COMMUNITY_PALETTE_CATALOG_URL`)
-12. ~~UpdateApplicationList for dock/launcher pins~~ (remaining ordered-list catalog rows still stub)
-13. Real backends (PW/NM/BlueZ/niri) · ~~Configuration1 `Update`/`Reset` guards~~ · ~~community template catalog sync~~ (`HELIX_COMMUNITY_TEMPLATE_CATALOG_URL` via `RefreshPalettes`) · ~~**Appearance1 `Reapply`** + **`templates-apply` msg IPC**~~ (`msg_ipc.rs` + in-process `helix-theme::apply`; optional `HELIX_TEMPLATE_APPLY_CMD` / legacy `HELIX_TEMPLATE_APPLY_BIN`) · ~~**Appearance1 `SavePalette` / `SetRole` / `SetAccent`**~~ (`theme_palette.rs` + `helix-theme::custom`; optional `HELIX_THEME_PALETTE_CMD` / legacy `HELIX_THEME_PALETTE_BIN`) · ~~system-bus agent unregister on shutdown~~ · ~~display-list options from live compositor inventory~~ · ~~config smoke / Meson smoke in-process theme~~ (`HELIX_DISABLE_CPP_THEME_HELPERS`) · ~~runtime theme apply without C++ CLI helpers~~ (`core/helix-theme` goldens; C++ `src/theme/` removed) · ~~Wallhaven~~ (`services/helix-desktop/src/wallhaven.rs`) · remaining domain cutovers
+12. ~~UpdateApplicationList for dock/launcher pins~~ · ~~ordered-list catalog rows~~ (`ordered_lists.rs` / `ordered_catalog.rs`; config smoke + `desktop_service_test`)
+13. ~~Real backends (PW/NM/BlueZ/niri)~~ · ~~Configuration1 guards, community catalogs, Appearance1 theme paths, Wallhaven, in-process theme (`helix-theme`; C++ `src/theme/` removed)~~ · **Open:** inference workers, greeter, shrink `src/desktop/` contract C++, `src/` → `cpp/` rename
 14. ~~Assistant~~ (Rust: `services/helix-assistant`), ~~inference service~~ (Rust: `services/helix-inference`; engine glue stays C++), ~~system-upgrade~~ (Rust: `services/helix-system-upgrade`)
 
 ## Next (C++ tail)
 
 1. ~~**Theme C++ tail**~~ — **Done.** Runtime theme is Rust (`helix-theme`, `helix-desktop`). `src/theme/` is deleted; config validation keeps `src/config/theme/scheme` + `color_roles` in `helix_core`. Goldens and contracts live under `cargo test -p helix-theme`; template regen uses `gen-golden-template`.
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
-3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
+3. **`src/desktop/` contract fixtures** — Grow Rust bus tests (`services/helix-desktop/tests/configuration_contract.rs`, `tools/nested/helix-desktop-configuration-contract.sh`) until they cover `desktop_service_test`; then freeze or shrink the C++ test and duplicate policy units in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.
 5. **`src/` rename** — When Meson only builds helpers + tests, rename `src/` to `cpp/` (one mechanical commit).

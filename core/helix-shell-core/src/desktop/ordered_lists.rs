@@ -409,6 +409,33 @@ mod tests {
     }
 
     #[test]
+    fn bar_widget_update_writes_settings_toml() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("helix-ordered-bar-{nanos}"));
+        let paths = ConfigPaths {
+            config_dir: root.join("config/helix"),
+            settings_toml: root.join("state/helix/settings.toml"),
+        };
+        std::fs::create_dir_all(&paths.config_dir).unwrap();
+        let store = ConfigStore::load(paths.clone());
+        let catalog = store.full_catalog(true, &[]);
+        let value = json!(["output_volume", "clock"]);
+        let validated =
+            validate_update(&catalog, "bar:default:center", &value).unwrap();
+        let mut store = store;
+        apply_update(&mut store, "bar:default:center", validated).unwrap();
+        assert!(paths.settings_toml.is_file());
+        let mut reloaded = ConfigStore::load(paths);
+        reloaded.force_reload();
+        let catalog = reloaded.full_catalog(true, &[]);
+        let current = current_value(&reloaded, &catalog, "bar:default:center").unwrap();
+        assert_eq!(current, value);
+    }
+
+    #[test]
     fn wallpaper_transition_round_trip() {
         let store = temp_store();
         let catalog = store.full_catalog(true, &[]);

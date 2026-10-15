@@ -1,5 +1,5 @@
 //! Builtin palette preview chips for Appearance1 (surface + accents only).
-//! Colors mirrored from `src/theme/builtin_palettes.cpp` — not the full Material expand path.
+//! Static preview chips (surface + accents); full palette math lives in `helix-theme`.
 
 use serde_json::{json, Value};
 

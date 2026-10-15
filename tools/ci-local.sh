@@ -39,6 +39,7 @@ job_config() {
   WAYLAND_DISPLAY="wayland-ci-$$" \
   HELIX_DISABLE_CPP_THEME_HELPERS=1 HELIX_ASSETS_DIR="$ROOT/assets" \
   ./tools/nested/helix-desktop-config-smoke.sh \
+    && ./tools/nested/helix-desktop-configuration-contract.sh \
     && WAYLAND_DISPLAY="wayland-ci-$$" CONTRACT_TIMEOUT=240 ./tools/nested/helix-desktop-cpp-contract.sh
 }
 job_meter()  { WAYLAND_DISPLAY="wayland-ci-$$" ./tools/nested/helix-desktop-audio-meter-integration.sh; }

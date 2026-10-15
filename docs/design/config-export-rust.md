@@ -27,4 +27,4 @@ Theme templates read `config.*` from `config_export::serialize` output (Rust in-
 4. Port **bar/widget placement** emitters from `config_export.cpp` anonymous namespace.
 5. When `config_export_golden` passes **without** `HELIX_CONFIG_EXPORT_BIN`, remove C++ export from Meson/CI. **Done:** frozen fixtures, in-process runtime export, `helix-rust-config-export` (`cargo build -p helix-shell-core --bin helix-rust-config-export`) for `tools/gen_config_export_*`; C++ `helix-config-export` target removed from Meson. Optional: keep `src/config/config_export_main.cpp` only until `parseConfigTable` → serialize replaces leaf-patch.
 
-`just build` compiles `helix-rust-config-export` via Cargo alongside Meson theme helpers.
+`just build` compiles `helix-rust-config-export` via Cargo alongside Meson `helix_core_base`.

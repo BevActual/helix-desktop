@@ -794,6 +794,11 @@ if build_tests
       test('helix_desktop_config_smoke', helix_dbus_session,
         args: _config_smoke_env, timeout: 120)
     endif
+    _config_contract = meson.project_source_root() / 'tools' / 'nested' / 'helix-desktop-configuration-contract.sh'
+    if _have_rust_desktop and run_command('test', '-x', _config_contract, check: false).returncode() == 0
+      test('helix_desktop_configuration_contract', helix_dbus_session,
+        args: [_config_contract], timeout: 180)
+    endif
   endif
   _agent_python = meson.project_source_root() / 'tools/helix-agent/.venv/bin/python'
   if run_command('test', '-x', _agent_python, check: false).returncode() == 0

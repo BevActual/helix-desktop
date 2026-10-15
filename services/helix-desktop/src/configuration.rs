@@ -196,6 +196,16 @@ impl Configuration {
         map.insert("network".into(), owned_bool(state.network.is_available()));
         map.insert("bluetooth".into(), owned_bool(state.bluetooth.is_available()));
         map.insert("implementation".into(), owned_str("rust"));
+        if let Ok(marker) = std::env::var("HELIX_DESKTOP_CONTRACT_TEST") {
+            map.insert("contract-marker".into(), owned_str(&marker));
+            let settings_path = state
+                .config
+                .paths()
+                .settings_toml
+                .to_string_lossy()
+                .into_owned();
+            map.insert("settings-toml-path".into(), owned_str(&settings_path));
+        }
         map.insert(
             "settings".into(),
             owned_bool(!state.config.catalog().is_empty()),

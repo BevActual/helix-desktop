@@ -2,8 +2,8 @@
 //!
 //! Builtin and custom palette sources with a concrete dark/light shell mode run in-process
 //! through `helix-theme`. Wallpaper sources use in-process generation when the wallpaper decodes;
-//! community when the cache file exists. Unreadable wallpapers, missing community cache, and
-//! Missing community cache and unreadable wallpaper sources fall back to `helix-theme-palette`.
+//! community when the cache file exists. Unreadable wallpapers or missing community cache fall
+//! back to optional `HELIX_THEME_PALETTE_BIN` when helpers are not disabled; otherwise the call errors.
 //! Builtin/custom sources resolve `theme.mode = auto` in-process via the day/night schedule.
 
 use std::path::PathBuf;

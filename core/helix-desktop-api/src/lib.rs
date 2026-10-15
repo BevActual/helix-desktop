@@ -28,6 +28,8 @@ trait Configuration {
 
     fn update(&self, id: &str, value: Value<'_>) -> zbus::Result<()>;
 
+    fn reset(&self, id: &str) -> zbus::Result<()>;
+
     #[zbus(signal)]
     fn changed(&self) -> zbus::Result<()>;
 }
@@ -88,6 +90,19 @@ fn value_string(value: &Value<'_>) -> Option<String> {
     }
 }
 
+/// Lookup a settings catalog row by id (from [`Desktop::settings`]).
+pub fn setting_by_id(settings: &serde_json::Value, id: &str) -> zbus::Result<serde_json::Value> {
+    settings
+        .as_array()
+        .and_then(|entries| {
+            entries.iter().find(|entry| {
+                entry.get("id").and_then(|value| value.as_str()) == Some(id)
+            })
+        })
+        .cloned()
+        .ok_or_else(|| zbus::Error::Failure(format!("setting not found: {id}")))
+}
+
 fn value_number(value: &Value<'_>) -> Option<f64> {
     match value {
         Value::F64(number) => Some(*number),
@@ -106,6 +121,7 @@ pub enum Domain {
     Audio,
     Network,
     Bluetooth,
+    Appearance,
     /// Settings. Has no `Action`; use [`Desktop::settings`] and [`Desktop::update_setting`], and `watch` for changes.
     Configuration,
 }
@@ -116,6 +132,7 @@ impl Domain {
             Self::Audio => "org.helix.Desktop.Audio1",
             Self::Network => "org.helix.Desktop.Network1",
             Self::Bluetooth => "org.helix.Desktop.Bluetooth1",
+            Self::Appearance => "org.helix.Desktop.Appearance1",
             Self::Configuration => "org.helix.Desktop.Configuration1",
         }
     }
@@ -156,6 +173,16 @@ impl Desktop {
     pub async fn register_desktop(&self) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Configuration).await?;
         proxy.call("RegisterDesktop", &()).await
+    }
+
+    /// Compositor capabilities from the registered desktop (`gamma-control`, …).
+    pub async fn register_capabilities(
+        &self,
+        capabilities: &serde_json::Value,
+    ) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        let map = args_from_json(capabilities).map_err(zbus::Error::Failure)?;
+        proxy.call("RegisterCapabilities", &(map,)).await
     }
 
     /// A watch on who owns the service's name: `next()` completes each time a (new) process takes it. A signal, not a poll.
@@ -296,19 +323,71 @@ impl Desktop {
         baseline: &[String],
         candidate: &[String],
     ) -> zbus::Result<()> {
-        let proxy = self.domain_proxy(Domain::Configuration).await?;
-        let to_av = |items: &[String]| -> zbus::Result<Vec<OwnedValue>> {
-            items
+        let baseline = serde_json::Value::Array(
+            baseline.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+        );
+        let candidate = serde_json::Value::Array(
+            candidate
                 .iter()
-                .map(|text| {
-                    OwnedValue::try_from(Value::from(text.as_str()))
-                        .map_err(|error| zbus::Error::Failure(error.to_string()))
-                })
-                .collect()
-        };
-        let baseline = to_av(baseline)?;
-        let candidate = to_av(candidate)?;
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
+        );
+        self.update_ordered_list_json(id, &baseline, &candidate).await
+    }
+
+    /// `UpdateOrderedList` with JSON array baseline/candidate (strings, rule objects, …).
+    pub async fn update_ordered_list_json(
+        &self,
+        id: &str,
+        baseline: &serde_json::Value,
+        candidate: &serde_json::Value,
+    ) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        let baseline = json::json_to_ordered_list_av(baseline).map_err(zbus::Error::Failure)?;
+        let candidate = json::json_to_ordered_list_av(candidate).map_err(zbus::Error::Failure)?;
         proxy.call("UpdateOrderedList", &(id, baseline, candidate)).await
+    }
+
+    /// `Configuration1.UpdateApplicationList` (dock pins and other `application-list` rows).
+    pub async fn update_application_list(
+        &self,
+        id: &str,
+        baseline: &[String],
+        candidate: &[String],
+    ) -> zbus::Result<()> {
+        let baseline = serde_json::Value::Array(
+            baseline.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+        );
+        let candidate = serde_json::Value::Array(
+            candidate
+                .iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
+        );
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        let baseline = json::json_to_ordered_list_av(&baseline).map_err(zbus::Error::Failure)?;
+        let candidate = json::json_to_ordered_list_av(&candidate).map_err(zbus::Error::Failure)?;
+        proxy
+            .call("UpdateApplicationList", &(id, baseline, candidate))
+            .await
+    }
+
+    /// `CommitOverrides(baseline, candidate)` for settings.toml sidecar writes (desktop registrant only).
+    pub async fn commit_overrides(&self, baseline: &str, candidate: &str) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        proxy.call("CommitOverrides", &(baseline, candidate)).await
+    }
+
+    /// `Configuration1.Reset(id)` clears a user override for one catalog row.
+    pub async fn reset_setting(&self, id: &str) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        proxy.call("Reset", &(id,)).await
+    }
+
+    /// One catalog row from [`Desktop::settings`], matched by `id`.
+    pub async fn setting(&self, id: &str) -> zbus::Result<serde_json::Value> {
+        let settings = self.settings().await?;
+        setting_by_id(&settings, id)
     }
 
     pub async fn audio_snapshot(&self) -> zbus::Result<serde_json::Value> {

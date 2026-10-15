@@ -53,6 +53,46 @@ pub fn owned_to_json(value: &OwnedValue) -> Json {
 
 /// The `a{sv}` argument of an Action call from a JSON object. Integers become unsigned 32-bit values (the service reads ids as
 /// `uint32`), other numbers doubles. Nested objects, arrays and null are not arguments and are refused.
+/// One catalog ordered-list row encoded as D-Bus `av` (each entry is a variant).
+pub fn json_to_ordered_list_av(array: &Json) -> Result<Vec<OwnedValue>, String> {
+    let items = array
+        .as_array()
+        .ok_or("ordered list baseline/candidate must be a JSON array")?;
+    items.iter().map(json_to_list_element).collect()
+}
+
+fn json_to_list_element(value: &Json) -> Result<OwnedValue, String> {
+    match value {
+        Json::Null => Err("ordered list entries cannot be null".into()),
+        Json::Bool(flag) => OwnedValue::try_from(Value::Bool(*flag))
+            .map_err(|error| error.to_string()),
+        Json::Number(number) => {
+            let converted = if let Some(whole) = number.as_i64() {
+                Value::I64(whole)
+            } else {
+                Value::F64(number.as_f64().ok_or("number out of range")?)
+            };
+            OwnedValue::try_from(converted).map_err(|error| error.to_string())
+        }
+        Json::String(text) => OwnedValue::try_from(Value::from(text.clone()))
+            .map_err(|error| error.to_string()),
+        Json::Array(items) => {
+            let owned: Vec<OwnedValue> = items
+                .iter()
+                .map(json_to_list_element)
+                .collect::<Result<Vec<_>, _>>()?;
+            OwnedValue::try_from(Value::from(owned)).map_err(|error| error.to_string())
+        }
+        Json::Object(map) => {
+            let mut out = HashMap::new();
+            for (key, nested) in map {
+                out.insert(key.clone(), json_to_list_element(nested)?);
+            }
+            OwnedValue::try_from(Value::from(out)).map_err(|error| error.to_string())
+        }
+    }
+}
+
 pub fn args_from_json(args: &Json) -> Result<HashMap<String, OwnedValue>, String> {
     let object = args.as_object().ok_or("arguments must be an object")?;
     let mut out = HashMap::new();

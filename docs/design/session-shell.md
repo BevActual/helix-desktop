@@ -33,7 +33,7 @@ Split processes: `helix-shell-strut` (exclusive zone) + `helix-shell-bar` (`HELI
 | Desktop authority | `services/helix-desktop` | `org.helix.Desktop`; unit `helix-service.service` runs `helix-desktop` |
 | Assistant / inference | `services/helix-assistant`, `services/helix-inference` | D-Bus processes are Rust; llama glue + `helix-transcribe` / `helix-image` workers under `src/inference/` |
 | Theme | `core/helix-theme` + `helix-desktop` | C++ `src/theme/` removed; see `cpp-to-rust.md` |
-| Contract tests | `src/desktop/`, `tests/desktop_service_test.cpp` | Behavioural contract against the Rust binary in CI |
+| Contract tests | `tests/desktop_service_test.cpp`, `services/helix-desktop/tests/configuration_contract.rs` | C++ integration test + growing Rust Configuration1 contract (`tools/nested/helix-desktop-configuration-contract.sh`) |
 
 See `product-structure.md` and `cpp-to-rust.md`.
 

@@ -1756,6 +1756,7 @@ name = "helix-desktop"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "helix-desktop-api",
  "helix-shell-core",
  "helix-theme",
  "libc",

@@ -116,6 +116,8 @@ jobs:
           HELIX_DISABLE_CPP_THEME_HELPERS: "1"
           HELIX_ASSETS_DIR: ${{ github.workspace }}/assets
         run: ./tools/nested/helix-desktop-config-smoke.sh
+      - name: Rust Configuration1 contract (subset of desktop_service_test)
+        run: ./tools/nested/helix-desktop-configuration-contract.sh
       # tests/desktop_service_test.cpp is the C++ service's behavioural contract; it takes the
       # service binary as an argument, so it checks the Rust service against the same assertions.
       - name: C++ service contract (Rust desktop)

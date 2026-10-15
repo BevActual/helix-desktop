@@ -63,7 +63,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `greeter/` | Login only | Session shell surfaces |
 | `compositor/` | Display server (separate workspace) | Shell chrome |
 | `src/desktop/` | Agent/policy fixtures for contract tests (not a shipped service) | New UI |
-| `src/` (platform) | C++ theme helpers, inference engine glue, golden generators | New session UI |
+| `src/` (platform) | C++ `helix_core` config/validate, inference glue, contract-test fixtures | New session UI |
 | `tools/` | Install, nested e2e, layering checks | Product runtime |
 | `docs/design/` | Architecture + HIG | Generated dumps (`archive/`) |
 
