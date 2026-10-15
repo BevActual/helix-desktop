@@ -176,6 +176,11 @@ fn rust_export_matches_cpp_for_shell_polkit_agent() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_bar_start_widgets() {
+    assert_rust_export_matches_cpp("[bar.default]\nstart = [\"clock\", \"date\"]\n");
+}
+
+#[test]
 fn rust_export_matches_cpp_for_minimal_fixture() {
     let root = unique_temp_dir("minimal");
     let paths = minimal_fixture(&root);
