@@ -1,17 +1,12 @@
 //! Typed `parseConfigTable` → `writeTable` slices for `config_export` (milestone C tail).
 //!
-//! Sections move here incrementally; until a section is ported, `config_export_rust` keeps
-//! using `merge_export_subtree` on `write_*_defaults`.
+//! Every `SCHEMA_EXPORT_SECTIONS` table is exported here (`storage` uses an explicit struct;
+//! others use filtered merge until ported field-by-field). `bar` stays in `config_export_rust`.
 
 use toml::Value as Toml;
 
-use super::config_export_defaults::{
-    write_accessibility_defaults, write_audio_defaults, write_backdrop_defaults,
-    write_battery_defaults, write_brightness_defaults, write_location_defaults,
-    write_nightlight_defaults, write_storage_defaults, write_tailscale_defaults,
-    write_weather_defaults,
-};
-use super::config_export_rust::export_flat_schema_section;
+use super::config_export_defaults::{schema_section_default_writer, write_storage_defaults};
+use super::config_export_rust::export_filtered_schema_section;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct StorageExport {
@@ -74,7 +69,7 @@ fn export_storage_section_from_merged(merged: &Toml) -> Toml {
         .unwrap_or_else(|| StorageExport::export_defaults().write_export_table())
 }
 
-/// Ported schema sections (flat or explicit struct). `None` → merge path in `config_export_rust`.
+/// Export one schema section. `bar` is handled only in `config_export_rust`.
 pub(crate) fn export_typed_schema_section(
     section: &str,
     merged: &Toml,
@@ -83,24 +78,14 @@ pub(crate) fn export_typed_schema_section(
     if section == "storage" {
         return Some(export_storage_section_from_merged(merged));
     }
-    let writer = match section {
-        "accessibility" => write_accessibility_defaults,
-        "audio" => write_audio_defaults,
-        "backdrop" => write_backdrop_defaults,
-        "battery" => write_battery_defaults,
-        "brightness" => write_brightness_defaults,
-        "location" => write_location_defaults,
-        "nightlight" => write_nightlight_defaults,
-        "tailscale" => write_tailscale_defaults,
-        "weather" => write_weather_defaults,
-        _ => return None,
-    };
-    Some(export_flat_schema_section(section, merged, default, writer))
+    let writer = schema_section_default_writer(section)?;
+    Some(export_filtered_schema_section(section, merged, default, writer))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::config_export_defaults::{PORTED_SCHEMA_WRITERS, SCHEMA_EXPORT_SECTIONS};
     use super::super::config_export_serialize::serialize_default_config;
 
     #[test]
@@ -130,30 +115,19 @@ key_file = "/etc/helix.key"
         );
     }
 
-    fn assert_typed_section_matches_writer(
-        section: &str,
-        writer: fn() -> Toml,
-        default: &Toml,
-        empty: &Toml,
-    ) {
-        let got = export_typed_schema_section(section, empty, default)
-            .unwrap_or_else(|| panic!("section {section} should be typed"));
-        assert_eq!(got, writer(), "section {section}");
-    }
-
     #[test]
-    fn flat_typed_sections_match_default_writers_without_merged_overlay() {
+    fn typed_schema_sections_match_default_writers_without_merged_overlay() {
         let default = serialize_default_config();
         let empty = Toml::Table(toml::map::Map::new());
-        assert_typed_section_matches_writer("accessibility", write_accessibility_defaults, &default, &empty);
-        assert_typed_section_matches_writer("audio", write_audio_defaults, &default, &empty);
-        assert_typed_section_matches_writer("backdrop", write_backdrop_defaults, &default, &empty);
-        assert_typed_section_matches_writer("battery", write_battery_defaults, &default, &empty);
-        assert_typed_section_matches_writer("brightness", write_brightness_defaults, &default, &empty);
-        assert_typed_section_matches_writer("location", write_location_defaults, &default, &empty);
-        assert_typed_section_matches_writer("nightlight", write_nightlight_defaults, &default, &empty);
-        assert_typed_section_matches_writer("storage", write_storage_defaults, &default, &empty);
-        assert_typed_section_matches_writer("tailscale", write_tailscale_defaults, &default, &empty);
-        assert_typed_section_matches_writer("weather", write_weather_defaults, &default, &empty);
+        for &section in SCHEMA_EXPORT_SECTIONS {
+            let got = export_typed_schema_section(section, &empty, &default)
+                .unwrap_or_else(|| panic!("section {section} should be typed"));
+            let writer = PORTED_SCHEMA_WRITERS
+                .iter()
+                .find(|(name, _)| *name == section)
+                .map(|(_, writer)| *writer)
+                .unwrap_or_else(|| panic!("writer for {section}"));
+            assert_eq!(got, writer(), "section {section}");
+        }
     }
 }

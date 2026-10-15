@@ -813,8 +813,8 @@ fn apply_merged_export_leaf(
     false
 }
 
-/// Schema sections with no deferred dynamic overlay: parse merged keys into defaults, drop unknowns.
-pub(crate) fn export_flat_schema_section(
+/// Merged overlay + `merge_export_subtree` for a schema section (`merged_overlay_for_parsed_section` strips dynamic subtrees).
+pub(crate) fn export_filtered_schema_section(
     section: &str,
     merged: &Toml,
     default: &Toml,
@@ -822,13 +822,10 @@ pub(crate) fn export_flat_schema_section(
 ) -> Toml {
     let default_section = dot_path_get(default, section).unwrap_or_else(writer);
     match merged.get(section) {
-        Some(merged_section) => merge_export_subtree(
-            &default_section,
-            merged_section,
-            merged,
-            default,
-            section,
-        ),
+        Some(merged_section) => {
+            let overlay = merged_overlay_for_parsed_section(section, merged_section);
+            merge_export_subtree(&default_section, &overlay, merged, default, section)
+        }
         None => default_section,
     }
 }
@@ -840,17 +837,18 @@ fn rebuild_parsed_export_section(
     merged: &Toml,
     default: &Toml,
 ) {
-    if let Some(section_root) = export_typed_schema_section(section, merged, default) {
-        root_table.insert(section.to_string(), section_root);
-        return;
-    }
-    let default_section = dot_path_get(default, section).unwrap_or_else(writer);
-    let section_root = match merged.get(section) {
-        Some(merged_section) => {
-            let overlay = merged_overlay_for_parsed_section(section, merged_section);
-            merge_export_subtree(&default_section, &overlay, merged, default, section)
+    let section_root = if section == "bar" {
+        let default_section = dot_path_get(default, section).unwrap_or_else(writer);
+        match merged.get(section) {
+            Some(merged_section) => {
+                let overlay = merged_overlay_for_parsed_section(section, merged_section);
+                merge_export_subtree(&default_section, &overlay, merged, default, section)
+            }
+            None => default_section,
         }
-        None => default_section,
+    } else {
+        export_typed_schema_section(section, merged, default)
+            .unwrap_or_else(|| dot_path_get(default, section).unwrap_or_else(writer))
     };
     root_table.insert(section.to_string(), section_root);
 }
