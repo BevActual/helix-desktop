@@ -3232,27 +3232,7 @@ fn config_signature(paths: &ConfigPaths) -> Vec<(PathBuf, Option<std::time::Syst
 }
 
 fn load_merged_config(config_dir: &Path) -> Toml {
-    let mut table = toml::map::Map::new();
-    let main = config_dir.join("config.toml");
-    if let Some(Toml::Table(root)) = read_toml_file(&main) {
-        deep_merge(&mut table, root);
-    }
-    if let Ok(entries) = fs::read_dir(config_dir) {
-        let mut files: Vec<PathBuf> = entries
-            .filter_map(|entry| entry.ok().map(|e| e.path()))
-            .filter(|path| {
-                path.extension().and_then(|ext| ext.to_str()) == Some("toml")
-                    && path.file_name().and_then(|name| name.to_str()) != Some("config.toml")
-            })
-            .collect();
-        files.sort();
-        for path in files {
-            if let Some(Toml::Table(part)) = read_toml_file(&path) {
-                deep_merge(&mut table, part);
-            }
-        }
-    }
-    Toml::Table(table)
+    Toml::Table(super::config_merge::merge_config_with_includes(config_dir))
 }
 
 fn read_toml_file(path: &Path) -> Option<Toml> {
@@ -3261,14 +3241,7 @@ fn read_toml_file(path: &Path) -> Option<Toml> {
 }
 
 fn deep_merge(into: &mut toml::map::Map<String, Toml>, from: toml::map::Map<String, Toml>) {
-    for (key, value) in from {
-        match (into.get_mut(&key), value) {
-            (Some(Toml::Table(existing)), Toml::Table(incoming)) => deep_merge(existing, incoming),
-            (_, value) => {
-                into.insert(key, value);
-            }
-        }
-    }
+    super::config_merge::deep_merge(into, from);
 }
 
 /// Maps catalog ids to TOML override paths (C++ `settingPath`).

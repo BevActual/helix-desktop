@@ -181,6 +181,66 @@ fn rust_export_matches_cpp_for_bar_start_widgets() {
 }
 
 #[test]
+fn rust_export_matches_cpp_with_config_include() {
+    let Some(bin) = discover_config_export_bin() else {
+        eprintln!("skip rust_export_matches_cpp_with_config_include: helix-config-export not built");
+        return;
+    };
+    let root = unique_temp_dir("include");
+    let config_dir = root.join("cfg").join("helix");
+    fs::create_dir_all(&config_dir).unwrap();
+    let state_dir = root.join("state").join("helix");
+    fs::create_dir_all(&state_dir).unwrap();
+    fs::write(
+        config_dir.join("base.toml"),
+        "[theme]\nmode = \"dark\"\n",
+    )
+    .unwrap();
+    fs::write(
+        config_dir.join("config.toml"),
+        "include = { files = [\"base.toml\"] }\n\n[theme]\nmode = \"light\"\n",
+    )
+    .unwrap();
+    fs::write(state_dir.join("settings.toml"), "\n").unwrap();
+    let paths = ConfigPaths {
+        config_dir,
+        settings_toml: state_dir.join("settings.toml"),
+    };
+    let store = ConfigStore::load(paths.clone());
+    let rust = rust_export_toml(store.paths()).expect("rust export");
+    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
+    assert_eq!(rust, cpp);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn rust_export_none_when_extra_bar_name() {
+    let root = unique_temp_dir("extra-bar");
+    let config_dir = root.join("cfg").join("helix");
+    let state_dir = root.join("state").join("helix");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&state_dir).unwrap();
+    fs::write(
+        config_dir.join("config.toml"),
+        "[bar.secondary]\nenabled = true\nthickness = 28\n",
+    )
+    .unwrap();
+    fs::write(state_dir.join("settings.toml"), "\n").unwrap();
+    let paths = ConfigPaths {
+        config_dir,
+        settings_toml: state_dir.join("settings.toml"),
+    };
+    assert!(rust_export_toml(&paths).is_none());
+    let Some(bin) = discover_config_export_bin() else {
+        let _ = fs::remove_dir_all(root);
+        return;
+    };
+    let store = ConfigStore::load(paths.clone());
+    assert!(export_effective_toml(&store, Some(&bin)).is_some());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn rust_export_matches_cpp_for_minimal_fixture() {
     let root = unique_temp_dir("minimal");
     let paths = minimal_fixture(&root);

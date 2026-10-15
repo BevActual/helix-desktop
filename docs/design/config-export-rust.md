@@ -20,7 +20,7 @@ Theme templates read `config.*` from `config_export::serialize` output (C++ toda
 ## Rust implementation plan
 
 1. **`helix-shell-core::desktop::config_export::rust_export_toml`** — wired ahead of C++ in `export_effective_toml`. First slice: patch `config_export_minimal.toml` (schema-default export) with merged user TOML leaves when every merged leaf path exists in that tree; otherwise `None` and C++ runs. Integration tests in `config_export_golden.rs` compare Rust vs C++ for the golden fixture, light theme, bar thickness, pure-black-dark, and dock disabled; unit test `declines_unknown_merged_paths` guards legacy keys C++ ignores (e.g. `shell.list`).
-2. Port **merge + `normalizeLegacyConfig` + `parseConfigTable`** into Rust (or generate from schema), starting with sections templates touch most (`theme`, `shell`, `bar`).
+2. Port **merge + `normalizeLegacyConfig` + `parseConfigTable`** into Rust (or generate from schema), starting with sections templates touch most (`theme`, `shell`, `bar`). **`mergeConfigWithIncludes`** lives in `desktop/config_merge.rs` and backs `ConfigStore` base config load.
 3. Port **`writeTable` per section** in the same order as `config_sections.cpp`.
 4. Port **bar/widget placement** emitters from `config_export.cpp` anonymous namespace.
 5. When `config_export_golden` passes **without** `HELIX_CONFIG_EXPORT_BIN`, remove `helix-config-export` from Meson/CI.
