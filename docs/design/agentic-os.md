@@ -65,7 +65,7 @@ agent**. Cursor may use it via `.cursor/mcp.json` as one consumer; it is not the
 
 `protocols/ipc/msg-risk.toml` assigns every `helix-panel` command a tier: `observe`, `observe-private`
 (returns screen, clipboard or notification content; output is untrusted data), `act`, `confirm`, or `blocked`.
-`tests/msg_risk_policy_test.py` fails when a command has no tier, so new commands cannot ship unclassified.
+The risk tests in `core/helix-agent/src/risk.rs` fail when a command has no tier, so new commands cannot ship unclassified.
 The MCP adapter enforces the policy in one place (`helix_msg`), refuses `blocked` and unknown commands
 regardless of configuration, and grants the tiers listed in `tools/helix-agent/allowlist.toml`. Model-supplied
 text is passed after `--` so it is never parsed as a flag. `helix schema-json` dumps the full msg schema

@@ -97,7 +97,9 @@ function everyMinute() {
   clockTimer = setTimeout(everyMinute, 60000 - (Date.now() % 60000) + 50);
 }
 
+let actView = null;
 function show(view) {
+  actView = view;
   if (reactMobius) return; // the Act pane is React
   const phase = view.phase;
   let body = "";
@@ -112,11 +114,15 @@ function show(view) {
     body = view.text || "Done.";
     if (view.unverified) note = "This came from outside the assistant.";
   } else if (view.failed) body = view.text;
+  const canUndo = phase === "result" && !view.failed && !!view.undoable && view.task > 0;
   $("body").textContent = body;
   $("reason").textContent = reason;
   $("note").textContent = note;
-  $("buttons").style.display = phase === "confirm" ? "flex" : "none";
+  $("buttons").style.display = phase === "confirm" || canUndo ? "flex" : "none";
+  $("cancel").hidden = phase !== "confirm";
+  $("doit").hidden = phase !== "confirm";
   $("doit").disabled = phase !== "confirm" || !view.armed;
+  $("undo").hidden = !canUndo;
   if (phase === "idle" || phase === "result") $("q").focus();
 }
 
@@ -877,6 +883,13 @@ $("q").addEventListener("keydown", (event) => {
 });
 $("cancel").onclick = () => invoke("assistant_cancel").then(show);
 $("doit").onclick = () => invoke("assistant_confirm").then(show);
+$("undo").onclick = () => {
+  if (!actView || !actView.task) return;
+  invoke("assistant_undo", { task: actView.task }).then(show).catch((error) => {
+    $("note").textContent = String(error);
+    $("undo").hidden = true;
+  });
+};
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (document.body.dataset.panel === "control-center") {

@@ -87,6 +87,12 @@ pub struct DesktopTask {
     pub summary: String,
     /// The result, or the reason it failed.
     pub detail: String,
+    /// Display form of the previous value. Empty when this task has no pair. A saved file cannot name a command.
+    pub before: String,
+    /// Display form of the value after the write. `after` is already where the note sits in the thread.
+    pub after_text: String,
+    /// The shell reported that the previous value was written back.
+    pub undone: bool,
     /// Seconds since the epoch.
     pub at: u64,
 }
@@ -96,6 +102,7 @@ pub const MAX_TASKS: usize = 100;
 const MAX_TASK_REQUEST: usize = 500;
 const MAX_TASK_SUMMARY: usize = 300;
 const MAX_TASK_DETAIL: usize = 1000;
+const MAX_TASK_PAIR: usize = 80;
 
 impl DesktopTask {
     /// Cleans every field the way a saved file's are: no control or direction characters, bounded length, a known outcome.
@@ -109,6 +116,8 @@ impl DesktopTask {
         }
         self.summary = tidy(self.summary.trim(), MAX_TASK_SUMMARY);
         self.detail = tidy(self.detail.trim(), MAX_TASK_DETAIL);
+        self.before = tidy(self.before.trim(), MAX_TASK_PAIR);
+        self.after_text = tidy(self.after_text.trim(), MAX_TASK_PAIR);
         self.after = self.after.min(messages);
         Some(self)
     }
@@ -258,6 +267,16 @@ impl Conversation {
         if self.tasks.len() > MAX_TASKS {
             self.tasks.remove(0);
         }
+        self.updated = now;
+        true
+    }
+
+    /// The shell wrote the previous value back. The note keeps the pair and records that it was restored.
+    pub fn mark_task_undone(&mut self, id: u64, now: u64) -> bool {
+        let Some(task) = self.tasks.iter_mut().rev().find(|task| task.id == id && !task.undone) else {
+            return false;
+        };
+        task.undone = true;
         self.updated = now;
         true
     }
@@ -493,7 +512,7 @@ impl Conversation {
             "tools_enabled": self.tools_enabled,
             "workspace": self.workspace,
             "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text, "images": m.images, "sources": m.sources, "activities": m.activities})).collect::<Vec<_>>(),
-            "tasks": self.tasks.iter().map(|t| json!({"id": t.id, "after": t.after.min(self.messages.len()), "request": t.request, "outcome": t.outcome, "summary": t.summary, "detail": t.detail, "at": t.at})).collect::<Vec<_>>(),
+            "tasks": self.tasks.iter().map(|t| json!({"id": t.id, "after": t.after.min(self.messages.len()), "request": t.request, "outcome": t.outcome, "summary": t.summary, "detail": t.detail, "before": t.before, "after_text": t.after_text, "undone": t.undone, "at": t.at})).collect::<Vec<_>>(),
         })
         .to_string()
     }
@@ -562,6 +581,9 @@ impl Conversation {
                             outcome: entry.get("outcome")?.as_str()?.to_string(),
                             summary: entry.get("summary").and_then(Value::as_str).unwrap_or_default().to_string(),
                             detail: entry.get("detail").and_then(Value::as_str).unwrap_or_default().to_string(),
+                            before: entry.get("before").and_then(Value::as_str).unwrap_or_default().to_string(),
+                            after_text: entry.get("after_text").and_then(Value::as_str).unwrap_or_default().to_string(),
+                            undone: entry.get("undone").and_then(Value::as_bool).unwrap_or(false),
                             at: entry.get("at").and_then(Value::as_u64).unwrap_or(0),
                         }
                         .cleaned(messages.len())
@@ -1106,6 +1128,16 @@ impl Chat {
                 if !task.detail.is_empty() {
                     text.push_str(&format!(": {}", task.detail.replace('\n', " ")));
                 }
+                if !task.before.is_empty() && !task.after_text.is_empty() {
+                    let before = task.before.replace('\n', " ");
+                    let after = task.after_text.replace('\n', " ");
+                    if !task.detail.contains(task.before.as_str()) || !task.detail.contains(task.after_text.as_str()) {
+                        text.push_str(&format!(" ({before} to {after})"));
+                    }
+                    if task.undone {
+                        text.push_str(&format!(" Restored to {before}."));
+                    }
+                }
                 text.push_str("\n\n");
             }
             text
@@ -1563,7 +1595,7 @@ mod tests {
     }
 
     fn task(request: &str, outcome: &str) -> DesktopTask {
-        DesktopTask { id: 3, after: 0, request: request.into(), outcome: outcome.into(), summary: "Make the screen dimmer".into(), detail: "The screen is dimmer.".into(), at: 9 }
+        DesktopTask { id: 3, after: 0, request: request.into(), outcome: outcome.into(), summary: "Make the screen dimmer".into(), detail: "The screen is dimmer.".into(), before: String::new(), after_text: String::new(), undone: false, at: 9 }
     }
 
     fn answered(c: &mut Chat, text: &str, at: u64) {
@@ -1706,5 +1738,31 @@ mod tests {
         let task_at = md.find("On the desktop:** Dim the screen").unwrap();
         assert!(md.find("first").unwrap() < task_at && task_at < md.find("second").unwrap(), "{md}");
         assert!(md.contains("> Done: The screen is dimmer."));
+    }
+
+    #[test]
+    fn a_task_pair_is_saved_and_kept_out_of_the_model() {
+        let mut c = chat();
+        answered(&mut c, "hello", 1);
+        let mut t = task("Dim the screen", "done");
+        t.after = c.conversation.messages.len();
+        t.before = "40%, muted".into();
+        t.after_text = "45%".into();
+        assert!(c.conversation.record_task(t, 20));
+        let again = Conversation::from_json(&c.conversation.to_json()).unwrap();
+        assert_eq!(again.tasks[0].before, "40%, muted");
+        assert_eq!(again.tasks[0].after_text, "45%");
+        assert!(!again.tasks[0].undone);
+        assert!(c.to_markdown().contains("(40%, muted to 45%)"));
+        let sent = c.conversation.context().into_iter().map(|(_, text)| text).collect::<String>();
+        assert!(!sent.contains("40%, muted"), "the pair is not a message");
+        assert!(c.conversation.mark_task_undone(3, 21));
+        assert!(c.conversation.tasks[0].undone);
+        assert!(c.to_markdown().contains("Restored to 40%, muted."));
+        let old = Conversation::from_json(r#"{"version":1,"id":"0123456789abcdef","title":"t","updated":1,"messages":[],"tasks":[{"request":"Dim","outcome":"done","summary":"s","detail":"d","before":"volume-set 10"}]}"#).unwrap();
+        assert_eq!(old.tasks[0].before, "volume-set 10");
+        assert!(old.tasks[0].after_text.is_empty() && !old.tasks[0].undone);
+        let bare = Conversation::from_json(r#"{"version":1,"id":"0123456789abcdef","title":"t","updated":1,"messages":[],"tasks":[{"request":"Dim","outcome":"done"}]}"#).unwrap();
+        assert!(bare.tasks[0].before.is_empty() && bare.tasks[0].after_text.is_empty() && !bare.tasks[0].undone);
     }
 }

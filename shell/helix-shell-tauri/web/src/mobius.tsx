@@ -111,9 +111,13 @@ function Talk({ active }: { active: boolean }) {
 function Act({ active, resetKey }: { active: boolean; resetKey: number }) {
   const [view, setView] = useState<AssistantView | null>(null);
   const [text, setText] = useState("");
+  const [undoError, setUndoError] = useState("");
   const field = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const stop = listen<AssistantView>("assistant-view", setView);
+    const stop = listen<AssistantView>("assistant-view", (next) => {
+      setUndoError("");
+      setView(next);
+    });
     return () => { stop.then((fn) => fn()); };
   }, []);
   useEffect(() => {
@@ -138,6 +142,15 @@ function Act({ active, resetKey }: { active: boolean; resetKey: number }) {
       if (view.unverified) note = "This came from outside the assistant.";
     } else if (view.failed) body = view.text;
   }
+  const canUndo = phase === "result" && !view?.failed && !!view?.undoable && (view?.task ?? 0) > 0;
+  const undo = () => {
+    if (!view) return;
+    setUndoError("");
+    invoke<AssistantView>("assistant_undo", { task: view.task }).then(setView).catch((error) => {
+      setUndoError(String(error));
+      setView((current) => (current ? { ...current, undoable: false } : current));
+    });
+  };
   return (
     <div id="mobius-act" className="mobius-pane" data-test="mobius-act-pane" hidden={!active}>
       <p className="ai-rail-note">Change the desktop. Confirm here when Mobius asks.</p>
@@ -158,10 +171,11 @@ function Act({ active, resetKey }: { active: boolean; resetKey: number }) {
       />
       <div id="body">{body}</div>
       <div id="reason">{reason}</div>
-      <div id="note">{note}</div>
-      <div id="buttons" style={{ display: phase === "confirm" ? "flex" : "none" }}>
-        <button id="cancel" onClick={() => invoke<AssistantView>("assistant_cancel").then(setView)}>Cancel</button>
-        <button id="doit" className="primary" disabled={phase !== "confirm" || !view?.armed} onClick={() => invoke<AssistantView>("assistant_confirm").then(setView)}>Do it</button>
+      <div id="note">{undoError || note}</div>
+      <div id="buttons" style={{ display: phase === "confirm" || canUndo ? "flex" : "none" }}>
+        {phase === "confirm" ? <button id="cancel" onClick={() => invoke<AssistantView>("assistant_cancel").then(setView)}>Cancel</button> : null}
+        {phase === "confirm" ? <button id="doit" className="primary" disabled={!view?.armed} onClick={() => invoke<AssistantView>("assistant_confirm").then(setView)}>Do it</button> : null}
+        {canUndo ? <button id="undo" type="button" data-test="act-undo" onClick={undo}>Undo</button> : null}
       </div>
     </div>
   );

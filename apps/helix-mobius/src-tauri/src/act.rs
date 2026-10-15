@@ -52,6 +52,8 @@ pub struct Finished {
     pub outcome: &'static str,
     pub summary: String,
     pub detail: String,
+    pub before: String,
+    pub after_text: String,
 }
 
 /// Feeds one reported state in. Returns the task when this state is the moment it ended: the shell reached a result, or went back
@@ -80,12 +82,26 @@ pub fn advance(track: &mut Track, view: &ActView) -> Option<Finished> {
             track.in_progress = false;
             let summary = if !view.description.is_empty() { view.description.clone() } else { track.description.clone() };
             let detail = if !view.text.is_empty() { view.text.clone() } else { view.reason.clone() };
-            Some(Finished { task: view.task, outcome: if view.failed { "failed" } else { "done" }, summary, detail })
+            Some(Finished {
+                task: view.task,
+                outcome: if view.failed { "failed" } else { "done" },
+                summary,
+                detail,
+                before: view.before.clone(),
+                after_text: view.after.clone(),
+            })
         }
         "idle" if track.in_progress && track.recorded != track.task => {
             track.recorded = track.task;
             track.in_progress = false;
-            Some(Finished { task: track.task, outcome: "stopped", summary: track.description.clone(), detail: String::new() })
+            Some(Finished {
+                task: track.task,
+                outcome: "stopped",
+                summary: track.description.clone(),
+                detail: String::new(),
+                before: String::new(),
+                after_text: String::new(),
+            })
         }
         _ => None,
     }
@@ -103,6 +119,14 @@ pub struct ActView {
     pub description: String,
     pub reason: String,
     pub failed: bool,
+    /// Display form of the previous value. Empty when the shell did not send one.
+    pub before: String,
+    /// Display form of the value after the write.
+    pub after: String,
+    /// The shell still holds this task and the live value still matches.
+    pub undoable: bool,
+    /// Undo already wrote the previous value back.
+    pub restored: bool,
 }
 
 fn text(map: &HashMap<String, OwnedValue>, key: &str) -> String {
@@ -120,6 +144,8 @@ pub fn view_from(map: &HashMap<String, OwnedValue>, mine: &str) -> ActView {
         _ => 0,
     };
     let failed = matches!(map.get("failed").map(|value| &**value), Some(Value::Bool(true)));
+    let undoable = matches!(map.get("undoable").map(|value| &**value), Some(Value::Bool(true)));
+    let restored = matches!(map.get("restored").map(|value| &**value), Some(Value::Bool(true)));
     ActView {
         mine: !mine.is_empty() && request == mine,
         task,
@@ -129,6 +155,10 @@ pub fn view_from(map: &HashMap<String, OwnedValue>, mine: &str) -> ActView {
         description: text(map, "description"),
         reason: text(map, "reason"),
         failed,
+        before: text(map, "before"),
+        after: text(map, "after"),
+        undoable,
+        restored,
     }
 }
 
@@ -156,7 +186,13 @@ pub fn watch(app: AppHandle) {
                 if let Ok(mut changes) = proxy.receive_signal("Changed").await {
                     while changes.next().await.is_some() {
                         let view = read().await;
-                        let finished = advance(&mut TRACK.lock().expect("act track"), &view);
+                        let (finished, restored_here) = {
+                            let mut track = TRACK.lock().expect("act track");
+                            let finished = advance(&mut track, &view);
+                            let restored_here =
+                                view.restored && view.mine && track.recorded == view.task;
+                            (finished, restored_here)
+                        };
                         let _ = app.emit("act-state", &view);
                         if let Some(done) = finished {
                             let handoff = MINE.lock().expect("act request").clone();
@@ -170,9 +206,15 @@ pub fn watch(app: AppHandle) {
                                     outcome: done.outcome.to_string(),
                                     summary: done.summary,
                                     detail: done.detail,
+                                    before: done.before,
+                                    after_text: done.after_text,
+                                    undone: false,
                                     at: 0,
                                 },
                             );
+                        }
+                        if restored_here {
+                            crate::mark_open_task_undone(&app, view.task);
                         }
                     }
                 }
@@ -196,6 +238,18 @@ pub async fn chat_act_stop() -> Result<(), String> {
         .await
         .map(|_| ())
         .map_err(|error| error.to_string())
+}
+
+/// Writes the previous value back for a task the shell still holds. The shell refuses when it does not, and nothing is written.
+#[tauri::command]
+pub async fn chat_act_undo(app: tauri::AppHandle, task: u64) -> Result<(), String> {
+    let proxy = proxy().await.map_err(|error| error.to_string())?;
+    proxy
+        .call_method("Undo", &(task,))
+        .await
+        .map_err(|error| error.to_string())?;
+    crate::mark_open_task_undone(&app, task);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -239,6 +293,23 @@ mod tests {
         let odd = map(&[("phase", Value::from(7u32)), ("failed", Value::from("yes"))]);
         let view = view_from(&odd, "x");
         assert_eq!((view.phase.as_str(), view.failed), ("", false));
+        assert!(view.before.is_empty() && view.after.is_empty() && !view.undoable);
+    }
+
+    #[test]
+    fn a_pair_is_read_and_a_missing_one_is_not_undoable() {
+        let state = map(&[
+            ("before", Value::from("40%, muted")),
+            ("after", Value::from("45%")),
+            ("undoable", Value::from(true)),
+        ]);
+        let view = view_from(&state, "");
+        assert_eq!(
+            (view.before.as_str(), view.after.as_str(), view.undoable),
+            ("40%, muted", "45%", true)
+        );
+        assert!(!view_from(&HashMap::new(), "").undoable);
+        assert!(!view_from(&HashMap::new(), "").restored);
     }
 
     #[test]

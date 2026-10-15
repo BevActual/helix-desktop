@@ -13,7 +13,7 @@ Priorities are based on current gaps in the code and everyday workflows. Each de
 | Make a picture | Local SD-Turbo generation, size/seed, progress, Stop, save/copy/reuse | Reference-image editing and measured quality improvements |
 | Dictate a prompt | Local microphone recording and Whisper transcription | Read-aloud replies, with playback and cancellation |
 | Inspect a compiled program | Local REA/Ghidra evidence jobs and explanation | Better evidence navigation and comparison between binaries |
-| Change the desktop | Act hands the request to the desktop assistant; a card above the composer shows it working or waiting for approval (Review, Stop); when it ends, the outcome (done, failed with the reason, or stopped) is written into the conversation and saved with it | Show the resulting state, not only the shell's words, and offer undo where an action can be undone |
+| Change the desktop | Act hands the request to the desktop assistant; a card above the composer shows it working or waiting for approval (Review, Stop); when it ends, the outcome (done, failed with the reason, or stopped) is written into the conversation and saved with it | Show the resulting state, not only the shell's words, and offer undo where an action can be undone (`act-undo.md`) |
 | Reuse an answer | Copy text/code/table, export Markdown, **Save as file** on replies and on individual code blocks (preview + zenity save) | Table export shortcuts; richer export formats |
 
 ## Delivered: desktop tasks in the conversation
@@ -26,6 +26,8 @@ export, and is carried into a fork only if it happened before the fork's cut.
 A task is deliberately not a message. It has no index, so edit, regenerate and fork work as before, and it is never sent to a model: the
 result is text from the desktop, and a model should neither reason over it nor be steered by it. A chat that has only tasks is saved
 and takes its title from the first request. Notes are bounded (100 per chat, the oldest dropped) and cleaned like any saved text.
+
+When the shell recorded a pair, the note keeps those two display values, and Undo is shown while the shell still says that task can be undone. The button calls `Undo` on the shell. The pair is not sent to a model. A confirm-tier restore is classified in `act-undo.md` and not built, because the shell does not run those commands yet.
 
 ## Delivered: context and a chat brief
 

@@ -66,6 +66,10 @@ export interface AssistantView {
   failed: boolean;
   unverified: boolean;
   armed: boolean;
+  task: number;
+  before: string;
+  after: string;
+  undoable: boolean;
 }
 export interface TalkLine { role: string; text: string; }
 export interface TalkView { phase: string; reply: string; error: string; history: TalkLine[]; }

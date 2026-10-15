@@ -71,6 +71,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
       set: (messages: Message[], streaming: boolean, context?: ContextInfo, tasks?: DesktopTask[]) => run((h) => h.set(messages, streaming, context, tasks)),
       stream: (blocks: Block[]) => run((h) => h.stream(blocks)),
       find: (needle: string) => run((h) => h.find(needle)),
+      undo: (task: number, undoable: boolean) => run((h) => h.undo(task, undoable)),
     };
   },
   dialogs: (host: HTMLElement, rail: HTMLElement | null, hooks: DialogHooks) => {

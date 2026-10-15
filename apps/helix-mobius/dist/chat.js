@@ -1028,8 +1028,20 @@ const reactThread = window.HelixMobiusReact
     },
     fork: (index) => forkChat(index),
     report: (error) => report(error),
+    undo: (id) => invoke("chat_act_undo", { task: id })
+      .then(() => { if (reactThread) reactThread.undo(id, false); })
+      .catch((error) => {
+        if (reactThread) reactThread.undo(id, false);
+        report(error);
+      }),
   })
   : null;
+if (reactAct && reactThread) {
+  listen("act-state", (event) => {
+    const state = event.payload;
+    if (state && state.mine && state.task) reactThread.undo(state.task, !!state.undoable);
+  });
+}
 
 function drawProjectFilter() {
   if (reactChats) return;

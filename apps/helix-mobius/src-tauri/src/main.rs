@@ -386,6 +386,22 @@ pub(crate) fn record_desktop_task(app: &AppHandle, chat_id: &str, task: helix_ch
     }
 }
 
+/// The shell restored a task's previous value. The open chat's note records that, when it has this task.
+pub(crate) fn mark_open_task_undone(app: &AppHandle, task: u64) {
+    let changed = {
+        let shared = shared(app);
+        let mut state = shared.lock().expect("state");
+        let marked = state.chat.conversation.mark_task_undone(task, now());
+        if marked && !state.chat.temporary && !state.chat.is_streaming() {
+            save(&state.chat.conversation);
+        }
+        marked
+    };
+    if changed {
+        emit_view(app);
+    }
+}
+
 fn persist(app: &AppHandle) {
     let shared = shared(app);
     let state = shared.lock().expect("state");
@@ -2233,6 +2249,7 @@ fn main() {
             chat_act_on_desktop,
             act::chat_act_state,
             act::chat_act_stop,
+            act::chat_act_undo,
             agent_desk_glance,
             agent_desk_focus,
             chat_open_shell_panel,

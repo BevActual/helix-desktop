@@ -59,6 +59,19 @@ import json, sys
 d = json.load(open(sys.argv[1]))
 sys.exit(0 if d.get("messages") == [] else 1)
 PY
+echo "--- 5b. the note offers Undo while the shell still can; it writes the previous value back and the note says so"
+wait_id task-note-undo-0 && echo "ok: Undo is offered on the finished task" || fail "no Undo on the note"
+click_id task-note-undo-0; sleep 1
+grep -q '^UNDO 1$' "$FAKE" && echo "ok: the shell was asked to undo task 1" || fail "no undo sent: $(cat "$FAKE")"
+gone_id task-note-undo-0 && echo "ok: Undo is gone once used" || fail "Undo stayed"
+shot act-undone
+[ "$(grep -c '^APPROVED' "$FAKE")" = 1 ] && echo "ok: undoing needed no approval" || fail "approval count changed"
+python3 - "$F" <<'PY' && echo "ok: the saved task records the restore" || fail "saved task is not marked undone"
+import json, sys
+d = json.load(open(sys.argv[1]))
+t = d["tasks"][0]
+sys.exit(0 if t.get("undone") and t.get("before") == "80%" and t.get("after_text") == "40%" else 1)
+PY
 echo "--- 6. Stop cancels a task in progress and is recorded as stopped"
 say "Dim it again"
 wait_id act-task-stop && click_id act-task-stop; gone_id act-task && echo "ok: stopped, the card went away" || fail "did not stop"

@@ -63,6 +63,11 @@ impl Quick {
         Self { theme, night_light }
     }
 
+    /// `dark`, `light`, or `auto`. `None` when the service does not offer the setting.
+    pub fn mode(&self) -> Option<&str> {
+        self.theme.as_deref()
+    }
+
     pub fn view(&self) -> QuickView {
         QuickView {
             dark: self.theme.as_deref().map(|mode| mode == "dark"),
@@ -126,7 +131,9 @@ mod tests {
             (view.dark, view.dark_label, view.night_light),
             (Some(false), Some("Light"), Some(true))
         );
-        let view = Quick::from_settings(&settings("auto", true)).view();
+        let quick = Quick::from_settings(&settings("auto", true));
+        assert_eq!(quick.mode(), Some("auto"));
+        let view = quick.view();
         assert_eq!(
             (view.dark, view.dark_label),
             (Some(false), Some("Automatic")),

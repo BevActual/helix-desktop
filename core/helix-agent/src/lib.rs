@@ -8,6 +8,7 @@ pub mod approvals;
 pub mod assistant;
 pub mod assistant_core;
 pub mod audit_log;
+pub mod change_ledger;
 pub mod confirm;
 pub mod confirmer;
 pub mod grant_store;
