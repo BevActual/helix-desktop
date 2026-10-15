@@ -14,6 +14,7 @@ mod config_export_serialize;
 mod config_export_key_chord;
 mod config_export_typed;
 mod config_export_typed_scalar;
+mod config_export_typed_shell;
 mod config_merge;
 mod config_settings_migrate;
 pub mod compositor_ipc;

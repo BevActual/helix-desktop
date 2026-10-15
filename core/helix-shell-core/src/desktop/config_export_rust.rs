@@ -656,7 +656,7 @@ fn rebuild_bar_from_merged(root: &mut Toml, merged: &Toml) {
 }
 
 /// Overlay merged config onto export defaults (C++ `parseConfigTable` + `writeTable` shape at the TOML layer).
-fn merge_export_subtree(
+pub(crate) fn merge_export_subtree(
     template: &Toml,
     patch: &Toml,
     merged: &Toml,
@@ -744,7 +744,7 @@ pub(crate) fn merged_overlay_for_parsed_section(section: &str, merged_section: &
 }
 
 /// Match C++ `writeTable` scalar kinds using the default-export node at `path` as the template.
-fn coerce_patch_value(template: &Toml, patch: &Toml) -> Toml {
+pub(crate) fn coerce_patch_value(template: &Toml, patch: &Toml) -> Toml {
     match (template, patch) {
         (Toml::Integer(_), Toml::Float(value)) if value.fract() == 0.0 => {
             Toml::Integer(*value as i64)

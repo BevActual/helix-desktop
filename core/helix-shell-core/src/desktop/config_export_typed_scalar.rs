@@ -804,8 +804,8 @@ pub(crate) fn export_idle_section_from_merged(merged: &Toml) -> Toml {
         .unwrap_or_else(|| IdleExport::export_defaults().write_export_table())
 }
 
-/// Overlay merged leaves onto `defaults` when the key exists in defaults (one table level).
-fn overlay_known_leaves(defaults: &Toml, merged: &Toml) -> Toml {
+/// Overlay merged leaves onto `defaults` when the key exists in defaults (recursive tables).
+pub(crate) fn overlay_known_leaves(defaults: &Toml, merged: &Toml) -> Toml {
     let default_table = match defaults.as_table() {
         Some(table) => table,
         None => return defaults.clone(),
