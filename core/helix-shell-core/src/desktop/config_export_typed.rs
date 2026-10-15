@@ -1,14 +1,13 @@
 //! Typed `parseConfigTable` → `writeTable` slices for `config_export` (milestone C tail).
 //!
-//! Every `SCHEMA_EXPORT_SECTIONS` table is exported here (`storage`, `accessibility`, `battery`,
-//! and `theme` use explicit structs; others use filtered merge until ported). `bar` stays in
-//! `config_export_rust`.
+//! Every `SCHEMA_EXPORT_SECTIONS` table is exported here (explicit structs, known-leaf overlay,
+//! or `shell` via `merge_export_subtree`). `bar` stays in `config_export_rust`.
 
 use toml::Value as Toml;
 
 use super::config_export_defaults::{
     schema_section_default_writer, write_accessibility_defaults, write_battery_defaults,
-    write_storage_defaults, write_theme_defaults,
+    write_shell_defaults, write_storage_defaults, write_theme_defaults,
 };
 use super::config_export_rust::export_filtered_schema_section;
 use super::config_export_serialize::f32_bits;
@@ -510,6 +509,11 @@ fn export_theme_section_from_merged(merged: &Toml) -> Toml {
         .unwrap_or_else(|| ThemeExport::export_defaults().write_export_table())
 }
 
+/// Optional schema leaves (`shell.panel.glass`, …) and array-shaped tables need full merge.
+fn export_shell_section_from_merged(merged: &Toml, default: &Toml) -> Toml {
+    export_filtered_schema_section("shell", merged, default, write_shell_defaults)
+}
+
 /// Export one schema section. `bar` is handled only in `config_export_rust`.
 pub(crate) fn export_typed_schema_section(
     section: &str,
@@ -540,6 +544,7 @@ pub(crate) fn export_typed_schema_section(
         "dock" => Some(export_dock_section_from_merged(merged)),
         "wallpaper" => Some(export_wallpaper_section_from_merged(merged)),
         "keybinds" => Some(export_keybinds_section_from_merged(merged)),
+        "shell" => Some(export_shell_section_from_merged(merged, default)),
         _ => None,
     };
     if let Some(table) = struct_export {
@@ -615,6 +620,39 @@ warning_threshold = 15
             export_filtered_schema_section("battery", &merged, &default, write_battery_defaults);
         let battery_typed = export_typed_schema_section("battery", &merged, &default).unwrap();
         assert_eq!(battery_typed, battery_filtered);
+    }
+
+    #[test]
+    fn shell_export_matches_filtered_merge() {
+        let default = serialize_default_config();
+        let merged: Toml = toml::from_str(
+            r#"
+[shell]
+polkit_agent = true
+
+[shell.panel]
+glass = 0.25
+
+[shell.launcher]
+compact = true
+
+[shell.launcher.providers.calculator]
+prefix = "calc"
+global = true
+"#,
+        )
+        .unwrap();
+        let filtered =
+            export_filtered_schema_section("shell", &merged, &default, write_shell_defaults);
+        let typed = export_typed_schema_section("shell", &merged, &default).unwrap();
+        assert_eq!(typed, filtered);
+        assert_eq!(
+            typed
+                .get("panel")
+                .and_then(|panel| panel.get("glass"))
+                .and_then(|v| v.as_float()),
+            Some(0.25)
+        );
     }
 
     #[test]
