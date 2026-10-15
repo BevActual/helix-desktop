@@ -192,7 +192,7 @@ def find_bin() -> Path:
             return candidate
     sys.exit(
         "error: build helix-rust-config-export "
-        "(cargo build -p helix-shell-core --bin helix-rust-config-export) "
+        "(cargo build -p helix-config-export --bin helix-rust-config-export) "
         "or set HELIX_RUST_CONFIG_EXPORT_BIN"
     )
 

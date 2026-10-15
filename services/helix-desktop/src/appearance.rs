@@ -229,7 +229,7 @@ impl Appearance {
                 "Appearance exports require Helix desktop".into(),
             ));
         }
-        helix_shell_core::desktop::color_spec::validate_accent_hex(value)
+        helix_config::color_spec::validate_accent_hex(value)
             .map_err(fdo::Error::InvalidArgs)?;
         let inputs = crate::theme_palette::Inputs::capture(&state.config, &state.wallpaper);
         drop(state);
@@ -259,7 +259,7 @@ impl Appearance {
                 "Appearance exports require Helix desktop".into(),
             ));
         }
-        helix_shell_core::desktop::color_spec::validate_accent_hex(color)
+        helix_config::color_spec::validate_accent_hex(color)
             .map_err(fdo::Error::InvalidArgs)?;
         let inputs = crate::theme_palette::Inputs::capture(&state.config, &state.wallpaper);
         drop(state);

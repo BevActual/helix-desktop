@@ -39,23 +39,29 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use helix_desktop_api::{sound_volume_label, Desktop, Domain};
-use helix_shell_core::activity::{
+use helix_agent::activity::{
     Activity, ActivityView, Request as ActivityRequest, RequestError as ActivityError,
 };
-use helix_shell_core::audio::{Audio, AudioView, Request, RequestError};
-use helix_shell_core::bluetooth::{
+use helix_models::audio::{Audio, AudioView, Request, RequestError};
+use helix_models::bluetooth::{
     Bluetooth, BluetoothView, Request as BluetoothRequest, RequestError as BluetoothError,
 };
-use helix_shell_core::network::{
+use helix_models::network::{
     Network, NetworkView, Request as NetworkRequest, RequestError as NetworkError,
 };
-use helix_shell_core::power::view as power_view;
-use helix_shell_core::quick::{Quick, QuickView, RequestError as QuickError, SettingUpdate};
-use helix_shell_core::{
-    Confirmation, ConfirmerView, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS, BAR_PLAN,
-    PANEL_CLOSED,
-};
-use helix_shell_core::panels_ipc::{PanelsReply, PanelsRequest};
+use helix_models::power::view as power_view;
+use helix_models::quick::{Quick, QuickView, RequestError as QuickError, SettingUpdate};
+use helix_agent::confirm::Confirmation;
+use helix_agent::confirmer::ConfirmerView;
+use helix_shell_model::shell_surface::Escape;
+use helix_agent::assistant::Phase;
+use helix_agent::assistant::Session;
+use helix_shell_model::shell_surface::ShellSurface;
+use helix_agent::assistant::Spawn;
+use helix_agent::confirm::ARMING_MS;
+use helix_shell_model::bar_surface::BAR_PLAN;
+use helix_shell_model::panel_surface::PANEL_CLOSED;
+use helix_shell_model::panels_ipc::{PanelsReply, PanelsRequest};
 use role::ShellRole;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -95,8 +101,8 @@ struct ShellState {
     talk: mobius_talk::TalkState,
     surface: ShellSurface,
     /// The applications the launcher lists, read each time it opens. The page refers to them by id only.
-    apps: Vec<helix_shell_core::launcher::App>,
-    history: helix_shell_core::launcher::History,
+    apps: Vec<helix_shell_model::launcher::App>,
+    history: helix_shell_model::launcher::History,
     /// The last Audio1 snapshot, read after every Changed signal. Writes are built from this and nothing else.
     audio: Audio,
     /// The last Network1 snapshot; Wi-Fi writes are built from it and nothing else.
@@ -104,23 +110,23 @@ struct ShellState {
     /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
     bluetooth: Bluetooth,
     /// What niri says is open (its event stream), the installed applications the dock matches them to, and the dock itself.
-    niri: helix_shell_core::niri::Niri,
-    dock_apps: Vec<helix_shell_core::launcher::App>,
-    dock: helix_shell_core::dock::Dock,
+    niri: helix_compositor::niri::Niri,
+    dock_apps: Vec<helix_shell_model::launcher::App>,
+    dock: helix_shell_model::dock::Dock,
     /// Applications' tray items (StatusNotifierItem), as the watcher this shell serves registered them.
-    tray: helix_shell_core::tray::Tray,
+    tray: helix_shell_model::tray::Tray,
     /// The menu last shown for a tray item, so a choice is checked against exactly what was on screen.
-    tray_menu: Option<(String, helix_shell_core::dbusmenu::Menu)>,
+    tray_menu: Option<(String, helix_shell_model::dbusmenu::Menu)>,
     /// The backlight as last read or written, if the machine has one.
-    brightness: Option<helix_shell_core::brightness::Brightness>,
+    brightness: Option<helix_models::brightness::Brightness>,
     /// What is playing (from playerctl), for the live-status pill.
-    media: Option<helix_shell_core::island::Media>,
+    media: Option<helix_shell_model::island::Media>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
     insert_target: Option<u64>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
-    insert: helix_shell_core::quick_insert::QuickInsert,
+    insert: helix_shell_model::quick_insert::QuickInsert,
     /// What applications have posted through org.freedesktop.Notifications; see `notify`.
-    notifications: helix_shell_core::notifications::Notifications,
+    notifications: helix_shell_model::notifications::Notifications,
     /// The last AgentSurfaceActivity1 reads; stop, revoke and the kill switch are built from them and nothing else.
     activity: Activity,
     /// The last settings list, for the dark-theme and night-light tiles.
@@ -323,11 +329,11 @@ fn open_mobius_panel_local(app: &AppHandle, mode: MobiusMode) {
 
 /// Bar process never promotes its surface to Overlay.
 /// Panels process keeps Overlay even when closed (`PANEL_CLOSED` / no input) — never Top/BarOnly from legacy ShellSurface.
-fn apply_panel_plan(app: &AppHandle, plan: helix_shell_core::Plan) {
+fn apply_panel_plan(app: &AppHandle, plan: helix_shell_model::shell_surface::Plan) {
     match ShellRole::from_env() {
         ShellRole::Bar => layer::apply(app, BAR_PLAN),
         ShellRole::Panels => {
-            let plan = if plan.input == helix_shell_core::shell_surface::InputRegion::Whole {
+            let plan = if plan.input == helix_shell_model::shell_surface::InputRegion::Whole {
                 plan
             } else {
                 PANEL_CLOSED
@@ -876,7 +882,7 @@ fn session_lock(app: AppHandle) {
 #[tauri::command]
 fn session_suspend(app: AppHandle) {
     close_panel(&app);
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         eprintln!("SESSION session_suspend skipped (test session)");
         return;
     }
@@ -891,7 +897,7 @@ fn session_suspend(app: AppHandle) {
 #[tauri::command]
 fn session_logout(app: AppHandle) {
     close_panel(&app);
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         eprintln!("SESSION session_logout skipped (test session)");
         return;
     }
@@ -906,7 +912,7 @@ fn session_logout(app: AppHandle) {
 #[tauri::command]
 fn session_reboot(app: AppHandle) {
     close_panel(&app);
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         eprintln!("SESSION session_reboot skipped (test session)");
         return;
     }
@@ -921,7 +927,7 @@ fn session_reboot(app: AppHandle) {
 #[tauri::command]
 fn session_poweroff(app: AppHandle) {
     close_panel(&app);
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         eprintln!("SESSION session_poweroff skipped (test session)");
         return;
     }
@@ -1138,12 +1144,12 @@ fn calendar_view(
     delta: i32,
     today: Today,
     week_start: u32,
-) -> Result<helix_shell_core::calendar::MonthView, String> {
-    helix_shell_core::calendar::month_view(
+) -> Result<helix_shell_model::calendar::MonthView, String> {
+    helix_shell_model::calendar::month_view(
         year,
         month,
         delta,
-        helix_shell_core::calendar::Date {
+        helix_shell_model::calendar::Date {
             year: today.year,
             month: today.month,
             day: today.day,
@@ -1249,7 +1255,7 @@ pub(crate) async fn toggle_mute(app: &AppHandle) {
 /// Writes a brightness request, remembers the result, and tells the page.
 async fn write_brightness(
     app: &AppHandle,
-    request: helix_shell_core::brightness::Request,
+    request: helix_models::brightness::Request,
 ) -> Result<u32, String> {
     backlight::write(request).await?;
     let view = {
@@ -1280,14 +1286,14 @@ pub(crate) async fn adjust_brightness(app: &AppHandle, delta: i32) {
 }
 
 #[tauri::command]
-fn brightness_view(app: AppHandle) -> helix_shell_core::brightness::BrightnessView {
+fn brightness_view(app: AppHandle) -> helix_models::brightness::BrightnessView {
     // Re-read: another tool may have changed it since the shell last wrote.
     let state = shell_state(&app);
     let mut shell = state.lock().expect("shell state");
     shell.brightness = backlight::read();
     shell
         .brightness
-        .map_or_else(helix_shell_core::brightness::Brightness::unavailable, |b| {
+        .map_or_else(helix_models::brightness::Brightness::unavailable, |b| {
             b.view()
         })
 }
@@ -1351,7 +1357,7 @@ fn watch_battery_while_open(app: AppHandle) {
 }
 
 #[tauri::command]
-fn battery_view() -> helix_shell_core::power::BatteryView {
+fn battery_view() -> helix_models::power::BatteryView {
     power_view(battery::read_battery())
 }
 
@@ -1607,7 +1613,7 @@ fn confirmer_set_tier(
 #[tauri::command]
 fn report_glass(
     app: AppHandle,
-    elements: Vec<helix_shell_core::glass::Glass>,
+    elements: Vec<helix_shell_model::glass::Glass>,
     width: i32,
     height: i32,
 ) {
@@ -1619,7 +1625,7 @@ fn report_glass(
         let Ok(gtk_window) = window.gtk_window() else {
             return;
         };
-        let rects = helix_shell_core::glass::blur_rects(
+        let rects = helix_shell_model::glass::blur_rects(
             &elements,
             width.clamp(1, 16384),
             height.clamp(1, 16384),
@@ -1634,14 +1640,14 @@ fn report_glass(
 #[tauri::command]
 fn report_interactive(
     app: AppHandle,
-    elements: Vec<helix_shell_core::glass::Glass>,
+    elements: Vec<helix_shell_model::glass::Glass>,
     width: i32,
     height: i32,
 ) {
-    let rects: Vec<helix_shell_core::glass::Rect> = helix_shell_core::glass::blur_rects(
+    let rects: Vec<helix_shell_model::glass::Rect> = helix_shell_model::glass::blur_rects(
         &elements
             .iter()
-            .map(|g| helix_shell_core::glass::Glass { radius: 0.0, ..*g })
+            .map(|g| helix_shell_model::glass::Glass { radius: 0.0, ..*g })
             .collect::<Vec<_>>(),
         width.clamp(1, 16384),
         height.clamp(1, 16384),
@@ -1848,7 +1854,7 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
         return Vec::new();
     }
     let query: String = query.chars().take(MAX_QUERY_CHARS).collect();
-    let actions = helix_shell_core::desktop_actions::search(&query, LAUNCHER_ROWS);
+    let actions = helix_shell_model::desktop_actions::search(&query, LAUNCHER_ROWS);
     let mut hits = Vec::with_capacity(actions.len() + LAUNCHER_ROWS);
     for action in actions {
         hits.push(AppHit {
@@ -1862,7 +1868,7 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
     let found = if app_slots == 0 {
         Vec::new()
     } else {
-        helix_shell_core::launcher::search_with_history(
+        helix_shell_model::launcher::search_with_history(
             &shell.apps,
             &query,
             app_slots,
@@ -2087,17 +2093,17 @@ fn main() {
                 network: Network::default(),
                 bluetooth: Bluetooth::default(),
                 activity: Activity::default(),
-                notifications: helix_shell_core::notifications::Notifications::new(),
+                notifications: helix_shell_model::notifications::Notifications::new(),
                 media: None,
                 insert_target: None,
-                tray: helix_shell_core::tray::Tray::default(),
+                tray: helix_shell_model::tray::Tray::default(),
                 tray_menu: None,
                 brightness: backlight::read(),
-                niri: helix_shell_core::niri::Niri::default(),
+                niri: helix_compositor::niri::Niri::default(),
                 dock_apps: Vec::new(),
-                dock: helix_shell_core::dock::Dock::default(),
-                insert: helix_shell_core::quick_insert::QuickInsert::new(
-                    helix_shell_core::quick_insert::parse_emoji(include_str!(
+                dock: helix_shell_model::dock::Dock::default(),
+                insert: helix_shell_model::quick_insert::QuickInsert::new(
+                    helix_shell_model::quick_insert::parse_emoji(include_str!(
                         "../../../../assets/emoji.json"
                     )),
                 ),
@@ -2135,7 +2141,7 @@ fn main() {
             if role.claims_shell1() {
                 control::serve(handle.clone());
                 agent_ipc::serve(handle.clone());
-                if helix_shell_core::shell_polkit_agent_enabled() {
+                if helix_config::settings::shell_polkit_agent_enabled() {
                     polkit_agent::start(handle.clone());
                 }
             }

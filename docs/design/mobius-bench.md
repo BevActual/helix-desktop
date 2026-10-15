@@ -21,7 +21,7 @@ Validation: real worker PNG and real D-Bus generation/cancellation; API tests fo
 Commands: `dbus-run-session -- python3 tests/inference_image_real.py "$PWD"`; `tools/nested/ui-suite.sh mobius-image-generation`; `cargo test -p helix-inference`.
 
 `tools/bench/mobius-bench.py` sends a fixed set of prompts through the real inference service (the call Mobius makes) for each model and
-style and prints timings and answers. It reads the default system prompt from `helix-shell-core`, so it always measures what ships.
+style and prints timings and answers. It reads the default system prompt from `helix-chat`, so it always measures what ships.
 
 ```sh
 tools/bench/mobius-bench.py                                   # both installed models, no style
@@ -71,7 +71,7 @@ cost of the 7B is the cold load: **~14 s** for the first request (the service un
 
 Mobius parses Markdown pipe tables into plain data and renders aligned header/body cells with horizontal scrolling. Inline bold, italic, and code retain their formatting; escaped pipes and pipes inside inline code stay in their cells. Incomplete or malformed header separators remain text while streaming. Copy table puts tab-separated values on the clipboard, with quoted cells for embedded tabs, newlines, or quotes, so the result can be pasted into a spreadsheet. Original Markdown remains in saved transcripts and chat exports.
 
-Validation: `cargo test -p helix-shell-core` (447 passing), Mobius frontend build and ESLint, and `tools/nested/ui-suite.sh mobius-tables`. The private desktop test checks actual table rendering from a scripted model reply, exact clipboard contents, and reopening the saved chat. It tests presentation rather than whether a particular model chooses to produce tables.
+Validation: `cargo test -p helix-chat` (447 passing across the then single core crate), Mobius frontend build and ESLint, and `tools/nested/ui-suite.sh mobius-tables`. The private desktop test checks actual table rendering from a scripted model reply, exact clipboard contents, and reopening the saved chat. It tests presentation rather than whether a particular model chooses to produce tables.
 
 ## History search
 

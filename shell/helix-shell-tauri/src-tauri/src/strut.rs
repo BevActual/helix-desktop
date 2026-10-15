@@ -5,7 +5,7 @@ use std::time::Duration;
 
 pub fn strut_unit_active() -> bool {
     // A test session shares the real user's systemd: it neither asks it nor starts units in it.
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         return false;
     }
     std::process::Command::new("systemctl")
@@ -16,7 +16,7 @@ pub fn strut_unit_active() -> bool {
 }
 
 fn strut_unit_installed() -> bool {
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         return false;
     }
     std::process::Command::new("systemctl")
@@ -30,7 +30,7 @@ fn strut_unit_installed() -> bool {
 }
 
 fn start_strut_unit() -> bool {
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         return false;
     }
     std::process::Command::new("systemctl")

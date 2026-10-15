@@ -1,6 +1,6 @@
 export type Page = "discover" | "category" | "library" | "updates" | "sources";
 
-/** The store categories: appstream name, name on screen, sidebar icon (matches `CATEGORIES` in helix-shell-core). */
+/** The store categories: appstream name, name on screen, sidebar icon (matches `CATEGORIES` in helix-software-model). */
 export const CATEGORIES: { id: string; title: string; icon: string }[] = [
   { id: "Office", title: "Productivity", icon: "clipboard" },
   { id: "Graphics", title: "Graphics & Design", icon: "palette" },

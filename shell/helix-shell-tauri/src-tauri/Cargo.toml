@@ -4,14 +4,20 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Helix shell surfaces on Tauri. A thin face over helix-shell-core and helix-desktop-api."
+description = "Helix shell surfaces on Tauri. A thin face over the helix core crates and helix-desktop-api."
 
 [build-dependencies]
 tauri-build = { workspace = true }
 
 [dependencies]
 helix-desktop-api = { workspace = true }
-helix-shell-core = { workspace = true }
+helix-agent = { workspace = true }
+helix-base = { workspace = true }
+helix-chat = { workspace = true }
+helix-compositor = { workspace = true }
+helix-config = { workspace = true }
+helix-models = { workspace = true }
+helix-shell-model = { workspace = true }
 gtk = { workspace = true }
 gtk-layer-shell = { workspace = true, features = ["v0_6"] }
 libc = { workspace = true }

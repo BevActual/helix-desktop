@@ -14,7 +14,7 @@ Instructions for this project:   the project's instructions        [experiment: 
 Style for this conversation:     the chat's style overlay          [experiment: style_overlays]
 ```
 
-`helix_shell_core::mobius_lab::compose_system(identity, project, style)`; empty layers add nothing. It is called from one place in the
+`helix_chat::mobius_lab::compose_system(identity, project, style)`; empty layers add nothing. It is called from one place in the
 host (`active_prompt`), so send, edit and regenerate always agree. Identity text is cleaned on save (invisible and direction-changing
 characters removed, length bounded) and scanned for override phrases, shown as a warning beside the editor.
 

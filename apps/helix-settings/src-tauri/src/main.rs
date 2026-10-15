@@ -1,7 +1,7 @@
 //! Helix Settings. A separate Tauri application with one window and a page per area; this file is the thin layer between the pages and
-//! `helix-shell-core` / `helix-desktop-api`. It holds the Agent Surface *manager* role (and nothing else of Agent Surface): it can read who has which
+//! the core crates / `helix-desktop-api`. It holds the Agent Surface *manager* role (and nothing else of Agent Surface): it can read who has which
 //! tiers and the audit, change tiers and revoke, but it is not an agent, cannot approve anything, and never talks to the model. What a
-//! change may be is decided by the pure models in `helix-shell-core`; the page only sends names those models listed.
+//! change may be is decided by the pure models in the core crates; the page only sends names those models listed.
 
 mod wallhaven;
 
@@ -9,20 +9,20 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use helix_desktop_api::{Desktop, Domain};
-use helix_shell_core::audio::{
+use helix_models::audio::{
     Audio, AudioView, Request as AudioRequest, RequestError as AudioError,
 };
-use helix_shell_core::bluetooth::{
+use helix_models::bluetooth::{
     Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError,
 };
-use helix_shell_core::catalog::{Catalog, Change, RowView};
-use helix_shell_core::grants::{Grants, GrantsView, Request, RequestError};
-use helix_shell_core::keybinds::{self, KeybindRow};
-use helix_shell_core::network::{
+use helix_config::catalog::{Catalog, Change, RowView};
+use helix_agent::grants::{Grants, GrantsView, Request, RequestError};
+use helix_config::keybinds::{self, KeybindRow};
+use helix_models::network::{
     EnterpriseInput, Network, NetworkView, Request as NetRequest, RequestError as NetError,
 };
-use helix_shell_core::pairing::{Pairing, PairingView};
-use helix_shell_core::shortcuts::{self, ShortcutGroup};
+use helix_models::pairing::{Pairing, PairingView};
+use helix_compositor::shortcuts::{self, ShortcutGroup};
 use helix_wallpaper::picker::{Picker, PickerView};
 use helix_wallpaper::{choice_path, choice_to_toml, load_config, Source};
 use serde::Serialize;
@@ -259,7 +259,7 @@ async fn bluetooth_pair(app: AppHandle, path: String) -> Result<(), String> {
 
 async fn send_reply(
     app: &AppHandle,
-    reply: Result<helix_shell_core::pairing::Reply, helix_shell_core::pairing::PairingError>,
+    reply: Result<helix_models::pairing::Reply, helix_models::pairing::PairingError>,
 ) -> Result<(), String> {
     let reply = reply.map_err(|error| format!("{error:?}"))?;
     let desktop = current().ok_or("not connected to the desktop service")?;
@@ -652,43 +652,43 @@ async fn agents_revoke(app: AppHandle, client: String) -> Result<(), String> {
 
 #[derive(Serialize)]
 struct CompositorSettingsView {
-    config: helix_shell_core::compositor_config::CompositorConfigView,
-    caps: helix_shell_core::compositor_ipc::HelixCaps,
-    desk: helix_shell_core::compositor_ipc::AgentDeskStatus,
+    config: helix_compositor::compositor_config::CompositorConfigView,
+    caps: helix_compositor::compositor_ipc::HelixCaps,
+    desk: helix_compositor::compositor_ipc::AgentDeskStatus,
 }
 
 #[tauri::command]
 fn compositor_view() -> CompositorSettingsView {
     CompositorSettingsView {
-        config: helix_shell_core::compositor_config::read_view(),
-        caps: helix_shell_core::compositor_ipc::helix_capabilities(),
-        desk: helix_shell_core::compositor_ipc::agent_desk_status(),
+        config: helix_compositor::compositor_config::read_view(),
+        caps: helix_compositor::compositor_ipc::helix_capabilities(),
+        desk: helix_compositor::compositor_ipc::agent_desk_status(),
     }
 }
 
 #[tauri::command]
 fn compositor_set_agent_desk_name(name: String) -> Result<(), String> {
-    helix_shell_core::compositor_config::save_snippet(
-        &helix_shell_core::compositor_config::HelixSnippet {
+    helix_compositor::compositor_config::save_snippet(
+        &helix_compositor::compositor_config::HelixSnippet {
             agent_desk_name: name,
         },
     )?;
-    helix_shell_core::compositor_ipc::reload_config();
+    helix_compositor::compositor_ipc::reload_config();
     Ok(())
 }
 
 #[tauri::command]
 fn compositor_set_placement(on: bool) -> Result<(), String> {
-    let prefs = helix_shell_core::compositor_config::CompositorPrefs {
+    let prefs = helix_compositor::compositor_config::CompositorPrefs {
         agent_desk_placement: on,
     };
-    helix_shell_core::compositor_config::save_prefs(&prefs)
+    helix_compositor::compositor_config::save_prefs(&prefs)
 }
 
 #[tauri::command]
 fn compositor_focus_agent_desk() -> Result<(), String> {
     let line = serde_json::json!({"Action": {"HelixFocusAgentDesk": {}}}).to_string();
-    helix_shell_core::compositor_ipc::request_json(&line)
+    helix_compositor::compositor_ipc::request_json(&line)
         .ok_or_else(|| "the compositor did not accept focus agent desk".to_string())?;
     Ok(())
 }
@@ -784,8 +784,8 @@ fn inference_restart_service() -> Result<(), String> {
 
 #[tauri::command]
 fn compositor_open_config(which: String) -> Result<(), String> {
-    let dir = helix_shell_core::compositor_config::niri_config_dir().ok_or("no config home")?;
-    let path = helix_shell_core::compositor_config::resolve_include_path(&dir, &which)
+    let dir = helix_compositor::compositor_config::niri_config_dir().ok_or("no config home")?;
+    let path = helix_compositor::compositor_config::resolve_include_path(&dir, &which)
         .ok_or_else(|| {
             if which == "main" {
                 "niri config.kdl is not present yet".into()
@@ -1056,7 +1056,7 @@ fn approvals_path() -> Option<std::path::PathBuf> {
 fn approvals_view() -> bool {
     approvals_path()
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .is_some_and(|text| helix_shell_core::approvals::allow_unprotected(&text))
+        .is_some_and(|text| helix_agent::approvals::allow_unprotected(&text))
 }
 
 #[tauri::command]
@@ -1073,7 +1073,7 @@ fn approvals_set(allow: bool) -> Result<bool, String> {
         .mode(0o600)
         .open(&temporary)
         .map_err(|e| e.to_string())?;
-    file.write_all(helix_shell_core::approvals::render(allow).as_bytes())
+    file.write_all(helix_agent::approvals::render(allow).as_bytes())
         .map_err(|e| e.to_string())?;
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     eprintln!("SETTINGS approvals allow_unprotected={allow}");
@@ -1104,10 +1104,10 @@ fn dock_prefs_file() -> Option<std::path::PathBuf> {
     Some(base.join("helix/dock-settings.json"))
 }
 
-fn read_dock_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+fn read_dock_prefs() -> helix_config::dock_prefs::DockPrefs {
     dock_prefs_file()
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .map(|text| helix_shell_core::dock_prefs::DockPrefs::parse(&text))
+        .map(|text| helix_config::dock_prefs::DockPrefs::parse(&text))
         .unwrap_or_default()
 }
 
@@ -1155,11 +1155,11 @@ fn idle_prefs_file() -> Option<std::path::PathBuf> {
     dock_prefs_file().map(|p| p.with_file_name("idle.toml"))
 }
 
-fn read_idle_prefs() -> (helix_shell_core::idle_prefs::IdlePrefs, String) {
+fn read_idle_prefs() -> (helix_config::idle_prefs::IdlePrefs, String) {
     let text = idle_prefs_file()
         .and_then(|path| std::fs::read_to_string(path).ok())
         .unwrap_or_default();
-    (helix_shell_core::idle_prefs::IdlePrefs::parse(&text), text)
+    (helix_config::idle_prefs::IdlePrefs::parse(&text), text)
 }
 
 /// The Power & lock page: when the session locks and the screen goes off (`idle.toml`, read by helix-idle).
@@ -1200,7 +1200,7 @@ fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, S
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     // helix-idle reads the file when it starts, so it is started again (a fixed command; nothing typed reaches it).
-    if !helix_shell_core::nested_test_session() {
+    if !helix_base::nested_test_session() {
         let _ = std::process::Command::new("systemctl")
             .args(["--user", "restart", "helix-idle.service"])
             .stdin(std::process::Stdio::null())
@@ -1263,12 +1263,12 @@ fn displays_rows() -> Vec<RowView> {
                 .unwrap_or_default();
             RowView {
                 id: name.chars().take(40).collect(),
-                title: helix_shell_core::sanitize_for_display(name, 40),
+                title: helix_base::display::sanitize_for_display(name, 40),
                 group: "Connected".into(),
-                description: helix_shell_core::sanitize_for_display(&make, 80),
+                description: helix_base::display::sanitize_for_display(&make, 80),
                 overridden: false,
-                control: helix_shell_core::catalog::Control::Text {
-                    value: helix_shell_core::sanitize_for_display(&format!("{mode}{scale}"), 80),
+                control: helix_config::catalog::Control::Text {
+                    value: helix_base::display::sanitize_for_display(&format!("{mode}{scale}"), 80),
                 },
             }
         })
@@ -1424,7 +1424,7 @@ fn greeter_sync_from(app: &AppHandle, bin: &std::path::Path, staging: &std::path
     if direct.code == 0 {
         return Ok(());
     }
-    if direct.code != 2 || helix_shell_core::nested_test_session() {
+    if direct.code != 2 || helix_base::nested_test_session() {
         return Err(direct.message);
     }
     let privilege = {

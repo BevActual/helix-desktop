@@ -60,7 +60,7 @@ tools/migrate-state.sh --dry-run       # what would be copied from the old nocta
 ```
 
 Nested tests run a private compositor and bus. They share the real user's systemd and login manager, so code that would touch those
-(start a unit, suspend, power off) checks `helix_shell_core::nested_test_session()` and does nothing there.
+(start a unit, suspend, power off) checks `helix_base::nested_test_session()` and does nothing there.
 
 ## Design
 

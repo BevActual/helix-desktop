@@ -18,7 +18,7 @@ Use this list when adding tests. **Do not** revive the old GTK-era 1k-line C++ m
 | Audio meter lease guard | `contract/bootstrap.rs` |
 | Network/Bluetooth snapshots; connect error path | `contract/bootstrap.rs` |
 | Bluetooth pair + cancel + backend disconnect | `contract/bluetooth.rs` + `helix-fake-bluez` |
-| `theme.mode` / `nightlight.enabled` via Configuration (quick tiles) | `contract/configuration.rs`, `helix-shell-core::desktop::quick` tests |
+| `theme.mode` / `nightlight.enabled` via Configuration (quick tiles) | `contract/configuration.rs`, `helix-models::quick` tests |
 | `RegisterDesktop` + gamma / nightlight guards | `contract/configuration.rs` |
 | Volume and domain `Action` in UI | `tools/nested/ui-suite.sh` (`qs`, `net`, `bt`, `cc`) |
 | `RegisterDesktop` / confirmer on panels | Shell integration; agent tests for confirm path |
@@ -39,7 +39,7 @@ Use this list when adding tests. **Do not** revive the old GTK-era 1k-line C++ m
 | Check | Where covered |
 |---|---|
 | Hello, Action, grants, manager | `tools/nested/helix-desktop-agent-integration.sh` |
-| Risk policy units | `helix-shell-core::agent` tests |
+| Risk policy units | `helix-desktop-api::agent` tests |
 
 ### CI gates for “desktop works”
 
@@ -84,6 +84,6 @@ Seed: `harness::HELIX_TEST_CONFIG_TOML` (`theme.mode` only).
 - Dead `OverrideCommitHandler` / D-Bus override commit branch in `config_service`
 - Config export: Rust-only `export_effective_toml`; C++ `helix-config-export` dropped from tests and `gen_config_export_*` scripts
 - `helix-desktop` dead-code cleanup (agent hub, audio meter, NM constants, day_night test-only helper)
-- C++ agent tree deleted (`cpp/desktop/`); agent Meson tests removed (Rust `helix-shell-core::agent`)
+- C++ agent tree deleted (`cpp/desktop/`); agent Meson tests removed (Rust `helix-desktop-api::agent`)
 - C++ inference unit tests deleted (queue/routing/image/schema/llama harness)
 - `helix-transcribe` and `helix-image` are Cargo; llama glue under `services/helix-inference/native/`

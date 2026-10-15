@@ -213,7 +213,7 @@ async fn lookup(input: &str) -> Result<Vec<Source>, String> {
     let direct = direct_address(input);
     if input.is_empty() || !direct && input.chars().count() > 300 { return Err("Enter a search within 300 characters, or a complete page address.".into()); }
     // Canned responses are confined to the explicit private-desktop test mode; URLs still undergo validation.
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         if let Some(dir) = std::env::var_os("HELIX_WEB_TEST_FIXTURES") {
             if input == "slow fixture" { tokio::time::sleep(Duration::from_secs(20)).await; }
             let file = std::path::PathBuf::from(dir).join(if direct { "page.html" } else { "search.xml" });
@@ -250,7 +250,7 @@ impl Research {
         self.perform(id, lookup(input)).await
     }
     async fn perform(&self, id: &str, work: impl std::future::Future<Output = Result<Vec<Source>, String>>) -> Result<Vec<Source>, String> {
-        if !helix_shell_core::chat::valid_id(id) { return Err("Invalid web request.".into()); }
+        if !helix_chat::chat::valid_id(id) { return Err("Invalid web request.".into()); }
         let mut cancelled = {
             let mut inner = self.inner.lock().expect("research state");
             if inner.cancelled.iter().any(|own| own == id) { return Err("Online lookup stopped.".into()); }

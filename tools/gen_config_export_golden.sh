@@ -19,7 +19,7 @@ if [[ -z "$BIN" ]]; then
 fi
 
 if [[ -z "$BIN" || ! -x "$BIN" ]]; then
-  echo "error: build helix-rust-config-export (cargo build -p helix-shell-core --bin helix-rust-config-export) or set HELIX_RUST_CONFIG_EXPORT_BIN" >&2
+  echo "error: build helix-rust-config-export (cargo build -p helix-config-export --bin helix-rust-config-export) or set HELIX_RUST_CONFIG_EXPORT_BIN" >&2
   exit 1
 fi
 

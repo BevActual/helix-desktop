@@ -1,7 +1,7 @@
 //! Pick and read text attachments for the next Mobius turn.
 //! Binary / oversized files are refused; contents stay in-memory until send.
 
-use helix_shell_core::chat::{MAX_ATTACH_CHARS, MAX_ATTACH_FILES, MAX_ATTACH_FILE_CHARS};
+use helix_chat::chat::{MAX_ATTACH_CHARS, MAX_ATTACH_FILES, MAX_ATTACH_FILE_CHARS};
 use serde::Serialize;
 use std::io::Read;
 use std::path::{Path, PathBuf};

@@ -7,7 +7,8 @@ license.workspace = true
 description = "Long-lived exclusive-zone holder for the Helix bar strip. Survives bar restarts so niri does not resize every window."
 
 [dependencies]
-helix-shell-core = { workspace = true }
+helix-config = { workspace = true }
+helix-shell-model = { workspace = true }
 gtk = { workspace = true }
 gtk-layer-shell = { workspace = true, features = ["v0_6"] }
 

@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-use helix_shell_core::desktop::settings::active_icon_theme_name;
+use helix_config::settings::active_icon_theme_name;
 use helix_theme::apply::{self, ApplyInputs, CommunityTemplate, Outcome};
 use helix_theme::custom::{resolve_palette, PaletteSource, ThemeSelection};
 use helix_theme::template::make_theme_data;

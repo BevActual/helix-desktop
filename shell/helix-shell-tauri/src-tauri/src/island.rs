@@ -1,4 +1,4 @@
-//! The live-status pill in the middle of the bar. What it shows is decided by `helix_shell_core::island`; this file gathers the inputs
+//! The live-status pill in the middle of the bar. What it shows is decided by `helix_shell_model::island`; this file gathers the inputs
 //! (agents waiting on the person, the assistant's phase, what is playing) and tells the page when the answer changes. What is playing comes
 //! from `playerctl --follow`, one long-lived process that sleeps until a player says something; nothing here polls.
 
@@ -7,8 +7,8 @@ use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use helix_shell_core::agent_desk::glance_from_niri;
-use helix_shell_core::island::{choose, parse_media_line, IslandView};
+use helix_compositor::agent_desk::glance_from_niri;
+use helix_shell_model::island::{choose, parse_media_line, IslandView};
 use tauri::{AppHandle, Emitter};
 
 use crate::{phase_name, shell_state};

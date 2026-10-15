@@ -3,7 +3,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use helix_shell_core::{AuditLog, ConfigStore, GrantStore, RiskPolicy, TaintTracker};
+use helix_agent::audit_log::AuditLog;
+use helix_config::settings::ConfigStore;
+use helix_agent::grant_store::GrantStore;
+use helix_agent::risk::RiskPolicy;
+use helix_agent::grant_store::TaintTracker;
 use serde_json::Value;
 use zbus::Connection;
 
@@ -97,7 +101,7 @@ impl State {
     }
 
     pub fn new(agents: Arc<AgentHub>) -> Self {
-        let config = ConfigStore::load(helix_shell_core::ConfigPaths::from_env());
+        let config = ConfigStore::load(helix_config::settings::ConfigPaths::from_env());
         let initial_volume = config.get("audio.sound_volume").as_f64().unwrap_or(0.5);
         let state_dir = config
             .paths()

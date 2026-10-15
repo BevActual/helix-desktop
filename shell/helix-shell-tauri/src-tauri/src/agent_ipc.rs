@@ -1,6 +1,6 @@
 //! The shell's command socket, in the wire format the desktop service already speaks to a shell (`helix-<display>.sock`, one line in,
 //! one reply out). It is what makes an agent's approved action happen under this shell: the service checks the client, tier, grant and
-//! confirmation (Agent Surface) and then sends the command here. Only the commands in `helix_shell_core::agent_msg::SUPPORTED` exist; the line is
+//! confirmation (Agent Surface) and then sends the command here. Only the commands in `helix_agent::agent_msg::SUPPORTED` exist; the line is
 //! parsed by that pure model and each command runs through the same code as the sliders, launcher and key bindings, so every range and
 //! refusal that applies there applies here. Free-text payloads (`clipboard-copy`, `app-launch`) are never written to the log. The socket
 //! is private to the user (it lives in `XDG_RUNTIME_DIR`, mode 0600), and like `org.helix.Shell1` it is not an authority boundary against
@@ -9,8 +9,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use helix_shell_core::agent_msg::{parse, Command, Direction, Theme, MAX_LINE, SUPPORTED};
-use helix_shell_core::agent_status::{status_json, StatusInput};
+use helix_agent::agent_msg::{parse, Command, Direction, Theme, MAX_LINE, SUPPORTED};
+use helix_agent::agent_status::{status_json, StatusInput};
 use tauri::AppHandle;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
@@ -194,7 +194,7 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             if shell.apps.is_empty() {
                 shell.apps = crate::apps::scan();
             }
-            let Some(entry) = helix_shell_core::launcher::resolve_launch(&shell.apps, &query).cloned()
+            let Some(entry) = helix_shell_model::launcher::resolve_launch(&shell.apps, &query).cloned()
             else {
                 return Err("no matching application".into());
             };

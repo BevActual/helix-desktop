@@ -47,7 +47,7 @@ Cargo.toml (workspace root)
   shared-ui/                       style.css + icons.js; each app build.rs copies into dist/
   shared-ui/react/                 @helix/ui: React components + generated TS bindings (apps only; see frontend-stack.md)
   helix-desktop-api/               zbus client for org.helix.Desktop (+ Inference), types from protocols/dbus/*.xml
-  helix-shell-core/                pure logic (shell/, desktop/, agent/, apps/); no Tauri, no GTK
+  core/helix-*/                    pure logic (agent, config, models, compositor, shell-model, chat, ...); no Tauri, no GTK
   helix-shell-tauri/               session shell: layer-shell bar + panels + confirmer Overlay
   helix-settings/                  Settings toplevel (Agent Surface manager)
   helix-mobius/                    Mobius hub over org.helix.Inference
@@ -67,7 +67,7 @@ Cargo.toml (workspace root)
 - **M2 memory.** Creating the panel webview only while it is open, and `WebviewWindow::destroy` on dismiss, drops bar-only to 191 MB and panel-open to 255 MB (under the 350 MB budget, with ~95 MB headroom before notifications/OSD). `close()` instead of `destroy()` did not reclaim and ballooned back toward 409 MB; keep `destroy()`. Destroy alone does not exit the panel's `WebKitWebProcess` on Linux (reopen used to accumulate a third helper and ~300 MB idle). The shell snapshots bar-only WebKit PIDs and SIGTERMs any extra web-process descendants ~750 ms after panel destroy (`webkit_mem.rs`). Nested reclaim: after dismiss, webkit-web-count returns to 1 and shell PSS to ~201 MB within 1 s; a second open/close does not accumulate. `webkit_web_context_set_web_process_count_limit(1)` is a no-op on WebKit 2.54 (deprecated since 2.26; getter stays 0). M3 is unblocked on the peak budget.
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
-- **M4 Assistant panel parity (done, see below).** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
+- **M4 Assistant panel parity (done, see below).** The session rules and their tests already live in `helix-agent` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
 - **M5 Launcher (done, see below), control center (sound, Wi-Fi and Bluetooth done, see below), notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
   the default until parity is signed off.
 - **M6 Decide lock screen and greeter.** They are trusted surfaces (ext-session-lock, greetd). Decide with measurements and
@@ -144,7 +144,7 @@ greeter as separate trusted surfaces regardless.
 
 ## Decision: one surface, adopted (M2b, done)
 
-The shell is now one layer surface hosting the bar and every panel (`ShellSurface` in `helix-shell-core`, applied by
+The shell is now one layer surface hosting the bar and every panel (`ShellSurface` in `helix-shell-model`, applied by
 `helix-shell-tauri/src-tauri/src/layer.rs`; frontend `dist/index.html` + `dist/shell.js`). The multi-surface manager
 (`surfaces.rs`) is kept for surfaces that must be separate, such as the approval dialog.
 
@@ -248,7 +248,7 @@ Icons: `apps.rs` resolves an entry's `Icon` (an absolute path, or a theme name l
 single path component; anything with `/` or `..` is refused. The page shows them in an `<img>`, which cannot run script, and the CSP
 gained `img-src 'self' data:`. Only the HICOLOR theme is searched, so apps whose icons live in other themes show no icon.
 
-History: `History` in `helix-shell-core` records launches by sequence number (no clock). With no query, recently launched apps lead
+History: `History` in `helix-shell-model` records launches by sequence number (no clock). With no query, recently launched apps lead
 (most recent first), then alphabetical; with a query, use adds at most 60 points (frequency up to 30, plus 30 if among the last five
 launches), which orders near-equal matches but never lifts a weaker kind of match over a stronger one (the gaps are 200). It keeps
 200 entries. It is saved as `$XDG_STATE_HOME/helix/launcher-history.json` (directory 0700, file 0600, written by rename) and a damaged
@@ -394,8 +394,8 @@ Tiles: **Internet** and **Bluetooth** (switch the radio; subtitles say what is c
 **Night Light** (`nightlight.enabled`). A tile appears only if the service offers its setting, so a tile never does nothing; Night Light is
 not offered outside a registered Helix desktop and so is absent in the nested sessions that run the real service.
 
-New models, each pure and mutation-checked: `helix-shell-core::quick` (the two setting-backed tiles; trusts a setting only with the expected
-type and value; builds the `Configuration1.Update` for it) and `helix-shell-core::power` (battery from the kernel's `capacity` and `status`
+New models, each pure and mutation-checked: `helix-models::quick` (the two setting-backed tiles; trusts a setting only with the expected
+type and value; builds the `Configuration1.Update` for it) and `helix-models::power` (battery from the kernel's `capacity` and `status`
 files; implausible values are "no battery"). `helix-desktop-api` gained `settings()` and `update_setting()`. The shell reads the battery
 when the panel opens and every 30 s while it is open (nothing runs while it is closed) and follows `Configuration1.Changed` for the tiles.
 
@@ -435,7 +435,7 @@ Gotcha: a unit's `ExecStart` needs `\x20` for a space, and a `sed` replacement t
 
 ## Notifications, the visual design, and the Caps Lock palette (2026-10-07)
 
-**Notifications.** The shell serves `org.freedesktop.Notifications` (never taking the name from another daemon). `helix-shell-core::notifications` is
+**Notifications.** The shell serves `org.freedesktop.Notifications` (never taking the name from another daemon). `helix-shell-model::notifications` is
 the pure store: names, summaries, bodies and button labels are sanitized and bounded, markup is reduced to text, buttons are returned by index into
 the list the application offered (the key sent back comes from the store), one application is capped at eight entries and twenty per ten seconds,
 critical ones never expire and ignore Do not disturb, and time is passed in so the model has no timers: the host sleeps until `next_deadline()`.
@@ -448,13 +448,13 @@ shade), notifications, agents and one status button (Wi-Fi, Bluetooth, sound, ba
 The approval dialog is deliberately unlike everything else: a modal on a dimmed screen with an "Exact action" box and an Allow button that visibly
 fills while it is still arming. Glass: the shell tells niri which rectangles to blur through `ext-background-effect-v1` (`src/blur.rs`, its own event queue on GTK's
 connection; only ever sets the blur region and commits). The page reports the bar, the open panel and the toasts from their layout boxes, so the blur is in
-place from the first frame of an opening panel; `helix_shell_core::glass` turns them into rectangles with the rounded corners cut in. The layer namespace is
+place from the first frame of an opening panel; `helix_shell_model::glass` turns them into rectangles with the rounded corners cut in. The layer namespace is
 `helix-panel`, which the person's generated niri rule (blur and liquid glass from their Theme settings) already matches, so no config is added.
 With blur active the page lightens its glass tokens. `tools/nested/blur-look.sh` screenshots panels over a striped window with that rule enabled.
 Tools: `tools/iterate.sh` (12 s edit-to-desktop loop on the live session), `tools/nested/look.sh` (a screenshot of every panel), `tools/nested/ui-suite.sh`
 (every nested UI test, each from an empty scratch directory). The layout report waits 300 ms so panel animations have settled before positions are read.
 
-**Caps Lock palette (`quick-insert`).** Caps Lock is remapped to F19 in the keymap and bound to this panel. `helix-shell-core::quick_insert` searches emoji
+**Caps Lock palette (`quick-insert`).** Caps Lock is remapped to F19 in the keymap and bound to this panel. `helix_shell_model::quick_insert` searches emoji
 (ranked: exact, prefix, word, keyword, stem, substring; what you use comes first), the clipboard history and desktop actions; typing always adds an
 "Ask Mobius:" row that hands the sentence to Mobius (Act). The page sends only the position of the chosen row; what it means comes from the last query's
 results. Emoji are typed with `wtype`; clipboard entries go on the clipboard and are pasted with Shift+Insert, so a terminal receives a bracketed paste
@@ -475,21 +475,21 @@ square, cropped not stretched). `tools/switch-shell.sh tauri` installs and enabl
 
 ## Today (2026-10-08)
 
-The clock opens **Today**: the date large, a month grid (previous, next, Today), then the notifications. The grid is `helix_shell_core::calendar` (pure date arithmetic, no time zones: the page says what today is in the person's zone; leap years, Sunday or Monday week starts, ISO week numbers by each row's Thursday, month moves across year ends, input refused outside 1900-2200). Reopening always starts on the current month, and the grid is rebuilt when midnight passes. No events yet: the service's calendar settings have no provider wired to the Tauri shell. `tools/nested/today-test.sh` clicks through months by name and checks today's real date.
+The clock opens **Today**: the date large, a month grid (previous, next, Today), then the notifications. The grid is `helix_shell_model::calendar` (pure date arithmetic, no time zones: the page says what today is in the person's zone; leap years, Sunday or Monday week starts, ISO week numbers by each row's Thursday, month moves across year ends, input refused outside 1900-2200). Reopening always starts on the current month, and the grid is rebuilt when midnight passes. No events yet: the service's calendar settings have no provider wired to the Tauri shell. `tools/nested/today-test.sh` clicks through months by name and checks today's real date.
 
 ## Volume and brightness keys, and the on-screen indicator (2026-10-07)
 
 The volume and brightness keys go through the shell (`org.helix.Shell1.AdjustVolume`, `ToggleMute`, `AdjustBrightness`; `helix-panel` calls them and falls back to
 `wpctl`/`brightnessctl` if the shell is not there), so they use the same validated models as the sliders and the shell can show what happened: a quiet glass pill at the
-bottom centre (the `osd` event; it never takes the pointer, and counts as glass while visible). `helix_shell_core::brightness` decides what may be written: never zero
+bottom centre (the `osd` event; it never takes the pointer, and counts as glass while visible). `helix_models::brightness` decides what may be written: never zero
 (the dimmest is 5%), never above the maximum, NaN changes nothing. The backlight is read from sysfs and written through logind (`SetBrightness`), so no root is needed;
 `HELIX_BACKLIGHT_DIR` stands in for the device in tests and nested sessions, which never touch the real one. Volume up unmutes. The sliders' native range inputs have a
 zero-width thumb so a click maps linearly onto the value (what you point at is where the fill ends). A negative argument to `busctl` must follow `--`.
 
 ## Dock, and an independent security review (2026-10-07)
 
-**Dock.** `helix_shell_core::niri` models niri's event stream (windows, workspaces; text from applications bounded, at most 512 windows) and
-`helix_shell_core::dock` turns installed applications plus open windows into the dock: pinned first, then whatever is open, matched by the app id a
+**Dock.** `helix_compositor::niri` models niri's event stream (windows, workspaces; text from applications bounded, at most 512 windows) and
+`helix_shell_model::dock` turns installed applications plus open windows into the dock: pinned first, then whatever is open, matched by the app id a
 window announces (desktop file name, `StartupWMClass`, or the program it runs); an unmatched window still gets a place. A click starts an application
 or focuses one of its windows (the next one if it already has the keyboard); middle click opens another window; the menu pins and unpins, saved in
 `~/.config/helix/dock.json` (0600). The dock stays hidden until the pointer touches the bottom edge: while hidden only a 5 px strip takes the pointer
@@ -497,7 +497,7 @@ or focuses one of its windows (the next one if it already has the keyboard); mid
 send back ids the dock listed, never holds a command line. niri is spoken to over `$NIRI_SOCKET` (a long-lived event-stream connection, no polling, and a
 short one per action). `tools/nested/dock-test.sh` drives it with a real pointer against two fake applications.
 **Window identity (2026-10-08, closes the app-id limitation above).** niri reports each window's process (`pid`, from the Wayland connection, not from anything
-the program says). The host reads `/proc/<pid>/exe`, the command line and, for Flatpak, the sandbox's own record of its application id; `helix_shell_core::identity`
+the program says). The host reads `/proc/<pid>/exe`, the command line and, for Flatpak, the sandbox's own record of its application id; `helix_shell_model::identity`
 decides whether that process fits the installed application the app id names, by shared distinctive words (the desktop entry's id, window class and program against
 the real executable, the script an interpreter runs, or the Flatpak id). A window that does not fit is not credited to the application: it gets its own item named
 for the program it really is, marked with a warning, and cannot be started as if it were an application. Stated limits: matching is by name, so two programs of one
@@ -522,7 +522,7 @@ through Agent Surface is a deployment requirement, recorded in `agent-and-infere
 small pills (the active one long) and a click sends only an id from that strip to niri (`FocusWorkspace`); a lone workspace shows nothing. niri keeps a spare empty
 workspace after the last one with a window, so the strip has two entries once anything is open.
 
-**Tray.** The shell is the StatusNotifierWatcher (it never displaces another one) and the only host. `helix_shell_core::tray` validates what applications register
+**Tray.** The shell is the StatusNotifierWatcher (it never displaces another one) and the only host. `helix_shell_model::tray` validates what applications register
 (bus names and object paths), size-checks icon pixels (at most 64x64, converted from ARGB32), sanitizes titles, bounds the item count, and hides `Passive` items;
 the page can only address an item by a key the model made. The shell reads an item's properties, re-reads them (coalesced) after its change signals, forwards left,
 right and middle click as `Activate`, `ContextMenu` and `SecondaryActivate`, and drops an item when its application leaves the bus or stops answering. Icons come
@@ -542,7 +542,7 @@ then on at a touch, and the lock does not repeat. Not tested: the logind paths (
 
 ## Live status in the middle of the bar (2026-10-07)
 
-The clock stays exactly centred; beside it a pill appears only when something is going on, one thing at a time by importance (`helix_shell_core::island`):
+The clock stays exactly centred; beside it a pill appears only when something is going on, one thing at a time by importance (`helix_shell_model::island`):
 agents waiting for a decision (amber, click opens Agents), the assistant thinking or working or needing an answer (click opens the assistant), music
 playing (click plays/pauses). Titles come from `playerctl --follow` (one long-lived process that sleeps until a player speaks) and are sanitized and bounded; a paused
 player or no player means no pill. A moon sits beside the time while Do Not Disturb is on. Not yet: mic or camera in use (the desktop service does not expose capture

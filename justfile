@@ -30,7 +30,7 @@ test profile="fast": (build-services profile)
     cargo test --workspace --quiet
     tools/test-integration.sh
 
-# Unit and golden tests of the core crates (the ones helix-shell-core re-exports).
+# Unit and golden tests of the core crates (models, policy, config; one crate per concern).
 test-core:
     cargo test -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model --quiet
 

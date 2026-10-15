@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use helix_shell_core::brightness::{Brightness, Request};
+use helix_models::brightness::{Brightness, Request};
 
 const CLASS_DIR: &str = "/sys/class/backlight";
 

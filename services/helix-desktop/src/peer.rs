@@ -1,6 +1,6 @@
 //! Resolve the D-Bus caller to a grant key (exe path + cmdline).
 
-use helix_shell_core::client_identity;
+use helix_agent::peer::client_identity;
 use zbus::Connection;
 
 #[derive(Clone, Debug)]

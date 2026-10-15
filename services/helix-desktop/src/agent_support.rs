@@ -3,7 +3,8 @@
 use std::path::Path;
 use std::time::Instant;
 
-use helix_shell_core::{AuditRecord, RiskTier};
+use helix_agent::audit_log::AuditRecord;
+use helix_agent::risk::Tier as RiskTier;
 use serde_json::json;
 use zbus::names::{BusName, UniqueName};
 use zbus::Connection;

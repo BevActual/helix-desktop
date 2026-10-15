@@ -20,7 +20,7 @@ the setting on the live service and seeing which files changed.
 ## What replaced them
 
 * **Power & lock** edits `~/.config/helix/idle.toml` (lock after, screen off after, each can be switched off) through
-  `helix_shell_core::idle_prefs`; other keys in the file (the commands) are preserved, and helix-idle is restarted so it reads the file.
+  `helix_config::idle_prefs`; other keys in the file (the commands) are preserved, and helix-idle is restarted so it reads the file.
 * **Displays** lists the connected outputs as the compositor reports them (read only).
 * **Dock** and **Wallpaper** are described elsewhere.
 
@@ -28,5 +28,5 @@ the setting on the live service and seeing which files changed.
 
 * Night light needs a gamma-control client in the Rust shell (wlr-gamma-control), then rows for temperature and schedule.
 * ~~A Sound page of real controls~~ — **Done.** Output and input device, volume and mute on the control center's audio model (`apps/helix-settings/web/src/pages/SoundPage.tsx`, `tools/nested/settings-sound-test.sh`). Still missing: a live input level meter.
-* Notification behaviour (how many toasts, where, how long) belongs to `helix_shell_core::notifications`; nothing there is configurable yet.
+* Notification behaviour (how many toasts, where, how long) belongs to `helix_shell_model::notifications`; nothing there is configurable yet.
 * Shell-level accessibility (text size) has no consumer; it needs a scale applied by the shell and by Settings.

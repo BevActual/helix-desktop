@@ -1,12 +1,12 @@
 //! Helix System Monitor. Reads `/proc` (or a fake tree under `HELIX_MONITOR_PROC`) and screen-time
-//! report files; pure models in `helix_shell_core::monitor` own the numbers. Poll timers match
+//! report files; pure models in `helix_monitor_model::monitor` own the numbers. Poll timers match
 //! docs/design/system-monitor-tauri.md.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use helix_shell_core::monitor::{
+use helix_monitor_model::monitor::{
     parse_cpu, parse_memory, parse_net, parse_process, parse_screen_time, Monitor, Overview, ProcessRow,
     ProcessSort, ScreenTimeRow,
 };

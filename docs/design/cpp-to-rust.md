@@ -11,9 +11,9 @@ Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`
 | C++ today | Rust home | Status |
 |---|---|---|
 | `helix-service` | `services/helix-desktop` (bin `helix-desktop`) | **Done.** Rust owns `org.helix.Desktop`; the C++ service was removed. |
-| `cpp/desktop/agent_*`, `tool_schema` | `helix-shell-core::agent` (+ service) | **Done.** C++ agent tree deleted; Rust owns risk policy, GrantStore, confirmation queue, tool schema |
-| `cpp/config/` | `helix-shell-core` | **Done.** C++ config library removed. Export, migrations, and settings validation live in Rust (`config_export_*`, `config_settings_migrate`, `settings.rs`) |
-| `helix-assistant` | `services/helix-assistant` | **Done.** Rust; reply/step logic and the tool schema live in `helix-shell-core::agent` (`assistant_core`, `tool_schema`), checked against C++ goldens. `just install` installs the binary |
+| `cpp/desktop/agent_*`, `tool_schema` | `helix-desktop-api::agent` (+ service) | **Done.** C++ agent tree deleted; Rust owns risk policy, GrantStore, confirmation queue, tool schema |
+| `cpp/config/` | `helix-config`, `helix-config-export` | **Done.** C++ config library removed. Export, migrations, and settings validation live in Rust (`config_export_*`, `config_settings_migrate`, `settings.rs`) |
+| `helix-assistant` | `services/helix-assistant` | **Done.** Rust; reply/step logic and the tool schema live in `helix-desktop-api::agent` (`assistant_core`, `tool_schema`), checked against C++ goldens. `just install` installs the binary |
 | `helix-inference` | `services/helix-inference` | **Mostly done (Rust).** Service, queue, routing, `helix-transcribe`, and `helix-image` are Cargo. Llama glue is still C++ under `services/helix-inference/native/inference/`. The image engine shim is C (`services/helix-image/native/image_engine.c`). Whisper stays a C shim (`native/transcribe_engine.c`) |
 | `helix-system-upgrade` | `services/helix-system-upgrade` | **Done.** Same plan logic and tests; `just install` puts it in libexecdir where the polkit policy points |
 | `compositor/` | already Rust (own workspace) | Done |
@@ -62,8 +62,8 @@ offline, etc.) return errors to the caller.
 
 ## Order
 
-1. ~~Scaffold `helix-desktop` + risk policy in `helix-shell-core`~~
-2. ~~Agent Surface (grants, Hello/Action/Confirm, ListTools, manager)~~ — Rust `Action` runs shell IPC via `helix_shell_core::shell_ipc`; `tests/desktop_agent_integration.py` and `desktop_agent_manager_integration.py` pass against `helix-desktop` (`tools/nested/helix-desktop-agent-integration.sh`, CI job `helix-desktop-agent`)
+1. ~~Scaffold `helix-desktop` + risk policy in `helix-agent`~~
+2. ~~Agent Surface (grants, Hello/Action/Confirm, ListTools, manager)~~ — Rust `Action` runs shell IPC via `helix_agent::shell_ipc`; `tests/desktop_agent_integration.py` and `desktop_agent_manager_integration.py` pass against `helix-desktop` (`tools/nested/helix-desktop-agent-integration.sh`, CI job `helix-desktop-agent`)
 3. ~~Configuration1 bootstrap catalog + writes~~ (theme/audio/accessibility/shell chrome; growing)
 4. ~~Audio1 in-memory backend~~ · **PipeWire via `wpctl`** when WirePlumber is present (`HELIX_DESKTOP_MOCK_AUDIO=1` for nested smoke); **`StartInputMeter` / `StopInputMeter` / `InputLevel`** via `audio_meter` + PipeWire capture (`Helix microphone level`, 8s lease, 80ms emit) · ~~Appearance1 GetSnapshot stub~~
 5. ~~Network1 in-memory mock~~ · **NetworkManager** on system bus when present (`HELIX_DESKTOP_MOCK_NETWORK=1` for nested); **SecretAgent** + `Prompt`/`Reply`; **enterprise**, **SetDns**, **wired** / **cellular** actions; async `Completed`

@@ -11,7 +11,11 @@ tauri-build = { workspace = true }
 
 [dependencies]
 helix-desktop-api = { workspace = true }
-helix-shell-core = { workspace = true }
+helix-agent = { workspace = true }
+helix-base = { workspace = true }
+helix-compositor = { workspace = true }
+helix-config = { workspace = true }
+helix-models = { workspace = true }
 helix-wallpaper = { workspace = true }
 image = { workspace = true, features = ["jpeg", "png", "webp"] }
 base64 = { workspace = true }

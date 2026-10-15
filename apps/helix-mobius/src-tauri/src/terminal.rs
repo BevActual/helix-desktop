@@ -42,7 +42,7 @@ pub fn open_on_agent_desk(folder: &Path) -> Result<(), String> {
     let dir = folder
         .to_str()
         .ok_or("The project folder path is not valid UTF-8.")?;
-    helix_shell_core::compositor_ipc::place_on_agent_desk(1)?;
+    helix_compositor::compositor_ipc::place_on_agent_desk(1)?;
     let dir_arg = dir.to_string();
     let attempts: [(&str, Vec<&str>); 5] = [
         ("foot", vec!["-D", &dir_arg]),

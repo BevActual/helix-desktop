@@ -10,7 +10,7 @@ description = "Helix System Monitor: Overview, Processes, Screen Time as a Tauri
 tauri-build = { workspace = true }
 
 [dependencies]
-helix-shell-core = { workspace = true }
+helix-monitor-model = { workspace = true }
 gtk = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

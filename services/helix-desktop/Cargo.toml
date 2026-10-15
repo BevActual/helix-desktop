@@ -15,7 +15,9 @@ name = "helix-fake-bluez"
 path = "src/bin/helix-fake-bluez.rs"
 
 [dependencies]
-helix-shell-core = { workspace = true }
+helix-agent = { workspace = true }
+helix-config = { workspace = true }
+helix-config-export = { workspace = true }
 helix-theme = { workspace = true }
 libc = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

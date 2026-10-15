@@ -1,7 +1,7 @@
 //! Resolves `auto` theme modes against the day/night schedule (`helix-theme::schedule`).
 //! Uses configured coordinates / custom times only, like the one-shot C++ helpers did.
 
-use helix_shell_core::ConfigStore;
+use helix_config::settings::ConfigStore;
 use helix_theme::schedule::{evaluate, LocalTime, LocationConfig};
 
 fn local_time() -> LocalTime {
@@ -104,7 +104,7 @@ pub fn resolve_mode(config: &ConfigStore, configured: &str) -> Option<&'static s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use helix_shell_core::desktop::settings::{ConfigPaths, ConfigStore};
+    use helix_config::settings::{ConfigPaths, ConfigStore};
 
     fn store() -> ConfigStore {
         let root = std::env::temp_dir().join(format!("helix-shell-mode-{}", std::process::id()));

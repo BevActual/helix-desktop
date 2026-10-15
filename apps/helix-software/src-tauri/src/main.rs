@@ -1,4 +1,4 @@
-//! Helix Software. Thin host: Flatpak (and fwupd) feed the pure `helix_shell_core::software::Store`; the page draws sanitized views and
+//! Helix Software. Thin host: Flatpak (and fwupd) feed the pure `helix_software_model::software::Store`; the page draws sanitized views and
 //! asks for confirmed mutations, which run as jobs with progress and Cancel. Nested tests set `HELIX_SOFTWARE_FAKE` to a JSON catalog and
 //! never run real installs.
 
@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use base64::Engine;
 use catalog::{Info, Remote};
-use helix_shell_core::software::{
+use helix_software_model::software::{
     valid_id, Discover, JobState, JobView, Jobs, Kind, Mutation, Package, PackageView, Store,
 };
 use serde::Serialize;
@@ -41,7 +41,7 @@ struct State {
     fake_screens: HashMap<String, Vec<String>>,
     indexing: bool,
     /// The last appstream index, kept so a catalog read can re-attach it at once.
-    meta: HashMap<String, helix_shell_core::software::Meta>,
+    meta: HashMap<String, helix_software_model::software::Meta>,
     cancels: HashMap<u64, Arc<AtomicBool>>,
 }
 

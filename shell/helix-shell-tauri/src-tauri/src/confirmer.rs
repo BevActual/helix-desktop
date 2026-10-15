@@ -10,7 +10,8 @@ use std::time::{Duration, Instant};
 use gtk::prelude::*;
 use gtk_layer_shell::LayerShell;
 use helix_desktop_api::Desktop;
-use helix_shell_core::{Confirmer, ConfirmerView};
+use helix_agent::confirmer::Confirmer;
+use helix_agent::confirmer::ConfirmerView;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::mpsc;
@@ -41,7 +42,7 @@ fn unprotected_allowed() -> bool {
         .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")));
     base.map(|b| b.join("helix/approvals.json"))
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .is_some_and(|text| helix_shell_core::approvals::allow_unprotected(&text))
+        .is_some_and(|text| helix_agent::approvals::allow_unprotected(&text))
 }
 
 impl ConfirmerHost {
@@ -232,7 +233,7 @@ pub fn probe_protection(app: AppHandle, host: Arc<Mutex<ConfirmerHost>>) {
 /// Wake the page once Allow becomes armed for the request currently showing.
 pub fn schedule_arm(app: AppHandle, host: Arc<Mutex<ConfirmerHost>>) {
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(helix_shell_core::ARMING_MS));
+        std::thread::sleep(Duration::from_millis(helix_agent::confirm::ARMING_MS));
         let runner = app.clone();
         let _ = app.run_on_main_thread(move || {
             let panel = host.lock().expect("confirmer");
@@ -254,7 +255,7 @@ fn gloss_for(app: &AppHandle, details: &Value) -> Option<String> {
         None => None,
     };
     let facts = crate::shell_state(app).lock().expect("shell state").dock.window_facts();
-    Some(helix_shell_core::agent_status::describe_window_close(&facts, id))
+    Some(helix_agent::agent_status::describe_window_close(&facts, id))
 }
 
 /// One Desktop connection: RegisterDesktop, RegisterConfirmer, watch, and Confirm all use it.

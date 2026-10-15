@@ -10,7 +10,7 @@ description = "Helix Software: Flatpak / Fedora / firmware store as a Tauri topl
 tauri-build = { workspace = true }
 
 [dependencies]
-helix-shell-core = { workspace = true }
+helix-software-model = { workspace = true }
 base64 = { workspace = true }
 gtk = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

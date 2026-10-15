@@ -59,7 +59,7 @@ pub fn store(dir: &Path, bytes: &[u8]) -> Result<String, String> {
 }
 
 pub fn path_of(dir: &Path, id: &str) -> Option<PathBuf> {
-    helix_shell_core::chat::valid_id(id).then(|| dir.join(id))
+    helix_chat::chat::valid_id(id).then(|| dir.join(id))
 }
 
 pub fn load(dir: &Path, id: &str) -> Result<Vec<u8>, String> {
@@ -86,7 +86,7 @@ pub fn sweep(dir: &Path, referenced: &std::collections::HashSet<String>) {
     let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(24 * 3600);
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if !helix_shell_core::chat::valid_id(&name) || referenced.contains(&name) {
+        if !helix_chat::chat::valid_id(&name) || referenced.contains(&name) {
             continue;
         }
         let old = entry.metadata().and_then(|m| m.modified()).is_ok_and(|t| t < cutoff);

@@ -4,7 +4,7 @@
 
 Frontend direction: React + TypeScript + Vite like the other apps (`frontend-stack.md`); the page is hand-written until it next grows a page.
 
-Standalone resource viewer. Reads `/proc` and screen-time report files directly (no shell, no desktop service). Pure parsing and list models in `helix-shell-core::monitor`; thin Tauri host schedules polls.
+Standalone resource viewer. Reads `/proc` and screen-time report files directly (no shell, no desktop service). Pure parsing and list models in `helix-monitor-model::monitor`; thin Tauri host schedules polls.
 
 ## Pages
 

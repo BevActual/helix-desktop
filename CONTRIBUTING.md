@@ -83,7 +83,7 @@ system install and `tools/test-integration.sh` runs the integration tests; `just
 
 | Layer | Library |
 |-------|---------|
-| Config export and validation | Rust (`helix-shell-core`) |
+| Config catalog, export and validation | Rust (`helix-config`, `helix-config-export`) |
 | Theme generation | Rust (`helix-theme`, vendored `material-colors`) |
 | Desktop bus | Rust (`helix-desktop`) |
 
@@ -168,7 +168,13 @@ python3 tools/i18n-check.py
 ```text
 Cargo.toml          Rust workspace (excludes compositor/)
 core/               Pure models and typed clients
-  helix-shell-core    Config catalog/export, agent risk policy, app models
+  helix-base          Leaf items shared by the rest (display text, panel ids)
+  helix-agent         Agent risk policy, grants, confirmation, assistant session
+  helix-config        Settings catalog, ordered lists, migration; helix-config-export is the export
+  helix-models        Audio, network, Bluetooth, brightness, power view models
+  helix-compositor    Compositor config and IPC, window facts, capture
+  helix-shell-model   Bar, panels, dock, tray, launcher, notifications
+  helix-chat, helix-software-model, helix-monitor-model   One model crate per app
   helix-desktop-api   Typed client for org.helix.Desktop
   helix-theme         Palettes, wallpaper schemes, template apply
   shared-ui/          CSS tokens, icons, @helix/ui React components, generated bindings

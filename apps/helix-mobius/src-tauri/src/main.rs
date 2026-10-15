@@ -19,16 +19,16 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use futures_util::StreamExt;
-use helix_shell_core::apps::assistant::MAX_REQUEST_CHARS;
-use helix_shell_core::chat::{
+use helix_agent::assistant::MAX_REQUEST_CHARS;
+use helix_chat::chat::{
     valid_id, Chat, ChatError, ChatView, Conversation, Outcome, Role, SearchHit, Summary,
     SYSTEM_PROMPT,
 };
-use helix_shell_core::inference_routing::{self, BackendKind, Routing};
-use helix_shell_core::model_catalog;
-use helix_shell_core::markdown::Block;
-use helix_shell_core::mobius_lab::{self, Experiments, StyleView};
-use helix_shell_core::personas::{self, Persona, PersonaStore};
+use helix_config::inference_routing::{self, BackendKind, Routing};
+use helix_chat::model_catalog;
+use helix_chat::markdown::Block;
+use helix_chat::mobius_lab::{self, Experiments, StyleView};
+use helix_chat::personas::{self, Persona, PersonaStore};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use zbus::zvariant::{Array, Signature, Value};
@@ -608,7 +608,7 @@ fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
     mobius_lab::compose_system(identity, &project_text, &style_text)
 }
 
-async fn dispatch_turn(app: AppHandle, turn: helix_shell_core::chat::Turn) -> Result<(), String> {
+async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(), String> {
     shared(&app).lock().expect("state").turn_started = Some(std::time::Instant::now());
     if std::env::var_os("HELIX_MOBIUS_LOG_PROMPT").is_some() {
         // Tests read the composed system prompt from the program log (never set in normal use).
@@ -936,7 +936,7 @@ async fn web_answer(app: AppHandle, chat_id: String, question: String, source_id
     let text = web::compose(&question, &sources)?;
     let persona = personas::load().active_persona().clone();
     let prompt = active_prompt(&app, &persona);
-    let metadata = sources.iter().map(|source| helix_shell_core::chat::WebSource { provider: source.provider.clone(), title: source.title.clone(), url: source.url.clone(), kind: source.kind.clone(), fetched: source.fetched }).collect();
+    let metadata = sources.iter().map(|source| helix_chat::chat::WebSource { provider: source.provider.clone(), title: source.title.clone(), url: source.url.clone(), kind: source.kind.clone(), fetched: source.fetched }).collect();
     let turn = {
         let shared = shared(&app); let mut state = shared.lock().expect("state");
         if state.chat.conversation.id != chat_id { return Err("The chat changed. Open online research again.".into()); }
@@ -976,19 +976,19 @@ async fn chat_send(
     } else {
         let pairs: Vec<(String, String)> = attachments
             .into_iter()
-            .take(helix_shell_core::chat::MAX_ATTACH_FILES)
+            .take(helix_chat::chat::MAX_ATTACH_FILES)
             .map(|a| {
                 let name = a.name.chars().take(120).collect::<String>();
                 let content = a
                     .content
                     .chars()
-                    .take(helix_shell_core::chat::MAX_ATTACH_FILE_CHARS)
+                    .take(helix_chat::chat::MAX_ATTACH_FILE_CHARS)
                     .collect();
                 (name, content)
             })
             .collect();
         let typed = text.trim();
-        if typed.chars().count() > helix_shell_core::chat::MAX_INPUT_CHARS {
+        if typed.chars().count() > helix_chat::chat::MAX_INPUT_CHARS {
             return Err(error_text(&ChatError::TooLong).to_string());
         }
         let typed = if excerpts {
@@ -1259,7 +1259,7 @@ fn chat_set_route(
         None
     };
     let entry = routing.profiles.entry("chat".into()).or_insert_with(|| {
-        helix_shell_core::inference_routing::ProfileRoute {
+        helix_config::inference_routing::ProfileRoute {
             backend: "local".into(),
             model: String::new(),
         }
@@ -1320,23 +1320,23 @@ fn chat_current_route() -> ChatRouteView {
 
 #[derive(Serialize)]
 struct AgentDeskGlanceView {
-    caps: helix_shell_core::compositor_ipc::HelixCaps,
-    desk: helix_shell_core::compositor_ipc::AgentDeskStatus,
+    caps: helix_compositor::compositor_ipc::HelixCaps,
+    desk: helix_compositor::compositor_ipc::AgentDeskStatus,
     placement: bool,
 }
 
 #[tauri::command]
 fn agent_desk_glance() -> AgentDeskGlanceView {
     AgentDeskGlanceView {
-        caps: helix_shell_core::compositor_ipc::helix_capabilities(),
-        desk: helix_shell_core::compositor_ipc::agent_desk_status(),
-        placement: helix_shell_core::compositor_config::agent_desk_placement_enabled(),
+        caps: helix_compositor::compositor_ipc::helix_capabilities(),
+        desk: helix_compositor::compositor_ipc::agent_desk_status(),
+        placement: helix_compositor::compositor_config::agent_desk_placement_enabled(),
     }
 }
 
 #[tauri::command]
 fn agent_desk_focus() -> Result<(), String> {
-    helix_shell_core::compositor_ipc::focus_agent_desk()
+    helix_compositor::compositor_ipc::focus_agent_desk()
 }
 
 /// Hands `text` to the bar Assistant (Agent Surface path). Does not call the model.
@@ -1493,7 +1493,7 @@ fn chat_reply_draft(app: AppHandle, index: usize) -> Result<ReplyDraftView, Stri
         if message.text.trim().is_empty() {
             return Err("There is nothing to save in that reply.".into());
         }
-        helix_shell_core::markdown::save_draft(&message.text)
+        helix_chat::markdown::save_draft(&message.text)
     };
     Ok(ReplyDraftView {
         body: draft.body,
@@ -1792,7 +1792,7 @@ fn routing_ensure_openrouter(app: AppHandle) -> Result<Routing, String> {
     if !routing.backends.iter().any(|b| b.id == "local") {
         routing.backends.insert(
             0,
-            helix_shell_core::inference_routing::Backend {
+            helix_config::inference_routing::Backend {
                 id: "local".into(),
                 kind: BackendKind::Local,
                 base_url: String::new(),

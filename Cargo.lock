@@ -1647,7 +1647,7 @@ name = "helix-assistant"
 version = "0.1.0"
 dependencies = [
  "futures-util",
- "helix-shell-core",
+ "helix-agent",
  "serde_json",
  "tokio",
  "toml 0.8.2",
@@ -1717,8 +1717,10 @@ name = "helix-desktop"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "helix-agent",
+ "helix-config",
+ "helix-config-export",
  "helix-desktop-api",
- "helix-shell-core",
  "helix-theme",
  "libc",
  "md5",
@@ -1794,8 +1796,12 @@ dependencies = [
  "base64 0.22.1",
  "futures-util",
  "gtk",
+ "helix-agent",
+ "helix-base",
+ "helix-chat",
+ "helix-compositor",
+ "helix-config",
  "helix-desktop-api",
- "helix-shell-core",
  "keyring",
  "libc",
  "reqwest 0.12.28",
@@ -1836,8 +1842,12 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "gtk",
+ "helix-agent",
+ "helix-base",
+ "helix-compositor",
+ "helix-config",
  "helix-desktop-api",
- "helix-shell-core",
+ "helix-models",
  "helix-wallpaper",
  "image",
  "serde",
@@ -1847,24 +1857,6 @@ dependencies = [
  "tokio",
  "ureq",
  "zbus",
-]
-
-[[package]]
-name = "helix-shell-core"
-version = "0.1.0"
-dependencies = [
- "helix-agent",
- "helix-base",
- "helix-chat",
- "helix-compositor",
- "helix-config",
- "helix-config-export",
- "helix-models",
- "helix-monitor-model",
- "helix-shell-model",
- "helix-software-model",
- "serde_json",
- "toml 0.8.2",
 ]
 
 [[package]]
@@ -1884,7 +1876,8 @@ version = "0.1.0"
 dependencies = [
  "gtk",
  "gtk-layer-shell",
- "helix-shell-core",
+ "helix-config",
+ "helix-shell-model",
 ]
 
 [[package]]
@@ -1896,8 +1889,14 @@ dependencies = [
  "gdkwayland-sys",
  "gtk",
  "gtk-layer-shell",
+ "helix-agent",
+ "helix-base",
+ "helix-chat",
+ "helix-compositor",
+ "helix-config",
  "helix-desktop-api",
- "helix-shell-core",
+ "helix-models",
+ "helix-shell-model",
  "libc",
  "nix",
  "serde",
@@ -1918,7 +1917,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "gtk",
- "helix-shell-core",
+ "helix-software-model",
  "serde",
  "serde_json",
  "tauri",
@@ -1939,7 +1938,7 @@ name = "helix-system-monitor"
 version = "0.1.0"
 dependencies = [
  "gtk",
- "helix-shell-core",
+ "helix-monitor-model",
  "serde",
  "serde_json",
  "tauri",

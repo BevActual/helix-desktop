@@ -32,10 +32,10 @@ fn gamma_available(state: &State) -> bool {
 fn require_setting_access(state: &State, id: &str) -> fdo::Result<()> {
     if id.starts_with("ai.") {
         return Err(fdo::Error::InvalidArgs(
-            helix_shell_core::desktop::settings::MOBIUS_ROUTING_MESSAGE.into(),
+            helix_config::settings::MOBIUS_ROUTING_MESSAGE.into(),
         ));
     }
-    if state.desktop.is_none() && !helix_shell_core::desktop::settings::is_portable_setting(id) {
+    if state.desktop.is_none() && !helix_config::settings::is_portable_setting(id) {
         return Err(fdo::Error::InvalidArgs(
             "This setting requires Helix desktop".into(),
         ));
@@ -113,7 +113,7 @@ fn apply_ordered_list_update(
     expected: &[OwnedValue],
     value: &[OwnedValue],
 ) -> fdo::Result<()> {
-    use helix_shell_core::desktop::ordered_lists;
+    use helix_config::ordered_lists;
     require_desktop(state, sender)?;
     let display_names = display_output_names(state, true);
     let catalog = state.config.full_catalog(true, &display_names);
@@ -272,8 +272,8 @@ impl Configuration {
     ) -> fdo::Result<()> {
         let json = value_from_zvariant(&value)
             .ok_or_else(|| fdo::Error::InvalidArgs("unsupported value type".into()))?;
-        if helix_shell_core::desktop::ordered_lists::requires_update_ordered_list(id) {
-            let message = helix_shell_core::desktop::ordered_lists::update_ordered_list_message(id);
+        if helix_config::ordered_lists::requires_update_ordered_list(id) {
+            let message = helix_config::ordered_lists::update_ordered_list_message(id);
             return Err(fdo::Error::InvalidArgs(message.into()));
         }
         let mut state = self.state.lock().await;

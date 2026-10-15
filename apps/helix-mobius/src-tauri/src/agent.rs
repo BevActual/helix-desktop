@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use std::sync::Mutex;
 use std::time::Duration;
 use futures_util::StreamExt;
-use helix_shell_core::{chat::{ToolActivity, Turn, WebSource}, inference_routing, personas};
+use helix_chat::chat::{ToolActivity, Turn, WebSource};
+use helix_config::inference_routing;
+use helix_chat::personas;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tokio::sync::{oneshot, watch};
@@ -191,7 +193,7 @@ async fn execute(app: &AppHandle, turn: &mut Turn, mut private: bool, cancel: &m
         if !model.unchanged() { return Err("Model routing changed during the tools task. Start the request again.".into()); }
         let id = crate::new_id();
         activity(app, generation, &id, "planning", "", "running", &format!("Choosing a tool with {} · {}", model.label, if model.model.is_empty() { "Auto" } else { &model.model }));
-        let scripted = if helix_shell_core::nested_test_session() {
+        let scripted = if helix_base::nested_test_session() {
             if let Some(path) = std::env::var_os("HELIX_TOOLS_TEST_RESPONSES") {
                 let body = tokio::fs::read_to_string(path).await.map_err(|e| e.to_string())?;
                 let values: Vec<serde_json::Value> = serde_json::from_str(&body).map_err(|e| e.to_string())?;

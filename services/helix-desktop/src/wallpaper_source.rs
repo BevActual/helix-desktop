@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use helix_shell_core::desktop::settings::ConfigStore;
+use helix_config::settings::ConfigStore;
 use helix_theme::custom::{GeneratedPalette, WallpaperPalette};
 use helix_theme::wallpaper::{generate, load_and_resize, Scheme};
 
@@ -188,7 +188,7 @@ pub fn wallpaper_palette(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use helix_shell_core::desktop::settings::ConfigPaths;
+    use helix_config::settings::ConfigPaths;
     use std::fs;
 
     #[test]

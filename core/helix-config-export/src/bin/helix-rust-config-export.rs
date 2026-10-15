@@ -2,8 +2,8 @@
 
 use std::process::ExitCode;
 
-use helix_shell_core::desktop::config_export::rust_export_toml;
-use helix_shell_core::desktop::settings::ConfigPaths;
+use helix_config::settings::ConfigPaths;
+use helix_config_export::config_export::rust_export_toml;
 
 fn main() -> ExitCode {
     if let Some(arg) = std::env::args().nth(1) {

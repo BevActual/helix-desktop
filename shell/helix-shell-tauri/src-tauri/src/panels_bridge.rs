@@ -1,10 +1,10 @@
-//! Client (bar → panels) and server (panels process) for [`helix_shell_core::panels_ipc`].
+//! Client (bar → panels) and server (panels process) for [`helix_shell_model::panels_ipc`].
 
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 
-use helix_shell_core::panels_ipc::{
+use helix_shell_model::panels_ipc::{
     decode_reply, decode_request, encode_reply, encode_request, socket_file_name, PanelsReply,
     PanelsRequest, MAX_LINE,
 };
@@ -103,7 +103,7 @@ pub async fn open_status() -> Result<Option<String>, String> {
 }
 
 fn panels_unit_installed() -> bool {
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         return false;
     }
     std::process::Command::new("systemctl")
@@ -127,7 +127,7 @@ fn unlink_stale_socket() {
 }
 
 fn start_panels_via_systemd() -> bool {
-    if helix_shell_core::nested_test_session() {
+    if helix_base::nested_test_session() {
         return false;
     }
     std::process::Command::new("systemctl")

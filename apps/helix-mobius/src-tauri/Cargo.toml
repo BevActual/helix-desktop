@@ -10,7 +10,11 @@ description = "Mobius: Helix’s desktop AI — conversations, personas, and mod
 tauri-build = { workspace = true }
 
 [dependencies]
-helix-shell-core = { workspace = true }
+helix-agent = { workspace = true }
+helix-base = { workspace = true }
+helix-chat = { workspace = true }
+helix-compositor = { workspace = true }
+helix-config = { workspace = true }
 helix-desktop-api = { workspace = true }
 gtk = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

@@ -2,7 +2,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "core/helix-shell-core",
     "core/helix-agent",
     "core/helix-base",
     "core/helix-chat",
@@ -46,7 +45,6 @@ repository = "https://github.com/BevActual/helix-desktop"
 # One place for the versions every crate shares. A member adds its own features: `tokio = { workspace = true, features = [...] }`.
 # Crates that differ on purpose say why next to their own line.
 [workspace.dependencies]
-helix-shell-core = { path = "core/helix-shell-core" }
 helix-agent = { path = "core/helix-agent" }
 helix-base = { path = "core/helix-base" }
 helix-chat = { path = "core/helix-chat" }

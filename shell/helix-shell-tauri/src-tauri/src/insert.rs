@@ -1,4 +1,4 @@
-//! The Caps Lock palette (`quick-insert`): what it searches comes from `helix_shell_core::quick_insert`; this file carries out what
+//! The Caps Lock palette (`quick-insert`): what it searches comes from `helix_shell_model::quick_insert`; this file carries out what
 //! a chosen row means. Text is typed or pasted into whichever window had the keyboard before the palette opened (the palette closes
 //! first, so focus returns there), and the commands are fixed programs with fixed arguments: nothing from the clipboard or an emoji
 //! name is ever interpreted by a shell. The clipboard history lives in memory only and skips anything a password manager marks.
@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use helix_shell_core::quick_insert::{decode_clip_hex, needs_care, Action, Outcome, Row, Source};
+use helix_shell_model::quick_insert::{decode_clip_hex, needs_care, Action, Outcome, Row, Source};
 use tauri::AppHandle;
 
 use crate::{close_panel, open_panel, shell_state};
@@ -159,7 +159,7 @@ fn deliver(app: &AppHandle, text: String, paste: bool) {
             shell
                 .niri
                 .window(target)
-                .is_some_and(|w| helix_shell_core::niri::looks_like_terminal(&w.app_id))
+                .is_some_and(|w| helix_compositor::niri::looks_like_terminal(&w.app_id))
         };
         if terminal && needs_care(&text) {
             crate::show_notice(&app, "Multi-line text was not pasted into a terminal");

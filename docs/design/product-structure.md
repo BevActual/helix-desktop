@@ -52,7 +52,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | Path | Owns | Must not own |
 |---|---|---|
 | `protocols/` | D-Bus XML + IPC schemas (source of truth) | Implementation |
-| `core/helix-shell-core` | Pure models, risk policy, config catalog helpers | D-Bus servers, UI |
+| `core/helix-base`, `helix-agent`, `helix-config`, `helix-config-export`, `helix-models`, `helix-compositor`, `helix-shell-model`, `helix-chat`, `helix-software-model`, `helix-monitor-model` | Pure models, risk policy, config catalog (`shell-core-split.md`) | D-Bus servers, UI |
 | `core/helix-desktop-api` | Typed client for `org.helix.Desktop` | Service logic |
 | `core/shared-ui` | Shared CSS tokens, icons, and `react/` (`@helix/ui` components, generated TS bindings) | Session policy |
 | `shell/` | Live session UI (layer-shell) | Device backends |
@@ -121,7 +121,7 @@ Rules that stay true after cutover:
 |---|---|---|
 | Theme | `core/helix-theme`, `services/helix-desktop` | Legacy C++ theme tree removed |
 | Inference workers | Rust `helix-transcribe` and `helix-image` crates; llama and image engine shims under `services/*/native/` | Replace those shims with Rust |
-| Agent policy C++ | **Deleted** | `helix-shell-core::agent` |
+| Agent policy C++ | **Deleted** | `helix-desktop-api::agent` |
 | Greeter | Tauri greeter with appearance sync | Power actions, last account/session, packaging (`greeter-tauri.md`) |
 | Shell frontend | React islands over the hand-written `shell.js` page, with fallbacks | Every slice React; fallbacks deleted (`frontend-stack.md`) |
 | Doc drift | Soak + a few entry docs may still mention the C++ desktop | This file is the structure SoT; others link here |

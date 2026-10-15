@@ -2,7 +2,7 @@
 //! Prefers the session Secret Service; falls back to a mode-0600 file under state.
 //! Keys never appear in transcripts or `inference-routing.toml` (see inference-fabric.md).
 
-use helix_shell_core::inference_routing;
+use helix_config::inference_routing;
 use std::fs;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};

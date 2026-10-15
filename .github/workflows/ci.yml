@@ -67,6 +67,7 @@ jobs:
       - name: Layering and contract checks
         run: tools/test-integration.sh layering desktop_dbus_contract template_undo_signal install_layout
 
+  # The job id and name keep the old crate name: branch protection may require this check by name.
   helix-shell-core:
     name: helix-shell-core (Rust)
     runs-on: ubuntu-latest

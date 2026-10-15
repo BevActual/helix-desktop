@@ -17,7 +17,7 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use helix_shell_core::desktop::settings::{ConfigPaths, ConfigStore};
+use helix_config::settings::{ConfigPaths, ConfigStore};
 use helix_theme::color::Color;
 use helix_theme::custom::find_builtin_palette;
 use helix_theme::palette::{expand_fixed_palette_mode, TokenMap};

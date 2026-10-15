@@ -7,7 +7,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 | Doc | When you need it |
 |---|---|
 | [product-structure.md](product-structure.md) | How Helix is split (greeter / compositor / shell / apps / services) and how processes relate |
-| [shell-core-split.md](shell-core-split.md) | Sizing for splitting `helix-shell-core` into focused crates |
+| [shell-core-split.md](shell-core-split.md) | The core crates: what each holds, what the split bought, the rules |
 | [roadmap.md](roadmap.md) | What is open, in what order, and where each gap was found |
 | [session-shell.md](session-shell.md) | Live Tauri shell install, restart rules, retired C++ UI |
 | [cpp-to-rust.md](cpp-to-rust.md) | History of the C++ → Rust cutover (complete); remaining native shims and greeter items |

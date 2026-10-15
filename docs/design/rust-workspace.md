@@ -6,7 +6,7 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 
 | Dir | Role |
 |---|---|
-| `core/` | `helix-shell-core` (pure models), `helix-desktop-api`, `shared-ui` |
+| `core/` | ten pure model crates (`helix-base`, `helix-agent`, `helix-config`, ...), `helix-theme`, `helix-desktop-api`, `shared-ui` |
 | `shell/` | `helix-shell-tauri` — live session shell |
 | `greeter/` | `helix-greeter` — greetd login (Tauri) |
 | `apps/` | Settings, Software, System Monitor, Chat (Tauri toplevels) |

@@ -12,7 +12,7 @@ from gi.repository import GLib
 
 
 def default_identity():
-    """The default system prompt, read from helix-shell-core so the bench always measures what Mobius ships."""
+    """The default system prompt, read from helix-chat so the bench always measures what Mobius ships."""
     import os, re
     source = os.path.join(os.path.dirname(__file__), "../../core/helix-chat/src/chat.rs")
     text = open(source).read()

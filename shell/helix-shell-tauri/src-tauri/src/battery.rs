@@ -1,9 +1,9 @@
-//! Reads the battery from the kernel's power-supply directory. Parsing and display are in helix_shell_core::power; this only finds the
+//! Reads the battery from the kernel's power-supply directory. Parsing and display are in helix_models::power; this only finds the
 //! files. `HELIX_POWER_SUPPLY_DIR` points it at another directory (the tests do).
 
 use std::path::{Path, PathBuf};
 
-use helix_shell_core::power::Battery;
+use helix_models::power::Battery;
 
 fn directory() -> PathBuf {
     std::env::var_os("HELIX_POWER_SUPPLY_DIR")
@@ -46,7 +46,7 @@ pub fn read_battery() -> Option<Battery> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use helix_shell_core::power::view;
+    use helix_models::power::view;
 
     fn supply(root: &Path, name: &str, kind: &str, capacity: &str, status: &str) {
         let dir = root.join(name);

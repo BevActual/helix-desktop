@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use helix_shell_core::desktop::settings::ConfigStore;
+use helix_config::settings::ConfigStore;
 use helix_theme::custom::{
     parse_hex, save_current_as_custom, save_role_color_as_custom, ColorRole, PaletteSource,
     SaveError, ThemeSelection,
@@ -177,7 +177,7 @@ pub fn set_accent(inputs: &Inputs, hex_color: &str) -> Result<Outcome, String> {
 #[cfg(test)]
 mod tests {
     use super::Inputs;
-    use helix_shell_core::desktop::settings::{ConfigPaths, ConfigStore};
+    use helix_config::settings::{ConfigPaths, ConfigStore};
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
