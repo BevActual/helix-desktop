@@ -50,6 +50,14 @@ impl Scheme {
         SCHEME_NAMES.iter().find(|(n, _)| *n == name).map(|(_, s)| *s)
     }
 
+    pub fn as_str(self) -> &'static str {
+        SCHEME_NAMES
+            .iter()
+            .find(|(_, scheme)| *scheme == self)
+            .map(|(name, _)| *name)
+            .expect("every Scheme has a canonical name")
+    }
+
     pub fn is_material(self) -> bool {
         matches!(
             self,

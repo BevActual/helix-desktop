@@ -58,10 +58,7 @@ fn local_selection(config: &ConfigStore, session_wallpaper: &str) -> Option<(The
     } else {
         None
     };
-    let mode = text("theme.mode").unwrap_or_else(|| "dark".into());
-    let shell_mode = text("theme.shell_mode").unwrap_or_else(|| "follow".into());
-    let effective = if shell_mode == "follow" { mode } else { shell_mode };
-    let shell_light = crate::day_night::resolve_mode(config, &effective)? == "light";
+    let shell_light = crate::day_night::shell_palette_light(config)?;
     if source == PaletteSource::Community {
         let name = text("theme.community_palette").unwrap_or_default();
         let state_dir = config.paths().settings_toml.parent()?;

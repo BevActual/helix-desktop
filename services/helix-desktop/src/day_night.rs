@@ -34,6 +34,51 @@ pub fn is_night(config: &ConfigStore) -> bool {
     evaluate(&location(config), local_time()).night
 }
 
+/// `[theme].shell_mode` when not `follow` pins the shell palette; app-facing `theme.mode` is unchanged.
+pub fn effective_shell_mode<'a>(app_mode: &'a str, shell_mode: &'a str) -> &'a str {
+    if shell_mode == "follow" || shell_mode.is_empty() {
+        app_mode
+    } else {
+        shell_mode
+    }
+}
+
+/// App-facing mode for templates and GTK (`ThemeService::resolvedMode` / resolved callback).
+pub fn resolved_app_mode(config: &ConfigStore) -> Option<&'static str> {
+    resolve_mode(config, config.get("theme.mode").as_str().unwrap_or("dark"))
+}
+
+/// Whether Helix chrome uses the light palette (`ThemeService::isLightMode`).
+pub fn shell_palette_light(config: &ConfigStore) -> Option<bool> {
+    let shell_mode = config
+        .get("theme.shell_mode")
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| "follow".into());
+    let app_mode = config
+        .get("theme.mode")
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| "dark".into());
+    let effective = effective_shell_mode(&app_mode, &shell_mode);
+    resolve_mode(config, effective).map(|mode| mode == "light")
+}
+
+/// Resolved shell mode string (`ThemeService::resolvedShellMode`).
+pub fn resolved_shell_mode_label(config: &ConfigStore) -> Option<&'static str> {
+    let shell_mode = config
+        .get("theme.shell_mode")
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| "follow".into());
+    let app_mode = config
+        .get("theme.mode")
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| "dark".into());
+    resolve_mode(config, effective_shell_mode(&app_mode, &shell_mode))
+}
+
 /// Resolves `dark` / `light` / `auto` to `dark` or `light`; anything else is `None`.
 pub fn resolve_mode(config: &ConfigStore, configured: &str) -> Option<&'static str> {
     match configured {
@@ -41,5 +86,51 @@ pub fn resolve_mode(config: &ConfigStore, configured: &str) -> Option<&'static s
         "light" => Some("light"),
         "auto" => Some(if is_night(config) { "dark" } else { "light" }),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use helix_shell_core::desktop::settings::{ConfigPaths, ConfigStore};
+
+    fn store() -> ConfigStore {
+        let root = std::env::temp_dir().join(format!("helix-shell-mode-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("cfg")).unwrap();
+        std::fs::create_dir_all(root.join("state")).unwrap();
+        ConfigStore::load(ConfigPaths {
+            config_dir: root.join("cfg"),
+            settings_toml: root.join("state/settings.toml"),
+        })
+    }
+
+    #[test]
+    fn shell_mode_matches_cpp_theme_service() {
+        use serde_json::json;
+        let mut config = store();
+        config.set("theme.mode", json!("light")).unwrap();
+        config.set("theme.shell_mode", json!("follow")).unwrap();
+        assert_eq!(resolved_app_mode(&config), Some("light"));
+        assert_eq!(resolved_shell_mode_label(&config), Some("light"));
+        assert_eq!(shell_palette_light(&config), Some(true));
+
+        config.set("theme.mode", json!("light")).unwrap();
+        config.set("theme.shell_mode", json!("dark")).unwrap();
+        assert_eq!(resolved_app_mode(&config), Some("light"));
+        assert_eq!(resolved_shell_mode_label(&config), Some("dark"));
+        assert_eq!(shell_palette_light(&config), Some(false));
+
+        config.set("theme.mode", json!("dark")).unwrap();
+        config.set("theme.shell_mode", json!("light")).unwrap();
+        assert_eq!(resolved_app_mode(&config), Some("dark"));
+        assert_eq!(resolved_shell_mode_label(&config), Some("light"));
+        assert_eq!(shell_palette_light(&config), Some(true));
+
+        config.set("theme.mode", json!("dark")).unwrap();
+        config.reset("theme.shell_mode").unwrap();
+        assert_eq!(resolved_app_mode(&config), Some("dark"));
+        assert_eq!(resolved_shell_mode_label(&config), Some("dark"));
+        assert_eq!(shell_palette_light(&config), Some(false));
     }
 }

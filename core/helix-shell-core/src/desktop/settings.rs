@@ -274,8 +274,24 @@ impl SettingDef {
                     "m3-fruit-salad",
                     "m3-rainbow",
                     "m3-monochrome",
+                    "vibrant",
+                    "faithful",
+                    "soft",
+                    "dysfunctional",
+                    "muted",
                 ],
-                &["Content", "Tonal spot", "Fruit salad", "Rainbow", "Monochrome"],
+                &[
+                    "Content",
+                    "Tonal spot",
+                    "Fruit salad",
+                    "Rainbow",
+                    "Monochrome",
+                    "Vibrant",
+                    "Faithful",
+                    "Soft",
+                    "Dysfunctional",
+                    "Muted",
+                ],
             )),
             SettingKind::NiriOverview => Some((
                 &["none", "backdrop", "stationary", "flat"],
@@ -3911,5 +3927,20 @@ mod tests {
             .commit_remote_overrides(&baseline, "[theme]\nmode = \"light\"\n")
             .unwrap();
         assert_eq!(store.get("theme.mode"), json!("light"));
+    }
+
+    #[test]
+    fn wallpaper_scheme_accepts_custom_generators() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths);
+        for scheme in ["vibrant", "faithful", "soft", "dysfunctional", "muted"] {
+            store
+                .set("theme.wallpaper_scheme", json!(scheme))
+                .unwrap_or_else(|e| panic!("{scheme}: {e}"));
+            assert_eq!(store.get("theme.wallpaper_scheme"), json!(scheme));
+        }
+        assert!(store
+            .set("theme.wallpaper_scheme", json!("softened"))
+            .is_err());
     }
 }

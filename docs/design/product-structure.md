@@ -106,7 +106,7 @@ Rules that stay true after cutover:
 
 | Tension | Today | Target |
 |---|---|---|
-| C++ theme reference | `src/theme/` in `helix_core`; `helix-gen-golden-template` for regen | Runtime in `helix-theme` / `helix-desktop`; delete `src/theme/` when tests allow |
+| C++ theme reference | `src/theme/` in `helix_theme` (legacy link) | Runtime in `helix-theme` / `helix-desktop`; template goldens regen in Rust; delete `src/theme/` when nothing links it |
 | Inference workers | `helix-transcribe`, `helix-image`, llama shim in `src/inference/` | Rust or isolated crates; service shell already Rust |
 | Contract-test C++ | `desktop_service_test`, agent policy units in `src/desktop/` | Keep until fully duplicated in Rust, or freeze goldens and delete |
 | Greeter | Tauri scaffold | Full greetd product surface |

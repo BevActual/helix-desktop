@@ -12,3 +12,7 @@ serde_json = "1"
 regex = "1"
 toml = "0.8"
 material-colors = { path = "../../third_party/material-colors", default-features = false, features = ["std", "quantize"] }
+
+[[bin]]
+name = "gen-golden-template"
+path = "src/bin/gen_golden_template.rs"

@@ -22,13 +22,13 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    # Meson: config/core only (`helix_theme` builds via `just test` / `just build-theme-golden`).
+    # Meson: `helix_core` only (pass `-Dtheme_cpp_reference=true` to build legacy `src/theme/`).
     meson compile -C build-{{m}} helix_core_base
     cargo build -p helix-shell-core --bin helix-rust-config-export
 
-# C++ TemplateEngine driver for `core/helix-theme/tools/regen_golden_template.sh` only.
-build-theme-golden m=mode: (_ensure-configured m)
-    meson compile -C build-{{m}} helix-gen-golden-template
+# Rust template-engine driver for `core/helix-theme/tools/regen_golden_template.sh`.
+build-theme-golden:
+    cargo build -p helix-theme --bin gen-golden-template
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)

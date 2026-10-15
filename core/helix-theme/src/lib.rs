@@ -9,6 +9,7 @@ pub mod contrast;
 pub mod custom;
 pub mod custom_schemes;
 pub mod firefox_theme;
+pub mod hook_runner;
 pub mod hct;
 pub mod kde;
 pub mod palette;

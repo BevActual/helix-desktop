@@ -1,5 +1,5 @@
-//! Parity with the C++ `TemplateEngine` render path. Regenerate with
-//! `tools/regen_golden_template.sh`. Bundled templates are compared by FNV-1a hash,
+//! Template render goldens (Rust engine). Regenerate with `tools/regen_golden_template.sh`.
+//! Bundled templates are compared by FNV-1a hash,
 //! the synthetic template (every filter, loop and error path) by full text.
 
 use std::collections::HashMap;

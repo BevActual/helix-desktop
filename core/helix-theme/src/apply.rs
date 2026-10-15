@@ -10,7 +10,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Arc, Condvar, Mutex};
 
 use serde_json::Value as Json;
 use toml::{Table, Value};
@@ -19,8 +18,6 @@ use crate::color::Color;
 use crate::hct::{Hct, TonalPalette};
 use crate::template::{render, Options, ThemeData};
 
-/// `HookRunner::kDefaultMaxConcurrent`.
-const MAX_CONCURRENT_HOOKS: usize = 4;
 
 #[derive(Clone, Debug)]
 pub struct CommunityTemplate {
@@ -699,79 +696,7 @@ impl Planner<'_> {
 
 // ---- execution ---------------------------------------------------------------------------
 
-struct HookRunner {
-    state: Arc<(Mutex<HookState>, Condvar)>,
-}
-
-#[derive(Default)]
-struct HookState {
-    running: usize,
-    failures: BTreeMap<String, String>,
-}
-
-fn compact_hook_error(stderr: &str, stdout: &str, code: Option<i32>) -> String {
-    let text = if stderr.is_empty() { stdout } else { stderr };
-    let text = text.split('\n').next().unwrap_or("");
-    let text = trim(text);
-    if text.is_empty() {
-        return format!("exit {}", code.unwrap_or(-1));
-    }
-    text.chars().take(160).collect()
-}
-
-impl HookRunner {
-    fn new() -> Self {
-        Self { state: Arc::new((Mutex::new(HookState::default()), Condvar::new())) }
-    }
-
-    fn enqueue(&self, command: String, template_id: String) {
-        let (lock, cv) = &*self.state;
-        let mut guard = lock.lock().unwrap();
-        while guard.running >= MAX_CONCURRENT_HOOKS {
-            guard = cv.wait(guard).unwrap();
-        }
-        guard.running += 1;
-        drop(guard);
-        let state = Arc::clone(&self.state);
-        std::thread::spawn(move || {
-            let result = Command::new("/bin/sh").arg("-lc").arg(&command).output();
-            let (lock, cv) = &*state;
-            let mut guard = lock.lock().unwrap();
-            match result {
-                Ok(out) if out.status.success() => {}
-                Ok(out) => {
-                    let msg = compact_hook_error(
-                        &String::from_utf8_lossy(&out.stderr),
-                        &String::from_utf8_lossy(&out.stdout),
-                        out.status.code(),
-                    );
-                    if !template_id.is_empty() {
-                        guard.failures.insert(template_id, msg);
-                    }
-                }
-                Err(_) => {
-                    if !template_id.is_empty() {
-                        guard.failures.insert(template_id, "failed to start".into());
-                    }
-                }
-            }
-            guard.running -= 1;
-            cv.notify_all();
-        });
-    }
-
-    fn wait_idle(&self) {
-        let (lock, cv) = &*self.state;
-        let mut guard = lock.lock().unwrap();
-        while guard.running > 0 {
-            guard = cv.wait(guard).unwrap();
-        }
-    }
-
-    fn take_failures(&self) -> BTreeMap<String, String> {
-        std::mem::take(&mut self.state.0.lock().unwrap().failures)
-    }
-}
+use crate::hook_runner::HookRunner;
 
 fn run_sync_hook(command: &str) -> Result<(), String> {
     match Command::new("/bin/sh").arg("-lc").arg(command).output() {
@@ -850,7 +775,7 @@ fn execute_entries(
                 report(&plan.name, plan.hook_render_failed[0]);
             } else if let Some(cmd) = &plan.post_hook {
                 if plan.hook_async {
-                    hooks.enqueue(cmd.clone(), plan.name.clone());
+                    hooks.enqueue(cmd.clone(), 1, plan.name.clone());
                 } else if let Err(msg) = run_sync_hook(cmd) {
                     report(&plan.name, &msg);
                 }
@@ -1024,7 +949,7 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
         still_owed.extend(owed.iter().cloned());
     }
 
-    let hooks = HookRunner::new();
+    let hooks = HookRunner::new(crate::hook_runner::DEFAULT_MAX_CONCURRENT);
     for (label, entry_plans, parsed) in plans {
         let ok =
             execute_entries(entry_plans, &hooks, &mut failures, inputs.notify_kde, &inputs.default_mode) && parsed;

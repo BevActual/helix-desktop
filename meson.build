@@ -478,14 +478,6 @@ helix_core_lib = static_library('helix_core',
 
 alias_target('helix_core_base', helix_core_lib)
 
-helix_theme_lib = static_library('helix_theme',
-  sources: _helix_theme_sources,
-  link_with: helix_core_lib,
-  dependencies: _helix_dependencies,
-  include_directories: _helix_inc,
-  cpp_args: _helix_cpp_args,
-)
-
 helix_core_base_dep = declare_dependency(
   link_with: helix_core_lib,
   dependencies: _helix_test_dependencies,
@@ -494,13 +486,19 @@ helix_core_base_dep = declare_dependency(
   sources: _protocol_headers,
 )
 
-helix_core_dep = declare_dependency(
-  link_with: [helix_core_lib, helix_theme_lib],
-  dependencies: _helix_test_dependencies,
-  include_directories: _helix_inc,
-  compile_args: _helix_compile_definitions,
-  sources: _protocol_headers,
-)
+# Inference workers and desktop contract tests link core only; runtime theme is Rust (`helix-theme`).
+helix_core_dep = helix_core_base_dep
+
+if get_option('theme_cpp_reference')
+  helix_theme_lib = static_library('helix_theme',
+    sources: _helix_theme_sources,
+    link_with: helix_core_lib,
+    dependencies: _helix_dependencies,
+    include_directories: _helix_inc,
+    cpp_args: _helix_cpp_args,
+  )
+  alias_target('helix_theme', helix_theme_lib)
+endif
 
 # C++ session binary is still built (tests / reference). Install only when explicitly enabled —
 # the live session shell is Tauri (`tools/switch-shell.sh install`).
@@ -533,7 +531,6 @@ if build_tests
   _cpp_test_names = [
     'cli_help',
     'cli_parse',
-    'cli_schema',
     'config_migration',
     'config_override_mutation',
     'config_path_resolution',
@@ -547,7 +544,6 @@ if build_tests
     'i18n_supported_languages',
     'inotify',
     'ipc_service',
-    'kde_color_scheme',
     'log',
     'network_manager_security',
     'notification_dnd',
@@ -556,13 +552,8 @@ if build_tests
     'notification_history_utf8',
     'package_spec',
     'process',
-    'scheme',
     'state_store',
     'string_utils',
-    'template_apply_notify',
-    'template_hook_async',
-    'template_hook_runner',
-    'theme_shell_mode',
     'time_format',
     'capsule_group_lane_override',
     'capsule_group_reconcile',
@@ -575,24 +566,10 @@ if build_tests
     'webp_decoder',
   ]
 
-  _cpp_tests_needing_theme = [
-    'cli_schema',
-    'kde_color_scheme',
-    'scheme',
-    'template_apply_notify',
-    'template_hook_async',
-    'template_hook_runner',
-    'theme_shell_mode',
-  ]
-
   foreach test_name : _cpp_test_names
-    _test_dep = helix_core_dep
-    if test_name not in _cpp_tests_needing_theme
-      _test_dep = helix_core_base_dep
-    endif
     test_exe = executable(test_name + '_test',
       sources: files('tests' / (test_name + '_test.cpp')),
-      dependencies: _test_dep,
+      dependencies: helix_core_base_dep,
       override_options: ['b_ndebug=false'],
     )
     test_args = []
@@ -638,14 +615,8 @@ if run_command('test', '-e', llama_prefix / 'lib64/libllama.so', check: false).r
   )
 endif
 
-# Helpers and adaptive applications. The org.helix.Desktop service itself is Rust (services/helix-desktop).
-# C++ TemplateEngine driver for regenerating template goldens only (runtime apply is Rust `helix-theme`).
-executable('helix-gen-golden-template',
-  sources: files('core/helix-theme/tools/gen_golden_template.cpp'),
-  dependencies: helix_core_dep,
-  cpp_args: _helix_cpp_args,
-  install: false,
-)
+# Template golden regen: `cargo run -p helix-theme --bin gen-golden-template` (see tools/regen_golden_template.sh).
+
 helix_assistant_config = configuration_data()
 helix_assistant_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
 configure_file(input: 'assets/services/helix-assistant-warm.service.in',

@@ -1771,14 +1771,24 @@
    "Tonal spot",
    "Fruit salad",
    "Rainbow",
-   "Monochrome"
+   "Monochrome",
+   "Vibrant",
+   "Faithful",
+   "Soft",
+   "Dysfunctional",
+   "Muted"
   ],
   "options": [
    "m3-content",
    "m3-tonal-spot",
    "m3-fruit-salad",
    "m3-rainbow",
-   "m3-monochrome"
+   "m3-monochrome",
+   "vibrant",
+   "faithful",
+   "soft",
+   "dysfunctional",
+   "muted"
   ],
   "overridden": false,
   "page": "appearance",

@@ -53,7 +53,8 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     } else {
         None
     };
-    let mode = crate::day_night::resolve_mode(config, text("theme.mode").as_deref().unwrap_or("dark"))?;
+    let mode = crate::day_night::resolved_app_mode(config)?;
+    let shell_light = crate::day_night::shell_palette_light(config)?;
 
     let assets = helix_assets_dir()?;
     let builtin_config = builtin_templates_root(&assets).join("builtin.toml");
@@ -73,7 +74,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         custom_palette: text("theme.custom_palette").unwrap_or_default(),
         community_cache: (source == PaletteSource::Community && !community_name.is_empty())
             .then(|| helix_theme::custom::community_palette_cache_path(&state_dir, &community_name)),
-        shell_light: false,
+        shell_light,
         wallpaper,
     };
     let mut generated = resolve_palette(&palettes_dir, &selection)?;

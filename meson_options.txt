@@ -6,5 +6,11 @@ option(
   value: false,
   description: 'Optimize for the build machine CPU; output may not be portable',
 )
+option(
+  'theme_cpp_reference',
+  type: 'boolean',
+  value: false,
+  description: 'Build legacy C++ src/theme/ reference lib (runtime theme is Rust helix-theme)',
+)
 
 
