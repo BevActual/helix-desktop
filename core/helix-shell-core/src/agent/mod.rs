@@ -4,6 +4,7 @@ pub mod agent_confirm;
 pub mod agent_msg;
 pub mod agent_status;
 pub mod approvals;
+pub mod assistant_core;
 pub mod confirm;
 pub mod confirmer;
 pub mod display;
