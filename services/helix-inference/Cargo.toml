@@ -1,0 +1,19 @@
+[package]
+name = "helix-inference"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "org.helix.Inference: the sandboxed model service. Port of C++ src/inference (service, queue, routing, workers)."
+
+[[bin]]
+name = "helix-inference"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+futures-util = "0.3"
+libc = "0.2"
