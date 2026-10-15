@@ -22,14 +22,18 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    # Meson: contract test binary + template golden driver; Rust services build separately.
-    meson compile -C build-{{m}} desktop_service_test helix-gen-golden-template
+    # Meson: config/core only (`helix_theme` builds via `just test` / `just build-theme-golden`).
+    meson compile -C build-{{m}} helix_core_base
     cargo build -p helix-shell-core --bin helix-rust-config-export
+
+# C++ TemplateEngine driver for `core/helix-theme/tools/regen_golden_template.sh` only.
+build-theme-golden m=mode: (_ensure-configured m)
+    meson compile -C build-{{m}} helix-gen-golden-template
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
     mkdir -p build-{{m}}/helix-tmp
-    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} desktop_service_test helix-gen-golden-template -j {{jobs}}
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix_core_base -j {{jobs}}
     cargo build -p helix-shell-core --bin helix-rust-config-export
 
 # Legacy GTK Settings only (needs -Ddesktop_apps=enabled). Prefer: (cargo build -p helix-settings)

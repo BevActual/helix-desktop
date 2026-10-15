@@ -476,6 +476,8 @@ helix_core_lib = static_library('helix_core',
   cpp_args: _helix_cpp_args,
 )
 
+alias_target('helix_core_base', helix_core_lib)
+
 helix_theme_lib = static_library('helix_theme',
   sources: _helix_theme_sources,
   link_with: helix_core_lib,

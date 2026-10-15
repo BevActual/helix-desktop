@@ -25,7 +25,7 @@ Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`
 ## Dev selection
 
 ```sh
-just build debug   # desktop_service_test, helix-gen-golden-template (Meson); helix-rust-config-export (Cargo)
+just build debug   # helix_core_base (Meson); helix-rust-config-export (Cargo). `just build-theme-golden` for C++ template regen.
 cargo build --profile fast -p helix-desktop
 HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 ```
