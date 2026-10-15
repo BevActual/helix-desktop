@@ -2,8 +2,9 @@
 //!
 //! Milestone B default tree: [`config_export_serialize::serialize_default_config`].
 //! Milestone C effective export: `merge_export_subtree` per `SCHEMA_EXPORT_SECTIONS` + `bar`,
-//! dynamic calendar/idle/bar/shell-provider passes, extra `widget` / placement roots, residual leaf
-//! patch, then [`config_export_serialize::finalize_serialized_export`]. Future: typed
+//! dynamic calendar/idle/bar/shell-provider passes, `merge_export_subtree` on `widget` / placement
+//! roots (placement `widget` tables deferred), residual leaf patch for anything else, then
+//! [`config_export_serialize::finalize_serialized_export`]. Future: typed
 //! `parseConfigTable` + `writeTable` (see `docs/design/config-export-rust.md`).
 
 use std::sync::OnceLock;
@@ -11,15 +12,27 @@ use std::sync::OnceLock;
 use toml::Value as Toml;
 
 use super::config_export_defaults::{
-    schema_section_default_writer, write_bar_defaults, EXTRA_EXPORT_ROOT_WRITERS,
+    schema_section_default_writer, write_bar_defaults, write_desktop_widgets_defaults,
+    write_lockscreen_widgets_defaults, write_widget_defaults, EXTRA_EXPORT_ROOT_WRITERS,
     SCHEMA_EXPORT_SECTIONS,
 };
 use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
 use super::settings::{ConfigPaths, ConfigStore};
 
+fn export_root_section(path: &str) -> &str {
+    path.split('.').next().unwrap_or("")
+}
+
 fn is_parsed_export_section_path(path: &str) -> bool {
-    let section = path.split('.').next().unwrap_or("");
+    let section = export_root_section(path);
     section == "bar" || SCHEMA_EXPORT_SECTIONS.contains(&section)
+}
+
+fn is_extra_export_root_path(path: &str) -> bool {
+    matches!(
+        export_root_section(path),
+        "widget" | "desktop_widgets" | "lockscreen_widgets"
+    )
 }
 
 fn default_export_root() -> &'static Toml {
@@ -892,6 +905,56 @@ fn set_dot_path(root: &mut Toml, path: &str, value: Toml) {
     table.insert(parts[parts.len() - 1].to_string(), value);
 }
 
+fn merged_overlay_for_extra_export_root(section: &str, merged_section: &Toml) -> Toml {
+    match section {
+        "desktop_widgets" | "lockscreen_widgets" => {
+            strip_table_keys(merged_section, &["widget", "widget_order"])
+        }
+        _ => merged_section.clone(),
+    }
+}
+
+fn merge_export_root_from_merged(
+    root: &mut Toml,
+    section: &str,
+    writer: fn() -> Toml,
+    merged: &Toml,
+    default: &Toml,
+) {
+    let merged_section = match merged.get(section) {
+        Some(section) => section,
+        None => return,
+    };
+    let default_section = root
+        .get(section)
+        .cloned()
+        .or_else(|| dot_path_get(default, section))
+        .unwrap_or_else(writer);
+    let overlay = merged_overlay_for_extra_export_root(section, merged_section);
+    let section_root = merge_export_subtree(&default_section, &overlay);
+    if let Some(root_table) = root.as_table_mut() {
+        root_table.insert(section.to_string(), section_root);
+    }
+}
+
+fn apply_deferred_placement_leaves_from_merged(
+    root: &mut Toml,
+    merged: &Toml,
+    default: &Toml,
+) {
+    let mut leaves = Vec::new();
+    collect_leaf_paths(merged, "", &mut leaves);
+    for path in leaves {
+        if path.starts_with("desktop_widgets.widget.")
+            || path == "desktop_widgets.widget_order"
+            || path.starts_with("lockscreen_widgets.widget.")
+            || path == "lockscreen_widgets.widget_order"
+        {
+            apply_merged_export_leaf(root, &path, merged, default);
+        }
+    }
+}
+
 fn seed_non_bar_extra_export_roots(root: &mut Toml, default: &Toml) {
     let root_table = match root.as_table_mut() {
         Some(table) => table,
@@ -913,8 +976,24 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     rebuild_parsed_sections_from_merged(&mut root, &merged, default);
     seed_non_bar_extra_export_roots(&mut root, default);
     rebuild_widget_from_merged(&mut root, &merged);
+    merge_export_root_from_merged(&mut root, "widget", write_widget_defaults, &merged, default);
     rebuild_desktop_widgets_from_merged(&mut root, &merged);
+    merge_export_root_from_merged(
+        &mut root,
+        "desktop_widgets",
+        write_desktop_widgets_defaults,
+        &merged,
+        default,
+    );
     rebuild_lockscreen_widgets_from_merged(&mut root, &merged);
+    merge_export_root_from_merged(
+        &mut root,
+        "lockscreen_widgets",
+        write_lockscreen_widgets_defaults,
+        &merged,
+        default,
+    );
+    apply_deferred_placement_leaves_from_merged(&mut root, &merged, default);
     rebuild_calendar_accounts_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
     rebuild_bar_from_merged(&mut root, &merged);
@@ -926,7 +1005,7 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
-        if is_parsed_export_section_path(&path) {
+        if is_parsed_export_section_path(&path) || is_extra_export_root_path(&path) {
             continue;
         }
         apply_merged_export_leaf(&mut root, &path, &merged, default);
