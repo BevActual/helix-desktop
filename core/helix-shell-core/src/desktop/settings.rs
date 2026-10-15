@@ -2738,6 +2738,11 @@ impl ConfigStore {
         &self.paths
     }
 
+    /// Merged `config.toml` (+ includes) and `settings.toml` as JSON for theme templates (`config.*`).
+    pub fn template_config_table(&self) -> serde_json::Value {
+        toml_to_json_value(&merge_toml_values(self.base.clone(), self.overrides.clone()))
+    }
+
     pub fn get(&self, id: &str) -> Value {
         let def = match find_def(id) {
             Some(def) => def,
@@ -3391,6 +3396,48 @@ fn toml_remove(root: &mut Toml, id: &str) {
     if let Some(table) = root.as_table_mut() {
         remove_path(table, &parts);
     }
+}
+
+/// Active GTK icon theme name (GNOME `gsettings`, then KDE `kdeglobals`, else `Adwaita`).
+pub fn active_icon_theme_name() -> String {
+    if let Ok(output) = std::process::Command::new("gsettings")
+        .args(["get", "org.gnome.desktop.interface", "icon-theme"])
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let unquoted = stdout.trim().trim_matches('\'').trim();
+            if !unquoted.is_empty() {
+                return unquoted.to_string();
+            }
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let globals = PathBuf::from(home).join(".config").join("kdeglobals");
+        if let Ok(text) = std::fs::read_to_string(globals) {
+            let mut in_icons = false;
+            for line in text.lines() {
+                let line = line.trim();
+                if line == "[Icons]" {
+                    in_icons = true;
+                    continue;
+                }
+                if line.starts_with('[') {
+                    in_icons = false;
+                    continue;
+                }
+                if in_icons {
+                    if let Some(theme) = line.strip_prefix("Theme=") {
+                        let theme = theme.trim();
+                        if !theme.is_empty() {
+                            return theme.to_string();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    "Adwaita".to_string()
 }
 
 fn toml_to_json_value(value: &Toml) -> Value {
