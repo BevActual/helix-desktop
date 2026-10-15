@@ -4,24 +4,11 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use helix_shell_core::desktop::config_export::configure_export_env;
+use helix_shell_core::desktop::config_export::{
+    configure_export_env, discover_config_export_bin, export_effective_toml, rust_export_toml,
+};
 use helix_shell_core::desktop::settings::ConfigPaths;
-fn export_bin() -> Option<PathBuf> {
-    if let Ok(path) = std::env::var("HELIX_CONFIG_EXPORT_BIN") {
-        let candidate = PathBuf::from(path);
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    for sub in ["../../build-debug", "../../build-fast", "../../_build"] {
-        let candidate = root.join(sub).join("helix-config-export");
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-    None
-}
+use helix_shell_core::ConfigStore;
 
 fn minimal_fixture(root: &PathBuf) -> ConfigPaths {
     let config_dir = root.join("cfg").join("helix");
@@ -42,7 +29,7 @@ fn minimal_fixture(root: &PathBuf) -> ConfigPaths {
 
 #[test]
 fn matches_helix_config_export_golden() {
-    let Some(bin) = export_bin() else {
+    let Some(bin) = discover_config_export_bin() else {
         eprintln!("skip matches_helix_config_export_golden: helix-config-export not built");
         return;
     };
@@ -70,5 +57,27 @@ fn matches_helix_config_export_golden() {
     );
     let got = String::from_utf8(output.stdout).expect("utf8");
     assert_eq!(got, expected, "config_export output drifted; rerun tools/gen_config_export_golden.sh");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn rust_export_matches_cpp_for_minimal_fixture() {
+    let root = std::env::temp_dir().join(format!("helix-rust-export-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let paths = minimal_fixture(&root);
+    let store = ConfigStore::load(paths.clone());
+    if rust_export_toml(store.paths()).is_none() {
+        eprintln!("skip rust_export_matches_cpp: rust_export_toml not implemented");
+        let _ = fs::remove_dir_all(root);
+        return;
+    }
+    let Some(bin) = discover_config_export_bin() else {
+        eprintln!("skip rust_export_matches_cpp: helix-config-export not built");
+        let _ = fs::remove_dir_all(root);
+        return;
+    };
+    let cpp = helix_shell_core::desktop::config_export::cpp_export_toml(&paths, &bin).expect("cpp");
+    let rust = export_effective_toml(&store, Some(&bin)).expect("export");
+    assert_eq!(rust, cpp);
     let _ = fs::remove_dir_all(root);
 }

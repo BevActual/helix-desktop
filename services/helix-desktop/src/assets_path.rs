@@ -78,5 +78,5 @@ pub fn helix_theme_palette_bin() -> Option<PathBuf> {
 
 /// C++ `config_export::serialize` helper for in-process template apply.
 pub fn helix_config_export_bin() -> Option<PathBuf> {
-    find_meson_helper_bin("HELIX_CONFIG_EXPORT_BIN", "helix-config-export")
+    helix_shell_core::desktop::config_export::discover_config_export_bin()
 }
