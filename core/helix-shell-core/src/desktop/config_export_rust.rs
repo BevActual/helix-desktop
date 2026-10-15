@@ -17,6 +17,7 @@ use super::config_export_defaults::{
     SCHEMA_EXPORT_SECTIONS,
 };
 use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
+use super::config_export_typed::export_storage_section_from_merged;
 use super::settings::{ConfigPaths, ConfigStore};
 
 fn default_export_root() -> &'static Toml {
@@ -819,6 +820,13 @@ fn rebuild_parsed_export_section(
     merged: &Toml,
     default: &Toml,
 ) {
+    if section == "storage" {
+        root_table.insert(
+            section.to_string(),
+            export_storage_section_from_merged(merged),
+        );
+        return;
+    }
     let default_section = dot_path_get(default, section).unwrap_or_else(writer);
     let section_root = match merged.get(section) {
         Some(merged_section) => {
