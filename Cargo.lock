@@ -1730,6 +1730,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "helix-assistant"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "helix-shell-core",
+ "serde_json",
+ "tokio",
+ "toml 0.8.2",
+ "zbus",
+]
+
+[[package]]
 name = "helix-attacker"
 version = "0.1.0"
 dependencies = [
@@ -1784,6 +1796,20 @@ dependencies = [
  "toml 0.8.2",
  "wayland-client",
  "wayland-protocols",
+ "zbus",
+]
+
+[[package]]
+name = "helix-inference"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "cc",
+ "futures-util",
+ "image",
+ "libc",
+ "serde_json",
+ "tokio",
  "zbus",
 ]
 

@@ -1,0 +1,2158 @@
+{
+  "commands": [
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-localai-delete",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "name",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Remove an installed LocalAI model"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-localai-endpoint",
+      "positionals": [
+        {
+          "choices": [
+            "chat",
+            "vision",
+            "tools",
+            "transcript",
+            "tts",
+            "embeddings",
+            "image",
+            "video",
+            "sound"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "capability",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Print the LocalAI base URL and the model to use, optionally for one capability"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-localai-install",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Gallery id such as localai@qwen3-4b",
+          "joinRemaining": false,
+          "name": "id",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Install a model from the LocalAI gallery"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-localai-model",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "name",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Persist a LocalAI model as the desktop's default chat model"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-localai-open",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Open the LocalAI web interface"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-localai-start",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Start the local LocalAI server"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-localai-stop",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Stop the local LocalAI server"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-ollama-cancel",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Cancel an in-progress Ollama model download"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-ollama-delete",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "name",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Remove an installed Ollama model"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-ollama-model",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "name",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Load an Ollama model and persist it as the selected model"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-ollama-pull",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "name",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Download an Ollama model from the library"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-ollama-start",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Start the local Ollama daemon"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-ollama-stop",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Stop the local Ollama daemon"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-refresh",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Refetch AI usage from local tools"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "ai-usage-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print AI usage and local inference status"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "app-launch",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Desktop id or application name",
+          "joinRemaining": true,
+          "name": "query",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Launch an installed application by desktop id or name"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "annotate",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Image file to annotate instead of the live screen",
+          "joinRemaining": false,
+          "name": "path",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Draw on the screen over running apps, or annotate an image file; press F or the Freeze button to capture the background"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bar-auto-hide-set",
+      "positionals": [
+        {
+          "choices": [
+            "on",
+            "off",
+            "smart",
+            "true",
+            "false",
+            "1",
+            "0"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "state",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "bar-name",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "monitor-selector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set auto-hide state for a bar"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bar-hide",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "bar-name",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "monitor-selector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Hide one or all bars and release their layout gaps"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bar-layer-set",
+      "positionals": [
+        {
+          "choices": [
+            "top",
+            "overlay"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "layer",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "bar-name",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "monitor-selector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set one or all bar layers"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bar-reserve-toggle",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "bar-name",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "monitor-selector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Temporarily toggle reserve space for one or all bars"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bar-show",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "bar-name",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "monitor-selector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Show one or all bars"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bar-toggle",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "bar-name",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "monitor-selector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Toggle visibility for one or all bars"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bluetooth-disable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Disable Bluetooth"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bluetooth-enable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Enable Bluetooth"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bluetooth-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print Bluetooth state"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "bluetooth-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle Bluetooth"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "brightness-down",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "target",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "step",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Decrease brightness (defaults to current monitor)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "brightness-list-backlight-devices",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "List available sysfs backlight device names"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "brightness-osd",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Show brightness OSD without changing brightness"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "brightness-set",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "target",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set brightness (defaults to current monitor)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "brightness-up",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "target",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "step",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Increase brightness (defaults to current monitor)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "caffeine-disable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Disable caffeine (idle inhibitor)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "caffeine-enable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Enable caffeine (idle inhibitor)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "caffeine-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle caffeine (idle inhibitor)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "clipboard-clear",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Clear clipboard history"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "clipboard-copy",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "text",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Copy text to the clipboard"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "clipboard-text",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print the most recent clipboard text (empty when the selection holds no text)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "color-scheme-get",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print active color scheme: <source> <name> (source is builtin, wallpaper, community, or custom)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "color-scheme-set",
+      "positionals": [],
+      "subcommands": [
+        {
+          "flags": [],
+          "hidden": false,
+          "name": "builtin",
+          "positionals": [
+            {
+              "choices": [
+                "Ayu",
+                "Catppuccin",
+                "Dracula",
+                "Eldritch",
+                "Gruvbox",
+                "Kanagawa",
+                "Helix",
+                "Nord",
+                "Rosé Pine",
+                "Tokyo-Night"
+              ],
+              "description": "",
+              "joinRemaining": false,
+              "name": "name",
+              "required": true,
+              "variadic": false
+            }
+          ],
+          "subcommands": [],
+          "summary": "Use a built-in palette"
+        },
+        {
+          "flags": [],
+          "hidden": false,
+          "name": "wallpaper",
+          "positionals": [
+            {
+              "choices": [
+                "m3-tonal-spot",
+                "m3-content",
+                "m3-fruit-salad",
+                "m3-rainbow",
+                "m3-monochrome",
+                "vibrant",
+                "faithful",
+                "soft",
+                "dysfunctional",
+                "muted"
+              ],
+              "description": "",
+              "joinRemaining": false,
+              "name": "name",
+              "required": true,
+              "variadic": false
+            }
+          ],
+          "subcommands": [],
+          "summary": "Use a wallpaper generator scheme"
+        },
+        {
+          "flags": [],
+          "hidden": false,
+          "name": "community",
+          "positionals": [
+            {
+              "choices": [],
+              "description": "",
+              "joinRemaining": false,
+              "name": "name",
+              "required": true,
+              "variadic": false
+            }
+          ],
+          "subcommands": [],
+          "summary": "Use a community palette"
+        },
+        {
+          "flags": [],
+          "hidden": false,
+          "name": "custom",
+          "positionals": [
+            {
+              "choices": [],
+              "description": "",
+              "joinRemaining": false,
+              "name": "name",
+              "required": true,
+              "variadic": false
+            }
+          ],
+          "subcommands": [],
+          "summary": "Use a custom palette"
+        }
+      ],
+      "summary": "Set palette source and selection in settings.toml (builtin name, wallpaper generator scheme, community id, or custom scheme folder name)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "config-reload",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Reload the config file"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-describe",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "path",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Describe a screenshot with the LocalAI vision model"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-dictate",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Start or stop microphone dictation through LocalAI"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-read",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "path",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Read the text in an image with the LocalAI vision model"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-rewrite",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Rewrite the clipboard text with LocalAI and copy the result"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-speak",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Read the clipboard text aloud with LocalAI"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print the desktop LocalAI action state and last result"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-summarize",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Summarize the clipboard text with LocalAI and copy the result"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-ai-translate",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Translate the clipboard text with LocalAI and copy the result"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-capture",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "target",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Capture the desktop for agents (non-interactive); prints ok <png-path>"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-widgets-edit",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Open the desktop widgets editor"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-widgets-exit",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Close the desktop widgets editor"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-widgets-hide",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Hide desktop widgets now (runtime only; does not change the saved setting)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-widgets-show",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Show desktop widgets now (runtime only; does not change the saved setting)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-widgets-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle desktop widgets visibility (runtime only; does not change the saved setting)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "desktop-widgets-toggle-edit",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle desktop widgets edit mode"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "dock-hide",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Hide the dock (persists override)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "dock-reload",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Reload dock configuration"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "dock-show",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Show the dock (persists override)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "dock-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle dock visibility (persists override)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "dpms-off",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Turn monitors off"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "dpms-on",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Turn monitors on"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "effects-profile-set",
+      "positionals": [
+        {
+          "choices": [
+            "output",
+            "input"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "kind",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "profile",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set the EasyEffects output or input profile"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "firewall-panic-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle firewalld panic mode"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "firewall-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print firewalld status, default zone, and panic mode"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "greeter-sync",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Sync wallpaper, colors, and monitor layout to Helix Greeter"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "keyboard-backlight-down",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Decrease all keyboard backlights by one level"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "keyboard-backlight-osd",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Show keyboard backlight OSD without changing brightness"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "keyboard-backlight-set",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set all keyboard backlights (0-100 percentage)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "keyboard-backlight-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle all keyboard backlights on/off"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "keyboard-backlight-up",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Increase all keyboard backlights by one level"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "keyboard-layout-cycle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Switch to the next keyboard layout"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "lockscreen-widgets-edit",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Open the lockscreen widgets editor"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "lockscreen-widgets-exit",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Close the lockscreen widgets editor"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "lockscreen-widgets-toggle-edit",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle lockscreen widgets edit mode"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "log-level-set",
+      "positionals": [
+        {
+          "choices": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "level",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set the console log level"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "log-level-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print the current console log level"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "media",
+      "positionals": [
+        {
+          "choices": [
+            "next",
+            "previous",
+            "toggle",
+            "play",
+            "pause",
+            "stop",
+            "raise",
+            "next-player",
+            "previous-player"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "action",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Control active media playback"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "mic-mute",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle microphone mute"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "mic-volume-down",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "step",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Decrease microphone volume"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "mic-volume-osd",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Show the microphone volume OSD without changing volume (defaults to the current volume)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "mic-volume-set",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set microphone volume"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "mic-volume-up",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "step",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Increase microphone volume"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "network-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Disconnect the active network, or reconnect when nothing is connected"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "nightlight-disable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Disable night light schedule"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "nightlight-enable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Enable night light schedule"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "nightlight-force-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle forced night light mode"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "nightlight-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle night light schedule"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-clear-active",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Dismiss all currently active notifications"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-clear-history",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Clear notification history"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-dnd-set",
+      "positionals": [
+        {
+          "choices": [
+            "on",
+            "off",
+            "true",
+            "false",
+            "1",
+            "0"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "state",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set notification Do Not Disturb state"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-dnd-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print notification Do Not Disturb state"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-dnd-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle notification Do Not Disturb state"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-history",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print recent notification history as JSON"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-invoke-latest",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Invoke the default action of the most recent active notification"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "notification-show",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "summary",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": true,
+          "name": "body",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Show an internal Helix notification"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "osd-disable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Disable OSD popups"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "osd-enable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Enable OSD popups"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "osd-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle OSD popups"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "panel-close",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "id",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Close the active panel, or close the named panel if it is active"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "panel-open",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "id",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "context",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Open a panel by id, optionally with context (e.g. launcher /emo, control-center audio)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "panel-toggle",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "id",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "context",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Toggle a panel by id, optionally with context (e.g. launcher /emo, control-center audio)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "privacy-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print capture activity plus telemetry and location mode"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "printers-start",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Start the CUPS printing service"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "printers-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print CUPS status and default printer"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "power-cycle",
+      "positionals": [
+        {
+          "choices": [
+            "next",
+            "prev"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "direction",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Step through UPower's ordered profile list, forward by default (wraps)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "power-set",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "profile",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set the UPower power profile (e.g. performance, balanced, power-saver)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screen-record-replay-save",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Save the last N seconds from the running replay buffer"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screen-record-replay-start",
+      "positionals": [
+        {
+          "choices": [
+            "focused",
+            "portal"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "source",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Start the gpu-screen-recorder replay buffer on the focused output or portal picker"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screen-record-replay-stop",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Stop the replay buffer without saving"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screen-record-replay-toggle",
+      "positionals": [
+        {
+          "choices": [
+            "focused",
+            "portal"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "source",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Start or stop the replay buffer (optional source: focused or portal)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screen-record-start",
+      "positionals": [
+        {
+          "choices": [
+            "focused",
+            "portal",
+            "region"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "source",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Start screen recording of the focused output, a region, or a portal picker"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screen-record-stop",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Stop the current screen recording"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screen-record-toggle",
+      "positionals": [
+        {
+          "choices": [
+            "focused",
+            "portal",
+            "region"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "source",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Start or stop screen recording (optional source: focused, portal, or region)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screenshot-annotate",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Freeze the screen and annotate it, then copy or save"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screenshot-fullscreen",
+      "positionals": [
+        {
+          "choices": [
+            "pick",
+            "monitor",
+            "all"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "mode",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Capture the focused monitor by default, pick interactively with pick, or all outputs with all"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screenshot-ocr",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Select a region and copy recognized text to the clipboard"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screenshot-pick-color",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Freeze the screen and copy the color under the click"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screenshot-region",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Start an interactive region screenshot"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "screenshot-scan-qr",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Select a region and copy a QR code or barcode to the clipboard"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "session",
+      "positionals": [
+        {
+          "choices": [
+            "lock",
+            "suspend",
+            "lock-and-suspend",
+            "lid-close",
+            "logout",
+            "reboot",
+            "shutdown"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "action",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Run a built-in session action"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "settings-close",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Close Control Center if it is open on a settings page"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "settings-open",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "context",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Open Control Center on a settings page, optionally at a specific section"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "settings-open-widget",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "bar-name",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "widget-name",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Open Control Center at a bar widget; from a widget gesture, targets that widget"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "settings-toggle",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "context",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Toggle Control Center on a settings page, optionally at a specific section"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print current state as JSON"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "tailscale-down",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Disconnect this machine from the Tailscale network"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "tailscale-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print Tailscale connection status"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "tailscale-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Connect or disconnect this machine from Tailscale"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "tailscale-up",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Connect this machine to the Tailscale network"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "taskbar-cycle",
+      "positionals": [
+        {
+          "choices": [
+            "next",
+            "prev"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "direction",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Step to the adjacent task or workspace group in the invoking taskbar"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "templates-apply",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Apply configured theme templates for the current palette"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "theme-mode-get",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print the current resolved theme mode"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "theme-mode-set",
+      "positionals": [
+        {
+          "choices": [
+            "dark",
+            "light",
+            "auto"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "mode",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set theme mode and persist to settings.toml"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "theme-mode-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle theme mode between dark and light"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "volume-down",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "step",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Decrease speaker volume"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "volume-mute",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle speaker mute"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "volume-osd",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Show the volume OSD without changing volume (defaults to the current volume)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "volume-set",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "value",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set speaker volume"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "volume-up",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "step",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Increase speaker volume"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wallpaper-get",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "connector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Print default wallpaper path, or effective path for an output"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wallpaper-next",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "connector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Switch to the next wallpaper immediately"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wallpaper-previous",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "connector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Switch to the previous wallpaper immediately"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wallpaper-random",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "connector",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Switch to a random wallpaper immediately"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wallpaper-set",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "connector",
+          "required": false,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "path",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Set wallpaper for all or a specific output (persisted)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wifi-disable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Disable Wi-Fi"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wifi-enable",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Enable Wi-Fi"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wifi-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print Wi-Fi state"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "wifi-toggle",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Toggle Wi-Fi"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "window-close",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Compositor window id; omit to close the focused window",
+          "joinRemaining": false,
+          "name": "id",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Close the focused window, or a compositor window id"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "window-switcher",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "action",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Open or close the window switcher overlay"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "workspace-alert-add",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "workspace",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Add a workspace alert (by number, name, or id)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "workspace-alert-add-window",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "window-id",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Add a workspace alert for a window"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "workspace-alert-clear",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "",
+          "joinRemaining": false,
+          "name": "workspace",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Clear a workspace alert"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "workspace-alert-clear-all",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Clear all workspace alerts"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "workspace-alert-status",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Print workspace alerts"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "workspace-switch",
+      "positionals": [
+        {
+          "choices": [
+            "next",
+            "prev"
+          ],
+          "description": "",
+          "joinRemaining": false,
+          "name": "direction",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Switch to the adjacent workspace on the target monitor (stops at both ends)"
+    }
+  ],
+  "version": 1
+}
