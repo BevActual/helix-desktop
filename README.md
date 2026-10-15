@@ -12,6 +12,8 @@ The compositor lives in-tree at [`compositor/`](compositor/) (helix-niri fork; o
 
 It gives you a polished, configurable desktop without stitching together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, settings UI, and a pile of service panels. Control Center also owns first-party services (packages, Tailscale, Firewall, Printers, Privacy, and similar tools).
 
+Helix is also being built as an **agentic OS**: the Agent Surface exposes the session to approved agents (observe and semantic act), **Mobius** is the local AI hub, and every desktop action by an agent goes through grants and a confirmation dialog. See [docs/design/agentic-os.md](docs/design/agentic-os.md) and [docs/design/inference-fabric.md](docs/design/inference-fabric.md).
+
 The product name, install paths, and IPC are **Helix** (see `docs/design/helix-identity.md`).
 
 <p><br/></p>

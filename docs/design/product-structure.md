@@ -75,7 +75,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | **Meson** | Units, polkit policy, assets, llama engine install tag. No compiled platform C++ | `meson install` |
 | **compositor/** | Own Cargo workspace (niri fork) | Separate |
 
-Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Shrink `cpp/` until it is gone (`cpp-to-rust.md`).
+Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Dependency direction between crates is checked by `tools/check-layers.py` (`layering.md`).
 
 ## How it should function
 
@@ -83,8 +83,8 @@ Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Shrin
 2. **Shell is presentation.** It registers as desktop (`RegisterDesktop`), shows state from snapshots, and writes through Configuration / domain Actions. It does not own PipeWire/NM/BlueZ long-term—the service does.
 3. **Apps are peers.** Settings is an app on the same bus, not a second shell. Manager/agent roles are explicit (see Agent Surface design).
 4. **Backends are replaceable behind snapshots.** Unavailable backends return readable empty/unavailable snapshots; pages still navigate.
-5. **Migration is domain cutover, not a big bang.** Parity on nested/unit tests, then delete the C++ domain in the same change (`cpp-to-rust.md`).
-6. **Visual language is one HIG.** GTK4/libadwaita for shared controls; glass only on floating chrome (`helix-hig.md`).
+5. **Change a domain with its contract.** Behavior changes land with the `protocols/` entry and the contract test in `services/helix-desktop/tests/contract/` (`desktop-contract-tests.md`). The C++ → Rust cutover that set this rule is finished (`cpp-to-rust.md`).
+6. **Visual language is one HIG.** Shared tokens and `@helix/ui` components; glass only on floating chrome (`helix-hig.md`).
 7. **Apps and the shell are Tauri + React + TypeScript + Vite** over typed commands (the shell moves in slices); only the trust surfaces
    (approval dialog, greeter) stay hand-written (`frontend-stack.md`).
 
@@ -119,8 +119,9 @@ Rules that stay true after cutover:
 | Theme | `core/helix-theme`, `services/helix-desktop` | Legacy C++ theme tree removed |
 | Inference workers | Rust `helix-transcribe` and `helix-image` crates; llama and image engine shims under `services/*/native/` | Replace those shims with Rust |
 | Agent policy C++ | **Deleted** | `helix-shell-core::agent` |
-| Greeter | Tauri scaffold | Full greetd product surface |
-| Doc drift | Soak + entry docs still mention C++ desktop | This file is the structure SoT; others link here |
+| Greeter | Tauri greeter with appearance sync | Power actions, last account/session, packaging (`greeter-tauri.md`) |
+| Shell frontend | React islands over the hand-written `shell.js` page, with fallbacks | Every slice React; fallbacks deleted (`frontend-stack.md`) |
+| Doc drift | Soak + a few entry docs may still mention the C++ desktop | This file is the structure SoT; others link here |
 
 ## Reading order
 
@@ -128,7 +129,7 @@ See `docs/design/README.md` for the full index. Short path:
 
 1. This file — product shape and ownership  
 2. `session-shell.md` — live install / restart rules  
-3. `cpp-to-rust.md` — cutover checklist  
+3. `cpp-to-rust.md` — how the cutover was done (history)  
 4. `protocols/` — wire contracts  
 5. `helix-hig.md` — UI rules  
 6. `inference-fabric.md` — Mobius + routing + MCP layer  

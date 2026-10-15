@@ -8,7 +8,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 |---|---|
 | [product-structure.md](product-structure.md) | How Helix is split (greeter / compositor / shell / apps / services) and how processes relate |
 | [session-shell.md](session-shell.md) | Live Tauri shell install, restart rules, retired C++ UI |
-| [cpp-to-rust.md](cpp-to-rust.md) | Desktop authority migration order and cutover rules |
+| [cpp-to-rust.md](cpp-to-rust.md) | History of the C++ → Rust cutover (complete); remaining native shims and greeter items |
 | [helix-identity.md](helix-identity.md) | Product names, paths, retired brand leftovers |
 | [helix-hig.md](helix-hig.md) | Visual / interaction language (chrome vs leftover vs modules) |
 | [rust-workspace.md](rust-workspace.md) | Cargo workspace members and build profiles |
@@ -21,7 +21,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 | `../../protocols/` | D-Bus + IPC schemas (source of truth for wire types) |
 | [desktop-service.md](desktop-service.md) | Domain API behavior for `org.helix.Desktop` (verify against `protocols/`) |
 | [desktop-contract-tests.md](desktop-contract-tests.md) | What bus/integration tests must pass for Tauri + Settings; cleanup backlog |
-| [layering.md](layering.md) | C++ `cpp/` dependency layers (ratchet while platform still lives there) |
+| [layering.md](layering.md) | Cargo workspace dependency rules and the `layering` check |
 | [trusted-surface.md](trusted-surface.md) | Trust boundaries for shell surfaces |
 
 ## Surfaces and apps

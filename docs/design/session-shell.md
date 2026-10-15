@@ -26,13 +26,13 @@ Split processes: `helix-shell-strut` (exclusive zone) + `helix-shell-bar` (`HELI
 | GTK Settings / Software / System Monitor | **Deleted.** Replaced by `apps/helix-*`. |
 | `helix-shell-dev.service` / `switch-shell native` | Removed. |
 
-## What still lives in C++ (migrating to Rust)
+## Who owns what now
 
 | Area | Location | Notes |
 |------|----------|-------|
 | Desktop authority | `services/helix-desktop` | `org.helix.Desktop`; unit `helix-service.service` runs `helix-desktop` |
-| Assistant / inference | `services/helix-assistant`, `services/helix-inference` | Rust; `helix-transcribe` is Cargo; Meson still builds optional `helix-image` |
-| Theme | `core/helix-theme` + `helix-desktop` | Legacy C++ theme tree removed; see `cpp-to-rust.md` |
+| Assistant / inference | `services/helix-assistant`, `services/helix-inference` | Rust; `helix-transcribe` and `helix-image` are Cargo bins over C/C++ engine shims in `native/` |
+| Theme | `core/helix-theme` + `helix-desktop` | Runtime theme and template apply are Rust |
 | Contract tests | `services/helix-desktop/tests/contract/` | Rust bus harness; `helix-fake-bluez`; see `desktop-contract-tests.md` |
 
 See `product-structure.md` and `cpp-to-rust.md`.
@@ -52,7 +52,7 @@ target/               cargo output (fast/release)
 protocols/            D-Bus + IPC contracts (source of truth)
 tools/                switch-shell, nested e2e, helpers
 services/helix-inference/  service + helix-transcribe + native/ llama|whisper
-cpp/inference/             Meson helix-image sources only (temporary)
+services/helix-image/      image worker + native/ C engine shim
 assets/               icons, templates, translations
 docs/design/          architecture + HIG; see README.md; archive/ is retired dumps
 ```

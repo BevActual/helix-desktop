@@ -2,11 +2,11 @@
 
 Product layout (greeter / compositor / shell / services): [docs/design/product-structure.md](docs/design/product-structure.md).
 
-This guide covers **Meson/C++** dependencies, build modes, and install layouts for live desktop authority and helpers (`helix-service`, `helix-assistant`, `helix-inference`).
+This guide covers dependencies, build modes, and install layouts. The desktop, assistant, inference and apps are **Cargo** builds; **Meson** installs units, policies and assets and drives the integration tests. The only C/C++ compiled is the engine shims under `services/*/native/`.
 
 The **live session shell and apps are Rust/Tauri** — see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
 Rust desktop scaffold: `cargo build -p helix-desktop` ([docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md)).
-The C++ session UI and GTK apps are removed; use `shell/` and `apps/`.
+The `cpp/` tree is gone; use `shell/` and `apps/`.
 
 For the older source-install path docs, see
 [docs/user/getting-started/installation.mdx](docs/user/getting-started/installation.mdx).

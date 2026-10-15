@@ -1,5 +1,9 @@
 # C++ → Rust migration
 
+> **Status: complete (2026-10-15).** The `cpp/` tree is deleted and Rust owns the desktop. This page is now the record of how
+> the cutover was done, plus the two items that are still open: the llama/whisper/image native shims and the greeter's remaining
+> features. Current structure lives in `product-structure.md`.
+
 Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`services/helix-desktop`). **Inference is a Rust product** (`services/helix-inference`). Runtime theme is Rust (`helix-theme`). **The `cpp/` tree is deleted**; the only remaining non-Rust code is Cargo-built native glue: the llama C++ under `services/helix-inference/native/inference/` and the C shims (`image_engine.c`, `transcribe_engine.c`). This doc is the cutover map and backlog.
 
 ## Inventory
@@ -78,5 +82,5 @@ offline, etc.) return errors to the caller.
 1. ~~**Theme C++ tail**~~ — **Done.** Runtime theme is Rust (`helix-theme`, `helix-desktop`). The C++ theme tree (and later all of `helix_core` and `cpp/`) is deleted. Goldens and contracts live under `cargo test -p helix-theme`; template regen uses `gen-golden-template`.
 2. **Inference → Rust** — workers are Cargo. The image engine shim is C (`image_engine.c`). Replace the llama C++ under `native/inference/` (`llama_backend.cpp`, `schema_grammar.cpp`, `llama_shim.cpp`).
 3. ~~**Desktop bus contract**~~ — **Done.** `services/helix-desktop/tests/contract/` + `tools/nested/helix-desktop-configuration-contract.sh`; checklist in `desktop-contract-tests.md`. C++ `desktop_service_test` removed.
-4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.
+4. **Greeter** — Appearance sync is in place (Settings **Sync login screen**, `helix-greeter-apply-appearance`, greeter paint). Still open: power actions, last account and session, packaging. See `greeter/HELIX.md`.
 5. ~~**`src/` → `cpp/` rename**~~ — **Done**, then superseded: the `cpp/` tree itself is deleted; Meson compiles nothing and remains only as the nested/python integration-test driver.

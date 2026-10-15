@@ -180,115 +180,40 @@ python3 tools/i18n-check.py
 ## Project Layout
 
 ```text
-cpp/                C++ platform library (config, inference glue, tests); session UI is Rust/Tauri
-  (no main.cpp)     helix_core static lib only
-  app/              Application bootstrap, main loop, poll sources
-  auth/             PAM and fingerprint authentication
-  calendar/         CalDAV, Google Calendar, iCalendar parsing, polling
-  capture/          Screenshots, screencopy capture, region overlay
-  compositors/      Compositor detection, runtime adapters, workspace/output/keyboard backends
-  config/           Configuration schema, validation, hot reload, state store, overrides
-    schema/         Typed config schema engine
-  core/             Logging, timers, process helpers, resource paths, shared utilities
-  dbus/             Session/system bus wrappers and service integrations
-    accounts/       AccountsService user metadata
-    bluetooth/      BlueZ service and pairing agent
-    idle/           Screensaver D-Bus service
-    logind/         logind integration
-    modem/          ModemManager cellular integration
-    mpris/          Media player integration and artwork cache
-    network/        NetworkManager, wpa_supplicant, and secret agent integration
-    notification/   Desktop notification D-Bus service
-    polkit/         Polkit authentication agent
-    power/          power-profiles-daemon integration
-    tray/           StatusNotifierItem watcher/host
-    upower/         Battery and power device integration
-  debug/            Debug D-Bus service
-  hooks/            User hook state and hook manager
-  i18n/             Translation catalog and language tag handling
-  idle/             Idle manager, inhibitor, grace overlay
-  ipc/              IPC client/service and CLI command parsing
-  launcher/         Launcher providers (apps, emoji, calculator, sessions, windows)
-  net/              HTTP client, URI parsing, URL opening
-  notification/     Notification model, manager, filtering, history
-  pipewire/         PipeWire audio service, sound playback, spectrum analyzer
-  render/
-    animation/      Animation manager, easing, motion settings
-    backend/        GLES render backend, framebuffers, texture manager
-    core/           Render data types, image decoders/encoders, texture caches
-    programs/       GLES shader programs
-    scene/          Scene graph nodes and pointer input dispatch
-    text/           Cairo/Pango text and glyph rendering
-  shell/
-    backdrop/       Backdrop layer surfaces
-    bar/            Bar surface, instance, widget base/factory
-      widgets/      Bar widget implementations
-    clipboard/      Clipboard history panel and paste helpers
-    control_center/ Control center panel, tabs, shortcut registry
-    desktop/        Desktop widget host, factory, layout, editor support
-      widgets/      Desktop widget implementations
-    dock/           Dock surface, model, pinned apps, context menu
-    greeter/        Greeter appearance sync
-    launcher/       Launcher panel
-    lockscreen/     Session lock surfaces and lockscreen widgets
-    notification/   Notification toasts
-    osd/            On-screen display overlays
-    overview/       Overview capture helpers
-    panel/          Panel base, manager, attached-panel context
-    polkit/         Polkit prompt panel
-    screen_corners/ Screen corner overlays
-    session/        Session panel and action runners
-    settings/       Settings editors, setting controls, registries, sheets
-    setup_wizard/   First-run setup wizard
-    surface/        Shared shell surface geometry and shadow helpers
-    switcher/       Window switcher UI
-    tooltip/        Tooltip manager
-    tray/           Tray drawer and D-Bus menu UI
-    wallpaper/      Wallpaper surfaces, paths, picker panel
-    widgets_editor/ Background widget editor
-  system/           Desktop entries, brightness, weather, location, system monitor, hardware services
-  config/theme/     Scheme tokens and color roles (runtime theme: core/helix-theme)
-  time/             Time service and polling
-  ui/
-    controls/       Reusable controls (Button, Input, Label, Select, Slider, Box, ...)
-    dialogs/        File, color, and glyph picker dialogs
-    visuals/        Shared visualizer controls
-  util/             Generic helpers
-  wayland/          Wayland connection, seats, surfaces, clipboard, toplevels, text input
-    hyprland/       Hyprland-specific Wayland protocol helpers
-assets/
-  fonts/            Bundled Tabler and UI fonts
-  sounds/           Notification and UI sounds
-  templates/        Built-in theme templates
-  translations/     Exported translation catalogs
+Cargo.toml          Rust workspace (excludes compositor/)
+core/               Pure models and typed clients
+  helix-shell-core    Config catalog/export, agent risk policy, app models
+  helix-desktop-api   Typed client for org.helix.Desktop
+  helix-theme         Palettes, wallpaper schemes, template apply
+  shared-ui/          CSS tokens, icons, @helix/ui React components, generated bindings
+services/           One process each
+  helix-desktop       org.helix.Desktop authority (audio, network, bluetooth, displays, appearance, agent surface)
+  helix-assistant     Explicit Act presence (Agent Surface client)
+  helix-inference     Inference fabric, helix-transcribe; native/ holds the llama and whisper shims
+  helix-image         Image worker; native/ holds the C engine shim
+  helix-system-upgrade, helix-wallpaper, helix-idle
+shell/              Live session shell (Tauri + React islands)
+apps/               Settings, Mobius, Software, System Monitor (Tauri + React)
+greeter/            Login greeter (Tauri + React, greetd client)
+compositor/         helix-niri fork (own Cargo workspace)
 protocols/          D-Bus + IPC contracts (source of truth); also vendored Wayland XML
-tests/              Unit tests and config validation fixtures
-tools/              Developer and translation helper scripts
+assets/             Icons, fonts, sounds, templates, translations, unit files
+tests/              Python integration tests, fixtures, eval
+tools/              Install, nested e2e, layering check, generators
+dev/                Nested probes and test tooling
 nix/                Nix package, module, and dev shell definitions
-third_party/
-  wuffs/          Raster image decoding (vendored)
-  fzy/            Fuzzy matching (vendored)
-  material_color_utilities/ Material Design color generation (vendored)
+third_party/        Vendored crates and libraries
+docs/design/        Architecture + HIG (see README.md); archive/ is retired
 ```
 
+Structure and ownership rules: [docs/design/product-structure.md](docs/design/product-structure.md). Dependency direction is checked
+by `python3 tools/check-layers.py .`.
 
 ## Debugging
 
-All debug commands use the `org.helix.Debug` D-Bus service, available at runtime.
-
-```sh
-# Enable verbose debug logs
-gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.SetVerboseLogs true
-
-# Disable verbose debug logs
-gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.SetVerboseLogs false
-
-# Check current verbose log state
-gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.GetVerboseLogs
-
-# Emit an internal notification (app_name, summary, body, timeout_ms, urgency 0-2)
-gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.EmitInternalNotification "Helix" "Test" "Hello from debug" 5000 1
-```
+Run the desktop service against mock backends with `HELIX_DESKTOP_MOCK_AUDIO=1`, `HELIX_DESKTOP_MOCK_NETWORK=1`,
+`HELIX_DESKTOP_MOCK_BLUETOOTH=1` and `HELIX_DESKTOP_MOCK_DISPLAYS=1`. The nested harnesses under `tools/nested/` and the
+hardware checklist in `docs/design/rust-desktop-soak.md` show how.
 
 ### Crash output
 
