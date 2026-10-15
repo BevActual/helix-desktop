@@ -181,3 +181,167 @@ fn generate_material(rgb112: &[u8], scheme: Scheme) -> GeneratedPalette {
     synthesize_terminal_palette_tokens(&mut light);
     GeneratedPalette { dark, light }
 }
+
+// ---- loading a wallpaper ---------------------------------------------------------------------------------------------------
+
+/// Decode `path` and force-resize it to 112x112 RGB (aspect ratio ignored): a triangle filter for the Material schemes (a
+/// port of the `image` crate's resize, which matugen uses) and a box filter for the custom ones. Both are hand-ported from
+/// C++ `image_loader.cpp` because a few LSB of drift in the buffer can move the seed to another cluster.
+pub fn load_and_resize(path: &std::path::Path, scheme: Scheme) -> Result<Vec<u8>, String> {
+    use image::ImageDecoder;
+    let bytes = std::fs::read(path).map_err(|_| "cannot open file".to_string())?;
+    if bytes.is_empty() {
+        return Err("empty image file".into());
+    }
+    let mut decoder = image::ImageReader::new(std::io::Cursor::new(&bytes))
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?
+        .into_decoder()
+        .map_err(|e| e.to_string())?;
+    let orientation = decoder.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut picture = image::DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
+    picture.apply_orientation(orientation);
+    let rgba = picture.to_rgba8();
+    let (width, height) = (rgba.width() as usize, rgba.height() as usize);
+    if width == 0 || height == 0 {
+        return Err("invalid image dimensions".into());
+    }
+    let resized = if scheme.is_material() {
+        triangle_resize(rgba.as_raw(), width, height, SIDE, SIDE)
+    } else {
+        box_resize(rgba.as_raw(), width, height, SIDE, SIDE)
+    };
+    let mut rgb = Vec::with_capacity(SIDE * SIDE * 3);
+    for pixel in resized.chunks_exact(4) {
+        rgb.extend_from_slice(&pixel[..3]);
+    }
+    Ok(rgb)
+}
+
+fn to_u8(v: f32) -> u8 {
+    (v.clamp(0.0, 255.0) + 0.5).floor() as u8
+}
+
+fn triangle_kernel(x: f32) -> f32 {
+    let x = x.abs();
+    if x < 1.0 {
+        1.0 - x
+    } else {
+        0.0
+    }
+}
+
+/// Weights for output index `out` of a triangle-filtered axis, and the first source index they apply to.
+fn triangle_weights(out: usize, src_len: usize, dst_len: usize) -> (usize, Vec<f32>) {
+    let ratio = src_len as f32 / dst_len as f32;
+    let sratio = if ratio < 1.0 { 1.0 } else { ratio };
+    let support = sratio;
+    let input_orig = (out as f32 + 0.5) * ratio;
+    let mut left = (input_orig - support).floor() as i64;
+    let mut right = (input_orig + support).ceil() as i64;
+    left = left.max(0).min(src_len as i64 - 1);
+    right = right.max(left + 1).min(src_len as i64);
+    let input = input_orig - 0.5;
+    let mut weights: Vec<f32> = (left..right)
+        .map(|i| triangle_kernel((i as f32 - input) / sratio))
+        .collect();
+    let sum: f32 = weights.iter().sum();
+    for w in &mut weights {
+        *w /= sum;
+    }
+    (left as usize, weights)
+}
+
+fn triangle_resize(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst_h: usize) -> Vec<u8> {
+    // Vertical first into f32 (no clamp or rounding between passes), then horizontal into u8.
+    let mut tmp = vec![0f32; src_w * dst_h * 4];
+    for outy in 0..dst_h {
+        let (left, weights) = triangle_weights(outy, src_h, dst_h);
+        for x in 0..src_w {
+            let mut t = [0f32; 4];
+            for (k, w) in weights.iter().enumerate() {
+                let p = ((left + k) * src_w + x) * 4;
+                for c in 0..4 {
+                    t[c] += f32::from(src[p + c]) * w;
+                }
+            }
+            let d = (outy * src_w + x) * 4;
+            tmp[d..d + 4].copy_from_slice(&t);
+        }
+    }
+    let mut dst = vec![0u8; dst_w * dst_h * 4];
+    for outx in 0..dst_w {
+        let (left, weights) = triangle_weights(outx, src_w, dst_w);
+        for y in 0..dst_h {
+            let mut t = [0f32; 4];
+            for (k, w) in weights.iter().enumerate() {
+                let p = (y * src_w + (left + k)) * 4;
+                for c in 0..4 {
+                    t[c] += tmp[p + c] * w;
+                }
+            }
+            let d = (y * dst_w + outx) * 4;
+            for c in 0..4 {
+                dst[d + c] = to_u8(t[c]);
+            }
+        }
+    }
+    dst
+}
+
+/// `(start, count, weight)` of the box window for output index `out`.
+fn box_window(out: usize, src_len: usize, dst_len: usize) -> Option<(usize, usize, f32)> {
+    const EPSILON: f64 = 1.0e-12;
+    let factor = dst_len as f64 / src_len as f64;
+    let mut scale = (1.0 / factor + EPSILON).max(1.0);
+    let mut support = scale * 0.5;
+    if support < 0.5 {
+        support = 0.5;
+        scale = 1.0;
+    }
+    let _ = scale;
+    let bisect = (out as f64 + 0.5) / factor + EPSILON;
+    let start = (bisect - support + 0.5).max(0.0) as i64;
+    let stop = (bisect + support + 0.5).min(src_len as f64) as i64;
+    let count = stop - start;
+    if count <= 0 {
+        return None;
+    }
+    Some((start as usize, count as usize, 1.0 / count as f32))
+}
+
+fn box_resize(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst_h: usize) -> Vec<u8> {
+    let mut tmp = vec![0f32; src_w * dst_h * 4];
+    for outy in 0..dst_h {
+        let Some((start, count, weight)) = box_window(outy, src_h, dst_h) else { continue };
+        for x in 0..src_w {
+            let mut t = [0f32; 4];
+            for i in start..start + count {
+                let p = (i * src_w + x) * 4;
+                for c in 0..4 {
+                    t[c] += f32::from(src[p + c]) * weight;
+                }
+            }
+            let d = (outy * src_w + x) * 4;
+            tmp[d..d + 4].copy_from_slice(&t);
+        }
+    }
+    let mut dst = vec![0u8; dst_w * dst_h * 4];
+    for outx in 0..dst_w {
+        let Some((start, count, weight)) = box_window(outx, src_w, dst_w) else { continue };
+        for y in 0..dst_h {
+            let mut t = [0f32; 4];
+            for i in start..start + count {
+                let p = (y * src_w + i) * 4;
+                for c in 0..4 {
+                    t[c] += tmp[p + c] * weight;
+                }
+            }
+            let d = (y * dst_w + outx) * 4;
+            for c in 0..4 {
+                dst[d + c] = to_u8(t[c]);
+            }
+        }
+    }
+    dst
+}
