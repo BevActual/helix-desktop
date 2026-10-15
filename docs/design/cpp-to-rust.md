@@ -25,11 +25,12 @@ Helix’s session UI is already Rust (Tauri). **`org.helix.Desktop` is Rust** (`
 ## Dev selection
 
 ```sh
+just build debug   # helix-template-apply, helix-theme-palette, helix-config-export
 cargo build --profile fast -p helix-desktop
 HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 ```
 
-**CI vs Meson:** GitHub Actions runs Rust nested smokes (`helix-desktop-config`, `helix-desktop-audio-meter`, agent integration). The **helix-desktop Configuration1** job builds `helix-desktop` plus **`helix-template-apply`** / **`helix-theme-palette`** on Arch and runs `tools/nested/helix-desktop-config-smoke.sh` with `HELIX_*_BIN` set so `templates-apply` and **`Appearance1.SetAccent`** are exercised (not skipped). **Build (debug)** still runs full `just build`, install layout, and `meson test` (including `helix_desktop_config_smoke` when `target/fast/helix-desktop` exists). Meson builds `desktop_service_test` (C++, the behavioural contract) and runs it, plus the assistant/agent integration tests, against `target/fast|debug/helix-desktop` when that binary exists.
+**CI vs Meson:** GitHub Actions runs Rust nested smokes (`helix-desktop-config`, `helix-desktop-audio-meter`, agent integration). The **helix-desktop Configuration1** job builds `helix-desktop` plus **`helix-template-apply`**, **`helix-theme-palette`**, and **`helix-config-export`** on Arch and runs `tools/nested/helix-desktop-config-smoke.sh` with `HELIX_*_BIN` set so `templates-apply`, **`config.*` template apply**, and **`Appearance1.SetAccent`** are exercised (not skipped). Local `cargo run -p helix-desktop` discovers helpers under `build-debug/` / `build-fast/` when `just build` has been run. **Build (debug)** still runs full `just build`, install layout, and `meson test` (including `helix_desktop_config_smoke` when `target/fast/helix-desktop` exists). Meson builds `desktop_service_test` (C++, the behavioural contract) and runs it, plus the assistant/agent integration tests, against `target/fast|debug/helix-desktop` when that binary exists.
 
 **Scalar catalog:** The C++ `settings_catalog.cpp` was removed; its rows live in Rust as hand-maintained `BOOTSTRAP` plus `settings_bootstrap_extra.rs`, checked against the frozen golden `core/helix-shell-core/tests/golden/settings_catalog_defaults.json`. Ordered types (key-chords, shortcuts, tabs, display lists, templates, transitions, notification rules, bar widget rows) stay in `ordered_lists.rs` / `ordered_catalog.rs`.
 

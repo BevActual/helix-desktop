@@ -66,10 +66,18 @@ jobs:
   helix-shell-core:
     name: helix-shell-core (Rust)
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: bash tools/ci/arch-helix-ci-deps.sh
+      - name: Build config export helper (parity test)
+        run: just configure debug && meson compile -C build-debug helix-config-export
       - name: Unit tests
+        env:
+          HELIX_CONFIG_EXPORT_BIN: ${{ github.workspace }}/build-debug/helix-config-export
         run: cargo test -p helix-shell-core --lib --quiet
       - name: helix-theme (C++ parity goldens)
         run: cargo test -p helix-theme --quiet

@@ -32,9 +32,8 @@ pub fn builtin_templates_root(assets: &Path) -> PathBuf {
     assets.join("templates")
 }
 
-/// C++ `helix-template-apply` (TemplateEngine) helper for Rust `helix-desktop`.
-pub fn helix_template_apply_bin() -> Option<PathBuf> {
-    if let Ok(path) = env::var("HELIX_TEMPLATE_APPLY_BIN") {
+fn find_meson_helper_bin(env_key: &str, base: &str) -> Option<PathBuf> {
+    if let Ok(path) = env::var(env_key) {
         if !path.is_empty() {
             let candidate = PathBuf::from(path);
             if candidate.is_file() {
@@ -43,72 +42,41 @@ pub fn helix_template_apply_bin() -> Option<PathBuf> {
         }
     }
     if let Ok(exe) = env::current_exe() {
-        for name in ["helix-template-apply", "helix-template-apply.exe"] {
-            let sibling = exe.parent().map(|dir| dir.join(name));
-            if sibling.as_ref().is_some_and(|p| p.is_file()) {
-                return sibling;
+        for name in [base, &format!("{base}.exe")] {
+            if let Some(parent) = exe.parent() {
+                let sibling = parent.join(name);
+                if sibling.is_file() {
+                    return Some(sibling);
+                }
             }
         }
         for ancestor in exe.ancestors() {
-            let build = ancestor.join("helix-template-apply");
-            if build.is_file() {
-                return Some(build);
+            for subdir in ["", "build-debug", "build-fast", "_build"] {
+                let candidate = if subdir.is_empty() {
+                    ancestor.join(base)
+                } else {
+                    ancestor.join(subdir).join(base)
+                };
+                if candidate.is_file() {
+                    return Some(candidate);
+                }
             }
         }
     }
     None
+}
+
+/// C++ `helix-template-apply` (TemplateEngine) helper for Rust `helix-desktop`.
+pub fn helix_template_apply_bin() -> Option<PathBuf> {
+    find_meson_helper_bin("HELIX_TEMPLATE_APPLY_BIN", "helix-template-apply")
 }
 
 /// C++ `helix-theme-palette` helper for Rust `Appearance1` palette mutations.
 pub fn helix_theme_palette_bin() -> Option<PathBuf> {
-    if let Ok(path) = env::var("HELIX_THEME_PALETTE_BIN") {
-        if !path.is_empty() {
-            let candidate = PathBuf::from(path);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
-    }
-    if let Ok(exe) = env::current_exe() {
-        for name in ["helix-theme-palette", "helix-theme-palette.exe"] {
-            let sibling = exe.parent().map(|dir| dir.join(name));
-            if sibling.as_ref().is_some_and(|p| p.is_file()) {
-                return sibling;
-            }
-        }
-        for ancestor in exe.ancestors() {
-            let build = ancestor.join("helix-theme-palette");
-            if build.is_file() {
-                return Some(build);
-            }
-        }
-    }
-    None
+    find_meson_helper_bin("HELIX_THEME_PALETTE_BIN", "helix-theme-palette")
 }
 
 /// C++ `config_export::serialize` helper for in-process template apply.
 pub fn helix_config_export_bin() -> Option<PathBuf> {
-    if let Ok(path) = env::var("HELIX_CONFIG_EXPORT_BIN") {
-        if !path.is_empty() {
-            let candidate = PathBuf::from(path);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
-    }
-    if let Ok(exe) = env::current_exe() {
-        for name in ["helix-config-export", "helix-config-export.exe"] {
-            let sibling = exe.parent().map(|dir| dir.join(name));
-            if sibling.as_ref().is_some_and(|p| p.is_file()) {
-                return sibling;
-            }
-        }
-        for ancestor in exe.ancestors() {
-            let build = ancestor.join("helix-config-export");
-            if build.is_file() {
-                return Some(build);
-            }
-        }
-    }
-    None
+    find_meson_helper_bin("HELIX_CONFIG_EXPORT_BIN", "helix-config-export")
 }
