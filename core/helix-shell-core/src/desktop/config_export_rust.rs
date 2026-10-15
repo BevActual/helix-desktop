@@ -9,12 +9,12 @@ use std::sync::OnceLock;
 
 use toml::Value as Toml;
 
-use super::config_export_defaults::write_theme_defaults;
+use super::config_export_defaults::{write_shell_defaults, write_theme_defaults};
 use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
 use super::settings::{ConfigPaths, ConfigStore};
 
 /// Milestone C: rebuilt from defaults + merged overlay before the global leaf pass.
-const PARSED_EXPORT_SECTIONS: &[&str] = &["theme"];
+const PARSED_EXPORT_SECTIONS: &[&str] = &["theme", "shell"];
 
 fn is_parsed_export_section_path(path: &str) -> bool {
     PARSED_EXPORT_SECTIONS
@@ -749,15 +749,31 @@ fn apply_merged_export_leaf_in_section(
     false
 }
 
+fn default_writer_for_parsed_section(section: &str) -> Option<fn() -> Toml> {
+    match section {
+        "theme" => Some(write_theme_defaults),
+        "shell" => Some(write_shell_defaults),
+        _ => None,
+    }
+}
+
 fn rebuild_parsed_sections_from_merged(root: &mut Toml, merged: &Toml, default: &Toml) {
-    let mut theme = write_theme_defaults();
     let mut leaves = Vec::new();
     collect_leaf_paths(merged, "", &mut leaves);
-    for path in leaves {
-        apply_merged_export_leaf_in_section(&mut theme, "theme", &path, merged, default);
-    }
-    if let Some(table) = root.as_table_mut() {
-        table.insert("theme".to_string(), theme);
+    let root_table = match root.as_table_mut() {
+        Some(table) => table,
+        None => return,
+    };
+    for section in PARSED_EXPORT_SECTIONS {
+        let writer = match default_writer_for_parsed_section(section) {
+            Some(writer) => writer,
+            None => continue,
+        };
+        let mut section_root = writer();
+        for path in &leaves {
+            apply_merged_export_leaf_in_section(&mut section_root, section, path, merged, default);
+        }
+        root_table.insert(section.to_string(), section_root);
     }
 }
 
@@ -789,12 +805,12 @@ fn patch_default_export(store: &ConfigStore) -> Toml {
     rebuild_bar_from_merged(&mut root, &merged);
     rebuild_bar_monitors_from_merged(&mut root, &merged);
     rebuild_widget_from_merged(&mut root, &merged);
-    rebuild_launcher_providers_from_merged(&mut root, &merged);
     rebuild_calendar_accounts_from_merged(&mut root, &merged);
     rebuild_desktop_widgets_from_merged(&mut root, &merged);
     rebuild_lockscreen_widgets_from_merged(&mut root, &merged);
     rebuild_idle_from_merged(&mut root, &merged);
     rebuild_parsed_sections_from_merged(&mut root, &merged, default);
+    rebuild_launcher_providers_from_merged(&mut root, &merged);
     let mut leaves = Vec::new();
     collect_leaf_paths(&merged, "", &mut leaves);
     for path in leaves {
