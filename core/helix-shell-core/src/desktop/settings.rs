@@ -2740,7 +2740,12 @@ impl ConfigStore {
 
     /// Merged `config.toml` (+ includes) and `settings.toml` as JSON for theme templates (`config.*`).
     pub fn template_config_table(&self) -> serde_json::Value {
-        toml_to_json_value(&merge_toml_values(self.base.clone(), self.overrides.clone()))
+        toml_to_json_value(&self.merged_user_toml())
+    }
+
+    /// `config.toml` (+ includes) deep-merged with `settings.toml` (pre-schema export input).
+    pub(crate) fn merged_user_toml(&self) -> Toml {
+        merge_toml_values(self.base.clone(), self.overrides.clone())
     }
 
     pub fn get(&self, id: &str) -> Value {
@@ -3327,7 +3332,7 @@ pub fn storage_path(id: &str) -> Cow<'_, str> {
     Cow::Borrowed(id)
 }
 
-fn merge_toml_values(base: Toml, overrides: Toml) -> Toml {
+pub(crate) fn merge_toml_values(base: Toml, overrides: Toml) -> Toml {
     match (base, overrides) {
         (Toml::Table(mut left), Toml::Table(right)) => {
             deep_merge(&mut left, right);
@@ -3518,7 +3523,7 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
     }
 }
 
-fn json_to_toml(value: &Value) -> Toml {
+pub(crate) fn json_to_toml(value: &Value) -> Toml {
     match value {
         Value::Bool(flag) => Toml::Boolean(*flag),
         Value::Number(number) => {

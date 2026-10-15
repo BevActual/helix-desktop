@@ -7,6 +7,7 @@ use std::process::Command;
 use serde_json::Value;
 use toml::Value as Toml;
 
+use super::config_export_rust;
 use super::settings::{toml_to_json_value, ConfigPaths, ConfigStore};
 
 pub fn configure_export_env(command: &mut Command, paths: &ConfigPaths) {
@@ -58,8 +59,8 @@ pub fn discover_config_export_bin() -> Option<PathBuf> {
 }
 
 /// In-process Rust exporter (parity target: `tests/golden/config_export_minimal.toml`).
-pub fn rust_export_toml(_paths: &ConfigPaths) -> Option<Toml> {
-    None
+pub fn rust_export_toml(paths: &ConfigPaths) -> Option<Toml> {
+    config_export_rust::rust_export_toml(paths)
 }
 
 /// Run `helix-config-export` and parse stdout as TOML.

@@ -8,6 +8,7 @@ pub mod palette_names;
 pub mod dynamic_desktop_catalog;
 pub mod compositor_config;
 pub mod config_export;
+mod config_export_rust;
 pub mod compositor_ipc;
 pub mod control_center_shortcuts;
 pub mod dock_prefs;

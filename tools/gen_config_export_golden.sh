@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Capture helix-config-export output for Rust parity work (config_export::serialize).
+# Capture helix-config-export default effective export for Rust parity (schema defaults + minimal fixture).
+# Regenerate when C++ config_export::serialize defaults change.
 # Usage: tools/gen_config_export_golden.sh [output.toml]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
