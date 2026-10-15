@@ -573,10 +573,24 @@ if build_tests
     'webp_decoder',
   ]
 
+  _cpp_tests_needing_theme = [
+    'cli_schema',
+    'kde_color_scheme',
+    'scheme',
+    'template_apply_notify',
+    'template_hook_async',
+    'template_hook_runner',
+    'theme_shell_mode',
+  ]
+
   foreach test_name : _cpp_test_names
+    _test_dep = helix_core_dep
+    if test_name not in _cpp_tests_needing_theme
+      _test_dep = helix_core_base_dep
+    endif
     test_exe = executable(test_name + '_test',
       sources: files('tests' / (test_name + '_test.cpp')),
-      dependencies: helix_core_dep,
+      dependencies: _test_dep,
       override_options: ['b_ndebug=false'],
     )
     test_args = []
