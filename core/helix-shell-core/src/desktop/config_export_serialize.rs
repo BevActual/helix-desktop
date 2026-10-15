@@ -3,7 +3,8 @@
 //! Milestone A (today): golden-default patch in `config_export_rust.rs`, then
 //! [`finalize_serialized_export`] to match C++ ordering and omission rules.
 //! Milestone B: `writeTable` per `config_sections.cpp` without an embedded golden.
-//! Milestone C: `parseConfigTable` on merged user config before serialize.
+//! Milestone C (in progress): parse merged user config into a typed `Config`, then `writeTable` per
+//! `config_sections.cpp` — replacing leaf-patch on [`assemble_default_export`] in `config_export_rust.rs`.
 
 use toml::Value as Toml;
 

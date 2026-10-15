@@ -38,7 +38,7 @@ HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 score, the five Material schemes through the vendored `third_party/material-colors`, the five custom HSL schemes), checked against
 60 palettes and 8 resized buffers from the C++ generator and 4 end-to-end template-apply scenarios. The service uses it for template
 apply and the save-palette / set-role / set-accent paths. Still on the C++ helpers when in-process apply declines: unreadable
-wallpaper images, missing community palette when fetch is blocked (offline / no URL base), or `helix-config-export` / merged-config gaps for `config.*`.
+wallpaper images, missing community palette when fetch is blocked (offline / no URL base), or merged-config export gaps for `config.*`.
 
 **Desktop-only catalog:** After `RegisterDesktop`, `GetSettings` also includes live `bar:<name>:<field>` scalars and `idle:<behavior>:<field>` rows from `config.toml` (`dynamic_desktop_catalog.rs`), matching C++ `settingsCatalog(helixDesktop=true)`. Override paths use `storage_path()` (`bar:*` → `bar.<name>.<field>`, `idle:*` → `idle.behavior.<name>.<field>`). `tools/nested/helix-desktop-config-smoke.sh` seeds a minimal bar + idle config and checks post-desktop rows plus `idle:*` `Update`.
 
@@ -63,7 +63,7 @@ wallpaper images, missing community palette when fetch is blocked (offline / no 
 
 ## Next (C++ tail)
 
-1. **Theme helpers** — `export_effective_toml` is in-process (`config_export_rust.rs`: merge/includes, migrations, `assemble_default_export`, rebuild/patch/finalize including launcher providers, optional schema leaves, keybind chord normalization, `f32` floats; 44 frozen fixtures + shipped **`example.toml`** byte parity vs `helix-config-export` when the binary is built; `tools/verify_config_export_golden.sh` in CI). `helix-desktop` never falls back to discovered C++ export at runtime. **Remaining gate:** `parseConfigTable` → serialize without leaf-patch on defaults, then drop the `helix-config-export` Meson target; then `helix-template-apply` / `helix-theme-palette` when smokes stay green without them.
+1. **Theme helpers** — `export_effective_toml` is in-process (`config_export_rust.rs`: merge/includes, migrations, `assemble_default_export`, rebuild/patch/finalize; `helix-rust-config-export` CLI; 44 frozen fixtures + **`example.toml`** parity vs legacy C++ export when that binary is built locally; `tools/verify_config_export_golden.sh` builds the Rust CLI in CI). **Remaining gate:** `parseConfigTable` → serialize without leaf-patch on defaults; then drop `helix-template-apply` / `helix-theme-palette` when smokes stay green without them.
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
 3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.

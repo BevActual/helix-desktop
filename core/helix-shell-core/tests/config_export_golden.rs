@@ -17,7 +17,8 @@ fn unique_temp_dir(label: &str) -> PathBuf {
 }
 
 use helix_shell_core::desktop::config_export::{
-    configure_export_env, discover_config_export_bin, export_effective_toml, rust_export_toml,
+    configure_export_env, discover_config_export_bin, discover_rust_config_export_bin,
+    export_effective_toml, rust_export_toml,
 };
 use helix_shell_core::desktop::settings::ConfigPaths;
 use helix_shell_core::ConfigStore;
@@ -52,6 +53,35 @@ fn rust_export_matches_golden_without_cpp_helper() {
     .expect("golden");
     let expected: toml::Value = golden.parse().expect("golden parse");
     assert_eq!(exported, expected);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn rust_export_cli_matches_in_process_for_minimal_fixture() {
+    let Some(bin) = discover_rust_config_export_bin() else {
+        eprintln!("skip rust_export_cli_matches_in_process_for_minimal_fixture: build helix-rust-config-export");
+        return;
+    };
+    let root = unique_temp_dir("rust-cli");
+    let _ = fs::remove_dir_all(&root);
+    let paths = minimal_fixture(&root);
+    let in_process = rust_export_toml(&paths).expect("rust export");
+
+    std::env::set_var("XDG_CONFIG_HOME", root.join("cfg"));
+    std::env::set_var("XDG_STATE_HOME", root.join("state"));
+    let mut command = Command::new(&bin);
+    configure_export_env(&mut command, &paths);
+    let output = command.output().expect("export cli");
+    assert!(
+        output.status.success(),
+        "cli export failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let cli: Toml = String::from_utf8(output.stdout)
+        .expect("utf8")
+        .parse()
+        .expect("cli parse");
+    assert_eq!(cli, in_process);
     let _ = fs::remove_dir_all(root);
 }
 

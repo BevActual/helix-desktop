@@ -1,6 +1,7 @@
-//! Effective config for theme templates (`config.*`). Rust export is default; `helix-config-export` is
-//! opt-in via [`export_effective_toml`]’s `export_bin` (or `HELIX_CONFIG_EXPORT_BIN` for tests/tools).
-//! Pure-Rust `config_export::serialize` is tracked in `docs/design/config-export-rust.md`.
+//! Effective config for theme templates (`config.*`). Rust export is default ([`rust_export_toml`],
+//! `helix-rust-config-export` CLI). Legacy C++ export is opt-in via [`export_effective_toml`]’s
+//! `export_bin` / [`discover_config_export_bin`] for local parity tests. Milestone C
+//! (`parseConfigTable` → serialize) is tracked in `docs/design/config-export-rust.md`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -24,7 +25,39 @@ pub fn configure_export_env(command: &mut Command, paths: &ConfigPaths) {
     }
 }
 
-/// Locate `helix-config-export` (`HELIX_CONFIG_EXPORT_BIN`, sibling of current exe, or Meson `build-*` dirs).
+/// Locate `helix-rust-config-export` (Cargo `target/*` or sibling of the current test binary).
+pub fn discover_rust_config_export_bin() -> Option<PathBuf> {
+    if let Ok(path) = std::env::var("HELIX_RUST_CONFIG_EXPORT_BIN") {
+        if !path.is_empty() {
+            let candidate = PathBuf::from(path);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    if let Some(root) = manifest.parent().and_then(|p| p.parent()) {
+        for subdir in ["target/debug", "target/fast", "build-debug"] {
+            let candidate = root.join(subdir).join("helix-rust-config-export");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        for name in ["helix-rust-config-export", "helix-rust-config-export.exe"] {
+            if let Some(parent) = exe.parent() {
+                let sibling = parent.join(name);
+                if sibling.is_file() {
+                    return Some(sibling);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Locate legacy C++ `helix-config-export` (`HELIX_CONFIG_EXPORT_BIN`, build dirs).
 pub fn discover_config_export_bin() -> Option<PathBuf> {
     if let Ok(path) = std::env::var("HELIX_CONFIG_EXPORT_BIN") {
         if !path.is_empty() {
