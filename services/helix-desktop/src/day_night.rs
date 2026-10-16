@@ -4,21 +4,6 @@
 use helix_config::settings::ConfigStore;
 use helix_theme::schedule::{evaluate, LocalTime, LocationConfig};
 
-fn local_time() -> LocalTime {
-    // SAFETY: `time` and `localtime_r` are called with valid pointers; `tm` is plain data.
-    unsafe {
-        let now = libc::time(std::ptr::null_mut());
-        let mut tm: libc::tm = std::mem::zeroed();
-        libc::localtime_r(&now, &mut tm);
-        LocalTime {
-            minute_of_day: tm.tm_hour * 60 + tm.tm_min,
-            second: tm.tm_sec,
-            day_of_year: tm.tm_yday + 1,
-            gmt_offset_secs: tm.tm_gmtoff,
-        }
-    }
-}
-
 fn location(config: &ConfigStore) -> LocationConfig {
     LocationConfig {
         custom_schedule: config
@@ -42,7 +27,7 @@ fn location(config: &ConfigStore) -> LocationConfig {
 
 /// Whether it is currently night per the configured schedule.
 pub fn is_night(config: &ConfigStore) -> bool {
-    evaluate(&location(config), local_time()).night
+    evaluate(&location(config), LocalTime::now()).night
 }
 
 /// `[theme].shell_mode` when not `follow` pins the shell palette; app-facing `theme.mode` is unchanged.

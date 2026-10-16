@@ -11,6 +11,8 @@ mod manager;
 pub use activity::{ActivityClient, ACTIVITY_METHODS, ACTIVITY_SIGNALS};
 pub use agent::{details_from_owned, ConfirmerClient, CONFIRMER_METHODS, CONFIRMER_SIGNALS};
 pub use contract::{parse_interfaces, protocol_xml, Interface, BUS_NAME, OBJECT_PATH};
+/// The wall clock the theme schedule is evaluated against.
+pub use helix_theme::schedule::LocalTime;
 pub use json::{args_from_json, owned_to_json, to_json};
 pub use manager::{ManagerClient, MANAGER_METHODS};
 
@@ -86,13 +88,26 @@ fn entry_of<'a>(entries: &'a [OwnedValue], id: &str) -> Option<Dict<'a, 'a>> {
     })
 }
 
-/// Whether applications should draw dark now: `theme.mode` (`dark`, `light`, or `auto`, which follows the day and night schedule
-/// the way the desktop service resolves it). Dark when the setting is missing or odd.
+/// Dark or light for a mode (`dark`, `light`, `auto`); `auto` follows the day and night schedule the way the desktop service
+/// resolves it. Dark when the mode is missing or odd.
+fn dark_for(
+    mode: Option<&str>,
+    location: impl FnOnce() -> helix_theme::schedule::LocationConfig,
+    now: helix_theme::schedule::LocalTime,
+) -> bool {
+    match mode {
+        Some("light") => false,
+        Some("auto") => helix_theme::schedule::evaluate(&location(), now).night,
+        _ => true,
+    }
+}
+
+/// Whether applications should draw dark now, from a GetSettings catalog (`theme.mode` and the `location.*` rows).
 pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTime) -> bool {
     let mode = entry_of(entries, "theme.mode").and_then(|dict| dict_string(&dict, "value"));
-    match mode.as_deref() {
-        Some("light") => false,
-        Some("auto") => {
+    dark_for(
+        mode.as_deref(),
+        || {
             let text = |id: &str| {
                 entry_of(entries, id)
                     .and_then(|dict| dict_string(&dict, "value"))
@@ -100,7 +115,7 @@ pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTi
             };
             let number =
                 |id: &str| entry_of(entries, id).and_then(|dict| dict_number(&dict, "value"));
-            let location = helix_theme::schedule::LocationConfig {
+            helix_theme::schedule::LocationConfig {
                 custom_schedule: entry_of(entries, "location.custom_schedule")
                     .and_then(|dict| dict_bool(&dict, "value"))
                     .unwrap_or(false),
@@ -108,26 +123,46 @@ pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTi
                 sunrise: text("location.sunrise"),
                 latitude: number("location.latitude"),
                 longitude: number("location.longitude"),
-            };
-            helix_theme::schedule::evaluate(&location, now).night
-        }
-        _ => true,
-    }
+            }
+        },
+        now,
+    )
 }
 
-fn local_time() -> helix_theme::schedule::LocalTime {
-    // SAFETY: `time` and `localtime_r` are called with valid pointers; `tm` is plain data.
-    unsafe {
-        let now = libc::time(std::ptr::null_mut());
-        let mut tm: libc::tm = std::mem::zeroed();
-        libc::localtime_r(&now, &mut tm);
-        helix_theme::schedule::LocalTime {
-            minute_of_day: tm.tm_hour * 60 + tm.tm_min,
-            second: tm.tm_sec,
-            day_of_year: tm.tm_yday + 1,
-            gmt_offset_secs: tm.tm_gmtoff,
-        }
-    }
+/// The same answer from the settings list as JSON (what [`Desktop::settings`] returns).
+pub fn theme_is_dark_json(
+    settings: &serde_json::Value,
+    now: helix_theme::schedule::LocalTime,
+) -> bool {
+    let entry = |id: &str| {
+        settings
+            .as_array()
+            .and_then(|entries| {
+                entries
+                    .iter()
+                    .find(|e| e.get("id").and_then(|v| v.as_str()) == Some(id))
+            })
+            .and_then(|e| e.get("value"))
+    };
+    dark_for(
+        entry("theme.mode").and_then(|v| v.as_str()),
+        || helix_theme::schedule::LocationConfig {
+            custom_schedule: entry("location.custom_schedule")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            sunset: entry("location.sunset")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            sunrise: entry("location.sunrise")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            latitude: entry("location.latitude").and_then(|v| v.as_f64()),
+            longitude: entry("location.longitude").and_then(|v| v.as_f64()),
+        },
+        now,
+    )
 }
 
 pub fn sound_volume_label(volume: Option<f64>) -> String {
@@ -553,7 +588,7 @@ impl Desktop {
     {
         let proxy = ConfigurationProxy::new(&self.connection).await?;
         let mut entries = proxy.get_settings().await?;
-        let mut last = theme_is_dark(&entries, local_time());
+        let mut last = theme_is_dark(&entries, helix_theme::schedule::LocalTime::now());
         on_dark(last);
         let mut changes = proxy.receive_changed().await?;
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
@@ -568,7 +603,7 @@ impl Desktop {
                 }
                 _ = tick.tick() => {}
             }
-            let dark = theme_is_dark(&entries, local_time());
+            let dark = theme_is_dark(&entries, helix_theme::schedule::LocalTime::now());
             if dark != last {
                 last = dark;
                 on_dark(dark);
@@ -600,7 +635,10 @@ impl Desktop {
 mod tests {
     use zbus::zvariant::{Dict, OwnedValue, Signature, Value};
 
-    use super::{sound_volume, sound_volume_label, theme_is_dark, ui_scale, BUS_NAME, OBJECT_PATH};
+    use super::{
+        sound_volume, sound_volume_label, theme_is_dark, theme_is_dark_json, ui_scale, BUS_NAME,
+        OBJECT_PATH,
+    };
 
     fn setting(id: &str, value: impl Into<Value<'static>>) -> OwnedValue {
         let mut dict = Dict::new(
@@ -665,6 +703,28 @@ mod tests {
         assert!(!theme_is_dark(&auto, at(12 * 60)), "light by day");
         assert!(theme_is_dark(&auto, at(21 * 60)), "dark by night");
         assert!(theme_is_dark(&auto, at(3 * 60)), "dark before sunrise");
+        let json = serde_json::json!([
+            {"id": "theme.mode", "value": "auto"},
+            {"id": "location.custom_schedule", "value": true},
+            {"id": "location.sunset", "value": "19:00"},
+            {"id": "location.sunrise", "value": "07:00"},
+        ]);
+        assert!(
+            !theme_is_dark_json(&json, at(12 * 60)),
+            "the JSON form agrees: light by day"
+        );
+        assert!(
+            theme_is_dark_json(&json, at(21 * 60)),
+            "the JSON form agrees: dark by night"
+        );
+        assert!(!theme_is_dark_json(
+            &serde_json::json!([{"id": "theme.mode", "value": "light"}]),
+            at(23 * 60)
+        ));
+        assert!(
+            theme_is_dark_json(&serde_json::Value::Null, at(12 * 60)),
+            "no settings means dark"
+        );
     }
 
     #[test]

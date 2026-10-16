@@ -16,6 +16,8 @@ pub struct Quick {
     /// One of `dark`, `light`, `auto`.
     theme: Option<String>,
     night_light: Option<bool>,
+    /// What the theme draws as right now (`auto` resolved by the day and night schedule). Set by the host, which knows the time.
+    resolved_dark: Option<bool>,
 }
 
 /// One Configuration1.Update call: the setting id and its new value.
@@ -38,6 +40,9 @@ pub struct QuickView {
     /// "Dark", "Light" or "Automatic".
     pub dark_label: Option<&'static str>,
     pub night_light: Option<bool>,
+    /// Whether the desktop draws dark right now. Differs from `dark` under Automatic, where the tile is off but the theme follows
+    /// the time of day. `None` when there is no theme setting.
+    pub resolved_dark: Option<bool>,
 }
 
 fn find<'a>(entries: &'a [Value], id: &str) -> Option<&'a Value> {
@@ -60,12 +65,21 @@ impl Quick {
         let night_light = find(entries, NIGHT_LIGHT)
             .filter(|entry| entry.get("type").and_then(Value::as_str) == Some("boolean"))
             .and_then(|entry| entry.get("value").and_then(Value::as_bool));
-        Self { theme, night_light }
+        Self {
+            theme,
+            night_light,
+            resolved_dark: None,
+        }
     }
 
     /// `dark`, `light`, or `auto`. `None` when the service does not offer the setting.
     pub fn mode(&self) -> Option<&str> {
         self.theme.as_deref()
+    }
+
+    /// Records what `auto` resolves to at the current time (the model does not read the clock).
+    pub fn set_resolved_dark(&mut self, dark: bool) {
+        self.resolved_dark = Some(dark);
     }
 
     pub fn view(&self) -> QuickView {
@@ -77,6 +91,11 @@ impl Quick {
                 _ => "Automatic",
             }),
             night_light: self.night_light,
+            resolved_dark: self.theme.as_deref().map(|mode| match mode {
+                "dark" => true,
+                "light" => false,
+                _ => self.resolved_dark.unwrap_or(true),
+            }),
         }
     }
 
@@ -169,6 +188,34 @@ mod tests {
     }
 
     #[test]
+    fn automatic_draws_what_the_host_resolved_and_the_tile_stays_off() {
+        let mut quick = Quick::from_settings(&settings("auto", false));
+        assert_eq!(
+            quick.view().resolved_dark,
+            Some(true),
+            "until the host says, dark"
+        );
+        quick.set_resolved_dark(false);
+        let view = quick.view();
+        assert_eq!((view.dark, view.resolved_dark), (Some(false), Some(false)));
+        quick.set_resolved_dark(true);
+        assert_eq!(quick.view().resolved_dark, Some(true));
+        let mut fixed = Quick::from_settings(&settings("light", false));
+        fixed.set_resolved_dark(true);
+        assert_eq!(
+            fixed.view().resolved_dark,
+            Some(false),
+            "a fixed mode ignores the clock"
+        );
+        assert_eq!(
+            Quick::from_settings(&settings("dark", false))
+                .view()
+                .resolved_dark,
+            Some(true)
+        );
+    }
+
+    #[test]
     fn a_missing_or_odd_setting_is_no_tile_and_no_update() {
         for data in [
             json!([]),
@@ -183,6 +230,7 @@ mod tests {
                 QuickView {
                     dark: None,
                     dark_label: None,
+                    resolved_dark: None,
                     night_light: None
                 },
                 "{data}"

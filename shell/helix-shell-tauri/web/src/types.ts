@@ -35,6 +35,8 @@ export interface BatteryView {
 export interface QuickView {
   dark: boolean | null;
   dark_label: string | null;
+  /** Whether the desktop draws dark right now (Automatic follows the time of day). */
+  resolved_dark: boolean | null;
   night_light: boolean | null;
 }
 
