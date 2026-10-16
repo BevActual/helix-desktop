@@ -41,6 +41,10 @@ const specs: Record<string, PageSpec> = {
     load: () => invoke<RowView[]>("dock_rows"),
     change: (id, change) => invoke<RowView[]>("dock_change", { id, change }),
   },
+  notifications: {
+    load: () => invoke<RowView[]>("notifications_rows"),
+    change: (id, change) => invoke<RowView[]>("notifications_change", { id, change }),
+  },
   power: {
     load: () => invoke<RowView[]>("power_rows"),
     change: (id, change) => invoke<RowView[]>("power_change", { id, change }),

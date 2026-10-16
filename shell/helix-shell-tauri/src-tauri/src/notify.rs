@@ -169,6 +169,7 @@ fn rearm(app: &AppHandle) {
 
 /// Claims the well-known name if nobody has it; never takes it from another notification daemon.
 pub fn serve(app: AppHandle) {
+    watch_prefs(app.clone());
     tauri::async_runtime::spawn(async move {
         let built = zbus::connection::Builder::session()
             .map(|builder| {
@@ -189,6 +190,50 @@ pub fn serve(app: AppHandle) {
                 publish(&app);
             }
             Err(error) => eprintln!("NOTIFICATIONS could not serve {NAME}: {error}"),
+        }
+    });
+}
+
+/// `~/.config/helix/notification-settings.json`, written by Settings.
+fn prefs_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+    Some(base.join("helix/notification-settings.json"))
+}
+
+fn read_prefs() -> helix_config::notification_prefs::NotificationPrefs {
+    prefs_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| helix_config::notification_prefs::NotificationPrefs::parse(&text))
+        .unwrap_or_default()
+}
+
+/// Applies the banner time and count from Settings now and whenever the file changes (a stat once a second, nothing more).
+fn watch_prefs(app: AppHandle) {
+    let apply = |app: &AppHandle| {
+        let prefs = read_prefs();
+        shell_state(app)
+            .lock()
+            .expect("shell state")
+            .notifications
+            .set_toast_prefs(u64::from(prefs.toast_seconds) * 1000, prefs.max_toasts as usize);
+        eprintln!("NOTIFICATIONS settings seconds={} toasts={}", prefs.toast_seconds, prefs.max_toasts);
+    };
+    apply(&app);
+    tauri::async_runtime::spawn(async move {
+        let stamp = || prefs_path().and_then(|p| std::fs::metadata(p).ok()).and_then(|m| m.modified().ok());
+        let mut seen = stamp();
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let now = stamp();
+            if now == seen {
+                continue;
+            }
+            seen = now;
+            apply(&app);
+            changed(&app, Vec::new()).await;
         }
     });
 }

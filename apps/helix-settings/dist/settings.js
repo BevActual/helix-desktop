@@ -28,6 +28,7 @@ const PAGES = [
   { name: "sound", title: "Sound", icon: "volume", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
   { name: "dock", title: "Dock", icon: "grid", rows: false },
+  { name: "notifications", title: "Notifications", icon: "bell", rows: false },
   { name: "power", title: "Power & lock", icon: "lock", rows: false },
   { name: "agents", title: "Privacy & agents", icon: "shield", rows: false },
   { name: "about", title: "About", icon: "sparkle", rows: false },
@@ -45,7 +46,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "power" || page.name === "displays") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -107,6 +108,7 @@ function showPage(name) {
     if (name === "keyboard") drawKeyboard();
     if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
     if (name === "dock") invoke("dock_rows").then(drawDock);
+    if (name === "notifications") invoke("notifications_rows").then(drawNotifications);
     if (name === "power") invoke("power_rows").then(drawPower);
     if (name === "displays") invoke("displays_rows").then(drawDisplays);
   }
@@ -348,7 +350,7 @@ function rowLine(page, row) {
   if (row.description) text.append(el("div", "setting-about", row.description));
   line.append(text);
   const control = row.control;
-  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -434,6 +436,15 @@ function drawDock(rows) {
   if (searching()) drawSearch();
   queueReport();
 }
+function drawNotifications(rows) {
+  if (reactPages.notifications) { reactPages.notifications.setRows(rows); return; }
+  pageRows.notifications = rows;
+  const host = $("notifications-host");
+  host.replaceChildren();
+  drawGroups(host, "notifications", rows);
+  if (searching()) drawSearch();
+  queueReport();
+}
 function drawPower(rows) {
   if (reactPages.power) { reactPages.power.setRows(rows); return; }
   pageRows.power = rows;
@@ -466,6 +477,7 @@ function drawRows(view) {
   queueReport();
 }
 invoke("dock_rows").then((rows) => { pageRows.dock = rows; });
+invoke("notifications_rows").then((rows) => { pageRows.notifications = rows; });
 invoke("power_rows").then((rows) => { pageRows.power = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 

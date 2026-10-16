@@ -37,12 +37,12 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 ## 2. Settings (missing pages and ghost settings)
 
 Settings has pages for Appearance, Accessibility, Displays, Network, Bluetooth, Keyboard, Wallpaper, Dock,
-Power & lock, Privacy & agents and About. The gaps below come from `settings-audit.md` and `settings-tauri.md`.
+Notifications, Power & lock, Privacy & agents and About. The gaps below come from `settings-audit.md` and `settings-tauri.md`.
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
 | Sound page: live input level meter | S | A `watch_input_level` call in `helix-desktop-api` for the `InputLevel` signal; `Audio1.StartInputMeter` is already there | The page ships without the meter (device choice, volume and mute are done) |
-| **Notifications page**: do-not-disturb schedule, per-app rules, toast count and duration | M | A consumer in `helix_shell_model::notifications`; the Tauri notification server reads none of the old rows | `settings-audit.md` |
+| **Notifications page, next**: do-not-disturb schedule and per-app rules (banner time and count are done) | M | A consumer in `helix_shell_model::notifications` for each | `settings-audit.md` |
 | **Night light**: temperature and schedule | L | A gamma-control client (`wlr-gamma-control` is in `protocols/`); the service only guards the setting today | `settings-audit.md`; `configuration.rs` has guards, no gamma client |
 | **Text size / UI scale** | M | A scale applied by the shell and Settings | `accessibility.ui_scale` has no live consumer except the greeter (it now reads it through the sync helper) |
 | Candidates, not yet confirmed as needed: date/time and region, default applications, pointer and touchpad | M each | Product decision | Common desktop expectations; no doc asks for them yet |

@@ -10,6 +10,7 @@ pub mod dynamic_desktop_catalog;
 pub mod idle_prefs;
 pub mod inference_routing;
 pub mod keybinds;
+pub mod notification_prefs;
 pub mod notification_rules;
 pub mod ordered_catalog;
 pub mod ordered_lists;
