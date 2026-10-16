@@ -44,7 +44,7 @@ Notifications, Power & lock, Privacy & agents and About. The gaps below come fro
 | Sound page: live input level meter | S | A `watch_input_level` call in `helix-desktop-api` for the `InputLevel` signal; `Audio1.StartInputMeter` is already there | The page ships without the meter (device choice, volume and mute are done) |
 | **Notifications page, next**: do-not-disturb schedule and per-app rules (banner time and count are done) | M | A consumer in `helix_shell_model::notifications` for each | `settings-audit.md` |
 | **Night light**: temperature and schedule | L | A gamma-control client (`wlr-gamma-control` is in `protocols/`); the service only guards the setting today | `settings-audit.md`; `configuration.rs` has guards, no gamma client |
-| **Text size / UI scale** | M | A scale applied by the shell and Settings | `accessibility.ui_scale` has no live consumer except the greeter (it now reads it through the sync helper) |
+| **Interface scale in the shell's own chrome** (bar, dock, panels follow the scale) | M | The bar and dock set layer-surface sizes and exclusive zones, so they need to follow the scale rather than be zoomed | Applications follow `accessibility.ui_scale` already; the shell does not |
 | Candidates, not yet confirmed as needed: date/time and region, default applications, pointer and touchpad | M each | Product decision | Common desktop expectations; no doc asks for them yet |
 
 Rule for any new row (from `settings-audit.md`): nothing ships in Settings unless something running in the session

@@ -2527,8 +2527,8 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         group: "Presentation",
         kind: SettingKind::Number,
         desktop: true,
-        minimum: 0.5,
-        maximum: 3.0,
+        minimum: 0.8,
+        maximum: 1.5,
         default: DefaultValue::Number(1.0),
     },
     SettingDef {

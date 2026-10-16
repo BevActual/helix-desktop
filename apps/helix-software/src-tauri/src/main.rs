@@ -1206,6 +1206,34 @@ fn report_layout(report: serde_json::Value) {
     }
 }
 
+/// Applies the person's interface scale (Settings > Accessibility) to this application's windows now and whenever it changes.
+fn follow_ui_scale(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let Ok(desktop) = helix_desktop_api::Desktop::session().await else {
+            return;
+        };
+        let _ = desktop
+            .watch_ui_scale(move |scale| {
+                eprintln!("UI scale {scale}");
+                let app = app.clone();
+                // The window may not exist yet at startup: try for a few seconds.
+                std::thread::spawn(move || {
+                    for _ in 0..40 {
+                        let windows = app.webview_windows();
+                        if !windows.is_empty() {
+                            for window in windows.values() {
+                                let _ = window.set_zoom(scale);
+                            }
+                            return;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(250));
+                    }
+                });
+            })
+            .await;
+    });
+}
+
 fn main() {
     gtk::glib::set_prgname(Some("org.helix.Software"));
     if std::env::var_os("JSC_useJIT").is_none() {
@@ -1230,6 +1258,7 @@ fn main() {
             report_layout
         ])
         .setup(move |app| {
+            follow_ui_scale(app.handle().clone());
             let mut state = State {
                 store: Store::default(),
                 jobs: Jobs::default(),
