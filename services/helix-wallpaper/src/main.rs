@@ -7,7 +7,7 @@ use std::fs::File;
 use std::os::fd::{AsFd, AsRawFd};
 use std::path::PathBuf;
 
-use helix_wallpaper::{
+use helix_wallpaper_model::{
     buffer_size, choice_path, cover_crop, load_config, settings_path, Config, Source, FALLBACK,
 };
 use memmap2::MmapMut;

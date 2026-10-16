@@ -16,7 +16,7 @@ helix-base = { workspace = true }
 helix-compositor = { workspace = true }
 helix-config = { workspace = true }
 helix-models = { workspace = true }
-helix-wallpaper = { workspace = true }
+helix-wallpaper-model = { workspace = true }
 image = { workspace = true, features = ["jpeg", "png", "webp"] }
 base64 = { workspace = true }
 gtk = { workspace = true }

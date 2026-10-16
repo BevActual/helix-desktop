@@ -18,6 +18,7 @@ everything that linked it. It is now ten focused crates and the old crate is gon
 | `helix-chat` | Mobius: chat, personas, lab, model catalog, markdown | ~2.7k | Mobius, shell |
 | `helix-software-model` | Helix Software catalog, search, jobs | ~0.6k | Software |
 | `helix-monitor-model` | Helix System Monitor `/proc` models | ~0.4k | System Monitor |
+| `helix-wallpaper-model` | Wallpaper choice file, configuration, cover-crop geometry, picker | ~0.5k | Wallpaper service, Settings |
 
 Dependency order, with no back-edges: `helix-base` ← every other crate; `helix-compositor` ← `helix-shell-model`;
 `helix-config` ← `helix-config-export`, `helix-chat`.

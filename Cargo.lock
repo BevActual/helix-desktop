@@ -2663,7 +2663,7 @@ dependencies = [
  "helix-config",
  "helix-desktop-api",
  "helix-models",
- "helix-wallpaper",
+ "helix-wallpaper-model",
  "image",
  "serde",
  "serde_json",
@@ -2732,6 +2732,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "gtk",
+ "helix-desktop-api",
  "helix-software-model",
  "serde",
  "serde_json",
@@ -2753,6 +2754,7 @@ name = "helix-system-monitor"
 version = "0.1.0"
 dependencies = [
  "gtk",
+ "helix-desktop-api",
  "helix-monitor-model",
  "serde",
  "serde_json",
@@ -2784,14 +2786,21 @@ dependencies = [
 name = "helix-wallpaper"
 version = "0.1.0"
 dependencies = [
+ "helix-wallpaper-model",
  "image",
  "libc",
  "memmap2",
- "serde",
- "toml 0.8.2",
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
+]
+
+[[package]]
+name = "helix-wallpaper-model"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml 0.8.2",
 ]
 
 [[package]]
