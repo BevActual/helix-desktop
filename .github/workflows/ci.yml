@@ -138,3 +138,20 @@ jobs:
             libpipewire-0.3-dev libspa-0.2-dev
       - name: Input meter integration (Rust desktop)
         run: ./tools/nested/helix-desktop-audio-meter-integration.sh
+
+  compositor:
+    name: compositor (niri fork)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    # Informational until its first runs confirm the package list below; it is not a required check.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: bash tools/ci/arch-helix-ci-deps.sh libinput seatd libdisplay-info mesa
+      - name: Clippy (warnings are errors)
+        run: cargo clippy -p niri -p niri-config -p niri-ipc --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test -p niri -p niri-config -p niri-ipc

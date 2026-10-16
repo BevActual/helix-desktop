@@ -394,11 +394,11 @@ impl TransformedRegion {
         }
 
         let mut groups: Vec<(usize, Vec<Rectangle<i32, Logical>>)> = Vec::new();
-        for i in 0..n {
+        for (i, rect) in rects.iter().enumerate().take(n) {
             let root = find(&mut parent, i);
             match groups.iter_mut().find(|(r, _)| *r == root) {
-                Some((_, v)) => v.push(rects[i]),
-                None => groups.push((root, vec![rects[i]])),
+                Some((_, v)) => v.push(*rect),
+                None => groups.push((root, vec![*rect])),
             }
         }
 

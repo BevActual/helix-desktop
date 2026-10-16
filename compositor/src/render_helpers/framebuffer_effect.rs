@@ -64,6 +64,7 @@ impl FramebufferEffect {
         self.commit.increment();
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &self,
         ns: Option<usize>,

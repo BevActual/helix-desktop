@@ -17,8 +17,8 @@ if [ -d node_modules ]; then
   npm run lint --silent
 fi
 step "cargo clippy (warnings are errors)"
-# The compositor crates (niri fork) carry upstream and Helix clippy findings of their own; they are built and tested, not gated on -D warnings.
-cargo clippy --release --workspace --exclude niri --exclude niri-config --exclude niri-ipc --exclude niri-visual-tests --all-targets -- -D warnings
+# niri-visual-tests is left out only because it needs GTK 4 and libadwaita installed.
+cargo clippy --release --workspace --exclude niri-visual-tests --all-targets -- -D warnings
 step "cargo test"
 cargo test --release --workspace --exclude niri-visual-tests
 if [ $integration = 1 ]; then

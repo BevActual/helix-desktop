@@ -266,6 +266,7 @@ impl BackgroundEffect {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_params_for_tile(
     geometry: Rectangle<f64, Logical>,
     scale: f64,

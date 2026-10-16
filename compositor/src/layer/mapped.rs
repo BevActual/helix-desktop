@@ -69,6 +69,7 @@ niri_render_elements! {
 }
 
 impl MappedLayer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         surface: LayerSurface,
         pre_commit_hook: HookId,
