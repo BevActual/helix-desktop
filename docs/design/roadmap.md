@@ -23,7 +23,7 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 | Retire the C++ formatting checks as one change: the `format` job in `ci.yml`, the PR template checkbox and `enforce-pr-template.py` + its tests, `tools/ci-local.sh`'s format job | S | They still ask for `just format` with clang-format over a `cpp/` tree. **Check required status-check names in branch protection before removing CI jobs.** |
 | Decide Rust formatting: one repo-wide `cargo fmt` commit plus a CI check, or no policy | S | The tree outside touched files is not rustfmt-clean (hundreds of diffs in `core/`, Mobius) |
 | Pin the toolchain (`rust-toolchain.toml`) | S | Fedora `rustc` with a rustup `clippy-driver` on one `PATH` fails with "incompatible version of rustc" |
-| Make `tools/install.sh` install the session shell, greeter and apps, then write the RPM spec over it | M | `PACKAGING.md`: today a package must add those binaries, desktop entries and `tools/systemd` units by hand |
+| Write the RPM spec over `tools/install.sh --require-session`, with a systemd user preset and a decision on how the compositor is packaged | M | `PACKAGING.md`; the installer now covers the whole session |
 | Move CI to a Fedora container and install the real dependency list from `BUILDING.md` | M | CI builds on Arch with a list trimmed from the C++ one, so it is not the platform we ship on |
 | Audit the remaining `docs/user` pages (configuration, services, launcher, control-center, theming, ipc) against what the Tauri shell does, rewrite or retire each | M | Most still describe the previous TOML-configured shell; the overview says so |
 | Remove the `helix-settings -> helix-wallpaper` layering exception | S | `tools/layers-baseline.txt` |

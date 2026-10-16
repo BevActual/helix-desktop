@@ -27,28 +27,35 @@ cd compositor && cargo build --release
 
 ## Install
 
-Install the session shell and apps for your user (no root needed):
+There are two ways to install, depending on whether you want Helix for one user from a checkout or on the whole system.
+
+For yourself, from a checkout (no root needed; it links the build tree and does not restart a running shell):
 
 ```bash
 tools/switch-shell.sh install
 ```
 
-Install the system services (desktop service, assistant, inference service, systemd user units, D-Bus activation, polkit policy):
+For the system, under a prefix (this is what a package does):
 
 ```bash
 just install            # /usr/local; use `just install /usr` for another prefix
 ```
 
-The login screen is installed with `tools/install-greeter.sh` and the compositor with `tools/install-trusted-niri.sh`. See
-[Running Helix](/helix/getting-started/running-the-shell/) to start a session.
+`just install` puts the desktop service, assistant, inference service, the session shell, the greeter, Settings, Mobius, Software and
+System Monitor under the prefix, with their systemd user units, D-Bus activation, polkit policy, desktop entries and icons. Units are
+installed disabled; enable the ones you want per user, for example
+`systemctl --user enable --now helix-shell-strut helix-shell-bar helix-shell-panels`.
+
+The login screen's greetd configuration is written by `tools/install-greeter.sh` and the compositor is installed with
+`tools/install-trusted-niri.sh`; neither is part of `just install`. See [Running Helix](/helix/getting-started/running-the-shell/) to
+start a session.
 
 ## Update or remove
 
 ```bash
 git pull
 just build release
-tools/switch-shell.sh install
-just install
+tools/switch-shell.sh install   # or: just install
 ```
 
 `just uninstall` removes what `just install` put under the prefix. Your configuration and state stay under `~/.config/helix`,

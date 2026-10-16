@@ -39,9 +39,49 @@ grep -q '/usr/bin/helix-inference' "$prefix/lib/systemd/user/helix-inference.ser
 [ -f "$prefix/share/helix/templates/builtin.toml" ] || fail 'theme templates are missing (the service reads share/helix/templates)'
 [ -f "$prefix/share/helix/helix-wallpaper.png" ] || fail 'first-run wallpaper is missing'
 
-# A staged install must not leave a template placeholder behind.
-if grep -rn '@HELIX_BINDIR@\|@HELPER_PATH@' "$prefix" >/dev/null 2>&1; then
+# The session half is installed when it was built (a services-only build leaves it out).
+if [ -x "$prefix/bin/helix-shell-tauri" ]; then
+  [ -x "$prefix/bin/helix-panel" ] || fail 'helix-panel is missing'
+  [ -x "$prefix/bin/helix-askpass" ] || fail 'helix-askpass is missing'
+  [ -f "$prefix/share/applications/org.helix.Shell.desktop" ] || fail 'shell desktop entry is missing'
+  [ -f "$prefix/share/icons/hicolor/scalable/apps/org.helix.Shell.svg" ] || fail 'shell icon is missing'
+  for unit in helix-shell-bar helix-shell-panels; do
+    grep -q 'ExecStart=/usr/bin/helix-shell-tauri' "$prefix/lib/systemd/user/$unit.service" || fail "$unit does not start the installed shell"
+  done
+  grep -q 'SUDO_ASKPASS=/usr/bin/helix-askpass' "$prefix/lib/systemd/user/helix-shell-bar.service" || fail 'bar unit does not use the installed askpass'
+fi
+if [ -x "$prefix/bin/helix-shell-strut" ]; then
+  grep -q 'ExecStart=/usr/bin/helix-shell-strut' "$prefix/lib/systemd/user/helix-shell-strut.service" || fail 'strut unit does not start the installed strut'
+fi
+for app in Settings:helix-settings Software:helix-software SystemMonitor:helix-system-monitor Mobius:helix-mobius; do
+  entry=${app%%:*}; binary=${app##*:}
+  if [ -x "$prefix/bin/$binary" ]; then
+    [ -f "$prefix/share/applications/org.helix.$entry.desktop" ] || fail "$entry desktop entry is missing"
+  else
+    [ ! -e "$prefix/share/applications/org.helix.$entry.desktop" ] || fail "$entry has a desktop entry but no binary"
+  fi
+done
+if [ -x "$prefix/bin/helix-greeter" ]; then
+  [ -x "$prefix/bin/helix-greeter-session" ] || fail 'greeter session script is missing'
+  [ -f "$prefix/share/helix-greeter/niri.kdl" ] || fail 'greeter compositor config is missing'
+  # The script finds the greeter and its config from where it is installed, whatever the prefix.
+  grep -q 'HERE=$(cd "$(dirname "$0")" && pwd)' "$prefix/bin/helix-greeter-session" || fail 'session script is tied to a fixed prefix'
+fi
+if [ -x "$prefix/bin/helix-settings" ] && [ -x "$prefix/bin/helix-greeter-apply-appearance" ]; then
+  : # Settings looks for the appearance helper next to itself; both are in bin/.
+elif [ -x "$prefix/bin/helix-settings" ]; then
+  fail 'Settings is installed without the greeter appearance helper beside it'
+fi
+
+# A staged install must not leave one of our template placeholders behind in a unit, activation file or policy.
+if grep -rn '@\(HELIX_BINDIR\|HELPER_PATH\|SHELL_BIN\|STRUT_BIN\|IDLE_BIN\|WALLPAPER_BIN\|ASKPASS\|POLKIT_AGENT\)@' \
+     "$prefix/lib/systemd" "$prefix/share/dbus-1" "$prefix/share/polkit-1" >/dev/null 2>&1; then
   fail 'a template placeholder was not substituted'
 fi
+
+# --uninstall removes what the install put there.
+"$root/tools/install.sh" --uninstall --prefix /usr --destdir "$stage" >/dev/null
+left=$(find "$stage" -type f | wc -l)
+[ "$left" = 0 ] || fail "uninstall left $left files behind"
 
 printf '%s\n' 'install_layout_test: OK'

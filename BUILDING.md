@@ -68,7 +68,8 @@ For yourself, the session shell and apps (user level, nothing needs root):
 tools/switch-shell.sh install
 ```
 
-System level (services, systemd user units, D-Bus activation, polkit policy, icon, agent policy tables):
+System level (services, the session shell and apps, greeter, systemd user units, D-Bus activation, polkit policy, desktop entries,
+icons, theme templates and agent policy tables):
 
 ```sh
 just install                          # /usr/local, release profile
@@ -77,5 +78,6 @@ DESTDIR=/tmp/stage just install /usr  # stage a tree (packagers)
 just uninstall                        # remove what install put under the prefix
 ```
 
-`tools/install.sh --help` lists the options. The greeter is installed with `tools/install-greeter.sh`, the compositor with
-`tools/install-trusted-niri.sh`, and the model runtime with `tools/install-inference.sh`.
+`tools/install.sh --help` lists the options (`--services-only` skips the session half and the web view libraries it needs). It does
+not touch greetd's configuration (`tools/install-greeter.sh` writes `/etc/greetd`), the compositor (`tools/install-trusted-niri.sh`)
+or the per-user niri configuration; the model runtime has its own `tools/install-inference.sh`.

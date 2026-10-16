@@ -116,7 +116,7 @@ write_units_and_links() {
   strut_escaped=$(printf '%s' "$STRUT" | sed 's/ /\\\\x20/g')
   # Legacy monolith unit (kept for nested tests / rollback).
   sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-tauri.service.in" > "$UNITS/helix-shell-tauri.service"
-  sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-bar.service.in" > "$UNITS/helix-shell-bar.service"
+  sed -e "s|@SHELL_BIN@|$escaped|" -e 's|@ASKPASS@|%h/.local/bin/helix-askpass|' "$ROOT/tools/systemd/helix-shell-bar.service.in" > "$UNITS/helix-shell-bar.service"
   sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-panels.service.in" > "$UNITS/helix-shell-panels.service"
   sed "s|@STRUT_BIN@|$strut_escaped|" "$ROOT/tools/systemd/helix-shell-strut.service.in" > "$UNITS/helix-shell-strut.service"
   python3 - "$HOME/.config/niri/config.kdl" "$HOME/.config/niri/helix-setup.kdl" "$HOME/.config/niri/helix-binds.kdl" <<'PY'
