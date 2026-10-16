@@ -55,7 +55,6 @@ acts on it, and a nested test asserts the exact requests sent.
 |---|---|---|---|
 | **Software: Fedora RPM backend (PackageKit)** | L | Backend trait, authentication flow | Fedora is the sole target and the store lists Flatpak only (`software-tauri.md`: "Not done") |
 | Software: add and remove sources | M | Confirmation and auth for system remotes | `software-tauri.md` |
-| Software and Monitor follow the system light theme | S | Appearance mode exposed to apps | Apps render dark today |
 | System Monitor: kill and renice, behind a confirmation | M | Own-process-only rule, confirm dialog | `system-monitor-tauri.md` "v1 omissions" |
 | System Monitor: cut the bar and Control Center `sysmon` widgets over | M | Monitor model shared with the shell | `system-monitor-tauri.md` |
 | Greeter: power actions (restart, shut down) | M | logind call from the greeter user, polkit | `greeter-tauri.md` "Not yet" |
