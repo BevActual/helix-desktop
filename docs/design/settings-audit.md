@@ -13,7 +13,7 @@ the setting on the live service and seeing which files changed.
 | Displays | `brightness.*` | the Tauri shell writes the backlight itself and ignores these | removed |
 | Displays | `nightlight.*` | need a gamma provider; none exists in the Tauri shell (the live catalog has no rows) | removed |
 | Sound | `audio.*` | feedback sounds and overdrive belonged to the native shell | page removed (output and input live in the control center) |
-| Notifications | `notification.*` (12 rows) | the Tauri shell's own `org.freedesktop.Notifications` server reads none of them | page removed |
+| Notifications | `notification.*` (12 rows) | the Tauri shell's own `org.freedesktop.Notifications` server reads none of them | replaced by a page of the two settings the shell honours (below) |
 | Power & lock | `lockscreen.*`, `idle.*`, `battery.*` | helix-idle reads `~/.config/helix/idle.toml`, not these | replaced by a page that edits `idle.toml` |
 | Dock | (all) | see settings-tauri.md | replaced earlier by `dock-settings.json` |
 
@@ -22,11 +22,14 @@ the setting on the live service and seeing which files changed.
 * **Power & lock** edits `~/.config/helix/idle.toml` (lock after, screen off after, each can be switched off) through
   `helix_config::idle_prefs`; other keys in the file (the commands) are preserved, and helix-idle is restarted so it reads the file.
 * **Displays** lists the connected outputs as the compositor reports them (read only).
+* **Notifications** edits `~/.config/helix/notification-settings.json` through `helix_config::notification_prefs`: how long a banner stays when
+  the application gave no time (2 to 15 s) and how many show at once (1 to 3). The shell watches the file and applies both to
+  `helix_shell_model::notifications` with no restart. `tools/nested/settings-notifications-test.sh` and `notifications-prefs-test.sh`.
 * **Dock** and **Wallpaper** are described elsewhere.
 
 ## Still to build, with their owners
 
 * Night light needs a gamma-control client in the Rust shell (wlr-gamma-control), then rows for temperature and schedule.
 * ~~A Sound page of real controls~~ — **Done.** Output and input device, volume and mute on the control center's audio model (`apps/helix-settings/web/src/pages/SoundPage.tsx`, `tools/nested/settings-sound-test.sh`). Still missing: a live input level meter.
-* Notification behaviour (how many toasts, where, how long) belongs to `helix_shell_model::notifications`; nothing there is configurable yet.
+* Notifications: banner time and count are done. Still open: a do-not-disturb schedule and per-application rules (each needs a consumer in `helix_shell_model::notifications` first).
 * Shell-level accessibility (text size) has no consumer; it needs a scale applied by the shell and by Settings.

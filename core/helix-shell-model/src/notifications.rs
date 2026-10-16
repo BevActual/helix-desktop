@@ -97,6 +97,9 @@ pub struct Notifications {
     items: Vec<Item>,
     dnd: bool,
     recent: Vec<(String, u64)>,
+    /// What the person chose in Settings; `None` means the defaults above.
+    default_toast_ms: Option<u64>,
+    max_toasts: Option<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -244,7 +247,7 @@ impl Notifications {
         let live_for = match (incoming.urgency, incoming.timeout_ms) {
             (Urgency::Critical, _) | (_, 0) => None,
             (_, ms) if ms > 0 => Some(u64::try_from(ms).unwrap_or(0)),
-            _ => Some(DEFAULT_TOAST_MS),
+            _ => Some(self.default_toast_ms.unwrap_or(DEFAULT_TOAST_MS)),
         };
         let toast_for = live_for.unwrap_or(MAX_TOAST_MS).clamp(1_000, MAX_TOAST_MS);
         let cut = |text: &str, max: usize| -> String { text.chars().take(max).collect() };
@@ -366,6 +369,13 @@ impl Notifications {
         Ok(events)
     }
 
+    /// How long a banner stays when its application did not ask for a time, and how many show at once (both bounded here).
+    /// Only banners drawn from now on use the time; a banner already showing keeps its own.
+    pub fn set_toast_prefs(&mut self, default_ms: u64, max_toasts: usize) {
+        self.default_toast_ms = Some(default_ms.clamp(1_000, MAX_TOAST_MS));
+        self.max_toasts = Some(max_toasts.clamp(1, MAX_TOASTS));
+    }
+
     pub fn set_dnd(&mut self, on: bool) {
         self.dnd = on;
     }
@@ -434,7 +444,7 @@ impl Notifications {
                     && (!self.dnd || item.urgency == Urgency::Critical)
                     && item.urgency != Urgency::Low
             })
-            .take(MAX_TOASTS)
+            .take(self.max_toasts.unwrap_or(MAX_TOASTS).clamp(1, MAX_TOASTS))
             .map(|item| row(item))
             .collect();
         NotificationsView {
@@ -637,6 +647,29 @@ mod tests {
         assert_eq!(view.toasts.len(), MAX_TOASTS);
         assert_eq!(view.toasts[0].summary, "m4");
         assert_eq!(view.items.len(), 5);
+    }
+
+    #[test]
+    fn the_chosen_banner_time_and_count_apply_where_the_app_did_not_say() {
+        let mut n = Notifications::new();
+        n.set_toast_prefs(2_000, 1);
+        n.notify(incoming("A", "x"), 100);
+        assert_eq!(n.next_deadline(), Some(100 + 2_000));
+        n.notify(incoming("B", "y"), 101);
+        let view = n.view(102);
+        assert_eq!(view.toasts.len(), 1, "one banner at once");
+        assert_eq!(view.toasts[0].summary, "y");
+        assert_eq!(view.items.len(), 2, "the other waits in the list");
+        let mut timed = incoming("C", "z");
+        timed.timeout_ms = 9_000;
+        n.expire(5_000);
+        n.notify(timed, 5_000);
+        assert_eq!(n.next_deadline(), Some(14_000), "an application that asks for a time keeps it");
+        n.set_toast_prefs(0, 99);
+        for (i, app) in ["D", "E", "F"].iter().enumerate() {
+            n.notify(incoming(app, "w"), 6_000 + i as u64);
+        }
+        assert_eq!(n.view(6_010).toasts.len(), MAX_TOASTS, "the count stays within the model's bound");
     }
 
     #[test]

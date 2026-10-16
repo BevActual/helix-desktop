@@ -1151,6 +1151,52 @@ fn dock_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, St
     Ok(next.rows())
 }
 
+fn notification_prefs_file() -> Option<std::path::PathBuf> {
+    dock_prefs_file().map(|p| p.with_file_name("notification-settings.json"))
+}
+
+fn read_notification_prefs() -> helix_config::notification_prefs::NotificationPrefs {
+    notification_prefs_file()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| helix_config::notification_prefs::NotificationPrefs::parse(&text))
+        .unwrap_or_default()
+}
+
+/// The Notifications page: banner time and count, kept in a file the shell watches.
+#[tauri::command]
+fn notifications_rows() -> Vec<RowView> {
+    read_notification_prefs().rows()
+}
+
+#[tauri::command]
+fn notifications_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let change = match (change.get("kind").and_then(|k| k.as_str()), change.get("value")) {
+        (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
+        _ => return Err("unknown change".into()),
+    };
+    let next = read_notification_prefs()
+        .apply(&id, &change)
+        .map_err(|error| format!("{error:?}"))?;
+    let path = notification_prefs_file().ok_or("no folder for the settings")?;
+    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("tmp");
+    {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        file.write_all(next.to_json().as_bytes()).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+    eprintln!("SETTINGS notifications {id} changed");
+    Ok(next.rows())
+}
+
 fn idle_prefs_file() -> Option<std::path::PathBuf> {
     dock_prefs_file().map(|p| p.with_file_name("idle.toml"))
 }
@@ -1592,6 +1638,8 @@ fn main() {
             wallpaper_choose_image,
             wallpaper_choose_swatch,
             dock_rows,
+            notifications_rows,
+            notifications_change,
             power_rows,
             power_change,
             displays_rows,
