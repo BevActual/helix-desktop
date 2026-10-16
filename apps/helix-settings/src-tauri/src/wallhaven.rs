@@ -165,5 +165,5 @@ pub async fn wallhaven_use(app: AppHandle, id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())??;
     }
     eprintln!("SETTINGS wallhaven saved");
-    crate::write_choice(&app, helix_wallpaper::Source::Image(target))
+    crate::write_choice(&app, helix_wallpaper_model::Source::Image(target))
 }

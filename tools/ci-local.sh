@@ -23,7 +23,7 @@ job_build() {
     && WAYLAND_DISPLAY="wayland-ci-$$" tools/test-integration.sh
 }
 job_rust() {
-  cargo test -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model --quiet && cargo test -p helix-theme --quiet && cargo test -p helix-desktop --quiet
+  cargo test -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model -p helix-wallpaper-model --quiet && cargo test -p helix-theme --quiet && cargo test -p helix-desktop --quiet
 }
 job_agent()  { WAYLAND_DISPLAY="wayland-ci-$$" ./tools/nested/helix-desktop-agent-integration.sh; }
 job_config() {

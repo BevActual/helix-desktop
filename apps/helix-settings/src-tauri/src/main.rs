@@ -23,8 +23,8 @@ use helix_models::network::{
 };
 use helix_models::pairing::{Pairing, PairingView};
 use helix_compositor::shortcuts::{self, ShortcutGroup};
-use helix_wallpaper::picker::{Picker, PickerView};
-use helix_wallpaper::{choice_path, choice_to_toml, load_config, Source};
+use helix_wallpaper_model::picker::{Picker, PickerView};
+use helix_wallpaper_model::{choice_path, choice_to_toml, load_config, Source};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 

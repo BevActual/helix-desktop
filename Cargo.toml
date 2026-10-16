@@ -12,6 +12,7 @@ members = [
     "core/helix-monitor-model",
     "core/helix-shell-model",
     "core/helix-software-model",
+    "core/helix-wallpaper-model",
     "core/helix-desktop-api",
     "core/helix-theme",
     "services/helix-wallpaper",
@@ -62,6 +63,7 @@ helix-software-model = { path = "core/helix-software-model" }
 helix-desktop-api = { path = "core/helix-desktop-api" }
 helix-theme = { path = "core/helix-theme" }
 helix-wallpaper = { path = "services/helix-wallpaper" }
+helix-wallpaper-model = { path = "core/helix-wallpaper-model" }
 
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"

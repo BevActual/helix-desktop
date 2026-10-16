@@ -25,7 +25,6 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 | Write the RPM spec over `tools/install.sh --require-session`, with a systemd user preset and a decision on how the compositor is packaged | M | `PACKAGING.md`; the installer now covers the whole session |
 | Move CI to a Fedora container and install the real dependency list from `BUILDING.md` | M | CI builds on Arch with a list trimmed from the C++ one, so it is not the platform we ship on |
 | Audit the remaining `docs/user` pages (configuration, services, launcher, control-center, theming, ipc) against what the Tauri shell does, rewrite or retire each | M | Most still describe the previous TOML-configured shell; the overview says so |
-| Remove the `helix-settings -> helix-wallpaper` layering exception | S | `tools/layers-baseline.txt` |
 | Record the pending budgets (USS/RSS) for Software and System Monitor | S | `software-tauri.md`, `system-monitor-tauri.md` budget tables read _pending_ |
 | Run the soak checklist on the real session now that C++ is gone | M | `rust-desktop-soak.md` |
 | Run `mobius-test.sh` again (it now starts the Rust inference service) and fix what has rotted | S | `tools/nested/mobius-nested.sh` |

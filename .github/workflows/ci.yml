@@ -55,7 +55,7 @@ jobs:
       - name: Unit tests
         run: |
           tools/verify_config_export_golden.sh
-          cargo test -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model --quiet
+          cargo test -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model -p helix-wallpaper-model --quiet
       - name: helix-theme (C++ parity goldens)
         run: cargo test -p helix-theme --quiet
       - name: helix-desktop in-process theme tests

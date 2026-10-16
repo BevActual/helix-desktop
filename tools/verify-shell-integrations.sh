@@ -13,7 +13,7 @@ fi
 export HELIX_NIRI_BIN="${HELIX_NIRI_BIN:-$NIRI_DEBUG}"
 
 echo "== core crates (lib)"
-cargo test -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model --quiet
+cargo test -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model -p helix-wallpaper-model --quiet
 
 echo "== nested agent-ipc (incl. helix-panel status / desktop-capture)"
 HELIX_NESTED_SCRIPT=tools/nested/agent-ipc-test.sh \

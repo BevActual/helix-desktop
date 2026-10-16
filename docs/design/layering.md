@@ -41,5 +41,5 @@ The compositor is in the same workspace and the same lockfile as everything else
 
 ## Known exceptions
 
-`tools/layers-baseline.txt` lists them. Today: `helix-settings -> helix-wallpaper` (Settings links the wallpaper helper's
-library). Fix it by moving the shared code into `core/` or by calling the helper over its interface, then drop the line.
+`tools/layers-baseline.txt` lists them. Today there are none: the last one (`helix-settings -> helix-wallpaper`) was removed by
+moving the shared code into `core/helix-wallpaper-model`. A new exception needs a line there and a plan to remove it.
