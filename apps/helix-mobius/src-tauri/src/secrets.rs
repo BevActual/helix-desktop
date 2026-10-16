@@ -124,7 +124,11 @@ pub fn clear(api_key_ref: &str) -> Result<(), String> {
     if let Ok(entry) = keyring_entry(&id) {
         match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => {}
-            Err(error) => failure = Some(format!("The saved key could not be removed from the keyring: {error}")),
+            Err(error) => {
+                failure = Some(format!(
+                    "The saved key could not be removed from the keyring: {error}"
+                ))
+            }
         }
     }
     // A key left in either place would be found and used again, so a failure to remove it is reported, not hidden.

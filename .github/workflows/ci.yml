@@ -52,6 +52,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         run: bash tools/ci/arch-helix-ci-deps.sh
+      - name: Rust formatting
+        run: |
+          rustup component add rustfmt
+          tools/rustfmt.sh --check
       - name: Unit tests
         run: |
           tools/verify_config_export_golden.sh

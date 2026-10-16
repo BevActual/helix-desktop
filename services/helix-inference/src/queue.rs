@@ -25,7 +25,12 @@ pub struct Limits {
 
 impl Default for Limits {
     fn default() -> Self {
-        Self { max_pending: 8, max_per_client: 3, max_prompt_bytes: 64 * 1024, max_tokens_cap: 1024 }
+        Self {
+            max_pending: 8,
+            max_per_client: 3,
+            max_prompt_bytes: 64 * 1024,
+            max_tokens_cap: 1024,
+        }
     }
 }
 
@@ -68,11 +73,18 @@ pub struct InferenceQueue {
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 impl InferenceQueue {
-    pub fn new(backend: Arc<dyn Backend>, limits: Limits, on_delta: DeltaFn, on_done: DoneFn) -> Self {
+    pub fn new(
+        backend: Arc<dyn Backend>,
+        limits: Limits,
+        on_delta: DeltaFn,
+        on_done: DoneFn,
+    ) -> Self {
         let shared = Arc::new(Shared {
             backend,
             limits,
@@ -94,20 +106,25 @@ impl InferenceQueue {
             wake: Condvar::new(),
         });
         let weak = Arc::downgrade(&shared);
-        shared.backend.set_progress(Arc::new(move |model: &str, fraction: f64| {
-            let Some(shared) = weak.upgrade() else { return };
-            let operation = lock(&shared.state).running_operation;
-            let callback = lock(&shared.on_loading).clone();
-            if let (true, Some(callback)) = (operation != 0, callback) {
-                callback(operation, model, fraction);
-            }
-        }));
+        shared
+            .backend
+            .set_progress(Arc::new(move |model: &str, fraction: f64| {
+                let Some(shared) = weak.upgrade() else { return };
+                let operation = lock(&shared.state).running_operation;
+                let callback = lock(&shared.on_loading).clone();
+                if let (true, Some(callback)) = (operation != 0, callback) {
+                    callback(operation, model, fraction);
+                }
+            }));
         let worker_shared = Arc::clone(&shared);
         let worker = std::thread::Builder::new()
             .name("inference-worker".into())
             .spawn(move || run(&worker_shared))
             .expect("spawn inference worker");
-        Self { shared, worker: Some(worker) }
+        Self {
+            shared,
+            worker: Some(worker),
+        }
     }
 
     pub fn on_loading(&self, callback: LoadingFn) {
@@ -151,7 +168,8 @@ impl InferenceQueue {
                 return Err("each message needs a string role and a string content (or a list of text and image parts)".into());
             }
         }
-        if request.messages.to_string().len() + request.json_schema.len() > limits.max_prompt_bytes {
+        if request.messages.to_string().len() + request.json_schema.len() > limits.max_prompt_bytes
+        {
             return Err("the request is too large".into());
         }
         request.max_tokens = request.max_tokens.clamp(1, limits.max_tokens_cap);
@@ -165,7 +183,11 @@ impl InferenceQueue {
         if state.waiting.len() + running >= limits.max_pending {
             return Err("the inference queue is full".into());
         }
-        let from_client = state.waiting.iter().filter(|e| e.request.client == request.client).count()
+        let from_client = state
+            .waiting
+            .iter()
+            .filter(|e| e.request.client == request.client)
+            .count()
             + usize::from(state.running_operation != 0 && state.running_client == request.client);
         if from_client >= limits.max_per_client {
             return Err("too many requests from this client".into());
@@ -211,7 +233,11 @@ impl InferenceQueue {
             }
             state.waiting.remove(at);
         }
-        let outcome = Outcome { cancelled: true, error: "cancelled".into(), ..Outcome::default() };
+        let outcome = Outcome {
+            cancelled: true,
+            error: "cancelled".into(),
+            ..Outcome::default()
+        };
         (self.shared.on_done)(operation, &outcome);
         true
     }
@@ -272,14 +298,18 @@ impl Drop for InferenceQueue {
 }
 
 fn well_formed(message: &Value) -> bool {
-    let Some(object) = message.as_object() else { return false };
+    let Some(object) = message.as_object() else {
+        return false;
+    };
     if !object.get("role").is_some_and(Value::is_string) {
         return false;
     }
     match object.get("content") {
         Some(Value::String(_)) => true,
         Some(Value::Array(parts)) => parts.iter().all(|part| {
-            let Some(part) = part.as_object() else { return false };
+            let Some(part) = part.as_object() else {
+                return false;
+            };
             let text = part.get("type").and_then(Value::as_str) == Some("text")
                 && part.get("text").is_some_and(Value::is_string);
             let image = part.get("type").and_then(Value::as_str) == Some("image")
@@ -326,14 +356,22 @@ fn run(shared: &Arc<Shared>) {
             };
             outcome = match generator {
                 Some(generator) => generator.generate(&request, &progress, &cancelled),
-                None => Outcome { error: "image generation is not available".into(), ..Outcome::default() },
+                None => Outcome {
+                    error: "image generation is not available".into(),
+                    ..Outcome::default()
+                },
             };
         } else if request.transcribe {
             let transcriber = lock(&shared.transcriber).clone();
             let samples = std::mem::take(&mut request.audio);
             outcome = match transcriber {
-                Some(transcriber) => transcriber.transcribe(&samples, &request.language, &cancelled),
-                None => Outcome { error: "speech to text is not available".into(), ..Outcome::default() },
+                Some(transcriber) => {
+                    transcriber.transcribe(&samples, &request.language, &cancelled)
+                }
+                None => Outcome {
+                    error: "speech to text is not available".into(),
+                    ..Outcome::default()
+                },
             };
         } else {
             let loaded = if request.model.is_empty() {
@@ -343,12 +381,20 @@ fn run(shared: &Arc<Shared>) {
             };
             outcome = match loaded {
                 Err(error) => Outcome {
-                    error: if error.is_empty() { "the model could not be loaded".into() } else { error },
+                    error: if error.is_empty() {
+                        "the model could not be loaded".into()
+                    } else {
+                        error
+                    },
                     ..Outcome::default()
                 },
                 Ok(()) => {
                     let delta = Arc::clone(&shared.on_delta);
-                    shared.backend.chat(&request, &mut |piece: &str| delta(operation, piece), &cancelled)
+                    shared.backend.chat(
+                        &request,
+                        &mut |piece: &str| delta(operation, piece),
+                        &cancelled,
+                    )
                 }
             };
         }
@@ -413,23 +459,36 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
         let background = queue.submit(request("b", Priority::Background)).unwrap();
         let interactive = queue.submit(request("c", Priority::Interactive)).unwrap();
-        let order: Vec<u64> = (0..3).map(|_| done.recv_timeout(Duration::from_secs(5)).unwrap().0).collect();
+        let order: Vec<u64> = (0..3)
+            .map(|_| done.recv_timeout(Duration::from_secs(5)).unwrap().0)
+            .collect();
         assert_eq!(order, vec![first, interactive, background]);
     }
 
     #[test]
     fn limits_are_enforced_per_client_and_overall() {
-        let limits = Limits { max_pending: 4, max_per_client: 2, ..Limits::default() };
+        let limits = Limits {
+            max_pending: 4,
+            max_per_client: 2,
+            ..Limits::default()
+        };
         let (queue, _done) = held(limits);
         assert!(queue.submit(request("a", Priority::Interactive)).is_ok());
         assert!(queue.submit(request("a", Priority::Interactive)).is_ok());
         assert_eq!(
-            queue.submit(request("a", Priority::Interactive)).unwrap_err(),
+            queue
+                .submit(request("a", Priority::Interactive))
+                .unwrap_err(),
             "too many requests from this client"
         );
         assert!(queue.submit(request("b", Priority::Interactive)).is_ok());
         assert!(queue.submit(request("c", Priority::Interactive)).is_ok());
-        assert_eq!(queue.submit(request("d", Priority::Interactive)).unwrap_err(), "the inference queue is full");
+        assert_eq!(
+            queue
+                .submit(request("d", Priority::Interactive))
+                .unwrap_err(),
+            "the inference queue is full"
+        );
     }
 
     #[test]

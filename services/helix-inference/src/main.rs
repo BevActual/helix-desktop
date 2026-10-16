@@ -24,7 +24,10 @@ use backend::{Backend, ImageGenerator, Transcriber};
 use service::{Config, Inner, Service, BUS_NAME, INTERFACE, OBJECT_PATH};
 
 fn env(name: &str, fallback: &str) -> String {
-    std::env::var(name).ok().filter(|v| !v.is_empty()).unwrap_or_else(|| fallback.to_string())
+    std::env::var(name)
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| fallback.to_string())
 }
 
 fn default_model_dir() -> PathBuf {
@@ -55,7 +58,9 @@ async fn main() {
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_IGN) };
 
     let model_dir = env("HELIX_MODEL_DIR", &default_model_dir().to_string_lossy());
-    let idle_seconds: u64 = env("HELIX_INFERENCE_IDLE_SECONDS", "300").parse().unwrap_or(300);
+    let idle_seconds: u64 = env("HELIX_INFERENCE_IDLE_SECONDS", "300")
+        .parse()
+        .unwrap_or(300);
     let kind = env("HELIX_INFERENCE_BACKEND", "llama");
 
     let backend: Arc<dyn Backend> = if kind == "fake" {
@@ -77,14 +82,18 @@ async fn main() {
     };
 
     // Speech to text: the worker program sits beside this one (or where HELIX_TRANSCRIBE_BIN says).
-    let transcriber: Arc<dyn Transcriber> = if kind == "fake" && env("HELIX_TRANSCRIBER", "") != "process" {
-        Arc::new(fake::FakeTranscriber)
-    } else {
-        let worker = std::env::var_os("HELIX_TRANSCRIBE_BIN")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| sibling("helix-transcribe"));
-        Arc::new(workers::ProcessTranscriber::new(worker, PathBuf::from(&model_dir).join("speech")))
-    };
+    let transcriber: Arc<dyn Transcriber> =
+        if kind == "fake" && env("HELIX_TRANSCRIBER", "") != "process" {
+            Arc::new(fake::FakeTranscriber)
+        } else {
+            let worker = std::env::var_os("HELIX_TRANSCRIBE_BIN")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| sibling("helix-transcribe"));
+            Arc::new(workers::ProcessTranscriber::new(
+                worker,
+                PathBuf::from(&model_dir).join("speech"),
+            ))
+        };
     let image_generator: Arc<dyn ImageGenerator> =
         if kind == "fake" && env("HELIX_IMAGE_GENERATOR", "") != "process" {
             Arc::new(fake::FakeImageGenerator)
@@ -92,7 +101,10 @@ async fn main() {
             let worker = std::env::var_os("HELIX_IMAGE_BIN")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| sibling("helix-image"));
-            Arc::new(workers::ProcessImageGenerator::new(worker, PathBuf::from(&model_dir).join("image")))
+            Arc::new(workers::ProcessImageGenerator::new(
+                worker,
+                PathBuf::from(&model_dir).join("image"),
+            ))
         };
 
     let config = Config {
@@ -116,7 +128,13 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    let service = Arc::new(Inner::new(connection.clone(), config, backend, transcriber, image_generator));
+    let service = Arc::new(Inner::new(
+        connection.clone(),
+        config,
+        backend,
+        transcriber,
+        image_generator,
+    ));
     // Registered through a thin wrapper so the main loop keeps a handle for owner-gone and idle ticks.
     if let Err(error) = connection
         .object_server()
@@ -174,4 +192,3 @@ async fn main() {
     drop(connection); // stops serving before the worker is joined
     drop(service);
 }
-

@@ -23,7 +23,10 @@ fn table_mut(root: &mut Toml) -> Option<&mut Map<String, Toml>> {
     root.as_table_mut()
 }
 
-fn ensure_table<'a>(parent: &'a mut Map<String, Toml>, key: &str) -> Option<&'a mut Map<String, Toml>> {
+fn ensure_table<'a>(
+    parent: &'a mut Map<String, Toml>,
+    key: &str,
+) -> Option<&'a mut Map<String, Toml>> {
     if !parent.contains_key(key) {
         parent.insert(key.to_string(), Toml::Table(Map::new()));
     }
@@ -35,7 +38,11 @@ fn bind_action(widget: &mut Toml, gesture: &str, action: &str) {
     if !widget_table.contains_key("actions") {
         widget_table.insert("actions".to_string(), Toml::Table(Map::new()));
     }
-    let actions = widget_table.get_mut("actions").unwrap().as_table_mut().unwrap();
+    let actions = widget_table
+        .get_mut("actions")
+        .unwrap()
+        .as_table_mut()
+        .unwrap();
     if !actions.contains_key(gesture) {
         actions.insert(gesture.to_string(), Toml::String(action.to_string()));
     }
@@ -225,7 +232,8 @@ fn migrate_remaining_widget_gestures(root: &mut Toml) {
         };
         let w = Toml::Table(widget.clone());
         let type_name = widget_type(&w, widget_name);
-        let scroll_type = type_name == "media" || type_name == "volume" || type_name == "brightness";
+        let scroll_type =
+            type_name == "media" || type_name == "volume" || type_name == "brightness";
 
         if scroll_type && widget.contains_key("enable_scroll") {
             let was_enabled = widget
@@ -243,7 +251,9 @@ fn migrate_remaining_widget_gestures(root: &mut Toml) {
             }
         }
 
-        if (type_name == "volume" || type_name == "brightness") && widget.contains_key("scroll_step") {
+        if (type_name == "volume" || type_name == "brightness")
+            && widget.contains_key("scroll_step")
+        {
             let step = widget
                 .get("scroll_step")
                 .and_then(Toml::as_integer)
@@ -266,8 +276,16 @@ fn migrate_remaining_widget_gestures(root: &mut Toml) {
                     ("brightness-up", "brightness-down")
                 };
                 let mut actions_host = Toml::Table(widget.clone());
-                bind_action(&mut actions_host, "scroll_up", &format!("{up_verb}{suffix}"));
-                bind_action(&mut actions_host, "scroll_down", &format!("{down_verb}{suffix}"));
+                bind_action(
+                    &mut actions_host,
+                    "scroll_up",
+                    &format!("{up_verb}{suffix}"),
+                );
+                bind_action(
+                    &mut actions_host,
+                    "scroll_down",
+                    &format!("{down_verb}{suffix}"),
+                );
                 if let Some(actions) = actions_host.get("actions") {
                     widget.insert("actions".to_string(), actions.clone());
                 }
@@ -401,7 +419,10 @@ fn migrate_dead_zone_actions(root: &mut Toml) {
 }
 
 fn migrate_lockscreen_login_box_deprecated_settings(root: &mut Toml) {
-    let section = match root.get_mut("lockscreen_widgets").and_then(Toml::as_table_mut) {
+    let section = match root
+        .get_mut("lockscreen_widgets")
+        .and_then(Toml::as_table_mut)
+    {
         Some(table) => table,
         None => return,
     };
@@ -414,10 +435,7 @@ fn migrate_lockscreen_login_box_deprecated_settings(root: &mut Toml) {
             Some(table) => table,
             None => continue,
         };
-        let type_name = widget
-            .get("type")
-            .and_then(Toml::as_str)
-            .unwrap_or("");
+        let type_name = widget.get("type").and_then(Toml::as_str).unwrap_or("");
         if type_name != "login_box" && !widget_id.starts_with("lockscreen-login-box@") {
             continue;
         }
@@ -583,7 +601,10 @@ fn migrate_keyboard_layout_custom_labels(root: &mut Toml) {
                 if label.is_none() || target_labels.contains_key(layout_name) {
                     continue;
                 }
-                target_labels.insert(layout_name.clone(), Toml::String(label.unwrap().to_string()));
+                target_labels.insert(
+                    layout_name.clone(),
+                    Toml::String(label.unwrap().to_string()),
+                );
             }
         }
     }
@@ -635,7 +656,11 @@ fn migrate_calendar_event_formats(root: &mut Toml) {
     } else if !root_table.get("calendar").is_some_and(Toml::is_table) {
         return;
     }
-    let calendar = root_table.get_mut("calendar").unwrap().as_table_mut().unwrap();
+    let calendar = root_table
+        .get_mut("calendar")
+        .unwrap()
+        .as_table_mut()
+        .unwrap();
     for (key, node) in moves {
         if !calendar.contains_key(&key) {
             calendar.insert(key, node);
@@ -665,7 +690,9 @@ fn migrate_launch_apps_as_systemd_services(root: &mut Toml) {
     if custom.is_some() {
         return;
     }
-    let enabled = shell.get("launch_apps_as_systemd_services").and_then(Toml::as_bool);
+    let enabled = shell
+        .get("launch_apps_as_systemd_services")
+        .and_then(Toml::as_bool);
     if !enabled.is_some_and(|v| !v) {
         return;
     }
@@ -688,14 +715,20 @@ fn migrate_calendar_timezones_to_clock(root: &mut Toml) {
     }
     let old_node = old_node.unwrap();
     let root_table = table_mut(root).unwrap();
-    let control_center = match root_table.get_mut("control_center").and_then(Toml::as_table_mut) {
+    let control_center = match root_table
+        .get_mut("control_center")
+        .and_then(Toml::as_table_mut)
+    {
         Some(table) => table,
         None => return,
     };
     let has_clock_table = control_center.get("clock").is_some_and(Toml::is_table);
     let clock_missing_or_table = !control_center.contains_key("clock") || has_clock_table;
     if !clock_missing_or_table {
-        if let Some(calendar_tab) = control_center.get_mut("calendar").and_then(Toml::as_table_mut) {
+        if let Some(calendar_tab) = control_center
+            .get_mut("calendar")
+            .and_then(Toml::as_table_mut)
+        {
             calendar_tab.remove("timezones");
         }
         return;
@@ -708,7 +741,10 @@ fn migrate_calendar_timezones_to_clock(root: &mut Toml) {
             clock_tab.insert("timezones".to_string(), old_node);
         }
     }
-    if let Some(calendar_tab) = control_center.get_mut("calendar").and_then(Toml::as_table_mut) {
+    if let Some(calendar_tab) = control_center
+        .get_mut("calendar")
+        .and_then(Toml::as_table_mut)
+    {
         calendar_tab.remove("timezones");
     }
 }
@@ -732,7 +768,10 @@ fn migrate_retired_control_center_services(root: &mut Toml) {
     };
     root_table.remove("localsend");
     root_table.remove("phone");
-    let control_center = match root_table.get_mut("control_center").and_then(Toml::as_table_mut) {
+    let control_center = match root_table
+        .get_mut("control_center")
+        .and_then(Toml::as_table_mut)
+    {
         Some(table) => table,
         None => return,
     };
@@ -868,9 +907,10 @@ pub fn prepare_settings_sidecar(sidecar: Toml) -> Toml {
     let mut root = Toml::Table(table);
     let applied = apply_pending_sidecar_migrations(&mut root, stored);
     if applied != stored {
-        root.as_table_mut()
-            .expect("sidecar root")
-            .insert(CONFIG_VERSION_KEY.to_string(), Toml::Integer(i64::from(applied)));
+        root.as_table_mut().expect("sidecar root").insert(
+            CONFIG_VERSION_KEY.to_string(),
+            Toml::Integer(i64::from(applied)),
+        );
     }
     root
 }
@@ -896,9 +936,7 @@ launch_apps_as_systemd_services = false
             Some(&Toml::Boolean(true))
         );
         assert_eq!(
-            migrated
-                .get(CONFIG_VERSION_KEY)
-                .and_then(Toml::as_integer),
+            migrated.get(CONFIG_VERSION_KEY).and_then(Toml::as_integer),
             Some(i64::from(CURRENT_CONFIG_VERSION))
         );
     }

@@ -8,10 +8,7 @@ pub fn client_identity(exe_path: &str, cmdline: &[String]) -> String {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or_default();
-    let interpreter = base == "sh"
-        || INTERPRETERS
-            .iter()
-            .any(|name| base.starts_with(name));
+    let interpreter = base == "sh" || INTERPRETERS.iter().any(|name| base.starts_with(name));
     if interpreter {
         for arg in cmdline.iter().skip(1) {
             if arg.is_empty() || arg.starts_with('-') {
@@ -32,7 +29,10 @@ mod tests {
 
     #[test]
     fn plain_binary() {
-        assert_eq!(client_identity("/usr/bin/helix-assistant", &[]), "exe:/usr/bin/helix-assistant");
+        assert_eq!(
+            client_identity("/usr/bin/helix-assistant", &[]),
+            "exe:/usr/bin/helix-assistant"
+        );
     }
 
     #[test]

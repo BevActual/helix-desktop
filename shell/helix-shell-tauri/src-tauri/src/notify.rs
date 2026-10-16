@@ -199,7 +199,9 @@ fn prefs_path() -> Option<std::path::PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .filter(|v| !v.is_empty())
         .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
     Some(base.join("helix/notification-settings.json"))
 }
 
@@ -218,12 +220,22 @@ fn watch_prefs(app: AppHandle) {
             .lock()
             .expect("shell state")
             .notifications
-            .set_toast_prefs(u64::from(prefs.toast_seconds) * 1000, prefs.max_toasts as usize);
-        eprintln!("NOTIFICATIONS settings seconds={} toasts={}", prefs.toast_seconds, prefs.max_toasts);
+            .set_toast_prefs(
+                u64::from(prefs.toast_seconds) * 1000,
+                prefs.max_toasts as usize,
+            );
+        eprintln!(
+            "NOTIFICATIONS settings seconds={} toasts={}",
+            prefs.toast_seconds, prefs.max_toasts
+        );
     };
     apply(&app);
     tauri::async_runtime::spawn(async move {
-        let stamp = || prefs_path().and_then(|p| std::fs::metadata(p).ok()).and_then(|m| m.modified().ok());
+        let stamp = || {
+            prefs_path()
+                .and_then(|p| std::fs::metadata(p).ok())
+                .and_then(|m| m.modified().ok())
+        };
         let mut seen = stamp();
         loop {
             tokio::time::sleep(Duration::from_secs(1)).await;

@@ -110,11 +110,16 @@ pub struct MediaView {
 
 #[tauri::command]
 pub fn media_view(app: AppHandle) -> Option<MediaView> {
-    shell_state(&app).lock().expect("shell state").media.as_ref().map(|m| MediaView {
-        playing: m.playing,
-        artist: m.artist.clone(),
-        title: m.title.clone(),
-    })
+    shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .media
+        .as_ref()
+        .map(|m| MediaView {
+            playing: m.playing,
+            artist: m.artist.clone(),
+            title: m.title.clone(),
+        })
 }
 
 fn emit_media(app: &AppHandle) {

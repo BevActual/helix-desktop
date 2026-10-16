@@ -61,7 +61,9 @@ pub struct RenderResult {
 /// C++ `makeThemeData`: every token as `#rrggbb` for dark and light.
 pub fn make_theme_data(dark: &HashMap<String, u32>, light: &HashMap<String, u32>) -> ThemeData {
     let conv = |m: &HashMap<String, u32>| -> HashMap<String, String> {
-        m.iter().map(|(k, v)| (k.clone(), Color::from_argb(*v).to_hex())).collect()
+        m.iter()
+            .map(|(k, v)| (k.clone(), Color::from_argb(*v).to_hex()))
+            .collect()
     };
     let mut data = ThemeData::new();
     data.insert("dark".into(), conv(dark));
@@ -91,7 +93,9 @@ enum Scope {
 
 fn from_json(value: &Value) -> Scope {
     match value {
-        Value::Object(map) => Scope::Map(map.iter().map(|(k, v)| (k.clone(), from_json(v))).collect()),
+        Value::Object(map) => {
+            Scope::Map(map.iter().map(|(k, v)| (k.clone(), from_json(v))).collect())
+        }
         Value::Array(items) => Scope::Array(items.iter().map(from_json).collect()),
         Value::String(s) => Scope::Str(s.clone()),
         Value::Number(n) => Scope::Num(n.as_f64().unwrap_or(0.0)),
@@ -126,7 +130,11 @@ fn is_truthy(value: &Scope) -> bool {
 /// `std::to_chars(double)`: shortest round-trip, scientific when it is shorter.
 pub fn format_dot_decimal(value: f64) -> String {
     if value == 0.0 {
-        return if value.is_sign_negative() { "-0".into() } else { "0".into() };
+        return if value.is_sign_negative() {
+            "-0".into()
+        } else {
+            "0".into()
+        };
     }
     let fixed = format!("{value}");
     let sci = format!("{value:e}");
@@ -205,12 +213,37 @@ fn format_color(c: &RichColor, format_type: &str) -> String {
 }
 
 const KNOWN_FORMATS: [&str; 14] = [
-    "hex", "hex_stripped", "rgb", "rgb_csv", "rgba", "hsl", "hsla", "red", "green", "blue", "alpha", "hue",
-    "saturation", "lightness",
+    "hex",
+    "hex_stripped",
+    "rgb",
+    "rgb_csv",
+    "rgba",
+    "hsl",
+    "hsla",
+    "red",
+    "green",
+    "blue",
+    "alpha",
+    "hue",
+    "saturation",
+    "lightness",
 ];
 const COLOR_FILTERS: [&str; 15] = [
-    "grayscale", "invert", "set_alpha", "set_lightness", "set_hue", "set_saturation", "set_red", "set_green",
-    "set_blue", "lighten", "darken", "saturate", "desaturate", "auto_lightness", "rotate_hue",
+    "grayscale",
+    "invert",
+    "set_alpha",
+    "set_lightness",
+    "set_hue",
+    "set_saturation",
+    "set_red",
+    "set_green",
+    "set_blue",
+    "lighten",
+    "darken",
+    "saturate",
+    "desaturate",
+    "auto_lightness",
+    "rotate_hue",
 ];
 const COLOR_ARG_FILTERS: [&str; 2] = ["blend", "harmonize"];
 
@@ -263,10 +296,18 @@ fn re() -> &'static Regexes {
         expr: Regex::new(r"\{\{([^}\n]+?)\}\}").unwrap(),
         filter_colon: Regex::new(r"^([a-z_]+)[ \t\n\r\x0b\x0c]*:[ \t\n\r\x0b\x0c]*(.+)$").unwrap(),
         camel_split: Regex::new(r"([a-z])([A-Z])").unwrap(),
-        replace_dq: Regex::new(r#"^"([^"]*?)"[ \t\n\r\x0b\x0c]*,[ \t\n\r\x0b\x0c]*"([^"]*?)"$"#).unwrap(),
-        replace_sq: Regex::new(r"^'([^']*?)'[ \t\n\r\x0b\x0c]*,[ \t\n\r\x0b\x0c]*'([^']*?)'$").unwrap(),
-        color_arg: Regex::new(r#"["']?(#[0-9a-fA-F]{6})["']?[ \t\n\r\x0b\x0c]*(?:,[ \t\n\r\x0b\x0c]*(.+))?"#).unwrap(),
-        for_cmd: Regex::new(r"^for[ \t\n\r\x0b\x0c]+(.+?)[ \t\n\r\x0b\x0c]+in[ \t\n\r\x0b\x0c]+(.+)$").unwrap(),
+        replace_dq: Regex::new(r#"^"([^"]*?)"[ \t\n\r\x0b\x0c]*,[ \t\n\r\x0b\x0c]*"([^"]*?)"$"#)
+            .unwrap(),
+        replace_sq: Regex::new(r"^'([^']*?)'[ \t\n\r\x0b\x0c]*,[ \t\n\r\x0b\x0c]*'([^']*?)'$")
+            .unwrap(),
+        color_arg: Regex::new(
+            r#"["']?(#[0-9a-fA-F]{6})["']?[ \t\n\r\x0b\x0c]*(?:,[ \t\n\r\x0b\x0c]*(.+))?"#,
+        )
+        .unwrap(),
+        for_cmd: Regex::new(
+            r"^for[ \t\n\r\x0b\x0c]+(.+?)[ \t\n\r\x0b\x0c]+in[ \t\n\r\x0b\x0c]+(.+)$",
+        )
+        .unwrap(),
         range: Regex::new(r"^(-?\d+)\.\.(-?\d+)$").unwrap(),
         color_expr: Regex::new(r"^colors\.([a-z_0-9]+)\.([a-z_0-9]+)\.([a-z_0-9]+)$").unwrap(),
         palette_expr: Regex::new(r"^palettes\.([a-z_]+)\.(_?\d+)\.([a-z_]+)$").unwrap(),
@@ -280,7 +321,10 @@ fn parse_filter(filter: &str) -> (String, Option<String>) {
     }
     match s.find([' ', '\t']) {
         None => (s.to_string(), None),
-        Some(i) => (trim(&s[..i]).to_string(), Some(trim(&s[i + 1..]).to_string())),
+        Some(i) => (
+            trim(&s[..i]).to_string(),
+            Some(trim(&s[i + 1..]).to_string()),
+        ),
     }
 }
 
@@ -311,7 +355,9 @@ fn capitalize(word: &str) -> String {
 
 fn to_camel_case(value: &str) -> String {
     let words = split_words(value);
-    let Some(first) = words.first() else { return value.to_string() };
+    let Some(first) = words.first() else {
+        return value.to_string();
+    };
     let mut out = first.to_ascii_lowercase();
     for w in &words[1..] {
         out += &capitalize(&w.to_ascii_lowercase());
@@ -324,18 +370,31 @@ fn to_pascal_case(value: &str) -> String {
     if words.is_empty() {
         return value.to_string();
     }
-    words.iter().map(|w| capitalize(&w.to_ascii_lowercase())).collect()
+    words
+        .iter()
+        .map(|w| capitalize(&w.to_ascii_lowercase()))
+        .collect()
 }
 
 fn join_lower(value: &str, sep: &str) -> String {
-    split_words(value).iter().map(|w| w.to_ascii_lowercase()).collect::<Vec<_>>().join(sep)
+    split_words(value)
+        .iter()
+        .map(|w| w.to_ascii_lowercase())
+        .collect::<Vec<_>>()
+        .join(sep)
 }
 
 fn apply_replace(value: &str, arg: &Option<String>) -> String {
-    let Some(arg) = arg else { return value.to_string() };
+    let Some(arg) = arg else {
+        return value.to_string();
+    };
     for re in [&re().replace_dq, &re().replace_sq] {
         if let Some(m) = re.captures(arg) {
-            return if m[1].is_empty() { value.to_string() } else { value.replace(&m[1], &m[2]) };
+            return if m[1].is_empty() {
+                value.to_string()
+            } else {
+                value.replace(&m[1], &m[2])
+            };
         }
     }
     value.to_string()
@@ -344,14 +403,22 @@ fn apply_replace(value: &str, arg: &Option<String>) -> String {
 fn as_rich_color(value: &Scope) -> Result<RichColor, ()> {
     match value {
         Scope::Color(c) => Ok(*c),
-        Scope::Str(s) => Color::from_hex(s).map(|color| RichColor { color, alpha: 1.0 }).ok_or(()),
+        Scope::Str(s) => Color::from_hex(s)
+            .map(|color| RichColor { color, alpha: 1.0 })
+            .ok_or(()),
         _ => Err(()),
     }
 }
 
-fn apply_color_arg_filter(mut value: RichColor, name: &str, arg: &Option<String>) -> Result<RichColor, ()> {
+fn apply_color_arg_filter(
+    mut value: RichColor,
+    name: &str,
+    arg: &Option<String>,
+) -> Result<RichColor, ()> {
     let Some(arg) = arg else { return Ok(value) };
-    let Some(m) = re().color_arg.captures(arg) else { return Ok(value) };
+    let Some(m) = re().color_arg.captures(arg) else {
+        return Ok(value);
+    };
     let target = Color::from_hex(&m[1]).ok_or(())?;
     let (src_hue, src_sat, src_light) = value.color.to_hsl();
     let (target_hue, _, _) = target.to_hsl();
@@ -377,17 +444,26 @@ fn apply_color_arg_filter(mut value: RichColor, name: &str, arg: &Option<String>
     Ok(value)
 }
 
-fn apply_color_filter(mut color: RichColor, name: &str, arg: &Option<String>) -> Result<RichColor, ()> {
+fn apply_color_filter(
+    mut color: RichColor,
+    name: &str,
+    arg: &Option<String>,
+) -> Result<RichColor, ()> {
     let (h, s, l) = color.color.to_hsl();
     if name == "grayscale" {
-        let gray = (0.299 * f64::from(color.color.r) + 0.587 * f64::from(color.color.g)
+        let gray = (0.299 * f64::from(color.color.r)
+            + 0.587 * f64::from(color.color.g)
             + 0.114 * f64::from(color.color.b))
         .round() as i32;
         color.color = Color::new(gray, gray, gray);
         return Ok(color);
     }
     if name == "invert" {
-        color.color = Color::new(255 - color.color.r, 255 - color.color.g, 255 - color.color.b);
+        color.color = Color::new(
+            255 - color.color.r,
+            255 - color.color.g,
+            255 - color.color.b,
+        );
         return Ok(color);
     }
     let n = parse_number(arg)?;
@@ -403,7 +479,11 @@ fn apply_color_filter(mut color: RichColor, name: &str, arg: &Option<String>) ->
         "saturate" => color.color = hsl(h, (s + n / 100.0).clamp(0.0, 1.0), l),
         "desaturate" => color.color = hsl(h, (s - n / 100.0).clamp(0.0, 1.0), l),
         "auto_lightness" => {
-            let target = if l < 0.5 { l + n / 100.0 } else { l - n / 100.0 };
+            let target = if l < 0.5 {
+                l + n / 100.0
+            } else {
+                l - n / 100.0
+            };
             color.color = hsl(h, s, target.clamp(0.0, 1.0));
         }
         "set_red" => color.color.r = (n.round() as i64).clamp(0, 255) as i32,
@@ -423,8 +503,17 @@ enum Token {
 
 enum Node {
     Text(String),
-    For { variables: Vec<String>, iterable: String, body: Vec<Node> },
-    If { condition: String, negated: bool, then_body: Vec<Node>, else_body: Vec<Node> },
+    For {
+        variables: Vec<String>,
+        iterable: String,
+        body: Vec<Node>,
+    },
+    If {
+        condition: String,
+        negated: bool,
+        then_body: Vec<Node>,
+        else_body: Vec<Node>,
+    },
 }
 
 fn tokenize(input: &str) -> Vec<Token> {
@@ -443,7 +532,11 @@ fn tokenize(input: &str) -> Vec<Token> {
             }
             if after == bytes.len() || bytes[after] == b'\n' {
                 adj_start = line_start;
-                adj_end = if after == bytes.len() { after } else { after + 1 };
+                adj_end = if after == bytes.len() {
+                    after
+                } else {
+                    after + 1
+                };
             }
         }
         if adj_start > last_end {
@@ -506,7 +599,11 @@ impl Parser<'_> {
         self.pos += 1;
         let Some(m) = re().for_cmd.captures(&cmd) else {
             self.errors += 1;
-            return Node::For { variables: vec![], iterable: String::new(), body: vec![] };
+            return Node::For {
+                variables: vec![],
+                iterable: String::new(),
+                body: vec![],
+            };
         };
         // `getline(',')` drops a trailing empty field.
         let mut variables: Vec<String> = m[1].split(',').map(|v| trim(v).to_string()).collect();
@@ -518,7 +615,11 @@ impl Parser<'_> {
         if self.pos < self.tokens.len() {
             self.pos += 1;
         }
-        Node::For { variables, iterable, body }
+        Node::For {
+            variables,
+            iterable,
+            body,
+        }
     }
 
     fn parse_if(&mut self) -> Node {
@@ -542,7 +643,12 @@ impl Parser<'_> {
         if self.pos < self.tokens.len() {
             self.pos += 1;
         }
-        Node::If { condition, negated, then_body, else_body }
+        Node::If {
+            condition,
+            negated,
+            then_body,
+            else_body,
+        }
     }
 }
 
@@ -595,7 +701,9 @@ impl Engine<'_> {
         if base.is_empty() || parts.is_empty() {
             return Scope::None;
         }
-        let Some(first) = self.scope_get(parts[0]) else { return Scope::None };
+        let Some(first) = self.scope_get(parts[0]) else {
+            return Scope::None;
+        };
         let mut value = first.clone();
         for part in &parts[1..] {
             value = match value {
@@ -610,7 +718,9 @@ impl Engine<'_> {
                 Scope::Str(s) => {
                     if s.len() >= 7 && s.starts_with('#') && KNOWN_FORMATS.contains(part) {
                         return match Color::from_hex(&s) {
-                            Some(color) => Scope::Str(format_color(&RichColor { color, alpha: 1.0 }, part)),
+                            Some(color) => {
+                                Scope::Str(format_color(&RichColor { color, alpha: 1.0 }, part))
+                            }
                             None => Scope::None,
                         };
                     }
@@ -673,7 +783,8 @@ impl Engine<'_> {
                 "kebab_case" => resolved = Scope::Str(join_lower(&text(&resolved), "-")),
                 "to_color" => resolved = Scope::Str(text(&resolved)),
                 n if COLOR_ARG_FILTERS.contains(&n) => {
-                    match as_rich_color(&resolved).and_then(|c| apply_color_arg_filter(c, n, &arg)) {
+                    match as_rich_color(&resolved).and_then(|c| apply_color_arg_filter(c, n, &arg))
+                    {
                         Ok(c) => resolved = Scope::Color(c),
                         Err(()) => self.errors += 1,
                     }
@@ -691,7 +802,13 @@ impl Engine<'_> {
     }
 
     /// Shared tail of `colors.*` / `palettes.*`: text filters short-circuit, colour filters chain.
-    fn finish_color(&mut self, mut color: RichColor, format_type: &str, filters: &[String], base: &str) -> String {
+    fn finish_color(
+        &mut self,
+        mut color: RichColor,
+        format_type: &str,
+        filters: &[String],
+        base: &str,
+    ) -> String {
         for filter in filters {
             let (name, arg) = parse_filter(filter);
             let fmt = |c: &RichColor| format_color(c, format_type);
@@ -703,7 +820,8 @@ impl Engine<'_> {
                 "snake_case" => return join_lower(&fmt(&color), "_"),
                 "kebab_case" => return join_lower(&fmt(&color), "-"),
                 "to_color" => continue,
-                n if COLOR_ARG_FILTERS.contains(&n) => match apply_color_arg_filter(color, n, &arg) {
+                n if COLOR_ARG_FILTERS.contains(&n) => match apply_color_arg_filter(color, n, &arg)
+                {
                     Ok(c) => color = c,
                     Err(()) => {
                         self.errors += 1;
@@ -736,7 +854,11 @@ impl Engine<'_> {
             "on_hover" => color_name = "on_surface".into(),
             _ => {}
         }
-        let mode_key = if mode == "default" { self.options.default_mode.as_str() } else { mode.as_str() };
+        let mode_key = if mode == "default" {
+            self.options.default_mode.as_str()
+        } else {
+            mode.as_str()
+        };
         let Some(hex) = self.data.get(mode_key).and_then(|m| m.get(&color_name)) else {
             self.errors += 1;
             return format!("{{{{UNKNOWN:{color_name}.{mode}}}}}");
@@ -763,8 +885,12 @@ impl Engine<'_> {
     }
 
     fn palette_entries(&mut self, family: &str) -> Vec<Scope> {
-        const TONES: [i32; 18] = [0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100];
-        let Some(color) = self.palette_family_color(family) else { return vec![] };
+        const TONES: [i32; 18] = [
+            0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100,
+        ];
+        let Some(color) = self.palette_family_color(family) else {
+            return vec![];
+        };
         let palette = TonalPalette::from_argb(color.to_argb());
         TONES
             .iter()
@@ -797,7 +923,15 @@ impl Engine<'_> {
         };
         let palette = TonalPalette::from_argb(color.to_argb());
         let tone_color = Color::from_argb(palette.get(f64::from(tone)));
-        self.finish_color(RichColor { color: tone_color, alpha: 1.0 }, &format_type, filters, base)
+        self.finish_color(
+            RichColor {
+                color: tone_color,
+                alpha: 1.0,
+            },
+            &format_type,
+            filters,
+            base,
+        )
     }
 
     fn resolve_text(&mut self, text: &str) -> String {
@@ -817,15 +951,24 @@ impl Engine<'_> {
 
     fn resolve_iterable(&mut self, expr: &str) -> Vec<Scope> {
         if let Some(m) = re().range.captures(expr) {
-            let (Ok(start), Ok(end)) = (m[1].parse::<i32>(), m[2].parse::<i32>()) else { return vec![] };
+            let (Ok(start), Ok(end)) = (m[1].parse::<i32>(), m[2].parse::<i32>()) else {
+                return vec![];
+            };
             return (start..end).map(|i| Scope::Num(f64::from(i))).collect();
         }
         self.note_config_use(expr);
         let pair = |k: &str, v: Scope| {
-            Scope::Map(BTreeMap::from([("key".to_string(), Scope::Str(k.to_string())), ("value".to_string(), v)]))
+            Scope::Map(BTreeMap::from([
+                ("key".to_string(), Scope::Str(k.to_string())),
+                ("value".to_string(), v),
+            ]))
         };
         if expr == "colors" {
-            return self.colors_map().into_iter().map(|(k, v)| pair(&k, v)).collect();
+            return self
+                .colors_map()
+                .into_iter()
+                .map(|(k, v)| pair(&k, v))
+                .collect();
         }
         if let Some(name) = expr.strip_prefix("palettes.") {
             return self.palette_entries(name);
@@ -842,8 +985,17 @@ impl Engine<'_> {
         for node in nodes {
             match node {
                 Node::Text(t) => out += &self.resolve_text(t),
-                Node::For { variables, iterable, body } => out += &self.eval_for(variables, iterable, body),
-                Node::If { condition, negated, then_body, else_body } => {
+                Node::For {
+                    variables,
+                    iterable,
+                    body,
+                } => out += &self.eval_for(variables, iterable, body),
+                Node::If {
+                    condition,
+                    negated,
+                    then_body,
+                    else_body,
+                } => {
                     let value = self.resolve_expression(condition);
                     let truthy = is_truthy(&value) != *negated;
                     out += &self.eval_nodes(if truthy { then_body } else { else_body });
@@ -909,15 +1061,30 @@ fn stoul(s: &str) -> Option<usize> {
 
 pub fn render(data: &ThemeData, options: &Options, template: &str) -> RenderResult {
     let tokens = tokenize(template);
-    let mut parser = Parser { tokens: &tokens, pos: 0, errors: 0 };
+    let mut parser = Parser {
+        tokens: &tokens,
+        pos: 0,
+        errors: 0,
+    };
     let nodes = parser.nodes(&[]);
     let parse_errors = parser.errors;
 
-    let mut engine = Engine { data, options, errors: parse_errors, unsupported: None, needs_config: false, needs_image: false, scopes: Vec::new() };
+    let mut engine = Engine {
+        data,
+        options,
+        errors: parse_errors,
+        unsupported: None,
+        needs_config: false,
+        needs_image: false,
+        scopes: Vec::new(),
+    };
     if let Some(table) = &options.config_table {
         let mut root = BTreeMap::new();
         root.insert("config".to_string(), from_json(table));
-        root.insert("icon_theme".to_string(), Scope::Str(options.icon_theme.clone()));
+        root.insert(
+            "icon_theme".to_string(),
+            Scope::Str(options.icon_theme.clone()),
+        );
         engine.scopes.push(root);
     }
     let text = engine.eval_nodes(&nodes);

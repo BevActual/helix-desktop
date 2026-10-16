@@ -12,7 +12,10 @@ pub fn safe_filename(name: &str) -> Result<String, String> {
     if trimmed.contains('/') || trimmed.contains('\\') || trimmed.contains("..") {
         return Err("The file name must not include paths.".into());
     }
-    if !trimmed.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' ')) {
+    if !trimmed
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' '))
+    {
         return Err("The file name uses unsupported characters.".into());
     }
     Ok(trimmed.to_string())
@@ -22,7 +25,12 @@ pub fn save_new_file(content: &str, default_filename: &str) -> Result<Option<Str
     terminal::safe_input(content, 512_000)?;
     let default = safe_filename(default_filename)?;
     let output = std::process::Command::new("zenity")
-        .args(["--file-selection", "--save", "--title=Save Mobius output", &format!("--filename={default}")])
+        .args([
+            "--file-selection",
+            "--save",
+            "--title=Save Mobius output",
+            &format!("--filename={default}"),
+        ])
         .output()
         .map_err(|_| "Saving files requires zenity.")?;
     if !output.status.success() {
@@ -38,7 +46,8 @@ pub fn save_new_file(content: &str, default_filename: &str) -> Result<Option<Str
         .mode(0o600)
         .open(&path)
         .map_err(|e| format!("Could not save (choose a new file name): {e}"))?;
-    file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| e.to_string())?;
     Ok(Some(path))
 }
 

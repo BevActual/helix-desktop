@@ -62,7 +62,14 @@ fn is_image(path: &Path) -> bool {
 }
 
 fn clean(text: &str) -> String {
-    text.chars().filter(|c| !c.is_control() && !('\u{202a}'..='\u{202e}').contains(c) && !('\u{2066}'..='\u{2069}').contains(c)).take(80).collect()
+    text.chars()
+        .filter(|c| {
+            !c.is_control()
+                && !('\u{202a}'..='\u{202e}').contains(c)
+                && !('\u{2066}'..='\u{2069}').contains(c)
+        })
+        .take(80)
+        .collect()
 }
 
 impl Picker {
@@ -163,7 +170,10 @@ mod tests {
     #[test]
     fn a_choice_is_a_listed_image_or_a_swatch_and_nothing_else() {
         let p = picker();
-        assert_eq!(p.choose_image(0), Ok(Source::Image("/pics/A_one.png".into())));
+        assert_eq!(
+            p.choose_image(0),
+            Ok(Source::Image("/pics/A_one.png".into()))
+        );
         assert_eq!(p.choose_image(2), Ok(Source::Image("/pics/c.webp".into())));
         assert_eq!(p.choose_image(3), Err(ChoiceError::NotListed));
         assert_eq!(p.choose_image(usize::MAX), Err(ChoiceError::NotListed));
@@ -176,12 +186,26 @@ mod tests {
         let mut p = picker();
         p.set_current(Some(Source::Image("/pics/b-two.JPG".into())));
         let v = p.view();
-        assert_eq!(v.images.iter().filter(|i| i.current).map(|i| i.index).collect::<Vec<_>>(), [1]);
+        assert_eq!(
+            v.images
+                .iter()
+                .filter(|i| i.current)
+                .map(|i| i.index)
+                .collect::<Vec<_>>(),
+            [1]
+        );
         assert!(v.swatches.iter().all(|s| !s.current));
         p.set_current(Some(Source::Color(SWATCHES[2])));
         let v = p.view();
         assert!(v.images.iter().all(|i| !i.current));
-        assert_eq!(v.swatches.iter().filter(|s| s.current).map(|s| s.index).collect::<Vec<_>>(), [2]);
+        assert_eq!(
+            v.swatches
+                .iter()
+                .filter(|s| s.current)
+                .map(|s| s.index)
+                .collect::<Vec<_>>(),
+            [2]
+        );
         p.set_current(None);
         assert!(p.view().images.iter().all(|i| !i.current));
     }
@@ -199,11 +223,16 @@ mod tests {
     #[test]
     fn the_listing_is_bounded_and_names_are_clean() {
         let mut p = Picker::default();
-        let files: Vec<PathBuf> = (0..1000).map(|i| PathBuf::from(format!("/p/{i:04}.png"))).collect();
+        let files: Vec<PathBuf> = (0..1000)
+            .map(|i| PathBuf::from(format!("/p/{i:04}.png")))
+            .collect();
         p.set_folder(Path::new("/p"), files);
         assert_eq!(p.view().images.len(), MAX_IMAGES);
         p.set_folder(Path::new("/p"), vec!["/p/a\u{202e}b\nc.png".into()]);
         let name = &p.view().images[0].name;
-        assert!(!name.contains('\u{202e}') && !name.contains('\n'), "{name:?}");
+        assert!(
+            !name.contains('\u{202e}') && !name.contains('\n'),
+            "{name:?}"
+        );
     }
 }

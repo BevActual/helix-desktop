@@ -14,7 +14,8 @@ use crate::color::Color;
 use crate::contrast::ensure_contrast;
 use crate::palette::{
     apply_terminal_palette, expand_fixed_palette_mode, map_generated_palette_mode,
-    synthesize_terminal_palette_tokens, terminal_palette_from_tokens, Palette, TerminalPalette, TokenMap, ANSI_KEYS,
+    synthesize_terminal_palette_tokens, terminal_palette_from_tokens, Palette, TerminalPalette,
+    TokenMap, ANSI_KEYS,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -67,8 +68,22 @@ impl ColorRole {
     pub fn from_index(index: u32) -> Option<Self> {
         use ColorRole::*;
         [
-            Primary, OnPrimary, Secondary, OnSecondary, Tertiary, OnTertiary, Error, OnError, Surface, OnSurface,
-            SurfaceVariant, OnSurfaceVariant, Outline, Shadow, Hover, OnHover,
+            Primary,
+            OnPrimary,
+            Secondary,
+            OnSecondary,
+            Tertiary,
+            OnTertiary,
+            Error,
+            OnError,
+            Surface,
+            OnSurface,
+            SurfaceVariant,
+            OnSurfaceVariant,
+            Outline,
+            Shadow,
+            Hover,
+            OnHover,
         ]
         .get(index as usize)
         .copied()
@@ -81,8 +96,16 @@ pub fn parse_hex(value: &str) -> Option<Color> {
     if !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
-    let byte = |i: usize| u8::from_str_radix(&digits[i..i + 2], 16).ok().map(i32::from);
-    let short = |i: usize| u8::from_str_radix(&digits[i..=i], 16).ok().map(|v| i32::from(v) * 17);
+    let byte = |i: usize| {
+        u8::from_str_radix(&digits[i..i + 2], 16)
+            .ok()
+            .map(i32::from)
+    };
+    let short = |i: usize| {
+        u8::from_str_radix(&digits[i..=i], 16)
+            .ok()
+            .map(|v| i32::from(v) * 17)
+    };
     match digits.len() {
         3 | 4 => Some(Color::new(short(0)?, short(1)?, short(2)?)),
         6 | 8 => Some(Color::new(byte(0)?, byte(2)?, byte(4)?)),
@@ -148,7 +171,10 @@ fn read_terminal_json(obj: &Value) -> TerminalPalette {
 
 fn read_mode(obj: &Value) -> Option<FixedPaletteMode> {
     let terminal = obj.get("terminal").filter(|v| v.is_object())?;
-    Some(FixedPaletteMode { palette: read_palette_json(obj), terminal: read_terminal_json(terminal) })
+    Some(FixedPaletteMode {
+        palette: read_palette_json(obj),
+        terminal: read_terminal_json(terminal),
+    })
 }
 
 /// C++ `parseCommunityPaletteJson`: a dark mode with a terminal block is required;
@@ -256,7 +282,11 @@ pub fn suggest_custom_palette_name(wallpaper_path: &str, scheme: &str) -> String
     let mut base = String::new();
     if let Some(color) = wallpaper_path.strip_prefix("color:") {
         let component = sanitize_component(color);
-        base = if component.is_empty() { "solid".to_string() } else { format!("color-{component}") };
+        base = if component.is_empty() {
+            "solid".to_string()
+        } else {
+            format!("color-{component}")
+        };
     } else if !wallpaper_path.is_empty() {
         let stem = Path::new(wallpaper_path)
             .file_stem()
@@ -283,7 +313,10 @@ pub fn save_wallpaper_as_custom(dir: &Path, sel: &ThemeSelection) -> Result<Stri
     let Some(wallpaper) = &sel.wallpaper else {
         return Err(SaveError::WallpaperSource);
     };
-    let name = allocate_custom_palette_name(dir, &suggest_custom_palette_name(&wallpaper.path, &wallpaper.scheme));
+    let name = allocate_custom_palette_name(
+        dir,
+        &suggest_custom_palette_name(&wallpaper.path, &wallpaper.scheme),
+    );
     if name.is_empty() {
         return Err("failed to allocate custom palette name".to_string().into());
     }
@@ -393,7 +426,11 @@ pub fn palette_json(generated: &GeneratedPalette) -> Option<String> {
 }
 
 /// C++ `saveCustomPaletteFromGenerated`. Returns the sanitized name actually used.
-pub fn save_custom_palette(dir: &Path, name: &str, generated: &GeneratedPalette) -> Result<String, String> {
+pub fn save_custom_palette(
+    dir: &Path,
+    name: &str,
+    generated: &GeneratedPalette,
+) -> Result<String, String> {
     let trimmed = sanitize_component(name);
     if trimmed.is_empty() {
         return Err("invalid custom palette name".into());
@@ -411,7 +448,11 @@ pub fn save_custom_palette(dir: &Path, name: &str, generated: &GeneratedPalette)
 
 /// C++ `applyEditablePaletteRole`. `false` for roles that are not editable.
 pub fn apply_editable_palette_role(palette: &mut Palette, role: ColorRole, color: Color) -> bool {
-    let seed = if crate::contrast::is_dark(color) { Color::new(255, 255, 255) } else { Color::new(0, 0, 0) };
+    let seed = if crate::contrast::is_dark(color) {
+        Color::new(255, 255, 255)
+    } else {
+        Color::new(0, 0, 0)
+    };
     let on = Color::from_argb(ensure_contrast(seed, color, 4.5, 0).to_argb() & 0x00ff_ffff);
     match role {
         ColorRole::Primary => {
@@ -506,7 +547,10 @@ fn resolve_from_source(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPale
         PaletteSource::Wallpaper => sel.wallpaper.as_ref().map(|w| w.generated.clone()),
         PaletteSource::Custom if !sel.custom_palette.is_empty() => {
             let path = custom_palette_path(dir, &sel.custom_palette);
-            path.exists().then(|| read_parsed(&path)).flatten().map(|p| expand_fixed_palette(&p))
+            path.exists()
+                .then(|| read_parsed(&path))
+                .flatten()
+                .map(|p| expand_fixed_palette(&p))
         }
         PaletteSource::Community => {
             let path = sel.community_cache.as_deref().filter(|p| p.exists())?;
@@ -551,7 +595,9 @@ pub fn url_encode(text: &str) -> String {
 
 /// `communityPaletteCachePath(name)` under the state dir (`<state>/community-palettes/`).
 pub fn community_palette_cache_path(state_dir: &Path, name: &str) -> PathBuf {
-    state_dir.join("community-palettes").join(format!("{}.json", url_encode(name)))
+    state_dir
+        .join("community-palettes")
+        .join(format!("{}.json", url_encode(name)))
 }
 
 /// C++ `saveRoleColorAsCustom` (local path). Returns the palette name; the caller must
@@ -566,7 +612,11 @@ pub fn save_role_color_as_custom(
         return Err(SaveError::WallpaperSource);
     }
     let mut generated = resolve(dir, sel);
-    let tokens = if sel.shell_light { &mut generated.light } else { &mut generated.dark };
+    let tokens = if sel.shell_light {
+        &mut generated.light
+    } else {
+        &mut generated.dark
+    };
     let mut palette = map_generated_palette_mode(tokens);
     if !apply_editable_palette_role(&mut palette, role, color) {
         return Err("unsupported palette role".to_string().into());

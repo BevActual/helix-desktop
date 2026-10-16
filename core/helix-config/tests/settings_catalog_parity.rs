@@ -49,7 +49,11 @@ fn pristine_catalog_matches_golden() {
         };
         for field in ["type", "page", "group"] {
             if g.get(field) != w.get(field) {
-                problems.push(format!("{id}.{field}: rust={:?} cpp={:?}", g.get(field), w.get(field)));
+                problems.push(format!(
+                    "{id}.{field}: rust={:?} cpp={:?}",
+                    g.get(field),
+                    w.get(field)
+                ));
             }
         }
         // Needs the installed template assets; the C++ golden ran without them.
@@ -57,14 +61,25 @@ fn pristine_catalog_matches_golden() {
             continue;
         }
         // Option lists (widget names, palettes, tabs, ...) are part of the contract too.
-        let options = |row: &Value| row.get("options").cloned().unwrap_or_else(|| Value::Array(vec![]));
+        let options = |row: &Value| {
+            row.get("options")
+                .cloned()
+                .unwrap_or_else(|| Value::Array(vec![]))
+        };
         if options(g) != options(w) {
-            problems.push(format!("{id}.options: rust={} cpp={}", options(g), options(w)));
+            problems.push(format!(
+                "{id}.options: rust={} cpp={}",
+                options(g),
+                options(w)
+            ));
         }
         if PRODUCT_DEFAULTS.contains(&id.as_str()) {
             continue;
         }
-        let (gv, wv) = (g.get("value").cloned().unwrap_or(Value::Null), w.get("value").cloned().unwrap_or(Value::Null));
+        let (gv, wv) = (
+            g.get("value").cloned().unwrap_or(Value::Null),
+            w.get("value").cloned().unwrap_or(Value::Null),
+        );
         if !same_number(&gv, &wv) {
             problems.push(format!("{id}.value: rust={gv} cpp={wv}"));
         }
@@ -73,5 +88,10 @@ fn pristine_catalog_matches_golden() {
         problems.push(format!("extra in Rust: {id}"));
     }
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(problems.is_empty(), "{} mismatches:\n{}", problems.len(), problems.join("\n"));
+    assert!(
+        problems.is_empty(),
+        "{} mismatches:\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
 }

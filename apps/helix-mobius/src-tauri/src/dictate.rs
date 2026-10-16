@@ -34,14 +34,28 @@ impl Dictation {
         if current.is_some() {
             return Err("Already listening.".into());
         }
-        let mut command = if let Some(file) = std::env::var_os("HELIX_DICTATE_SOURCE_FILE").filter(|v| !v.is_empty()) {
+        let mut command = if let Some(file) =
+            std::env::var_os("HELIX_DICTATE_SOURCE_FILE").filter(|v| !v.is_empty())
+        {
             // Tests: play a recorded file as if it were the microphone.
             let mut c = Command::new("sh");
-            c.arg("-c").arg("cat \"$1\"; exec sleep 3600").arg("dictate").arg(file);
+            c.arg("-c")
+                .arg("cat \"$1\"; exec sleep 3600")
+                .arg("dictate")
+                .arg(file);
             c
         } else {
             let mut c = Command::new("pw-record");
-            c.args(["--raw", "--rate", "16000", "--channels", "1", "--format", "s16", "-"]);
+            c.args([
+                "--raw",
+                "--rate",
+                "16000",
+                "--channels",
+                "1",
+                "--format",
+                "s16",
+                "-",
+            ]);
             c
         };
         let mut child = command
@@ -49,7 +63,9 @@ impl Dictation {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|_| "No microphone recorder is available (pw-record from PipeWire).".to_string())?;
+            .map_err(|_| {
+                "No microphone recorder is available (pw-record from PipeWire).".to_string()
+            })?;
         let mut stdout = child.stdout.take().ok_or("No microphone.")?;
         let buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
         let sink = buffer.clone();
@@ -61,7 +77,8 @@ impl Dictation {
                     Ok(n) => {
                         let mut peak = 0i32;
                         for pair in chunk[..n].as_chunks::<2>().0 {
-                            peak = peak.max(i32::from(i16::from_le_bytes([pair[0], pair[1]])).abs());
+                            peak =
+                                peak.max(i32::from(i16::from_le_bytes([pair[0], pair[1]])).abs());
                         }
                         level((peak as f32 / 32768.0).min(1.0));
                         let mut data = sink.lock().expect("buffer");
@@ -73,14 +90,27 @@ impl Dictation {
                 }
             }
         });
-        *current = Some(Recording { child, buffer, reader });
+        *current = Some(Recording {
+            child,
+            buffer,
+            reader,
+        });
         Ok(())
     }
 
     /// Closes the microphone and returns what was heard (16-bit little-endian, 16 kHz, mono).
     pub fn stop(&self) -> Result<Vec<u8>, String> {
-        let recording = self.current.lock().expect("dictation").take().ok_or("Not listening.")?;
-        let Recording { mut child, buffer, reader } = recording;
+        let recording = self
+            .current
+            .lock()
+            .expect("dictation")
+            .take()
+            .ok_or("Not listening.")?;
+        let Recording {
+            mut child,
+            buffer,
+            reader,
+        } = recording;
         let _ = child.kill();
         let _ = child.wait();
         let _ = reader.join();
@@ -171,11 +201,17 @@ mod tests {
         assert_eq!(hub.wait(7).await.unwrap(), (true, "early".to_string()));
         hub.expect(8);
         let hub = Arc::new(hub);
-        let waiter = { let hub = hub.clone(); tokio::spawn(async move { hub.wait(8).await }) };
+        let waiter = {
+            let hub = hub.clone();
+            tokio::spawn(async move { hub.wait(8).await })
+        };
         tokio::task::yield_now().await;
         assert!(hub.deliver(8, false, "late".into()));
         assert_eq!(waiter.await.unwrap().unwrap(), (false, "late".to_string()));
-        assert!(!hub.deliver(9, true, "chat".into()), "a chat reply is not a transcription");
+        assert!(
+            !hub.deliver(9, true, "chat".into()),
+            "a chat reply is not a transcription"
+        );
         // The signal can be seen before the caller learns the operation id.
         assert!(!hub.deliver(10, true, "first".into()));
         hub.expect(10);

@@ -86,7 +86,11 @@ impl Monitor {
         let mut rows: Vec<_> = self
             .processes
             .iter()
-            .filter(|p| q.is_empty() || p.name.to_ascii_lowercase().contains(&q) || p.pid.to_string().contains(&q))
+            .filter(|p| {
+                q.is_empty()
+                    || p.name.to_ascii_lowercase().contains(&q)
+                    || p.pid.to_string().contains(&q)
+            })
             .cloned()
             .collect();
         match sort {
@@ -107,7 +111,8 @@ impl Monitor {
             let dt = snap.total.saturating_sub(prev.total);
             let di = snap.idle.saturating_sub(prev.idle);
             if dt > 0 {
-                self.overview.cpu_percent = ((dt - di) as f64 / dt as f64 * 100.0).clamp(0.0, 100.0);
+                self.overview.cpu_percent =
+                    ((dt - di) as f64 / dt as f64 * 100.0).clamp(0.0, 100.0);
             }
         }
         self.prev_cpu = Some(snap);
@@ -284,7 +289,9 @@ pub fn parse_screen_time(text: &str) -> Vec<ScreenTimeRow> {
     for line in text.lines() {
         let mut parts = line.split_whitespace();
         let Some(app) = parts.next() else { continue };
-        let Some(seconds) = parts.next().and_then(|s| s.parse().ok()) else { continue };
+        let Some(seconds) = parts.next().and_then(|s| s.parse().ok()) else {
+            continue;
+        };
         if seconds == 0 || app.is_empty() || parts.next().is_some() {
             continue;
         }
@@ -328,7 +335,9 @@ mod tests {
         assert_eq!(p.name, "bash");
         assert_eq!(p.cpu_ticks, 15);
         assert_eq!(p.rss, 200 * 4096);
-        let rows = parse_screen_time("org.helix.Settings 120\nbad\norg.helix.Mobius 30 extra\norg.helix.Mobius 60\n");
+        let rows = parse_screen_time(
+            "org.helix.Settings 120\nbad\norg.helix.Mobius 30 extra\norg.helix.Mobius 60\n",
+        );
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].app, "org.helix.Settings");
         assert_eq!(rows[0].seconds, 120);
@@ -337,8 +346,14 @@ mod tests {
     #[test]
     fn overview_deltas_and_process_filter() {
         let mut m = Monitor::default();
-        m.set_cpu(CpuSnap { total: 100, idle: 50 });
-        m.set_cpu(CpuSnap { total: 200, idle: 80 });
+        m.set_cpu(CpuSnap {
+            total: 100,
+            idle: 50,
+        });
+        m.set_cpu(CpuSnap {
+            total: 200,
+            idle: 80,
+        });
         assert!((m.overview().cpu_percent - 70.0).abs() < 0.01);
         m.set_memory(MemorySnap {
             total: 1000,
@@ -348,8 +363,22 @@ mod tests {
         });
         assert!((m.overview().mem_percent - 75.0).abs() < 0.01);
         m.set_processes(vec![
-            ProcessRow { pid: 1, name: "init".into(), state: 'S', threads: 1, rss: 10, cpu_ticks: 1 },
-            ProcessRow { pid: 2, name: "helix-shell".into(), state: 'R', threads: 4, rss: 90, cpu_ticks: 50 },
+            ProcessRow {
+                pid: 1,
+                name: "init".into(),
+                state: 'S',
+                threads: 1,
+                rss: 10,
+                cpu_ticks: 1,
+            },
+            ProcessRow {
+                pid: 2,
+                name: "helix-shell".into(),
+                state: 'R',
+                threads: 4,
+                rss: 90,
+                cpu_ticks: 50,
+            },
         ]);
         let rows = m.processes("helix", ProcessSort::Memory);
         assert_eq!(rows.len(), 1);

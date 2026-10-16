@@ -93,10 +93,17 @@ pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTi
     match mode.as_deref() {
         Some("light") => false,
         Some("auto") => {
-            let text = |id: &str| entry_of(entries, id).and_then(|dict| dict_string(&dict, "value")).unwrap_or_default();
-            let number = |id: &str| entry_of(entries, id).and_then(|dict| dict_number(&dict, "value"));
+            let text = |id: &str| {
+                entry_of(entries, id)
+                    .and_then(|dict| dict_string(&dict, "value"))
+                    .unwrap_or_default()
+            };
+            let number =
+                |id: &str| entry_of(entries, id).and_then(|dict| dict_number(&dict, "value"));
             let location = helix_theme::schedule::LocationConfig {
-                custom_schedule: entry_of(entries, "location.custom_schedule").and_then(|dict| dict_bool(&dict, "value")).unwrap_or(false),
+                custom_schedule: entry_of(entries, "location.custom_schedule")
+                    .and_then(|dict| dict_bool(&dict, "value"))
+                    .unwrap_or(false),
                 sunset: text("location.sunset"),
                 sunrise: text("location.sunrise"),
                 latitude: number("location.latitude"),
@@ -169,9 +176,9 @@ pub fn setting_by_id(settings: &serde_json::Value, id: &str) -> zbus::Result<ser
     settings
         .as_array()
         .and_then(|entries| {
-            entries.iter().find(|entry| {
-                entry.get("id").and_then(|value| value.as_str()) == Some(id)
-            })
+            entries
+                .iter()
+                .find(|entry| entry.get("id").and_then(|value| value.as_str()) == Some(id))
         })
         .cloned()
         .ok_or_else(|| zbus::Error::Failure(format!("setting not found: {id}")))
@@ -362,7 +369,10 @@ impl Desktop {
         let proxy = self.domain_proxy(Domain::Bluetooth).await?;
         let mut prompts = proxy.receive_signal("Prompt").await?;
         while let Some(message) = prompts.next().await {
-            if let Ok((body,)) = message.body().deserialize::<(std::collections::HashMap<String, OwnedValue>,)>() {
+            if let Ok((body,)) = message
+                .body()
+                .deserialize::<(std::collections::HashMap<String, OwnedValue>,)>()
+            {
                 let mut object = serde_json::Map::new();
                 for (key, value) in &body {
                     object.insert(key.clone(), owned_to_json(value));
@@ -425,7 +435,10 @@ impl Desktop {
         candidate: &[String],
     ) -> zbus::Result<()> {
         let baseline = serde_json::Value::Array(
-            baseline.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+            baseline
+                .iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
         );
         let candidate = serde_json::Value::Array(
             candidate
@@ -433,7 +446,8 @@ impl Desktop {
                 .map(|s| serde_json::Value::String(s.clone()))
                 .collect(),
         );
-        self.update_ordered_list_json(id, &baseline, &candidate).await
+        self.update_ordered_list_json(id, &baseline, &candidate)
+            .await
     }
 
     /// `UpdateOrderedList` with JSON array baseline/candidate (strings, rule objects, …).
@@ -446,7 +460,9 @@ impl Desktop {
         let proxy = self.domain_proxy(Domain::Configuration).await?;
         let baseline = json::json_to_ordered_list_av(baseline).map_err(zbus::Error::Failure)?;
         let candidate = json::json_to_ordered_list_av(candidate).map_err(zbus::Error::Failure)?;
-        proxy.call("UpdateOrderedList", &(id, baseline, candidate)).await
+        proxy
+            .call("UpdateOrderedList", &(id, baseline, candidate))
+            .await
     }
 
     /// `Configuration1.UpdateApplicationList` (dock pins and other `application-list` rows).
@@ -457,7 +473,10 @@ impl Desktop {
         candidate: &[String],
     ) -> zbus::Result<()> {
         let baseline = serde_json::Value::Array(
-            baseline.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+            baseline
+                .iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
         );
         let candidate = serde_json::Value::Array(
             candidate
@@ -616,13 +635,22 @@ mod tests {
         assert_eq!(ui_scale(&with(3.0)), 1.5);
         assert_eq!(ui_scale(&with(0.1)), 0.8);
         assert_eq!(ui_scale(&with(f64::NAN)), 1.0);
-        assert_eq!(ui_scale(&[setting("audio.sound_volume", Value::from(0.5f64))]), 1.0, "a missing row means no scaling");
+        assert_eq!(
+            ui_scale(&[setting("audio.sound_volume", Value::from(0.5f64))]),
+            1.0,
+            "a missing row means no scaling"
+        );
     }
 
     #[test]
     fn applications_follow_the_theme_mode_and_the_schedule() {
         use helix_theme::schedule::LocalTime;
-        let at = |minute_of_day| LocalTime { minute_of_day, second: 0, day_of_year: 100, gmt_offset_secs: 0 };
+        let at = |minute_of_day| LocalTime {
+            minute_of_day,
+            second: 0,
+            day_of_year: 100,
+            gmt_offset_secs: 0,
+        };
         let mode = |mode: &str| vec![setting("theme.mode", Value::from(mode.to_string()))];
         assert!(theme_is_dark(&mode("dark"), at(12 * 60)));
         assert!(!theme_is_dark(&mode("light"), at(23 * 60)));
@@ -630,7 +658,10 @@ mod tests {
         let mut auto = mode("auto");
         auto.push(setting("location.custom_schedule", Value::from(true)));
         auto.push(setting("location.sunset", Value::from("19:00".to_string())));
-        auto.push(setting("location.sunrise", Value::from("07:00".to_string())));
+        auto.push(setting(
+            "location.sunrise",
+            Value::from("07:00".to_string()),
+        ));
         assert!(!theme_is_dark(&auto, at(12 * 60)), "light by day");
         assert!(theme_is_dark(&auto, at(21 * 60)), "dark by night");
         assert!(theme_is_dark(&auto, at(3 * 60)), "dark before sunrise");

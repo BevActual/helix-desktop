@@ -64,8 +64,9 @@ pub fn json_to_ordered_list_av(array: &Json) -> Result<Vec<OwnedValue>, String> 
 fn json_to_list_element(value: &Json) -> Result<OwnedValue, String> {
     match value {
         Json::Null => Err("ordered list entries cannot be null".into()),
-        Json::Bool(flag) => OwnedValue::try_from(Value::Bool(*flag))
-            .map_err(|error| error.to_string()),
+        Json::Bool(flag) => {
+            OwnedValue::try_from(Value::Bool(*flag)).map_err(|error| error.to_string())
+        }
         Json::Number(number) => {
             let converted = if let Some(whole) = number.as_i64() {
                 Value::I64(whole)
@@ -74,8 +75,9 @@ fn json_to_list_element(value: &Json) -> Result<OwnedValue, String> {
             };
             OwnedValue::try_from(converted).map_err(|error| error.to_string())
         }
-        Json::String(text) => OwnedValue::try_from(Value::from(text.clone()))
-            .map_err(|error| error.to_string()),
+        Json::String(text) => {
+            OwnedValue::try_from(Value::from(text.clone())).map_err(|error| error.to_string())
+        }
         Json::Array(items) => {
             let owned: Vec<OwnedValue> = items
                 .iter()

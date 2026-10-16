@@ -222,11 +222,7 @@ mod tests {
         ));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
-        fs::write(
-            root.join("base.toml"),
-            "[theme]\nmode = \"dark\"\n",
-        )
-        .unwrap();
+        fs::write(root.join("base.toml"), "[theme]\nmode = \"dark\"\n").unwrap();
         fs::write(
             root.join("config.toml"),
             "include = { files = [\"base.toml\"] }\n\n[theme]\nmode = \"light\"\n",

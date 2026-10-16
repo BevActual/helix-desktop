@@ -47,7 +47,10 @@ pub const SCHEME_NAMES: [(&str, Scheme); 10] = [
 
 impl Scheme {
     pub fn parse(name: &str) -> Option<Self> {
-        SCHEME_NAMES.iter().find(|(n, _)| *n == name).map(|(_, s)| *s)
+        SCHEME_NAMES
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, s)| *s)
     }
 
     pub fn as_str(self) -> &'static str {
@@ -88,7 +91,10 @@ pub fn generate(rgb112: &[u8], scheme: Scheme) -> Result<GeneratedPalette, Strin
 }
 
 fn argb(color: Rgb) -> u32 {
-    0xff00_0000 | (u32::from(color.red) << 16) | (u32::from(color.green) << 8) | u32::from(color.blue)
+    0xff00_0000
+        | (u32::from(color.red) << 16)
+        | (u32::from(color.green) << 8)
+        | u32::from(color.blue)
 }
 
 /// Quantize, drop low-chroma clusters (as matugen does), score, take the first ranked colour.
@@ -143,7 +149,10 @@ fn token_map(scheme: &MaterialScheme) -> TokenMap {
     set("surface_container_low", scheme.surface_container_low);
     set("surface_container", scheme.surface_container);
     set("surface_container_high", scheme.surface_container_high);
-    set("surface_container_highest", scheme.surface_container_highest);
+    set(
+        "surface_container_highest",
+        scheme.surface_container_highest,
+    );
     set("outline", scheme.outline);
     set("outline_variant", scheme.outline_variant);
     set("shadow", scheme.shadow);
@@ -159,11 +168,17 @@ fn token_map(scheme: &MaterialScheme) -> TokenMap {
     set("secondary_fixed", scheme.secondary_fixed);
     set("secondary_fixed_dim", scheme.secondary_fixed_dim);
     set("on_secondary_fixed", scheme.on_secondary_fixed);
-    set("on_secondary_fixed_variant", scheme.on_secondary_fixed_variant);
+    set(
+        "on_secondary_fixed_variant",
+        scheme.on_secondary_fixed_variant,
+    );
     set("tertiary_fixed", scheme.tertiary_fixed);
     set("tertiary_fixed_dim", scheme.tertiary_fixed_dim);
     set("on_tertiary_fixed", scheme.on_tertiary_fixed);
-    set("on_tertiary_fixed_variant", scheme.on_tertiary_fixed_variant);
+    set(
+        "on_tertiary_fixed_variant",
+        scheme.on_tertiary_fixed_variant,
+    );
     m
 }
 
@@ -171,10 +186,18 @@ fn make_scheme(source: Hct, scheme: Scheme, is_dark: bool) -> MaterialScheme {
     // The C++ built MCU's schemes, which are the 2021 spec on phone.
     let (spec, platform) = (SpecVersion::Spec2021, Platform::Phone);
     let dynamic = match scheme {
-        Scheme::Content => SchemeContent::with_spec(source, is_dark, Some(0.0), spec, platform).scheme,
-        Scheme::FruitSalad => SchemeFruitSalad::with_spec(source, is_dark, Some(0.0), spec, platform).scheme,
-        Scheme::Rainbow => SchemeRainbow::with_spec(source, is_dark, Some(0.0), spec, platform).scheme,
-        Scheme::Monochrome => SchemeMonochrome::with_spec(source, is_dark, Some(0.0), spec, platform).scheme,
+        Scheme::Content => {
+            SchemeContent::with_spec(source, is_dark, Some(0.0), spec, platform).scheme
+        }
+        Scheme::FruitSalad => {
+            SchemeFruitSalad::with_spec(source, is_dark, Some(0.0), spec, platform).scheme
+        }
+        Scheme::Rainbow => {
+            SchemeRainbow::with_spec(source, is_dark, Some(0.0), spec, platform).scheme
+        }
+        Scheme::Monochrome => {
+            SchemeMonochrome::with_spec(source, is_dark, Some(0.0), spec, platform).scheme
+        }
         _ => SchemeTonalSpot::with_spec(source, is_dark, Some(0.0), spec, platform).scheme,
     };
     MaterialScheme::from(dynamic)
@@ -208,7 +231,9 @@ pub fn load_and_resize(path: &std::path::Path, scheme: Scheme) -> Result<Vec<u8>
         .map_err(|e| e.to_string())?
         .into_decoder()
         .map_err(|e| e.to_string())?;
-    let orientation = decoder.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
+    let orientation = decoder
+        .orientation()
+        .unwrap_or(image::metadata::Orientation::NoTransforms);
     let mut picture = image::DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
     picture.apply_orientation(orientation);
     let rgba = picture.to_rgba8();
@@ -323,7 +348,9 @@ fn box_window(out: usize, src_len: usize, dst_len: usize) -> Option<(usize, usiz
 fn box_resize(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst_h: usize) -> Vec<u8> {
     let mut tmp = vec![0f32; src_w * dst_h * 4];
     for outy in 0..dst_h {
-        let Some((start, count, weight)) = box_window(outy, src_h, dst_h) else { continue };
+        let Some((start, count, weight)) = box_window(outy, src_h, dst_h) else {
+            continue;
+        };
         for x in 0..src_w {
             let mut t = [0f32; 4];
             for i in start..start + count {
@@ -338,7 +365,9 @@ fn box_resize(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst_h: usize
     }
     let mut dst = vec![0u8; dst_w * dst_h * 4];
     for outx in 0..dst_w {
-        let Some((start, count, weight)) = box_window(outx, src_w, dst_w) else { continue };
+        let Some((start, count, weight)) = box_window(outx, src_w, dst_w) else {
+            continue;
+        };
         for y in 0..dst_h {
             let mut t = [0f32; 4];
             for i in start..start + count {

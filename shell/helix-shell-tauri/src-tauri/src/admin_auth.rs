@@ -80,7 +80,10 @@ pub async fn prompt(app: AppHandle, prompt: String) -> Result<String, String> {
         return Err("another authentication is already in progress".into());
     }
     let (tx, rx) = oneshot::channel();
-    PENDING.lock().expect("admin auth").replace(Pending { reply: tx });
+    PENDING
+        .lock()
+        .expect("admin auth")
+        .replace(Pending { reply: tx });
     let app2 = app.clone();
     let text = trimmed.to_string();
     let shown = tauri::async_runtime::spawn_blocking(move || {

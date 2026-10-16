@@ -5,7 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use helix_theme::custom::{
-    save_current_as_custom, save_role_color_as_custom, ColorRole, PaletteSource, SaveError, ThemeSelection,
+    save_current_as_custom, save_role_color_as_custom, ColorRole, PaletteSource, SaveError,
+    ThemeSelection,
 };
 use helix_theme::Color;
 
@@ -52,9 +53,12 @@ fn run_scenario(root: &Path) {
     for (i, (step, want)) in steps.lines().zip(expected.lines()).enumerate() {
         let parts: Vec<&str> = step.split_whitespace().collect();
         let result = match parts.as_slice() {
-            ["set-accent", hex] => {
-                save_role_color_as_custom(&palettes, &sel, ColorRole::Primary, Color::from_hex(hex).unwrap())
-            }
+            ["set-accent", hex] => save_role_color_as_custom(
+                &palettes,
+                &sel,
+                ColorRole::Primary,
+                Color::from_hex(hex).unwrap(),
+            ),
             ["set-role", idx, hex] => {
                 let role = ColorRole::from_index(idx.parse().unwrap()).unwrap();
                 save_role_color_as_custom(&palettes, &sel, role, Color::from_hex(hex).unwrap())
@@ -65,14 +69,20 @@ fn run_scenario(root: &Path) {
         let (code, name) = want.split_once(' ').unwrap_or((want, ""));
         match result {
             Ok(got) => {
-                assert_eq!(code, "0", "{scenario} step {i} ({step}) succeeded but C++ exited {code}");
+                assert_eq!(
+                    code, "0",
+                    "{scenario} step {i} ({step}) succeeded but C++ exited {code}"
+                );
                 assert_eq!(got, name, "{scenario} step {i} ({step}) palette name");
                 sel.source = PaletteSource::Custom;
                 sel.custom_palette = got.clone();
                 last_name = got;
             }
             Err(SaveError::Message(_)) => {
-                assert_eq!(code, "2", "{scenario} step {i} ({step}) failed but C++ exited {code}");
+                assert_eq!(
+                    code, "2",
+                    "{scenario} step {i} ({step}) failed but C++ exited {code}"
+                );
             }
             Err(SaveError::WallpaperSource) => panic!("{scenario}: wallpaper not expected"),
         }
@@ -80,7 +90,11 @@ fn run_scenario(root: &Path) {
 
     let settings = fs::read_to_string(root.join("expected_settings.toml")).unwrap_or_default();
     if !last_name.is_empty() {
-        assert_eq!(config_value(&settings, "custom_palette").as_deref(), Some(last_name.as_str()), "{scenario}");
+        assert_eq!(
+            config_value(&settings, "custom_palette").as_deref(),
+            Some(last_name.as_str()),
+            "{scenario}"
+        );
     }
 
     let mut want_files: Vec<_> = fs::read_dir(root.join("expected"))

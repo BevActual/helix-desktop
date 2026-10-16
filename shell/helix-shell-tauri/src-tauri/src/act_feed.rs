@@ -327,12 +327,7 @@ mod tests {
         state.before = "40%, muted".into();
         state.after = "45%".into();
         state.undoable = true;
-        assert!(state.follow(&view(
-            "result",
-            "Volume 40%, muted to 45%.",
-            "",
-            false
-        )));
+        assert!(state.follow(&view("result", "Volume 40%, muted to 45%.", "", false)));
         assert_eq!(
             (state.before.as_str(), state.after.as_str(), state.undoable),
             ("40%, muted", "45%", true)
@@ -341,12 +336,7 @@ mod tests {
         state.text = "Restored to 40%, muted.".into();
         state.undoable = false;
         state.phase = "acting".into();
-        assert!(state.follow(&view(
-            "result",
-            "Volume 40%, muted to 45%.",
-            "",
-            false
-        )));
+        assert!(state.follow(&view("result", "Volume 40%, muted to 45%.", "", false)));
         assert_eq!(state.text, "Restored to 40%, muted.");
         state.begin("Next");
         assert!(state.before.is_empty() && state.after.is_empty());

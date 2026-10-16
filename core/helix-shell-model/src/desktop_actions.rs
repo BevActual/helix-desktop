@@ -193,7 +193,11 @@ pub fn search(raw: &str, limit: usize) -> Vec<&'static DesktopAction> {
             })
             .collect();
         hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
-        return hits.into_iter().take(limit.min(3)).map(|(_, i)| &ACTIONS[i]).collect();
+        return hits
+            .into_iter()
+            .take(limit.min(3))
+            .map(|(_, i)| &ACTIONS[i])
+            .collect();
     }
     if !act_mode {
         return Vec::new();
@@ -210,7 +214,10 @@ pub fn search(raw: &str, limit: usize) -> Vec<&'static DesktopAction> {
         })
         .collect();
     hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
-    hits.into_iter().take(limit).map(|(_, i)| &ACTIONS[i]).collect()
+    hits.into_iter()
+        .take(limit)
+        .map(|(_, i)| &ACTIONS[i])
+        .collect()
 }
 
 pub fn get(id: &str) -> Option<&'static DesktopAction> {
@@ -233,11 +240,12 @@ mod tests {
         assert!(search("firefox", 8).is_empty());
         assert!(search("act", 8).len() >= 5);
         assert_eq!(search("act agent", 3)[0].id, "helix:desktop:agent-desk");
-        assert_eq!(search("notifications", 1)[0].id, "helix:desktop:notifications");
-        assert!(
-            search("act hide", 5)
-                .iter()
-                .any(|a| a.id == "helix:desktop:bar-hide")
+        assert_eq!(
+            search("notifications", 1)[0].id,
+            "helix:desktop:notifications"
         );
+        assert!(search("act hide", 5)
+            .iter()
+            .any(|a| a.id == "helix:desktop:bar-hide"));
     }
 }

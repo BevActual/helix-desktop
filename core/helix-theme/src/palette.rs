@@ -36,8 +36,11 @@ pub struct Palette {
     pub on_hover: Color,
 }
 
-pub const ANSI_KEYS: [&str; 8] = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"];
-pub const ANSI_GROUPS: [(&str, &str); 2] = [("normal", "terminal_normal"), ("bright", "terminal_bright")];
+pub const ANSI_KEYS: [&str; 8] = [
+    "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+];
+pub const ANSI_GROUPS: [(&str, &str); 2] =
+    [("normal", "terminal_normal"), ("bright", "terminal_bright")];
 /// `(json key, token key)`
 pub const DIRECT_KEYS: [(&str, &str); 6] = [
     ("foreground", "terminal_foreground"),
@@ -112,12 +115,22 @@ fn interpolate(a: Color, b: Color, t: f64) -> Color {
 }
 
 fn ensure_terminal_text_contrast(foreground: u32, background: u32) -> u32 {
-    ensure_contrast(Color::from_argb(foreground), Color::from_argb(background), 4.5, 0).to_argb()
+    ensure_contrast(
+        Color::from_argb(foreground),
+        Color::from_argb(background),
+        4.5,
+        0,
+    )
+    .to_argb()
 }
 
 pub fn apply_terminal_palette(tokens: &mut TokenMap, terminal: &TerminalPalette) {
     for (json, prefix) in ANSI_GROUPS {
-        let colors = if json == "bright" { &terminal.bright } else { &terminal.normal };
+        let colors = if json == "bright" {
+            &terminal.bright
+        } else {
+            &terminal.normal
+        };
         for (key, color) in ANSI_KEYS.iter().zip(colors) {
             set_token(tokens, &format!("{prefix}_{key}"), *color);
         }
@@ -128,7 +141,11 @@ pub fn apply_terminal_palette(tokens: &mut TokenMap, terminal: &TerminalPalette)
 }
 
 pub fn synthesize_terminal_palette_tokens(tokens: &mut TokenMap) {
-    let background = token_or(tokens, "background", token_or(tokens, "surface", OPAQUE_BLACK));
+    let background = token_or(
+        tokens,
+        "background",
+        token_or(tokens, "surface", OPAQUE_BLACK),
+    );
     let foreground = token_or(tokens, "on_surface", OPAQUE_WHITE);
     let surface = token_or(tokens, "surface", background);
     let surface_variant = token_or(tokens, "surface_variant", surface);
@@ -214,14 +231,32 @@ pub fn expand_fixed_palette_mode(palette: &Palette, is_dark: bool) -> TokenMap {
     };
     let fixed_dark = |base: Color| {
         let (h, s, _) = base.to_hsl();
-        (Color::from_hsl(h, s.max(0.70), 0.85), Color::from_hsl(h, s.max(0.65), 0.75))
+        (
+            Color::from_hsl(h, s.max(0.70), 0.85),
+            Color::from_hsl(h, s.max(0.65), 0.75),
+        )
     };
     let fixed_light = |base: Color| {
         let (h, s, _) = base.to_hsl();
-        (Color::from_hsl(h, s.max(0.70), 0.40), Color::from_hsl(h, s.max(0.65), 0.30))
+        (
+            Color::from_hsl(h, s.max(0.70), 0.40),
+            Color::from_hsl(h, s.max(0.65), 0.30),
+        )
     };
-    let container = |c: Color| if is_dark { container_dark(c) } else { container_light(c) };
-    let fixed = |c: Color| if is_dark { fixed_dark(c) } else { fixed_light(c) };
+    let container = |c: Color| {
+        if is_dark {
+            container_dark(c)
+        } else {
+            container_light(c)
+        }
+    };
+    let fixed = |c: Color| {
+        if is_dark {
+            fixed_dark(c)
+        } else {
+            fixed_light(c)
+        }
+    };
     let ec = |fg: Color, bg: Color| ensure_contrast(fg, bg, 4.5, 0);
 
     let primary_container = container(primary);
@@ -235,10 +270,22 @@ pub fn expand_fixed_palette_mode(palette: &Palette, is_dark: bool) -> TokenMap {
     let (error_h, error_s, _) = error.to_hsl();
 
     let on_container_l = if is_dark { 0.90 } else { 0.15 };
-    let on_primary_container = ec(Color::from_hsl(primary_h, primary_s, on_container_l), primary_container);
-    let on_secondary_container = ec(Color::from_hsl(secondary_h, secondary_s, on_container_l), secondary_container);
-    let on_tertiary_container = ec(Color::from_hsl(tertiary_h, tertiary_s, on_container_l), tertiary_container);
-    let on_error_container = ec(Color::from_hsl(error_h, error_s, on_container_l), error_container);
+    let on_primary_container = ec(
+        Color::from_hsl(primary_h, primary_s, on_container_l),
+        primary_container,
+    );
+    let on_secondary_container = ec(
+        Color::from_hsl(secondary_h, secondary_s, on_container_l),
+        secondary_container,
+    );
+    let on_tertiary_container = ec(
+        Color::from_hsl(tertiary_h, tertiary_s, on_container_l),
+        tertiary_container,
+    );
+    let on_error_container = ec(
+        Color::from_hsl(error_h, error_s, on_container_l),
+        error_container,
+    );
 
     let (primary_fixed, primary_fixed_dim) = fixed(primary);
     let (secondary_fixed, secondary_fixed_dim) = fixed(secondary);
@@ -246,7 +293,8 @@ pub fn expand_fixed_palette_mode(palette: &Palette, is_dark: bool) -> TokenMap {
 
     let (on_fixed_l, on_fixed_variant_l) = if is_dark { (0.15, 0.20) } else { (0.90, 0.85) };
     let on_fixed = |h: f64, base: Color| ec(Color::from_hsl(h, 0.15, on_fixed_l), base);
-    let on_fixed_variant = |h: f64, base: Color| ec(Color::from_hsl(h, 0.15, on_fixed_variant_l), base);
+    let on_fixed_variant =
+        |h: f64, base: Color| ec(Color::from_hsl(h, 0.15, on_fixed_variant_l), base);
     let on_primary_fixed = on_fixed(primary_h, primary_fixed);
     let on_primary_fixed_variant = on_fixed_variant(primary_h, primary_fixed_dim);
     let on_secondary_fixed = on_fixed(secondary_h, secondary_fixed);
@@ -259,21 +307,22 @@ pub fn expand_fixed_palette_mode(palette: &Palette, is_dark: bool) -> TokenMap {
     let surface_container = surface_variant;
     let surface_container_lowest = interpolate(surface, surface_variant, 0.2);
     let surface_container_low = interpolate(surface, surface_variant, 0.5);
-    let (surface_container_high, surface_container_highest, surface_dim, surface_bright) = if is_dark {
-        (
-            Color::from_hsl(sv_h, sv_s, (sv_l + 0.04).min(0.40)),
-            Color::from_hsl(sv_h, sv_s, (sv_l + 0.08).min(0.45)),
-            Color::from_hsl(surface_h, surface_s, (surface_l - 0.04).max(0.02)),
-            Color::from_hsl(sv_h, sv_s, (sv_l + 0.12).min(0.50)),
-        )
-    } else {
-        (
-            Color::from_hsl(sv_h, sv_s, (sv_l - 0.04).max(0.60)),
-            Color::from_hsl(sv_h, sv_s, (sv_l - 0.08).max(0.55)),
-            Color::from_hsl(sv_h, sv_s, (sv_l - 0.12).max(0.50)),
-            Color::from_hsl(surface_h, surface_s, (surface_l + 0.03).min(0.98)),
-        )
-    };
+    let (surface_container_high, surface_container_highest, surface_dim, surface_bright) =
+        if is_dark {
+            (
+                Color::from_hsl(sv_h, sv_s, (sv_l + 0.04).min(0.40)),
+                Color::from_hsl(sv_h, sv_s, (sv_l + 0.08).min(0.45)),
+                Color::from_hsl(surface_h, surface_s, (surface_l - 0.04).max(0.02)),
+                Color::from_hsl(sv_h, sv_s, (sv_l + 0.12).min(0.50)),
+            )
+        } else {
+            (
+                Color::from_hsl(sv_h, sv_s, (sv_l - 0.04).max(0.60)),
+                Color::from_hsl(sv_h, sv_s, (sv_l - 0.08).max(0.55)),
+                Color::from_hsl(sv_h, sv_s, (sv_l - 0.12).max(0.50)),
+                Color::from_hsl(surface_h, surface_s, (surface_l + 0.03).min(0.98)),
+            )
+        };
 
     let outline = ensure_contrast(outline_raw, surface, 3.0, 0);
     let (outline_h, outline_s, outline_l) = outline.to_hsl();
@@ -382,7 +431,11 @@ pub fn map_generated_palette_mode(t: &TokenMap) -> Palette {
 pub fn terminal_palette_from_tokens(tokens: &TokenMap) -> TerminalPalette {
     let mut terminal = TerminalPalette::default();
     for (json, prefix) in ANSI_GROUPS {
-        let colors = if json == "bright" { &mut terminal.bright } else { &mut terminal.normal };
+        let colors = if json == "bright" {
+            &mut terminal.bright
+        } else {
+            &mut terminal.normal
+        };
         for (slot, key) in colors.iter_mut().zip(ANSI_KEYS) {
             *slot = token_to_color(tokens, &format!("{prefix}_{key}"));
         }

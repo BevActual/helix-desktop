@@ -24,7 +24,9 @@ impl Default for RemoteOptions {
 /// so a key is never put on the open internet in clear text (a typo of `http://` for a cloud service would do that).
 pub fn key_allowed(base: &str) -> bool {
     let base = base.trim();
-    base.starts_with("https://") || (base.starts_with("http://") && helix_config::inference_routing::is_local_network_url(base))
+    base.starts_with("https://")
+        || (base.starts_with("http://")
+            && helix_config::inference_routing::is_local_network_url(base))
 }
 
 /// POST `{base}/chat/completions`. `base` is e.g. `http://host:11434/v1` (no trailing slash required).
@@ -44,7 +46,9 @@ pub async fn chat_completions(
         return Err("Remote URL must start with http:// or https://.".into());
     }
     if api_key.map(str::trim).is_some_and(|k| !k.is_empty()) && !key_allowed(base) {
-        return Err("An API key is only sent over https, or to this computer or your local network.".into());
+        return Err(
+            "An API key is only sent over https, or to this computer or your local network.".into(),
+        );
     }
     let url = format!("{base}/chat/completions");
     let temperature = if options.temperature.is_finite() {
@@ -65,7 +69,9 @@ pub async fn chat_completions(
         "stream": false,
     });
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(options.timeout_secs.clamp(15, 600)))
+        .timeout(std::time::Duration::from_secs(
+            options.timeout_secs.clamp(15, 600),
+        ))
         .build()
         .map_err(|e| e.to_string())?;
     let mut request = client
@@ -105,7 +111,9 @@ pub async fn list_models(base_url: &str, api_key: Option<&str>) -> Result<Vec<St
         return Err("Remote backend has no URL.".into());
     }
     if api_key.map(str::trim).is_some_and(|k| !k.is_empty()) && !key_allowed(base) {
-        return Err("An API key is only sent over https, or to this computer or your local network.".into());
+        return Err(
+            "An API key is only sent over https, or to this computer or your local network.".into(),
+        );
     }
     let url = format!("{base}/models");
     let client = reqwest::Client::builder()
@@ -193,16 +201,34 @@ mod tests {
     #[test]
     fn a_key_never_goes_to_the_internet_in_clear_text() {
         for ok in [
-            "https://api.openai.com/v1", "https://openrouter.ai/api/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080/v1",
-            "http://192.168.1.20:1234/v1", "http://10.0.0.5/v1", "http://172.16.4.1/v1", "http://172.31.255.1/v1", "http://[::1]:8080/v1",
-            "http://studio.local:11434/v1", "http://169.254.1.1/v1",
+            "https://api.openai.com/v1",
+            "https://openrouter.ai/api/v1",
+            "http://localhost:11434/v1",
+            "http://127.0.0.1:8080/v1",
+            "http://192.168.1.20:1234/v1",
+            "http://10.0.0.5/v1",
+            "http://172.16.4.1/v1",
+            "http://172.31.255.1/v1",
+            "http://[::1]:8080/v1",
+            "http://studio.local:11434/v1",
+            "http://169.254.1.1/v1",
         ] {
             assert!(key_allowed(ok), "{ok}");
         }
         for bad in [
-            "http://api.openai.com/v1", "http://8.8.8.8/v1", "http://172.32.0.1/v1", "http://172.15.0.1/v1", "http://192.169.1.1/v1",
-            "http://localhost@evil.example/v1", "http://example.com:80/v1", "ftp://x", "file:///etc/passwd", "", "api.openai.com",
-            "http://10.0.0.5.evil.example/v1", "http://127.0.0.1.evil.example/v1",
+            "http://api.openai.com/v1",
+            "http://8.8.8.8/v1",
+            "http://172.32.0.1/v1",
+            "http://172.15.0.1/v1",
+            "http://192.169.1.1/v1",
+            "http://localhost@evil.example/v1",
+            "http://example.com:80/v1",
+            "ftp://x",
+            "file:///etc/passwd",
+            "",
+            "api.openai.com",
+            "http://10.0.0.5.evil.example/v1",
+            "http://127.0.0.1.evil.example/v1",
         ] {
             assert!(!key_allowed(bad), "{bad}");
         }
@@ -227,6 +253,9 @@ mod tests {
     #[test]
     fn extracts_model_ids() {
         let v = json!({"data":[{"id":"b"},{"id":"a"},{"id":"a"}]});
-        assert_eq!(extract_model_ids(&v).unwrap(), vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(
+            extract_model_ids(&v).unwrap(),
+            vec!["a".to_string(), "b".to_string()]
+        );
     }
 }

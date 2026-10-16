@@ -30,27 +30,87 @@ struct App {
 }
 
 impl Dispatch<WlRegistry, GlobalListContents> for App {
-    fn event(_: &mut Self, _: &WlRegistry, _: wayland_client::protocol::wl_registry::Event, _: &GlobalListContents, _: &Connection, _: &QueueHandle<Self>) {}
+    fn event(
+        _: &mut Self,
+        _: &WlRegistry,
+        _: wayland_client::protocol::wl_registry::Event,
+        _: &GlobalListContents,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
 }
 impl Dispatch<WlOutput, ()> for App {
-    fn event(_: &mut Self, _: &WlOutput, _: wayland_client::protocol::wl_output::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+    fn event(
+        _: &mut Self,
+        _: &WlOutput,
+        _: wayland_client::protocol::wl_output::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
 }
 impl Dispatch<WlShm, ()> for App {
-    fn event(_: &mut Self, _: &WlShm, _: wl_shm::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+    fn event(
+        _: &mut Self,
+        _: &WlShm,
+        _: wl_shm::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
 }
 impl Dispatch<WlShmPool, ()> for App {
-    fn event(_: &mut Self, _: &WlShmPool, _: wayland_client::protocol::wl_shm_pool::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+    fn event(
+        _: &mut Self,
+        _: &WlShmPool,
+        _: wayland_client::protocol::wl_shm_pool::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
 }
 impl Dispatch<WlBuffer, ()> for App {
-    fn event(_: &mut Self, _: &WlBuffer, _: wayland_client::protocol::wl_buffer::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+    fn event(
+        _: &mut Self,
+        _: &WlBuffer,
+        _: wayland_client::protocol::wl_buffer::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
 }
 impl Dispatch<ZwlrScreencopyManagerV1, ()> for App {
-    fn event(_: &mut Self, _: &ZwlrScreencopyManagerV1, _: wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_manager_v1::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+    fn event(
+        _: &mut Self,
+        _: &ZwlrScreencopyManagerV1,
+        _: wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_manager_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
 }
 impl Dispatch<ZwlrScreencopyFrameV1, ()> for App {
-    fn event(app: &mut Self, _: &ZwlrScreencopyFrameV1, event: zwlr_screencopy_frame_v1::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
+    fn event(
+        app: &mut Self,
+        _: &ZwlrScreencopyFrameV1,
+        event: zwlr_screencopy_frame_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
         match event {
-            zwlr_screencopy_frame_v1::Event::Buffer { format: WEnum::Value(format), width, height, stride } => {
+            zwlr_screencopy_frame_v1::Event::Buffer {
+                format: WEnum::Value(format),
+                width,
+                height,
+                stride,
+            } => {
                 app.format = Some((format as u32, width, height, stride));
             }
             zwlr_screencopy_frame_v1::Event::Flags { flags } => {
@@ -64,7 +124,9 @@ impl Dispatch<ZwlrScreencopyFrameV1, ()> for App {
 }
 
 fn main() {
-    let out = std::env::args().nth(1).unwrap_or_else(|| "capture.ppm".into());
+    let out = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "capture.ppm".into());
     let connection = Connection::connect_to_env().expect("no compositor");
     let (globals, mut queue) = registry_queue_init::<App>(&connection).expect("registry");
     let qh = queue.handle();
@@ -95,8 +157,20 @@ fn main() {
     file.set_len(size as u64).unwrap();
     let map = unsafe { MmapMut::map_mut(&file) }.unwrap();
     let pool = shm.create_pool(file.as_fd(), size as i32, &qh, ());
-    let wl_format = if format == wl_shm::Format::Argb8888 as u32 { wl_shm::Format::Argb8888 } else { wl_shm::Format::Xrgb8888 };
-    let buffer = pool.create_buffer(0, width as i32, height as i32, stride as i32, wl_format, &qh, ());
+    let wl_format = if format == wl_shm::Format::Argb8888 as u32 {
+        wl_shm::Format::Argb8888
+    } else {
+        wl_shm::Format::Xrgb8888
+    };
+    let buffer = pool.create_buffer(
+        0,
+        width as i32,
+        height as i32,
+        stride as i32,
+        wl_format,
+        &qh,
+        (),
+    );
     frame.copy(&buffer);
     while !app.ready && !app.failed {
         if queue.blocking_dispatch(&mut app).is_err() {
@@ -109,12 +183,18 @@ fn main() {
     }
     let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
     for line in 0..height as usize {
-        let row = if app.y_invert { height as usize - 1 - line } else { line };
+        let row = if app.y_invert {
+            height as usize - 1 - line
+        } else {
+            line
+        };
         for column in 0..width as usize {
             let at = row * stride as usize + column * 4;
             ppm.extend_from_slice(&[map[at + 2], map[at + 1], map[at]]);
         }
     }
-    File::create(&out).and_then(|mut f| f.write_all(&ppm)).expect("write");
+    File::create(&out)
+        .and_then(|mut f| f.write_all(&ppm))
+        .expect("write");
     println!("CAPTURED {width}x{height}");
 }

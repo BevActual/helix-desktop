@@ -131,7 +131,12 @@ impl Dock {
     /// does not count as that application: it gets an item of its own, named for the program it really is. A window whose process could
     /// not be read (it has gone, or the compositor gave no pid) keeps the application its app id names: nothing a program can do makes
     /// its own process unreadable to its own user, so that is not a way around the check.
-    pub fn refresh_checked(&mut self, apps: &[App], niri: &Niri, processes: &HashMap<u32, Process>) {
+    pub fn refresh_checked(
+        &mut self,
+        apps: &[App],
+        niri: &Niri,
+        processes: &HashMap<u32, Process>,
+    ) {
         let mut items: Vec<Item> = Vec::new();
         let new_item = |id: &str, name: &str, icon: &str, installed: bool, pinned: bool| Item {
             id: id.to_string(),
@@ -165,7 +170,9 @@ impl Dock {
                 .max_by_key(|(score, _)| *score);
             let process = window.pid.and_then(|pid| processes.get(&pid));
             let imposter = match (best, process) {
-                (Some((_, app)), Some(process)) if verify(app, process) == Identity::Unverified => Some((app, process)),
+                (Some((_, app)), Some(process)) if verify(app, process) == Identity::Unverified => {
+                    Some((app, process))
+                }
                 _ => None,
             };
             let index = match best {
@@ -179,7 +186,10 @@ impl Dock {
                             items.push(new_item(&key, &label, "", false, false));
                             let last = items.len() - 1;
                             items[last].warning = Some(sanitize_for_display(
-                                &format!("This window says it is {} but is running {}", app.name, label),
+                                &format!(
+                                    "This window says it is {} but is running {}",
+                                    app.name, label
+                                ),
                                 120,
                             ));
                             last
@@ -737,7 +747,11 @@ mod tests {
     }
 
     fn running(exe: &str, cmdline: &[&str]) -> Process {
-        Process { exe: exe.into(), cmdline: cmdline.iter().map(|s| s.to_string()).collect(), flatpak: None }
+        Process {
+            exe: exe.into(),
+            cmdline: cmdline.iter().map(|s| s.to_string()).collect(),
+            flatpak: None,
+        }
     }
 
     #[test]
@@ -745,23 +759,48 @@ mod tests {
         let mut d = Dock::new(vec!["brave-browser.desktop".into()]);
         let mut processes = HashMap::new();
         processes.insert(7, running("/usr/bin/python3", &["python3", "/tmp/evil.py"]));
-        d.refresh_checked(&apps(), &niri_with_pids(&[(1, "brave-browser", 7)]), &processes);
+        d.refresh_checked(
+            &apps(),
+            &niri_with_pids(&[(1, "brave-browser", 7)]),
+            &processes,
+        );
         let view = d.view();
         let brave = view.iter().find(|i| i.name == "Brave").unwrap();
         assert_eq!(brave.running, 0, "the real application is not running");
         assert!(!brave.unverified);
-        let fake = view.iter().find(|i| i.unverified).expect("the program has an item of its own");
+        let fake = view
+            .iter()
+            .find(|i| i.unverified)
+            .expect("the program has an item of its own");
         assert_eq!((fake.name.as_str(), fake.running), ("python3", 1));
-        assert!(fake.detail.contains("Brave") && fake.detail.contains("python3"), "{}", fake.detail);
-        assert_eq!(d.activate(&fake.id), Ok(Action::Focus(1)), "its window can still be focused");
-        assert_eq!(d.launch_new(&fake.id), Err(RequestError::NotInstalled), "and it can never be started as if it were an application");
+        assert!(
+            fake.detail.contains("Brave") && fake.detail.contains("python3"),
+            "{}",
+            fake.detail
+        );
+        assert_eq!(
+            d.activate(&fake.id),
+            Ok(Action::Focus(1)),
+            "its window can still be focused"
+        );
+        assert_eq!(
+            d.launch_new(&fake.id),
+            Err(RequestError::NotInstalled),
+            "and it can never be started as if it were an application"
+        );
     }
 
     #[test]
     fn the_real_application_is_credited_and_unreadable_processes_keep_the_claim() {
         let mut d = Dock::new(vec!["brave-browser.desktop".into()]);
         let mut processes = HashMap::new();
-        processes.insert(8, running("/opt/brave.com/brave/brave", &["/opt/brave.com/brave/brave"]));
+        processes.insert(
+            8,
+            running(
+                "/opt/brave.com/brave/brave",
+                &["/opt/brave.com/brave/brave"],
+            ),
+        );
         // Window 1: really Brave. Window 2: no process information read (pid 99). Window 3: no pid from the compositor at all.
         let mut n = niri_with_pids(&[(1, "brave-browser", 8), (2, "brave-browser", 99)]);
         n.apply(&json!({"WindowOpenedOrChanged": {"window": {"id": 3, "app_id": "brave-browser", "title": "t"}}}));
@@ -778,13 +817,20 @@ mod tests {
         processes.insert(1, running("/tmp/a/payload", &["payload"]));
         processes.insert(2, running("/tmp/a/payload", &["payload"]));
         processes.insert(3, running("/tmp/b/other", &["other"]));
-        d.refresh_checked(&apps(), &niri_with_pids(&[(10, "cursor", 1), (11, "cursor", 2), (12, "cursor", 3)]), &processes);
+        d.refresh_checked(
+            &apps(),
+            &niri_with_pids(&[(10, "cursor", 1), (11, "cursor", 2), (12, "cursor", 3)]),
+            &processes,
+        );
         let fakes: Vec<_> = d.view().into_iter().filter(|i| i.unverified).collect();
         assert_eq!(fakes.len(), 2);
         let mut counts: Vec<usize> = fakes.iter().map(|i| i.running).collect();
         counts.sort_unstable();
         assert_eq!(counts, [1, 2]);
-        assert!(d.view().iter().all(|i| i.name != "Cursor" || i.running == 0));
+        assert!(d
+            .view()
+            .iter()
+            .all(|i| i.name != "Cursor" || i.running == 0));
     }
 
     #[test]
@@ -792,7 +838,11 @@ mod tests {
         let mut d = Dock::new(Vec::new());
         let mut processes = HashMap::new();
         processes.insert(5, running("/usr/bin/whatever", &["whatever"]));
-        d.refresh_checked(&apps(), &niri_with_pids(&[(1, "some-unlisted-app", 5)]), &processes);
+        d.refresh_checked(
+            &apps(),
+            &niri_with_pids(&[(1, "some-unlisted-app", 5)]),
+            &processes,
+        );
         let view = d.view();
         assert_eq!(view.len(), 1);
         assert!(!view[0].unverified && view[0].name == "some-unlisted-app");

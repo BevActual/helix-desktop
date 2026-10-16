@@ -256,7 +256,10 @@ impl Bluetooth {
 
     /// The name a device is shown under, for a prompt about it.
     pub fn name_of(&self, path: &str) -> Option<String> {
-        self.devices.iter().find(|d| d.path == path).map(|d| d.name.clone())
+        self.devices
+            .iter()
+            .find(|d| d.path == path)
+            .map(|d| d.name.clone())
     }
 
     /// Starts pairing with a device that has not been paired yet.

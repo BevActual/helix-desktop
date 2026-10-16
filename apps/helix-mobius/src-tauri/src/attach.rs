@@ -25,11 +25,64 @@ pub struct Selection {
 }
 
 const TEXT_EXTENSIONS: &[&str] = &[
-    "txt", "md", "markdown", "rst", "log", "csv", "tsv", "json", "toml", "yaml", "yml", "xml",
-    "html", "htm", "css", "scss", "less", "js", "mjs", "cjs", "ts", "tsx", "jsx", "rs", "py",
-    "go", "java", "kt", "swift", "c", "h", "cpp", "cc", "cxx", "hpp", "cs", "rb", "php", "sh",
-    "bash", "zsh", "fish", "ps1", "sql", "graphql", "env", "ini", "cfg", "conf", "desktop",
-    "service", "timer", "svg", "dockerfile", "makefile", "cmake", "gradle", "properties",
+    "txt",
+    "md",
+    "markdown",
+    "rst",
+    "log",
+    "csv",
+    "tsv",
+    "json",
+    "toml",
+    "yaml",
+    "yml",
+    "xml",
+    "html",
+    "htm",
+    "css",
+    "scss",
+    "less",
+    "js",
+    "mjs",
+    "cjs",
+    "ts",
+    "tsx",
+    "jsx",
+    "rs",
+    "py",
+    "go",
+    "java",
+    "kt",
+    "swift",
+    "c",
+    "h",
+    "cpp",
+    "cc",
+    "cxx",
+    "hpp",
+    "cs",
+    "rb",
+    "php",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "ps1",
+    "sql",
+    "graphql",
+    "env",
+    "ini",
+    "cfg",
+    "conf",
+    "desktop",
+    "service",
+    "timer",
+    "svg",
+    "dockerfile",
+    "makefile",
+    "cmake",
+    "gradle",
+    "properties",
 ];
 
 fn is_probably_text(path: &Path, bytes: &[u8]) -> bool {
@@ -56,10 +109,27 @@ fn is_probably_text(path: &Path, bytes: &[u8]) -> bool {
 /// Files that hold secrets are never sent to a model, whatever the person picked: a private key or a credentials file is one slip away
 /// from leaving the computer when the backend is a remote one.
 fn is_secret_file(path: &Path, text: &str) -> bool {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_ascii_lowercase();
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     let by_name = matches!(
         name.as_str(),
-        "id_rsa" | "id_dsa" | "id_ecdsa" | "id_ed25519" | ".netrc" | "_netrc" | ".pgpass" | "credentials" | ".git-credentials" | "secrets.toml" | "secrets.json" | "secrets.yaml" | "secrets.yml" | "kdbx"
+        "id_rsa"
+            | "id_dsa"
+            | "id_ecdsa"
+            | "id_ed25519"
+            | ".netrc"
+            | "_netrc"
+            | ".pgpass"
+            | "credentials"
+            | ".git-credentials"
+            | "secrets.toml"
+            | "secrets.json"
+            | "secrets.yaml"
+            | "secrets.yml"
+            | "kdbx"
     ) || name.ends_with(".pem")
         || name.ends_with(".key")
         || name.ends_with(".p12")
@@ -76,8 +146,16 @@ fn pick_paths(pictures: bool) -> Result<Vec<PathBuf>, String> {
             "--file-selection",
             "--multiple",
             "--separator=\n",
-            if pictures { "--title=Add pictures to Mobius" } else { "--title=Attach files to Mobius" },
-            if pictures { "--file-filter=Pictures | *.png *.jpg *.jpeg *.gif *.webp *.bmp" } else { "--file-filter=All files | *" },
+            if pictures {
+                "--title=Add pictures to Mobius"
+            } else {
+                "--title=Attach files to Mobius"
+            },
+            if pictures {
+                "--file-filter=Pictures | *.png *.jpg *.jpeg *.gif *.webp *.bmp"
+            } else {
+                "--file-filter=All files | *"
+            },
         ])
         .output()
     {
@@ -118,16 +196,15 @@ fn pick_paths(pictures: bool) -> Result<Vec<PathBuf>, String> {
 }
 
 fn read_one(path: &Path) -> Result<Attachment, String> {
-    let meta = std::fs::metadata(path).map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    let meta =
+        std::fs::metadata(path).map_err(|e| format!("Could not read {}: {e}", path.display()))?;
     if !meta.is_file() {
         return Err(format!("{} is not a file.", path.display()));
     }
     if meta.len() > 512 * 1024 {
         return Err(format!(
             "{} is larger than 512 KiB. Attach a smaller excerpt.",
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("file")
+            path.file_name().and_then(|n| n.to_str()).unwrap_or("file")
         ));
     }
     // The file may grow after metadata was read; bound the actual read as well.
@@ -136,14 +213,15 @@ fn read_one(path: &Path) -> Result<Attachment, String> {
         .and_then(|file| file.take(512 * 1024 + 1).read_to_end(&mut bytes))
         .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
     if bytes.len() > 512 * 1024 {
-        return Err(format!("{} is larger than 512 KiB. Attach a smaller excerpt.", path.display()));
+        return Err(format!(
+            "{} is larger than 512 KiB. Attach a smaller excerpt.",
+            path.display()
+        ));
     }
     if !is_probably_text(path, &bytes) {
         return Err(format!(
             "{} looks binary. Attach text or source files.",
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("file")
+            path.file_name().and_then(|n| n.to_str()).unwrap_or("file")
         ));
     }
     if is_secret_file(path, &String::from_utf8_lossy(&bytes)) {
@@ -196,7 +274,12 @@ fn read_selection(paths: &[PathBuf]) -> Selection {
     if paths.len() > MAX_ATTACH_FILES {
         warnings.push(format!("Only the first {MAX_ATTACH_FILES} selected files were checked. Add the remaining files separately."));
     }
-    Selection { files, warnings, max_files: MAX_ATTACH_FILES, max_chars: MAX_ATTACH_CHARS }
+    Selection {
+        files,
+        warnings,
+        max_files: MAX_ATTACH_FILES,
+        max_chars: MAX_ATTACH_CHARS,
+    }
 }
 
 /// Read explicit paths (e.g. future drag-drop). Same safety checks as the picker.
@@ -232,11 +315,29 @@ mod tests {
 
     #[test]
     fn keys_and_credentials_are_not_attached() {
-        for name in ["id_rsa", "id_ed25519", ".netrc", "server.pem", "tls.key", "store.p12", "vault.kdbx", ".git-credentials"] {
-            assert!(is_secret_file(Path::new(&format!("/home/me/{name}")), ""), "{name}");
+        for name in [
+            "id_rsa",
+            "id_ed25519",
+            ".netrc",
+            "server.pem",
+            "tls.key",
+            "store.p12",
+            "vault.kdbx",
+            ".git-credentials",
+        ] {
+            assert!(
+                is_secret_file(Path::new(&format!("/home/me/{name}")), ""),
+                "{name}"
+            );
         }
-        assert!(is_secret_file(Path::new("/tmp/notes.txt"), "x\n-----BEGIN OPENSSH PRIVATE KEY-----\nabc"));
-        assert!(!is_secret_file(Path::new("/tmp/notes.txt"), "a public key is -----BEGIN PUBLIC KEY----- fine"));
+        assert!(is_secret_file(
+            Path::new("/tmp/notes.txt"),
+            "x\n-----BEGIN OPENSSH PRIVATE KEY-----\nabc"
+        ));
+        assert!(!is_secret_file(
+            Path::new("/tmp/notes.txt"),
+            "a public key is -----BEGIN PUBLIC KEY----- fine"
+        ));
         assert!(!is_secret_file(Path::new("/src/main.rs"), "fn main() {}"));
     }
 
@@ -245,7 +346,11 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("mobius-attach-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let key = dir.join("id_ed25519");
-        std::fs::write(&key, "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----\n").unwrap();
+        std::fs::write(
+            &key,
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----\n",
+        )
+        .unwrap();
         let note = dir.join("note.md");
         std::fs::write(&note, "hello").unwrap();
         assert!(read_one(&key).unwrap_err().contains("key or credentials"));

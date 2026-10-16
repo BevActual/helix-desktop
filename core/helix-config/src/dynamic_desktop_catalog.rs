@@ -7,7 +7,12 @@ use super::settings::{ConfigStore, SETTING_UNAVAILABLE};
 
 const IDLE_FIELDS: &[(&str, &str, &str, &str)] = &[
     ("enabled", "Enable timer", "boolean", ""),
-    ("timeout", "Idle delay (seconds)", "number", "Zero disables this timer while unlocked."),
+    (
+        "timeout",
+        "Idle delay (seconds)",
+        "number",
+        "Zero disables this timer while unlocked.",
+    ),
     (
         "locked_timeout",
         "Delay while locked (seconds)",
@@ -15,7 +20,12 @@ const IDLE_FIELDS: &[(&str, &str, &str, &str)] = &[
         "Zero uses the normal idle delay.",
     ),
     ("action", "Action", "idle-action", ""),
-    ("lock_before_suspend", "Lock before suspending", "boolean", ""),
+    (
+        "lock_before_suspend",
+        "Lock before suspending",
+        "boolean",
+        "",
+    ),
 ];
 
 const IDLE_ACTIONS: &[(&str, &str)] = &[
@@ -30,8 +40,22 @@ const BAR_SCALAR_FIELDS: &[(&str, &str, &str, &str, f64, f64)] = &[
     ("position", "Position", "", "position", 0.0, 0.0),
     ("layer", "Layer", "", "shell-layer", 0.0, 0.0),
     ("auto_hide", "Automatically hide", "", "boolean", 0.0, 0.0),
-    ("smart_auto_hide", "Hide behind windows", "", "boolean", 0.0, 0.0),
-    ("reserve_space", "Reserve space for the bar", "", "boolean", 0.0, 0.0),
+    (
+        "smart_auto_hide",
+        "Hide behind windows",
+        "",
+        "boolean",
+        0.0,
+        0.0,
+    ),
+    (
+        "reserve_space",
+        "Reserve space for the bar",
+        "",
+        "boolean",
+        0.0,
+        0.0,
+    ),
     (
         "show_on_workspace_switch",
         "Reveal when switching workspaces",
@@ -46,9 +70,30 @@ const BAR_SCALAR_FIELDS: &[(&str, &str, &str, &str, f64, f64)] = &[
     ("scale", "Content scale", " · Size", "number", 0.5, 4.0),
     ("font_scale", "Font scale", " · Size", "number", 0.2, 2.5),
     ("padding", "End padding", " · Size", "integer", 0.0, 200.0),
-    ("widget_spacing", "Widget spacing", " · Size", "integer", 0.0, 100.0),
-    ("panel_overlap", "Panel overlap", " · Layout", "integer", -2.0, 3.0),
-    ("margin_ends", "Inset from display ends", " · Layout", "integer", 0.0, 500.0),
+    (
+        "widget_spacing",
+        "Widget spacing",
+        " · Size",
+        "integer",
+        0.0,
+        100.0,
+    ),
+    (
+        "panel_overlap",
+        "Panel overlap",
+        " · Layout",
+        "integer",
+        -2.0,
+        3.0,
+    ),
+    (
+        "margin_ends",
+        "Inset from display ends",
+        " · Layout",
+        "integer",
+        0.0,
+        500.0,
+    ),
     (
         "margin_edge",
         "Distance from display edge",
@@ -74,7 +119,14 @@ const BAR_SCALAR_FIELDS: &[(&str, &str, &str, &str, f64, f64)] = &[
         1.0,
     ),
     ("radius", "Corner radius", " · Shape", "integer", 0.0, 500.0),
-    ("border_width", "Border width", " · Shape", "number", 0.0, 20.0),
+    (
+        "border_width",
+        "Border width",
+        " · Shape",
+        "number",
+        0.0,
+        20.0,
+    ),
     (
         "concave_edge_corners",
         "Concave edge corners",
@@ -83,8 +135,22 @@ const BAR_SCALAR_FIELDS: &[(&str, &str, &str, &str, f64, f64)] = &[
         0.0,
         0.0,
     ),
-    ("font_weight", "Font weight", " · Typography", "integer", 100.0, 900.0),
-    ("font_family", "Font family", " · Typography", "string", 0.0, 0.0),
+    (
+        "font_weight",
+        "Font weight",
+        " · Typography",
+        "integer",
+        100.0,
+        900.0,
+    ),
+    (
+        "font_family",
+        "Font family",
+        " · Typography",
+        "string",
+        0.0,
+        0.0,
+    ),
 ];
 
 /// Behaviors a pristine C++ config defines, in its order.
@@ -93,7 +159,10 @@ const DEFAULT_IDLE_BEHAVIORS: [&str; 3] = ["lock", "screen-off", "lock-and-suspe
 fn idle_behavior_names(store: &ConfigStore) -> Vec<String> {
     // The built-in behaviors always exist; configured entries override them by name and
     // custom names follow in key order.
-    let mut names: Vec<String> = DEFAULT_IDLE_BEHAVIORS.iter().map(|n| (*n).to_string()).collect();
+    let mut names: Vec<String> = DEFAULT_IDLE_BEHAVIORS
+        .iter()
+        .map(|n| (*n).to_string())
+        .collect();
     if let Some(table) = store
         .merged_node("idle.behavior")
         .and_then(|node| node.as_table().cloned())
@@ -120,7 +189,12 @@ pub fn idle_catalog_entries(store: &ConfigStore) -> Vec<Value> {
         let behavior = store
             .get_json_value(&format!("idle:{name}:action"))
             .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .unwrap_or_else(|| default_idle_value(&name, "action").as_str().unwrap_or("").to_string());
+            .unwrap_or_else(|| {
+                default_idle_value(&name, "action")
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string()
+            });
         for (field, title, typ, description) in IDLE_FIELDS {
             if *field == "lock_before_suspend" && behavior != "suspend" {
                 continue;
@@ -229,8 +303,13 @@ pub fn bar_scalar_entries(store: &ConfigStore) -> Vec<Value> {
                 }
             };
             let options: Option<(&[&str], &[&str])> = match *typ {
-                "position" => Some((&["top", "bottom", "left", "right"], &["Top", "Bottom", "Left", "Right"])),
-                "shell-layer" => Some((&["top", "overlay"], &["Normal", "Above fullscreen windows"])),
+                "position" => Some((
+                    &["top", "bottom", "left", "right"],
+                    &["Top", "Bottom", "Left", "Right"],
+                )),
+                "shell-layer" => {
+                    Some((&["top", "overlay"], &["Normal", "Above fullscreen windows"]))
+                }
                 _ => None,
             };
             let mut row = json!({
@@ -259,7 +338,10 @@ pub fn is_bar_field(field: &str) -> bool {
 }
 
 pub fn is_idle_field(field: &str) -> bool {
-    matches!(field, "enabled" | "timeout" | "locked_timeout" | "action" | "lock_before_suspend")
+    matches!(
+        field,
+        "enabled" | "timeout" | "locked_timeout" | "action" | "lock_before_suspend"
+    )
 }
 
 pub fn validate_bar_scalar(field: &str, value: Value) -> Result<Value, String> {
@@ -297,8 +379,11 @@ pub fn validate_bar_scalar(field: &str, value: Value) -> Result<Value, String> {
             .ok_or_else(|| "This setting requires text".into()),
         "position" | "shell-layer" => {
             let text = value.as_str().ok_or("This setting requires text")?;
-            let allowed: &[&str] =
-                if *typ == "position" { &["top", "bottom", "left", "right"] } else { &["top", "overlay"] };
+            let allowed: &[&str] = if *typ == "position" {
+                &["top", "bottom", "left", "right"]
+            } else {
+                &["top", "overlay"]
+            };
             if allowed.contains(&text) {
                 Ok(Value::String(text.to_string()))
             } else {
@@ -376,7 +461,12 @@ mod tests {
         let rows = desktop_extension_entries(&store, true);
         assert!(rows.iter().any(|row| row["id"] == "bar:main:enabled"));
         assert!(rows.iter().any(|row| row["id"] == "idle:lock:timeout"));
-        assert_eq!(store.get_json_value("idle:lock:timeout").and_then(|v| v.as_f64()), Some(420.0));
+        assert_eq!(
+            store
+                .get_json_value("idle:lock:timeout")
+                .and_then(|v| v.as_f64()),
+            Some(420.0)
+        );
     }
 
     #[test]

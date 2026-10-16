@@ -30,7 +30,13 @@ fn matches_cpp_engine() {
     let templates = root().join("../../assets/templates");
 
     let mut lines = hashes.lines();
-    let icon_theme = lines.next().unwrap().split('\t').nth(1).unwrap().to_string();
+    let icon_theme = lines
+        .next()
+        .unwrap()
+        .split('\t')
+        .nth(1)
+        .unwrap()
+        .to_string();
 
     let config = serde_json::json!({
         "shell": {
@@ -42,7 +48,10 @@ fn matches_cpp_engine() {
     let mut data_by_palette = HashMap::new();
     for p in builtin_palettes() {
         let generated = expand_fixed_palette(&p.palette);
-        data_by_palette.insert(p.name.clone(), make_theme_data(&generated.dark, &generated.light));
+        data_by_palette.insert(
+            p.name.clone(),
+            make_theme_data(&generated.dark, &generated.light),
+        );
     }
 
     let mut checked = 0;
@@ -66,11 +75,17 @@ fn matches_cpp_engine() {
         let label = format!("{palette}/{mode}/{name}");
 
         if name == "synthetic.tpl" {
-            let want = fs::read_to_string(golden.join(format!("full/{palette}_{mode}_synthetic.tpl"))).unwrap();
+            let want =
+                fs::read_to_string(golden.join(format!("full/{palette}_{mode}_synthetic.tpl")))
+                    .unwrap();
             assert_eq!(result.text, want, "{label} text");
         }
         assert_eq!(result.error_count.to_string(), errors, "{label} errors");
-        assert_eq!(format!("{:016x}", fnv1a(&result.text)), hash, "{label} hash");
+        assert_eq!(
+            format!("{:016x}", fnv1a(&result.text)),
+            hash,
+            "{label} hash"
+        );
         assert!(
             result.unsupported.is_none() || name.starts_with("t:"),
             "{label} unexpectedly unsupported"

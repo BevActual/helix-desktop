@@ -13,7 +13,10 @@ pub fn allow_unprotected(text: &str) -> bool {
 
 /// The file's content for the choice.
 pub fn render(allow_unprotected: bool) -> String {
-    format!("{}\n", json!({"version": 1, "allow_unprotected": allow_unprotected}))
+    format!(
+        "{}\n",
+        json!({"version": 1, "allow_unprotected": allow_unprotected})
+    )
 }
 
 #[cfg(test)]
@@ -24,8 +27,17 @@ mod tests {
     fn only_a_literal_true_allows() {
         assert!(allow_unprotected(r#"{"allow_unprotected": true}"#));
         for text in [
-            "", "{}", "null", "[]", "not json", r#"{"allow_unprotected": false}"#, r#"{"allow_unprotected": "true"}"#,
-            r#"{"allow_unprotected": 1}"#, r#"{"allow_unprotected": null}"#, r#"{"Allow_Unprotected": true}"#, r#"{"a": {"allow_unprotected": true}}"#,
+            "",
+            "{}",
+            "null",
+            "[]",
+            "not json",
+            r#"{"allow_unprotected": false}"#,
+            r#"{"allow_unprotected": "true"}"#,
+            r#"{"allow_unprotected": 1}"#,
+            r#"{"allow_unprotected": null}"#,
+            r#"{"Allow_Unprotected": true}"#,
+            r#"{"a": {"allow_unprotected": true}}"#,
         ] {
             assert!(!allow_unprotected(text), "{text:?}");
         }

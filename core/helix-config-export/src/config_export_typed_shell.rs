@@ -3,7 +3,9 @@
 use toml::Value as Toml;
 
 use super::config_export_defaults::write_shell_defaults;
-use super::config_export_rust::{coerce_patch_value, merge_export_subtree, merged_overlay_for_parsed_section};
+use super::config_export_rust::{
+    coerce_patch_value, merge_export_subtree, merged_overlay_for_parsed_section,
+};
 use super::config_export_serialize::f32_bits;
 use super::config_export_typed_scalar::overlay_known_leaves;
 
@@ -29,10 +31,7 @@ fn shell_panel_export(merged_shell: Option<&Toml>) -> Toml {
     };
     if let Some(panel) = merged_panel.and_then(Toml::as_table) {
         if let Some(glass) = panel.get("glass") {
-            let coerced = coerce_patch_value(
-                &Toml::Float(0.0),
-                glass,
-            );
+            let coerced = coerce_patch_value(&Toml::Float(0.0), glass);
             out.as_table_mut()
                 .expect("panel export table")
                 .insert("glass".to_string(), coerced);
@@ -99,12 +98,18 @@ impl ShellScreenRecordExport {
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
         table.insert("audio".to_string(), Toml::Boolean(self.audio));
-        table.insert("directory".to_string(), Toml::String(self.directory.clone()));
+        table.insert(
+            "directory".to_string(),
+            Toml::String(self.directory.clone()),
+        );
         table.insert(
             "filename_pattern".to_string(),
             Toml::String(self.filename_pattern.clone()),
         );
-        table.insert("replay_duration".to_string(), Toml::Integer(self.replay_duration));
+        table.insert(
+            "replay_duration".to_string(),
+            Toml::Integer(self.replay_duration),
+        );
         table.insert("show_cursor".to_string(), Toml::Boolean(self.show_cursor));
         Toml::Table(table)
     }
@@ -141,7 +146,10 @@ impl ShellScreenshotExport {
     fn from_export_table(table: &Toml) -> Self {
         let table = table.as_table().expect("screenshot table");
         Self {
-            annotate: table.get("annotate").and_then(Toml::as_bool).unwrap_or(false),
+            annotate: table
+                .get("annotate")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
             close_on_copy: table
                 .get("close_on_copy")
                 .and_then(Toml::as_bool)
@@ -214,21 +222,42 @@ impl ShellScreenshotExport {
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
         table.insert("annotate".to_string(), Toml::Boolean(self.annotate));
-        table.insert("close_on_copy".to_string(), Toml::Boolean(self.close_on_copy));
-        table.insert("close_on_save".to_string(), Toml::Boolean(self.close_on_save));
-        table.insert("confirm_region".to_string(), Toml::Boolean(self.confirm_region));
+        table.insert(
+            "close_on_copy".to_string(),
+            Toml::Boolean(self.close_on_copy),
+        );
+        table.insert(
+            "close_on_save".to_string(),
+            Toml::Boolean(self.close_on_save),
+        );
+        table.insert(
+            "confirm_region".to_string(),
+            Toml::Boolean(self.confirm_region),
+        );
         table.insert(
             "copy_to_clipboard".to_string(),
             Toml::Boolean(self.copy_to_clipboard),
         );
-        table.insert("directory".to_string(), Toml::String(self.directory.clone()));
+        table.insert(
+            "directory".to_string(),
+            Toml::String(self.directory.clone()),
+        );
         table.insert(
             "filename_pattern".to_string(),
             Toml::String(self.filename_pattern.clone()),
         );
-        table.insert("freeze_screen".to_string(), Toml::Boolean(self.freeze_screen));
-        table.insert("pipe_command".to_string(), Toml::String(self.pipe_command.clone()));
-        table.insert("pipe_to_command".to_string(), Toml::Boolean(self.pipe_to_command));
+        table.insert(
+            "freeze_screen".to_string(),
+            Toml::Boolean(self.freeze_screen),
+        );
+        table.insert(
+            "pipe_command".to_string(),
+            Toml::String(self.pipe_command.clone()),
+        );
+        table.insert(
+            "pipe_to_command".to_string(),
+            Toml::Boolean(self.pipe_to_command),
+        );
         table.insert(
             "remember_last_region".to_string(),
             Toml::Boolean(self.remember_last_region),
@@ -273,14 +302,23 @@ impl ShellLauncherExport {
     fn from_export_table(table: &Toml) -> Self {
         let table = table.as_table().expect("launcher table");
         Self {
-            app_grid: table.get("app_grid").and_then(Toml::as_bool).unwrap_or(false),
+            app_grid: table
+                .get("app_grid")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
             auto_paste: table
                 .get("auto_paste")
                 .and_then(Toml::as_str)
                 .unwrap_or("auto")
                 .to_string(),
-            categories: table.get("categories").and_then(Toml::as_bool).unwrap_or(true),
-            compact: table.get("compact").and_then(Toml::as_bool).unwrap_or(false),
+            categories: table
+                .get("categories")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            compact: table
+                .get("compact")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
             fetch_exchange_rates: table
                 .get("fetch_exchange_rates")
                 .and_then(Toml::as_bool)
@@ -308,7 +346,10 @@ impl ShellLauncherExport {
                 .get("show_app_origin_indicator")
                 .and_then(Toml::as_bool)
                 .unwrap_or(true),
-            show_icons: table.get("show_icons").and_then(Toml::as_bool).unwrap_or(true),
+            show_icons: table
+                .get("show_icons")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
             sort_by_usage: table
                 .get("sort_by_usage")
                 .and_then(Toml::as_bool)
@@ -335,7 +376,13 @@ impl ShellLauncherExport {
         let patch_dmenu = patch.get("dmenu").unwrap_or(&empty);
         out_table.insert(
             "dmenu".to_string(),
-            merge_export_subtree(def_dmenu, patch_dmenu, merged, default, "shell.launcher.dmenu"),
+            merge_export_subtree(
+                def_dmenu,
+                patch_dmenu,
+                merged,
+                default,
+                "shell.launcher.dmenu",
+            ),
         );
         let def_panels = launcher_defaults.get("panels").unwrap_or(&empty);
         let patch_panels = patch.get("panels").unwrap_or(&empty);
@@ -355,7 +402,10 @@ impl ShellLauncherExport {
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
         table.insert("app_grid".to_string(), Toml::Boolean(self.app_grid));
-        table.insert("auto_paste".to_string(), Toml::String(self.auto_paste.clone()));
+        table.insert(
+            "auto_paste".to_string(),
+            Toml::String(self.auto_paste.clone()),
+        );
         table.insert("categories".to_string(), Toml::Boolean(self.categories));
         table.insert("compact".to_string(), Toml::Boolean(self.compact));
         table.insert(
@@ -375,13 +425,19 @@ impl ShellLauncherExport {
             "provider_prefix".to_string(),
             Toml::String(self.provider_prefix.clone()),
         );
-        table.insert("show_app_actions".to_string(), Toml::Boolean(self.show_app_actions));
+        table.insert(
+            "show_app_actions".to_string(),
+            Toml::Boolean(self.show_app_actions),
+        );
         table.insert(
             "show_app_origin_indicator".to_string(),
             Toml::Boolean(self.show_app_origin_indicator),
         );
         table.insert("show_icons".to_string(), Toml::Boolean(self.show_icons));
-        table.insert("sort_by_usage".to_string(), Toml::Boolean(self.sort_by_usage));
+        table.insert(
+            "sort_by_usage".to_string(),
+            Toml::Boolean(self.sort_by_usage),
+        );
         table.insert("dmenu".to_string(), self.dmenu.clone());
         table.insert("panels".to_string(), self.panels.clone());
         Toml::Table(table)
@@ -478,7 +534,10 @@ impl ShellSessionExport {
         let mut table = toml::map::Map::new();
         table.insert("grid".to_string(), Toml::Boolean(self.grid));
         table.insert("grid_columns".to_string(), Toml::Integer(self.grid_columns));
-        table.insert("show_shortcuts".to_string(), Toml::Boolean(self.show_shortcuts));
+        table.insert(
+            "show_shortcuts".to_string(),
+            Toml::Boolean(self.show_shortcuts),
+        );
         table.insert("power".to_string(), self.power.clone());
         table.insert("actions".to_string(), self.actions.clone());
         Toml::Table(table)
@@ -585,9 +644,8 @@ impl ShellRootScalarsExport {
     }
 
     fn from_scalar_table(table: toml::map::Map<String, Toml>) -> Self {
-        let get_bool = |key: &str, default: bool| {
-            table.get(key).and_then(Toml::as_bool).unwrap_or(default)
-        };
+        let get_bool =
+            |key: &str, default: bool| table.get(key).and_then(Toml::as_bool).unwrap_or(default);
         let get_str = |key: &str, default: &str| {
             table
                 .get(key)
@@ -595,9 +653,8 @@ impl ShellRootScalarsExport {
                 .unwrap_or(default)
                 .to_string()
         };
-        let get_i64 = |key: &str, default: i64| {
-            table.get(key).and_then(Toml::as_integer).unwrap_or(default)
-        };
+        let get_i64 =
+            |key: &str, default: i64| table.get(key).and_then(Toml::as_integer).unwrap_or(default);
         let get_f64 = |key: &str, default: f64| {
             table
                 .get(key)
@@ -663,9 +720,18 @@ impl ShellRootScalarsExport {
 
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
-        table.insert("app_icon_colorize".to_string(), Toml::Boolean(self.app_icon_colorize));
-        table.insert("avatar_path".to_string(), Toml::String(self.avatar_path.clone()));
-        table.insert("button_borders".to_string(), Toml::Boolean(self.button_borders));
+        table.insert(
+            "app_icon_colorize".to_string(),
+            Toml::Boolean(self.app_icon_colorize),
+        );
+        table.insert(
+            "avatar_path".to_string(),
+            Toml::String(self.avatar_path.clone()),
+        );
+        table.insert(
+            "button_borders".to_string(),
+            Toml::Boolean(self.button_borders),
+        );
         table.insert("card_borders".to_string(), Toml::Boolean(self.card_borders));
         table.insert(
             "clipboard_auto_paste".to_string(),
@@ -675,7 +741,10 @@ impl ShellRootScalarsExport {
             "clipboard_confirm_clear_history".to_string(),
             Toml::Boolean(self.clipboard_confirm_clear_history),
         );
-        table.insert("clipboard_enabled".to_string(), Toml::Boolean(self.clipboard_enabled));
+        table.insert(
+            "clipboard_enabled".to_string(),
+            Toml::Boolean(self.clipboard_enabled),
+        );
         table.insert(
             "clipboard_history_max_entries".to_string(),
             Toml::Integer(self.clipboard_history_max_entries),
@@ -692,14 +761,26 @@ impl ShellRootScalarsExport {
             "corner_radius_scale".to_string(),
             Toml::Float(self.corner_radius_scale),
         );
-        table.insert("date_format".to_string(), Toml::String(self.date_format.clone()));
-        table.insert("disable_mipmaps".to_string(), Toml::Boolean(self.disable_mipmaps));
+        table.insert(
+            "date_format".to_string(),
+            Toml::String(self.date_format.clone()),
+        );
+        table.insert(
+            "disable_mipmaps".to_string(),
+            Toml::Boolean(self.disable_mipmaps),
+        );
         table.insert(
             "external_ip_enabled".to_string(),
             Toml::Boolean(self.external_ip_enabled),
         );
-        table.insert("font_family".to_string(), Toml::String(self.font_family.clone()));
-        table.insert("input_borders".to_string(), Toml::Boolean(self.input_borders));
+        table.insert(
+            "font_family".to_string(),
+            Toml::String(self.font_family.clone()),
+        );
+        table.insert(
+            "input_borders".to_string(),
+            Toml::Boolean(self.input_borders),
+        );
         table.insert(
             "launch_apps_as_systemd_services".to_string(),
             Toml::Boolean(self.launch_apps_as_systemd_services),
@@ -713,10 +794,19 @@ impl ShellRootScalarsExport {
             Toml::Boolean(self.niri_overview_type_to_launch_enabled),
         );
         table.insert("offline_mode".to_string(), Toml::Boolean(self.offline_mode));
-        table.insert("password_style".to_string(), Toml::String(self.password_style.clone()));
+        table.insert(
+            "password_style".to_string(),
+            Toml::String(self.password_style.clone()),
+        );
         table.insert("polkit_agent".to_string(), Toml::Boolean(self.polkit_agent));
-        table.insert("popup_borders".to_string(), Toml::Boolean(self.popup_borders));
-        table.insert("popup_shadows".to_string(), Toml::Boolean(self.popup_shadows));
+        table.insert(
+            "popup_borders".to_string(),
+            Toml::Boolean(self.popup_borders),
+        );
+        table.insert(
+            "popup_shadows".to_string(),
+            Toml::Boolean(self.popup_shadows),
+        );
         table.insert(
             "screen_time_enabled".to_string(),
             Toml::Boolean(self.screen_time_enabled),
@@ -729,10 +819,22 @@ impl ShellRootScalarsExport {
             "setup_wizard_enabled".to_string(),
             Toml::Boolean(self.setup_wizard_enabled),
         );
-        table.insert("shared_gl_context".to_string(), Toml::Boolean(self.shared_gl_context));
-        table.insert("show_location".to_string(), Toml::Boolean(self.show_location));
-        table.insert("telemetry_enabled".to_string(), Toml::Boolean(self.telemetry_enabled));
-        table.insert("time_format".to_string(), Toml::String(self.time_format.clone()));
+        table.insert(
+            "shared_gl_context".to_string(),
+            Toml::Boolean(self.shared_gl_context),
+        );
+        table.insert(
+            "show_location".to_string(),
+            Toml::Boolean(self.show_location),
+        );
+        table.insert(
+            "telemetry_enabled".to_string(),
+            Toml::Boolean(self.telemetry_enabled),
+        );
+        table.insert(
+            "time_format".to_string(),
+            Toml::String(self.time_format.clone()),
+        );
         Toml::Table(table)
     }
 }
@@ -759,7 +861,9 @@ pub(crate) fn export_shell_section_from_merged(merged: &Toml, default: &Toml) ->
     let shell_defaults = write_shell_defaults();
     for key in OVERLAY_SUBTREE_KEYS {
         let value = match *key {
-            "screenshot" => ShellScreenshotExport::from_merged_section(merged_shell).write_export_table(),
+            "screenshot" => {
+                ShellScreenshotExport::from_merged_section(merged_shell).write_export_table()
+            }
             "screen_record" => {
                 ShellScreenRecordExport::from_merged_section(merged_shell).write_export_table()
             }
@@ -786,9 +890,9 @@ pub(crate) fn export_shell_section_from_merged(merged: &Toml, default: &Toml) ->
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::config_export_rust::export_filtered_schema_section;
     use super::super::config_export_serialize::serialize_default_config;
+    use super::*;
 
     #[test]
     fn session_and_keyboard_layout_match_full_merge() {
@@ -906,7 +1010,10 @@ corner_radius_scale = 1.5
             export_filtered_schema_section("shell", &merged, &default, write_shell_defaults);
         let composed = export_shell_section_from_merged(&merged, &default);
         assert_eq!(composed.get("polkit_agent"), filtered.get("polkit_agent"));
-        assert_eq!(composed.get("corner_radius_scale"), filtered.get("corner_radius_scale"));
+        assert_eq!(
+            composed.get("corner_radius_scale"),
+            filtered.get("corner_radius_scale")
+        );
     }
 
     #[test]
@@ -914,7 +1021,10 @@ corner_radius_scale = 1.5
         let shell_defaults = write_shell_defaults();
         assert_eq!(
             ShellScreenshotExport::export_defaults().write_export_table(),
-            shell_defaults.get("screenshot").expect("screenshot").clone(),
+            shell_defaults
+                .get("screenshot")
+                .expect("screenshot")
+                .clone(),
         );
         assert_eq!(
             ShellScreenRecordExport::export_defaults().write_export_table(),

@@ -90,7 +90,10 @@ impl std::fmt::Debug for Request {
         if let Some(secret) = args.get_mut("secret") {
             *secret = Value::String("<hidden>".into());
         }
-        f.debug_struct("Request").field("action", &self.action).field("args", &args).finish()
+        f.debug_struct("Request")
+            .field("action", &self.action)
+            .field("args", &args)
+            .finish()
     }
 }
 
@@ -111,7 +114,10 @@ pub struct EnterpriseInput {
 
 impl std::fmt::Debug for EnterpriseInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EnterpriseInput").field("identity", &self.identity).field("password", &"<hidden>").finish_non_exhaustive()
+        f.debug_struct("EnterpriseInput")
+            .field("identity", &self.identity)
+            .field("password", &"<hidden>")
+            .finish_non_exhaustive()
     }
 }
 
@@ -122,7 +128,8 @@ fn plain(text: &str, max: usize) -> bool {
 /// Whether `text` can be a WPA passphrase or a raw 64-digit key.
 fn is_wifi_password(text: &str) -> bool {
     let printable = text.chars().all(|c| (' '..='~').contains(&c));
-    (printable && (8..=63).contains(&text.len())) || (text.len() == 64 && text.chars().all(|c| c.is_ascii_hexdigit()))
+    (printable && (8..=63).contains(&text.len()))
+        || (text.len() == 64 && text.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -379,7 +386,11 @@ impl Network {
     }
 
     /// Joins a secured network with a password the person typed. The password goes into the request and nowhere else.
-    pub fn connect_with_password(&self, path: &str, password: &str) -> Result<Request, RequestError> {
+    pub fn connect_with_password(
+        &self,
+        path: &str,
+        password: &str,
+    ) -> Result<Request, RequestError> {
         self.require_wifi()?;
         let ap = self.point(path)?;
         if ap.active {
@@ -402,7 +413,11 @@ impl Network {
 
     /// Joins an enterprise network with the identity and password the person typed. Mirrors what the service insists on, so a form that
     /// cannot work is refused here with the reason instead of failing at association time.
-    pub fn connect_enterprise(&self, path: &str, input: &EnterpriseInput) -> Result<Request, RequestError> {
+    pub fn connect_enterprise(
+        &self,
+        path: &str,
+        input: &EnterpriseInput,
+    ) -> Result<Request, RequestError> {
         self.require_wifi()?;
         let ap = self.point(path)?;
         if ap.active {
@@ -420,7 +435,10 @@ impl Network {
         if input.certificate.is_empty() && input.domain.trim().is_empty() {
             return Err(RequestError::MissingServerName);
         }
-        let domain_ok = input.domain.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+        let domain_ok = input
+            .domain
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
         if !plain(&input.identity, 128)
             || !plain(&input.anonymous, 128)
             || input.password.chars().count() > 128
@@ -607,34 +625,96 @@ mod tests {
     #[test]
     fn a_secured_network_is_joined_with_a_password_that_is_checked() {
         let network = Network::from_snapshot(&snapshot());
-        let request = network.connect_with_password("/ap/3", "correct horse").unwrap();
-        assert_eq!(request, Request { action: "connect", args: json!({"path": "/ap/3", "secret": "correct horse"}) });
-        assert!(network.connect_with_password("/ap/4", "another pass").is_ok(), "a saved network can be given a new password");
-        for bad in ["", "short", "1234567", &"x".repeat(64), &"x".repeat(100), "tab\tinside!", "new\nline!!", "ünïcode-pass", "emoji🙂passwd"] {
-            assert_eq!(network.connect_with_password("/ap/3", bad), Err(RequestError::BadPassword), "{bad:?}");
+        let request = network
+            .connect_with_password("/ap/3", "correct horse")
+            .unwrap();
+        assert_eq!(
+            request,
+            Request {
+                action: "connect",
+                args: json!({"path": "/ap/3", "secret": "correct horse"})
+            }
+        );
+        assert!(
+            network
+                .connect_with_password("/ap/4", "another pass")
+                .is_ok(),
+            "a saved network can be given a new password"
+        );
+        for bad in [
+            "",
+            "short",
+            "1234567",
+            &"x".repeat(64),
+            &"x".repeat(100),
+            "tab\tinside!",
+            "new\nline!!",
+            "ünïcode-pass",
+            "emoji🙂passwd",
+        ] {
+            assert_eq!(
+                network.connect_with_password("/ap/3", bad),
+                Err(RequestError::BadPassword),
+                "{bad:?}"
+            );
         }
-        assert!(network.connect_with_password("/ap/3", &"x".repeat(63)).is_ok());
-        assert!(network.connect_with_password("/ap/3", &"x".repeat(8)).is_ok());
-        assert!(network.connect_with_password("/ap/3", &"Ab12".repeat(16)).is_ok(), "a raw 64-digit hex key");
-        assert_eq!(network.connect_with_password("/ap/3", &"g".repeat(64)), Err(RequestError::BadPassword), "64 characters that are not hex");
+        assert!(network
+            .connect_with_password("/ap/3", &"x".repeat(63))
+            .is_ok());
+        assert!(network
+            .connect_with_password("/ap/3", &"x".repeat(8))
+            .is_ok());
+        assert!(
+            network
+                .connect_with_password("/ap/3", &"Ab12".repeat(16))
+                .is_ok(),
+            "a raw 64-digit hex key"
+        );
+        assert_eq!(
+            network.connect_with_password("/ap/3", &"g".repeat(64)),
+            Err(RequestError::BadPassword),
+            "64 characters that are not hex"
+        );
     }
 
     #[test]
     fn a_password_is_refused_for_the_wrong_kind_of_network() {
         let network = Network::from_snapshot(&snapshot());
-        assert_eq!(network.connect_with_password("/ap/1", "correct horse"), Err(RequestError::NotSecured), "an open network has none");
-        assert_eq!(network.connect_with_password("/ap/2", "correct horse"), Err(RequestError::AlreadyConnected));
-        assert_eq!(network.connect_with_password("/ap/999", "correct horse"), Err(RequestError::UnknownNetwork));
+        assert_eq!(
+            network.connect_with_password("/ap/1", "correct horse"),
+            Err(RequestError::NotSecured),
+            "an open network has none"
+        );
+        assert_eq!(
+            network.connect_with_password("/ap/2", "correct horse"),
+            Err(RequestError::AlreadyConnected)
+        );
+        assert_eq!(
+            network.connect_with_password("/ap/999", "correct horse"),
+            Err(RequestError::UnknownNetwork)
+        );
         let mut data = snapshot();
         data["access-points"][2]["enterprise"] = json!(true);
-        assert_eq!(Network::from_snapshot(&data).connect_with_password("/ap/3", "correct horse"), Err(RequestError::Enterprise));
+        assert_eq!(
+            Network::from_snapshot(&data).connect_with_password("/ap/3", "correct horse"),
+            Err(RequestError::Enterprise)
+        );
         let mut off = snapshot();
         off["enabled"] = json!(false);
-        assert!(Network::from_snapshot(&off).connect_with_password("/ap/3", "correct horse").is_err());
+        assert!(Network::from_snapshot(&off)
+            .connect_with_password("/ap/3", "correct horse")
+            .is_err());
     }
 
     fn corporate() -> EnterpriseInput {
-        EnterpriseInput { identity: "me@corp".into(), password: "hunter2!".into(), eap: "peap".into(), phase2: "mschapv2".into(), domain: "radius.corp.example".into(), ..Default::default() }
+        EnterpriseInput {
+            identity: "me@corp".into(),
+            password: "hunter2!".into(),
+            eap: "peap".into(),
+            phase2: "mschapv2".into(),
+            domain: "radius.corp.example".into(),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -646,10 +726,29 @@ mod tests {
         assert_eq!(request.action, "enterprise");
         assert_eq!(request.args["identity"], "me@corp");
         assert_eq!(request.args["secret"], "hunter2!");
-        assert_eq!((request.args["eap"].as_i64(), request.args["phase2"].as_i64()), (Some(0), Some(0)));
-        let ttls = EnterpriseInput { eap: "ttls".into(), phase2: "pap".into(), certificate: "/etc/ca.pem".into(), domain: "radius.corp.example".into(), anonymous: "anon@corp".into(), ..corporate() };
+        assert_eq!(
+            (
+                request.args["eap"].as_i64(),
+                request.args["phase2"].as_i64()
+            ),
+            (Some(0), Some(0))
+        );
+        let ttls = EnterpriseInput {
+            eap: "ttls".into(),
+            phase2: "pap".into(),
+            certificate: "/etc/ca.pem".into(),
+            domain: "radius.corp.example".into(),
+            anonymous: "anon@corp".into(),
+            ..corporate()
+        };
         let request = network.connect_enterprise("/ap/3", &ttls).unwrap();
-        assert_eq!((request.args["eap"].as_i64(), request.args["phase2"].as_i64()), (Some(1), Some(1)));
+        assert_eq!(
+            (
+                request.args["eap"].as_i64(),
+                request.args["phase2"].as_i64()
+            ),
+            (Some(1), Some(1))
+        );
         assert_eq!(request.args["certificate"], "/etc/ca.pem");
     }
 
@@ -663,22 +762,74 @@ mod tests {
             change(&mut input);
             network.connect_enterprise("/ap/3", &input)
         };
-        assert_eq!(try_with(&|i| i.identity = "  ".into()), Err(RequestError::MissingIdentity));
-        assert_eq!(try_with(&|i| i.password.clear()), Err(RequestError::BadPassword));
-        assert_eq!(try_with(&|i| { i.certificate.clear(); i.domain.clear(); }), Err(RequestError::MissingServerName), "system trust needs a server name");
-        assert!(try_with(&|i| { i.certificate.clear(); i.domain = "radius.corp.example".into(); }).is_ok());
-        assert_eq!(try_with(&|i| i.phase2 = "pap".into()), Err(RequestError::UnsupportedPhase2), "PEAP carries only MSCHAPv2");
-        assert_eq!(try_with(&|i| i.eap = "tls".into()), Err(RequestError::BadField));
-        assert_eq!(try_with(&|i| i.phase2 = "magic".into()), Err(RequestError::BadField));
-        assert_eq!(try_with(&|i| i.certificate = "relative/ca.pem".into()), Err(RequestError::BadField));
-        assert_eq!(try_with(&|i| i.certificate = "/ca\n.pem".into()), Err(RequestError::BadField));
-        assert_eq!(try_with(&|i| i.domain = "bad domain!".into()), Err(RequestError::BadField));
-        assert_eq!(try_with(&|i| i.identity = "a\nb".into()), Err(RequestError::BadField));
-        assert_eq!(try_with(&|i| i.password = "x".repeat(129)), Err(RequestError::BadField));
-        assert_eq!(try_with(&|i| i.identity = "x".repeat(129)), Err(RequestError::BadField));
+        assert_eq!(
+            try_with(&|i| i.identity = "  ".into()),
+            Err(RequestError::MissingIdentity)
+        );
+        assert_eq!(
+            try_with(&|i| i.password.clear()),
+            Err(RequestError::BadPassword)
+        );
+        assert_eq!(
+            try_with(&|i| {
+                i.certificate.clear();
+                i.domain.clear();
+            }),
+            Err(RequestError::MissingServerName),
+            "system trust needs a server name"
+        );
+        assert!(try_with(&|i| {
+            i.certificate.clear();
+            i.domain = "radius.corp.example".into();
+        })
+        .is_ok());
+        assert_eq!(
+            try_with(&|i| i.phase2 = "pap".into()),
+            Err(RequestError::UnsupportedPhase2),
+            "PEAP carries only MSCHAPv2"
+        );
+        assert_eq!(
+            try_with(&|i| i.eap = "tls".into()),
+            Err(RequestError::BadField)
+        );
+        assert_eq!(
+            try_with(&|i| i.phase2 = "magic".into()),
+            Err(RequestError::BadField)
+        );
+        assert_eq!(
+            try_with(&|i| i.certificate = "relative/ca.pem".into()),
+            Err(RequestError::BadField)
+        );
+        assert_eq!(
+            try_with(&|i| i.certificate = "/ca\n.pem".into()),
+            Err(RequestError::BadField)
+        );
+        assert_eq!(
+            try_with(&|i| i.domain = "bad domain!".into()),
+            Err(RequestError::BadField)
+        );
+        assert_eq!(
+            try_with(&|i| i.identity = "a\nb".into()),
+            Err(RequestError::BadField)
+        );
+        assert_eq!(
+            try_with(&|i| i.password = "x".repeat(129)),
+            Err(RequestError::BadField)
+        );
+        assert_eq!(
+            try_with(&|i| i.identity = "x".repeat(129)),
+            Err(RequestError::BadField)
+        );
         assert!(try_with(&|i| i.identity = "x".repeat(128)).is_ok());
-        assert_eq!(network.connect_enterprise("/ap/1", &corporate()), Err(RequestError::NotEnterprise), "an open network is not enterprise");
-        assert_eq!(network.connect_enterprise("/ap/999", &corporate()), Err(RequestError::UnknownNetwork));
+        assert_eq!(
+            network.connect_enterprise("/ap/1", &corporate()),
+            Err(RequestError::NotEnterprise),
+            "an open network is not enterprise"
+        );
+        assert_eq!(
+            network.connect_enterprise("/ap/999", &corporate()),
+            Err(RequestError::UnknownNetwork)
+        );
     }
 
     #[test]
@@ -687,18 +838,25 @@ mod tests {
         assert!(!shown.contains("hunter2"), "{shown}");
         let mut data = snapshot();
         data["access-points"][2]["enterprise"] = json!(true);
-        let request = Network::from_snapshot(&data).connect_enterprise("/ap/3", &corporate()).unwrap();
+        let request = Network::from_snapshot(&data)
+            .connect_enterprise("/ap/3", &corporate())
+            .unwrap();
         assert!(!format!("{request:?}").contains("hunter2"));
     }
 
     #[test]
     fn a_request_never_prints_its_secret() {
         let network = Network::from_snapshot(&snapshot());
-        let request = network.connect_with_password("/ap/3", "correct horse").unwrap();
+        let request = network
+            .connect_with_password("/ap/3", "correct horse")
+            .unwrap();
         let shown = format!("{request:?} {:#?}", request);
         assert!(!shown.contains("correct horse"), "{shown}");
         assert!(shown.contains("<hidden>") && shown.contains("/ap/3"));
-        assert_eq!(request.args["secret"], "correct horse", "only the printing is hidden, not the data");
+        assert_eq!(
+            request.args["secret"], "correct horse",
+            "only the printing is hidden, not the data"
+        );
     }
 
     #[test]

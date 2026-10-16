@@ -101,7 +101,12 @@ pub fn scan() -> Vec<App> {
 /// Starts the application in its own process group, with no terminal and no inherited stdio, and reaps it when it exits.
 /// Settings the shell's own processes are started with. A program the shell launches is not part of the shell, and must not take its role
 /// from the process that started it (a second shell started by hand from a launched terminal would otherwise come up as "panels").
-const SHELL_ONLY_VARS: &[&str] = &["HELIX_SHELL_ROLE", "HELIX_SHELL_CONFIRMER", "HELIX_SURFACE_CONTROL", "HELIX_SPIKE_AUTO_PANEL"];
+const SHELL_ONLY_VARS: &[&str] = &[
+    "HELIX_SHELL_ROLE",
+    "HELIX_SHELL_CONFIRMER",
+    "HELIX_SURFACE_CONTROL",
+    "HELIX_SPIKE_AUTO_PANEL",
+];
 
 pub fn scrub_shell_env(command: &mut Command) -> &mut Command {
     for name in SHELL_ONLY_VARS {
@@ -253,11 +258,23 @@ mod env_tests {
     #[test]
     fn a_launched_program_does_not_inherit_the_shells_role() {
         let mut command = Command::new("true");
-        command.env("HELIX_SHELL_ROLE", "panels").env("HOME", "/home/x");
+        command
+            .env("HELIX_SHELL_ROLE", "panels")
+            .env("HOME", "/home/x");
         scrub_shell_env(&mut command);
-        let removed: Vec<_> = command.get_envs().filter(|(_, v)| v.is_none()).map(|(k, _)| k.to_string_lossy().into_owned()).collect();
-        assert!(removed.contains(&"HELIX_SHELL_ROLE".to_string()), "{removed:?}");
+        let removed: Vec<_> = command
+            .get_envs()
+            .filter(|(_, v)| v.is_none())
+            .map(|(k, _)| k.to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            removed.contains(&"HELIX_SHELL_ROLE".to_string()),
+            "{removed:?}"
+        );
         assert!(removed.contains(&"HELIX_SHELL_CONFIRMER".to_string()));
-        assert!(!removed.contains(&"HOME".to_string()), "ordinary variables are untouched");
+        assert!(
+            !removed.contains(&"HOME".to_string()),
+            "ordinary variables are untouched"
+        );
     }
 }

@@ -45,7 +45,11 @@ fn to_oklch(color: Color) -> Oklch {
     let lightness = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
     let a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
     let b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
-    Oklch { lightness, chroma: a.hypot(b), hue_radians: b.atan2(a) }
+    Oklch {
+        lightness,
+        chroma: a.hypot(b),
+        hue_radians: b.atan2(a),
+    }
 }
 
 fn from_oklch(color: Oklch) -> LinearRgb {
@@ -72,7 +76,8 @@ fn is_in_srgb_gamut(c: LinearRgb) -> bool {
 }
 
 fn to_srgb_color(c: LinearRgb) -> Color {
-    let to_byte = |channel: f64| (delinearize_channel(channel).clamp(0.0, 1.0) * 255.0).round() as i32;
+    let to_byte =
+        |channel: f64| (delinearize_channel(channel).clamp(0.0, 1.0) * 255.0).round() as i32;
     Color::new(to_byte(c.red), to_byte(c.green), to_byte(c.blue))
 }
 
@@ -118,7 +123,12 @@ pub fn is_dark(c: Color) -> bool {
 /// WCAG contrast ratio against `background` meets `min_ratio`. Chroma is reduced
 /// only when needed to stay inside sRGB. `prefer_light`: `>0` lighten, `<0` darken,
 /// `0` decide from the background.
-pub fn ensure_contrast(foreground: Color, background: Color, min_ratio: f64, prefer_light: i32) -> Color {
+pub fn ensure_contrast(
+    foreground: Color,
+    background: Color,
+    min_ratio: f64,
+    prefer_light: i32,
+) -> Color {
     if contrast_ratio(foreground, background) >= min_ratio {
         return foreground;
     }
@@ -131,7 +141,11 @@ pub fn ensure_contrast(foreground: Color, background: Color, min_ratio: f64, pre
     };
 
     let endpoint_at = |lightness: f64| {
-        gamut_map_to_srgb(Oklch { lightness, chroma: source.chroma, hue_radians: source.hue_radians })
+        gamut_map_to_srgb(Oklch {
+            lightness,
+            chroma: source.chroma,
+            hue_radians: source.hue_radians,
+        })
     };
     let preferred_endpoint = endpoint_at(if lighten { 1.0 } else { 0.0 });
     let preferred_ratio = contrast_ratio(preferred_endpoint, background);
@@ -144,7 +158,11 @@ pub fn ensure_contrast(foreground: Color, background: Color, min_ratio: f64, pre
         };
     }
 
-    let (mut low, mut high) = if lighten { (source.lightness, 1.0) } else { (0.0, source.lightness) };
+    let (mut low, mut high) = if lighten {
+        (source.lightness, 1.0)
+    } else {
+        (0.0, source.lightness)
+    };
     let mut best = preferred_endpoint;
     for _ in 0..20 {
         let lightness = (low + high) / 2.0;

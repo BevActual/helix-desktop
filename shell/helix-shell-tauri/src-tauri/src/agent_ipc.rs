@@ -425,7 +425,9 @@ pub(crate) async fn undo(app: &AppHandle, task: u64) -> Result<(), String> {
 
 fn live_machine(app: &AppHandle, key: SettingKey) -> Option<String> {
     match key {
-        SettingKey::Volume => audio_level(app).map(|(percent, muted)| volume_machine(percent, muted)),
+        SettingKey::Volume => {
+            audio_level(app).map(|(percent, muted)| volume_machine(percent, muted))
+        }
         SettingKey::Brightness => brightness_level(app).map(|percent| format!("{percent}%")),
         SettingKey::Theme => theme_mode(app),
         SettingKey::NightLight => night_light(app),
@@ -482,7 +484,11 @@ async fn restore(app: &AppHandle, record: &ChangeRecord) -> Result<(), String> {
                 "dark" => crate::quick_set_dark(app.clone(), true).await?,
                 "light" => crate::quick_set_dark(app.clone(), false).await?,
                 "auto" => {
-                    let update = shell_state(app).lock().expect("shell state").quick.set_auto();
+                    let update = shell_state(app)
+                        .lock()
+                        .expect("shell state")
+                        .quick
+                        .set_auto();
                     crate::send_setting(update).await?;
                 }
                 _ => return Err("That setting is not available.".into()),

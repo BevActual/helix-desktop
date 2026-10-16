@@ -57,7 +57,10 @@ impl GrantStore {
     pub fn save(&self) -> Result<(), String> {
         let mut clients = serde_json::Map::new();
         for (client, tiers) in &self.grants {
-            let names: Vec<Value> = tiers.iter().map(|tier| Value::String(tier.name().into())).collect();
+            let names: Vec<Value> = tiers
+                .iter()
+                .map(|tier| Value::String(tier.name().into()))
+                .collect();
             clients.insert(client.clone(), Value::Array(names));
         }
         let body = format!(
@@ -91,11 +94,15 @@ impl GrantStore {
     }
 
     pub fn set(&mut self, client: &str, tiers: impl IntoIterator<Item = Tier>) {
-        let mut set: BTreeSet<Tier> = tiers.into_iter().filter(|tier| *tier != Tier::Blocked).collect();
+        let mut set: BTreeSet<Tier> = tiers
+            .into_iter()
+            .filter(|tier| *tier != Tier::Blocked)
+            .collect();
         if set.is_empty() {
             self.grants.remove(client);
         } else {
-            self.grants.insert(client.to_string(), std::mem::take(&mut set));
+            self.grants
+                .insert(client.to_string(), std::mem::take(&mut set));
         }
     }
 
@@ -243,7 +250,14 @@ mod tests {
         let taint = TaintTracker::default();
         let allowed = evaluate(&policy, &loaded, &taint, "exe:/bin/agent", "status", &[]);
         assert_eq!(allowed.verdict, Verdict::Allow);
-        let denied = evaluate(&policy, &loaded, &taint, "exe:/bin/agent", "window-close", &[]);
+        let denied = evaluate(
+            &policy,
+            &loaded,
+            &taint,
+            "exe:/bin/agent",
+            "window-close",
+            &[],
+        );
         assert_eq!(denied.verdict, Verdict::Deny);
         let _ = fs::remove_file(path);
     }

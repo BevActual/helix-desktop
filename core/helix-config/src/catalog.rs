@@ -21,10 +21,22 @@ pub struct Choice {
 #[serde(tag = "kind", rename_all = "lowercase")]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum Control {
-    Switch { on: bool },
-    Choice { options: Vec<Choice>, current: String },
-    Slider { min: f64, max: f64, integer: bool, value: f64 },
-    Text { value: String },
+    Switch {
+        on: bool,
+    },
+    Choice {
+        options: Vec<Choice>,
+        current: String,
+    },
+    Slider {
+        min: f64,
+        max: f64,
+        integer: bool,
+        value: f64,
+    },
+    Text {
+        value: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -90,20 +102,33 @@ impl Catalog {
 
     /// The text value of a string setting, if the catalog has it and it is not empty.
     pub fn text_of(&self, id: &str) -> Option<String> {
-        self.entry(id)?.get("value")?.as_str().filter(|t| !t.is_empty()).map(str::to_string)
+        self.entry(id)?
+            .get("value")?
+            .as_str()
+            .filter(|t| !t.is_empty())
+            .map(str::to_string)
     }
 
     fn entry(&self, id: &str) -> Option<&Value> {
-        self.entries.iter().find(|e| e.get("id").and_then(Value::as_str) == Some(id))
+        self.entries
+            .iter()
+            .find(|e| e.get("id").and_then(Value::as_str) == Some(id))
     }
 
     fn control(entry: &Value) -> Option<Control> {
         let kind = entry.get("type").and_then(Value::as_str)?;
         let value = entry.get("value")?;
         match kind {
-            "boolean" => Some(Control::Switch { on: value.as_bool()? }),
+            "boolean" => Some(Control::Switch {
+                on: value.as_bool()?,
+            }),
             // Any string setting that comes with a list of options (modes, positions, layers, corner actions) is a choice.
-            _ if value.is_string() && entry.get("options").and_then(Value::as_array).is_some_and(|o| !o.is_empty()) => {
+            _ if value.is_string()
+                && entry
+                    .get("options")
+                    .and_then(Value::as_array)
+                    .is_some_and(|o| !o.is_empty()) =>
+            {
                 let options = entry.get("options").and_then(Value::as_array)?;
                 let labels = entry.get("option-labels").and_then(Value::as_array);
                 let options: Vec<Choice> = options
@@ -111,17 +136,33 @@ impl Catalog {
                     .enumerate()
                     .filter_map(|(i, o)| {
                         let value = o.as_str()?;
-                        let label = labels.and_then(|l| l.get(i)).and_then(Value::as_str).unwrap_or(value);
-                        Some(Choice { value: sanitize_for_display(value, 60), label: sanitize_for_display(label, 60) })
+                        let label = labels
+                            .and_then(|l| l.get(i))
+                            .and_then(Value::as_str)
+                            .unwrap_or(value);
+                        Some(Choice {
+                            value: sanitize_for_display(value, 60),
+                            label: sanitize_for_display(label, 60),
+                        })
                     })
                     .collect();
-                (!options.is_empty()).then(|| Control::Choice { options, current: value.as_str().unwrap_or("").to_string() })
+                (!options.is_empty()).then(|| Control::Choice {
+                    options,
+                    current: value.as_str().unwrap_or("").to_string(),
+                })
             }
             "integer" | "number" => {
                 let (min, max) = (number(entry, "minimum")?, number(entry, "maximum")?);
-                (max > min).then(|| Control::Slider { min, max, integer: kind == "integer", value: value.as_f64().unwrap_or(min).clamp(min, max) })
+                (max > min).then(|| Control::Slider {
+                    min,
+                    max,
+                    integer: kind == "integer",
+                    value: value.as_f64().unwrap_or(min).clamp(min, max),
+                })
             }
-            "string" => Some(Control::Text { value: sanitize_for_display(value.as_str()?, MAX_TEXT) }),
+            "string" => Some(Control::Text {
+                value: sanitize_for_display(value.as_str()?, MAX_TEXT),
+            }),
             _ => None,
         }
     }
@@ -136,7 +177,10 @@ impl Catalog {
                     title: text(entry, "title", 80),
                     group: text(entry, "group", 60),
                     description: text(entry, "description", 300),
-                    overridden: entry.get("overridden").and_then(Value::as_bool).unwrap_or(false),
+                    overridden: entry
+                        .get("overridden")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
                     control: Self::control(entry)?,
                 })
             })
@@ -154,17 +198,31 @@ impl Catalog {
             (Control::Switch { .. }, Change::Switch(on)) => json!(on),
             (Control::Choice { options, .. }, Change::Choice(choice)) => {
                 // Compare with what the catalog really offered, not the sanitized copy shown.
-                let raw = entry.get("options").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str);
+                let raw = entry
+                    .get("options")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str);
                 if !raw.clone().any(|o| o == choice) || options.is_empty() {
                     return Err(RequestError::NotAnOption);
                 }
                 json!(choice)
             }
-            (Control::Slider { min, max, integer, .. }, Change::Number(n)) => {
+            (
+                Control::Slider {
+                    min, max, integer, ..
+                },
+                Change::Number(n),
+            ) => {
                 if !n.is_finite() || n < min || n > max {
                     return Err(RequestError::OutOfRange);
                 }
-                if integer { json!(n.round() as i64) } else { json!(n) }
+                if integer {
+                    json!(n.round() as i64)
+                } else {
+                    json!(n)
+                }
             }
             (Control::Text { .. }, Change::Text(t)) => {
                 if t.chars().count() > MAX_TEXT || t.chars().any(char::is_control) {
@@ -174,7 +232,10 @@ impl Catalog {
             }
             _ => return Err(RequestError::WrongKind),
         };
-        Ok(Update { id: id.to_string(), value })
+        Ok(Update {
+            id: id.to_string(),
+            value,
+        })
     }
 }
 
@@ -196,24 +257,76 @@ mod tests {
         c
     }
 
-    const PAGE: &[&str] = &["theme.mode", "theme.pure_black_dark", "nightlight.temperature_night", "wallpaper.edge", "shell.font_family", "weird.thing", "missing.id"];
+    const PAGE: &[&str] = &[
+        "theme.mode",
+        "theme.pure_black_dark",
+        "nightlight.temperature_night",
+        "wallpaper.edge",
+        "shell.font_family",
+        "weird.thing",
+        "missing.id",
+    ];
 
     #[test]
     fn rows_follow_the_pages_order_and_skip_what_cannot_be_drawn() {
         let rows = catalog().rows(PAGE);
         let ids: Vec<&str> = rows.iter().map(|r| r.id.as_str()).collect();
-        assert_eq!(ids, ["theme.mode", "theme.pure_black_dark", "nightlight.temperature_night", "wallpaper.edge", "shell.font_family"]);
+        assert_eq!(
+            ids,
+            [
+                "theme.mode",
+                "theme.pure_black_dark",
+                "nightlight.temperature_night",
+                "wallpaper.edge",
+                "shell.font_family"
+            ]
+        );
     }
 
     #[test]
     fn each_kind_becomes_its_control() {
         let rows = catalog().rows(PAGE);
-        assert_eq!(rows[0].control, Control::Choice { options: vec![Choice { value: "dark".into(), label: "Dark".into() }, Choice { value: "light".into(), label: "Light".into() }, Choice { value: "auto".into(), label: "Automatic".into() }], current: "dark".into() });
+        assert_eq!(
+            rows[0].control,
+            Control::Choice {
+                options: vec![
+                    Choice {
+                        value: "dark".into(),
+                        label: "Dark".into()
+                    },
+                    Choice {
+                        value: "light".into(),
+                        label: "Light".into()
+                    },
+                    Choice {
+                        value: "auto".into(),
+                        label: "Automatic".into()
+                    }
+                ],
+                current: "dark".into()
+            }
+        );
         assert_eq!(rows[1].control, Control::Switch { on: false });
         assert_eq!(rows[1].description, "Darker surfaces");
-        assert_eq!(rows[2].control, Control::Slider { min: 1000.0, max: 24900.0, integer: true, value: 3500.0 });
-        assert!(matches!(rows[3].control, Control::Slider { integer: false, .. }));
-        assert_eq!(rows[4].control, Control::Text { value: "Inter".into() });
+        assert_eq!(
+            rows[2].control,
+            Control::Slider {
+                min: 1000.0,
+                max: 24900.0,
+                integer: true,
+                value: 3500.0
+            }
+        );
+        assert!(matches!(
+            rows[3].control,
+            Control::Slider { integer: false, .. }
+        ));
+        assert_eq!(
+            rows[4].control,
+            Control::Text {
+                value: "Inter".into()
+            }
+        );
     }
 
     #[test]
@@ -225,7 +338,11 @@ mod tests {
             {"id": "c", "title": "C", "group": "g", "type": "integer", "value": 99, "minimum": 0, "maximum": 10}
         ]));
         let rows = c.rows(&["a", "b", "c"]);
-        assert_eq!(rows.len(), 1, "no bounds and empty bounds cannot be drawn as a slider");
+        assert_eq!(
+            rows.len(),
+            1,
+            "no bounds and empty bounds cannot be drawn as a slider"
+        );
         assert!(matches!(rows[0].control, Control::Slider { value, .. } if value == 10.0));
     }
 
@@ -242,56 +359,150 @@ mod tests {
     #[test]
     fn valid_changes_become_the_exact_update() {
         let c = catalog();
-        assert_eq!(c.update(PAGE, "theme.pure_black_dark", Change::Switch(true)), Ok(Update { id: "theme.pure_black_dark".into(), value: json!(true) }));
-        assert_eq!(c.update(PAGE, "theme.mode", Change::Choice("light".into())).unwrap().value, json!("light"));
-        assert_eq!(c.update(PAGE, "nightlight.temperature_night", Change::Number(4000.4)).unwrap().value, json!(4000), "integers are whole");
-        assert_eq!(c.update(PAGE, "wallpaper.edge", Change::Number(0.25)).unwrap().value, json!(0.25));
-        assert_eq!(c.update(PAGE, "shell.font_family", Change::Text("SF Pro".into())).unwrap().value, json!("SF Pro"));
+        assert_eq!(
+            c.update(PAGE, "theme.pure_black_dark", Change::Switch(true)),
+            Ok(Update {
+                id: "theme.pure_black_dark".into(),
+                value: json!(true)
+            })
+        );
+        assert_eq!(
+            c.update(PAGE, "theme.mode", Change::Choice("light".into()))
+                .unwrap()
+                .value,
+            json!("light")
+        );
+        assert_eq!(
+            c.update(PAGE, "nightlight.temperature_night", Change::Number(4000.4))
+                .unwrap()
+                .value,
+            json!(4000),
+            "integers are whole"
+        );
+        assert_eq!(
+            c.update(PAGE, "wallpaper.edge", Change::Number(0.25))
+                .unwrap()
+                .value,
+            json!(0.25)
+        );
+        assert_eq!(
+            c.update(PAGE, "shell.font_family", Change::Text("SF Pro".into()))
+                .unwrap()
+                .value,
+            json!("SF Pro")
+        );
     }
 
     #[test]
     fn only_ids_the_page_shows_can_be_changed() {
         let c = catalog();
-        assert_eq!(c.update(PAGE, "hidden.setting", Change::Switch(false)), Err(RequestError::NotShown), "in the catalog but not on this page");
-        assert_eq!(c.update(PAGE, "missing.id", Change::Switch(false)), Err(RequestError::NotShown), "on the page but not in the catalog");
-        assert_eq!(c.update(PAGE, "weird.thing", Change::Switch(false)), Err(RequestError::NotShown), "of a kind this model cannot draw");
-        assert_eq!(c.update(PAGE, "../etc", Change::Switch(false)), Err(RequestError::NotShown));
+        assert_eq!(
+            c.update(PAGE, "hidden.setting", Change::Switch(false)),
+            Err(RequestError::NotShown),
+            "in the catalog but not on this page"
+        );
+        assert_eq!(
+            c.update(PAGE, "missing.id", Change::Switch(false)),
+            Err(RequestError::NotShown),
+            "on the page but not in the catalog"
+        );
+        assert_eq!(
+            c.update(PAGE, "weird.thing", Change::Switch(false)),
+            Err(RequestError::NotShown),
+            "of a kind this model cannot draw"
+        );
+        assert_eq!(
+            c.update(PAGE, "../etc", Change::Switch(false)),
+            Err(RequestError::NotShown)
+        );
     }
 
     #[test]
     fn the_value_must_be_of_the_rows_kind() {
         let c = catalog();
-        assert_eq!(c.update(PAGE, "theme.pure_black_dark", Change::Text("yes".into())), Err(RequestError::WrongKind));
-        assert_eq!(c.update(PAGE, "theme.mode", Change::Switch(true)), Err(RequestError::WrongKind));
-        assert_eq!(c.update(PAGE, "nightlight.temperature_night", Change::Switch(true)), Err(RequestError::WrongKind));
-        assert_eq!(c.update(PAGE, "shell.font_family", Change::Number(1.0)), Err(RequestError::WrongKind));
+        assert_eq!(
+            c.update(PAGE, "theme.pure_black_dark", Change::Text("yes".into())),
+            Err(RequestError::WrongKind)
+        );
+        assert_eq!(
+            c.update(PAGE, "theme.mode", Change::Switch(true)),
+            Err(RequestError::WrongKind)
+        );
+        assert_eq!(
+            c.update(PAGE, "nightlight.temperature_night", Change::Switch(true)),
+            Err(RequestError::WrongKind)
+        );
+        assert_eq!(
+            c.update(PAGE, "shell.font_family", Change::Number(1.0)),
+            Err(RequestError::WrongKind)
+        );
     }
 
     #[test]
     fn numbers_must_be_finite_and_inside_the_bounds() {
         let c = catalog();
-        for n in [999.0, 24901.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -5.0] {
-            assert_eq!(c.update(PAGE, "nightlight.temperature_night", Change::Number(n)), Err(RequestError::OutOfRange), "{n}");
+        for n in [
+            999.0,
+            24901.0,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -5.0,
+        ] {
+            assert_eq!(
+                c.update(PAGE, "nightlight.temperature_night", Change::Number(n)),
+                Err(RequestError::OutOfRange),
+                "{n}"
+            );
         }
-        assert!(c.update(PAGE, "nightlight.temperature_night", Change::Number(1000.0)).is_ok());
-        assert!(c.update(PAGE, "nightlight.temperature_night", Change::Number(24900.0)).is_ok());
+        assert!(c
+            .update(PAGE, "nightlight.temperature_night", Change::Number(1000.0))
+            .is_ok());
+        assert!(c
+            .update(
+                PAGE,
+                "nightlight.temperature_night",
+                Change::Number(24900.0)
+            )
+            .is_ok());
     }
 
     #[test]
     fn a_choice_must_be_one_the_catalog_offered() {
         let c = catalog();
-        assert_eq!(c.update(PAGE, "theme.mode", Change::Choice("sepia".into())), Err(RequestError::NotAnOption));
-        assert_eq!(c.update(PAGE, "theme.mode", Change::Choice("Dark".into())), Err(RequestError::NotAnOption), "the label is not the value");
-        assert_eq!(c.update(PAGE, "theme.mode", Change::Choice(String::new())), Err(RequestError::NotAnOption));
+        assert_eq!(
+            c.update(PAGE, "theme.mode", Change::Choice("sepia".into())),
+            Err(RequestError::NotAnOption)
+        );
+        assert_eq!(
+            c.update(PAGE, "theme.mode", Change::Choice("Dark".into())),
+            Err(RequestError::NotAnOption),
+            "the label is not the value"
+        );
+        assert_eq!(
+            c.update(PAGE, "theme.mode", Change::Choice(String::new())),
+            Err(RequestError::NotAnOption)
+        );
     }
 
     #[test]
     fn text_is_bounded_and_has_no_control_characters() {
         let c = catalog();
-        assert_eq!(c.update(PAGE, "shell.font_family", Change::Text("a\nb".into())), Err(RequestError::BadText));
-        assert_eq!(c.update(PAGE, "shell.font_family", Change::Text("a\u{7}b".into())), Err(RequestError::BadText));
-        assert_eq!(c.update(PAGE, "shell.font_family", Change::Text("x".repeat(501))), Err(RequestError::BadText));
-        assert!(c.update(PAGE, "shell.font_family", Change::Text("x".repeat(500))).is_ok());
+        assert_eq!(
+            c.update(PAGE, "shell.font_family", Change::Text("a\nb".into())),
+            Err(RequestError::BadText)
+        );
+        assert_eq!(
+            c.update(PAGE, "shell.font_family", Change::Text("a\u{7}b".into())),
+            Err(RequestError::BadText)
+        );
+        assert_eq!(
+            c.update(PAGE, "shell.font_family", Change::Text("x".repeat(501))),
+            Err(RequestError::BadText)
+        );
+        assert!(c
+            .update(PAGE, "shell.font_family", Change::Text("x".repeat(500)))
+            .is_ok());
     }
 
     #[test]
@@ -302,10 +513,25 @@ mod tests {
             {"id": "dock.launcher_icon", "title": "Icon", "group": "Dock", "type": "string", "value": "x", "options": []}
         ]));
         let rows = c.rows(&["dock.position", "dock.launcher_icon"]);
-        assert!(matches!(&rows[0].control, Control::Choice { options, .. } if options[1].label == "bottom"), "a missing label falls back to the value");
+        assert!(
+            matches!(&rows[0].control, Control::Choice { options, .. } if options[1].label == "bottom"),
+            "a missing label falls back to the value"
+        );
         assert!(matches!(rows[1].control, Control::Text { .. }));
-        assert!(c.update(&["dock.position"], "dock.position", Change::Choice("left".into())).is_err());
-        assert!(c.update(&["dock.position"], "dock.position", Change::Choice("top".into())).is_ok());
+        assert!(c
+            .update(
+                &["dock.position"],
+                "dock.position",
+                Change::Choice("left".into())
+            )
+            .is_err());
+        assert!(c
+            .update(
+                &["dock.position"],
+                "dock.position",
+                Change::Choice("top".into())
+            )
+            .is_ok());
     }
 
     #[test]
@@ -323,6 +549,9 @@ mod tests {
         let mut c = Catalog::default();
         c.set(&json!("not a list"));
         assert!(c.rows(PAGE).is_empty());
-        assert_eq!(c.update(PAGE, "theme.mode", Change::Choice("dark".into())), Err(RequestError::NotShown));
+        assert_eq!(
+            c.update(PAGE, "theme.mode", Change::Choice("dark".into())),
+            Err(RequestError::NotShown)
+        );
     }
 }

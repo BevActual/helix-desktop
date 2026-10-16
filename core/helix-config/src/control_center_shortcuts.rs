@@ -102,7 +102,9 @@ pub fn validate(catalog: &[Value], value: &Value) -> Result<Value, String> {
     }
     let mut out = Vec::new();
     for item in items {
-        let object = item.as_object().ok_or("Shortcut entries require a type and size")?;
+        let object = item
+            .as_object()
+            .ok_or("Shortcut entries require a type and size")?;
         if object.len() != 2 || !object.contains_key("type") || !object.contains_key("size") {
             return Err("Shortcut entries require a type and size".into());
         }
@@ -163,7 +165,9 @@ mod tests {
         let next = store.full_catalog(true, &[]);
         let entry = next
             .iter()
-            .find(|row| row.get("id").and_then(|id| id.as_str()) == Some("control_center.shortcuts"))
+            .find(|row| {
+                row.get("id").and_then(|id| id.as_str()) == Some("control_center.shortcuts")
+            })
             .unwrap();
         assert_eq!(entry.get("value"), Some(&value));
     }

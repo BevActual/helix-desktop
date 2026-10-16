@@ -2,9 +2,13 @@
 
 use helix_theme::hct::{Hct, TonalPalette};
 
-const TONES: [f64; 11] = [0.0, 5.0, 10.0, 25.5, 40.0, 50.0, 60.0, 80.0, 90.0, 99.99999, 100.0];
+const TONES: [f64; 11] = [
+    0.0, 5.0, 10.0, 25.5, 40.0, 50.0, 60.0, 80.0, 90.0, 99.99999, 100.0,
+];
 const CHROMAS: [f64; 5] = [0.0, 8.0, 36.0, 80.0, 200.0];
-const PALETTE_TONES: [i32; 18] = [0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100];
+const PALETTE_TONES: [i32; 18] = [
+    0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100,
+];
 
 fn hex(v: u32) -> String {
     format!("{v:08x}")
@@ -41,7 +45,12 @@ fn matches_material_color_utilities() {
         i += 1;
         let palette = TonalPalette::from_argb(argb);
         for t in PALETTE_TONES {
-            assert_eq!(hex(palette.get(f64::from(t))), f[i], "{} palette tone {t}", f[0]);
+            assert_eq!(
+                hex(palette.get(f64::from(t))),
+                f[i],
+                "{} palette tone {t}",
+                f[0]
+            );
             i += 1;
         }
         assert_eq!(i, f.len());

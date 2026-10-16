@@ -54,7 +54,8 @@ pub fn store(dir: &Path, bytes: &[u8]) -> Result<String, String> {
         .mode(0o600)
         .open(dir.join(&id))
         .map_err(|_| "Could not save the picture.".to_string())?;
-    file.write_all(bytes).map_err(|_| "Could not save the picture.".to_string())?;
+    file.write_all(bytes)
+        .map_err(|_| "Could not save the picture.".to_string())?;
     Ok(id)
 }
 
@@ -64,7 +65,8 @@ pub fn path_of(dir: &Path, id: &str) -> Option<PathBuf> {
 
 pub fn load(dir: &Path, id: &str) -> Result<Vec<u8>, String> {
     let path = path_of(dir, id).ok_or("not a picture")?;
-    let bytes = std::fs::read(path).map_err(|_| "That picture is no longer on this computer.".to_string())?;
+    let bytes = std::fs::read(path)
+        .map_err(|_| "That picture is no longer on this computer.".to_string())?;
     if bytes.len() > MAX_BYTES || sniff(&bytes).is_none() {
         return Err("That picture cannot be read.".into());
     }
@@ -82,14 +84,19 @@ pub fn remove(dir: &Path, ids: &[String]) {
 
 /// Pictures nobody refers to (staged and never sent, or left by a deleted chat) and that are over a day old.
 pub fn sweep(dir: &Path, referenced: &std::collections::HashSet<String>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(24 * 3600);
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         if !helix_chat::chat::valid_id(&name) || referenced.contains(&name) {
             continue;
         }
-        let old = entry.metadata().and_then(|m| m.modified()).is_ok_and(|t| t < cutoff);
+        let old = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .is_ok_and(|t| t < cutoff);
         if old {
             let _ = std::fs::remove_file(entry.path());
             let _ = std::fs::remove_file(dir.join(format!("{name}.json")));

@@ -30,7 +30,8 @@ fn config_path() -> Option<PathBuf> {
 }
 
 /// The dock's look and behaviour as the person set it in Settings (`dock-settings.json`), re-read when the file changes.
-static PREFS: std::sync::Mutex<Option<helix_config::dock_prefs::DockPrefs>> = std::sync::Mutex::new(None);
+static PREFS: std::sync::Mutex<Option<helix_config::dock_prefs::DockPrefs>> =
+    std::sync::Mutex::new(None);
 
 pub fn prefs_path() -> Option<PathBuf> {
     config_path().map(|p| p.with_file_name("dock-settings.json"))
@@ -54,7 +55,11 @@ fn apply_reserve(app: &AppHandle, prefs: &helix_config::dock_prefs::DockPrefs) {
 }
 
 pub fn prefs() -> helix_config::dock_prefs::DockPrefs {
-    PREFS.lock().expect("dock prefs").get_or_insert_with(read_prefs).clone()
+    PREFS
+        .lock()
+        .expect("dock prefs")
+        .get_or_insert_with(read_prefs)
+        .clone()
 }
 
 #[tauri::command]
@@ -65,7 +70,11 @@ pub fn dock_prefs() -> helix_config::dock_prefs::DockPrefs {
 /// Looks at the settings file once a second (a stat, nothing more) and tells the page and the dock list when it changed.
 fn watch_prefs(app: AppHandle) {
     std::thread::spawn(move || {
-        let stamp = || prefs_path().and_then(|p| std::fs::metadata(p).ok()).and_then(|m| m.modified().ok());
+        let stamp = || {
+            prefs_path()
+                .and_then(|p| std::fs::metadata(p).ok())
+                .and_then(|m| m.modified().ok())
+        };
         let mut seen = stamp();
         loop {
             std::thread::sleep(Duration::from_secs(1));
@@ -213,13 +222,17 @@ fn items(app: &AppHandle) -> Vec<DockItem> {
 
 /// What each window's process really is, read from `/proc` (the pid is the compositor's, taken from the connection). A process that cannot
 /// be read (it has gone) is simply left out: the dock then keeps the application its window names.
-fn read_processes(niri: &helix_compositor::niri::Niri) -> std::collections::HashMap<u32, helix_shell_model::identity::Process> {
+fn read_processes(
+    niri: &helix_compositor::niri::Niri,
+) -> std::collections::HashMap<u32, helix_shell_model::identity::Process> {
     let mut found = std::collections::HashMap::new();
     for pid in niri.windows().filter_map(|w| w.pid) {
         if found.contains_key(&pid) {
             continue;
         }
-        let Ok(exe) = std::fs::read_link(format!("/proc/{pid}/exe")) else { continue };
+        let Ok(exe) = std::fs::read_link(format!("/proc/{pid}/exe")) else {
+            continue;
+        };
         let mut raw = std::fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
         raw.truncate(4096);
         let cmdline = raw

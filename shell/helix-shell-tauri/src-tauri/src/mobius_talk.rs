@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use futures_util::StreamExt;
+use helix_base::display::sanitize_for_display;
 use helix_chat::chat::SYSTEM_PROMPT;
 use helix_config::inference_routing;
-use helix_base::display::sanitize_for_display;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use zbus::zvariant::{Array, Dict, Signature, Value};
@@ -78,7 +78,6 @@ impl TalkState {
                 .collect(),
         }
     }
-
 }
 
 fn shell_state(app: &AppHandle) -> Arc<Mutex<ShellState>> {
@@ -86,11 +85,7 @@ fn shell_state(app: &AppHandle) -> Arc<Mutex<ShellState>> {
 }
 
 pub fn emit(app: &AppHandle) {
-    let view = shell_state(app)
-        .lock()
-        .expect("shell state")
-        .talk
-        .view();
+    let view = shell_state(app).lock().expect("shell state").talk.view();
     let _ = app.emit("mobius-talk-view", view);
 }
 
@@ -154,10 +149,7 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
     let (generation, messages) = {
         let state = shell_state(&app);
         let mut shell = state.lock().expect("shell state");
-        if matches!(
-            shell.talk.phase,
-            TalkPhase::Thinking | TalkPhase::Streaming
-        ) {
+        if matches!(shell.talk.phase, TalkPhase::Thinking | TalkPhase::Streaming) {
             return Err("Wait for the reply, or stop it.".into());
         }
         shell.talk.generation = shell.talk.generation.saturating_add(1);
@@ -180,7 +172,11 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
     let proxy = match inference_proxy().await {
         Ok(p) => p,
         Err(reason) => {
-            fail(&app, generation, &format!("Mobius is offline ({reason}). Open full Mobius or try again."));
+            fail(
+                &app,
+                generation,
+                &format!("Mobius is offline ({reason}). Open full Mobius or try again."),
+            );
             return Ok(());
         }
     };
@@ -236,10 +232,8 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
         Delta(zbus::Message),
         Done(zbus::Message),
     }
-    let mut events = futures_util::stream::select(
-        deltas.map(TalkEv::Delta),
-        done.map(TalkEv::Done),
-    );
+    let mut events =
+        futures_util::stream::select(deltas.map(TalkEv::Delta), done.map(TalkEv::Done));
     while let Some(event) = events.next().await {
         match event {
             TalkEv::Delta(message) => {
@@ -311,11 +305,7 @@ fn finish(app: &AppHandle, generation: u64, ok: bool, result_json: &str) {
     if !ok {
         let err = serde_json::from_str::<serde_json::Value>(result_json)
             .ok()
-            .and_then(|v| {
-                v.get("error")
-                    .and_then(|e| e.as_str())
-                    .map(str::to_string)
-            })
+            .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_string))
             .unwrap_or_else(|| "The model could not answer.".into());
         shell.talk.phase = TalkPhase::Failed;
         shell.talk.error = err;
@@ -354,10 +344,7 @@ pub async fn cancel(app: AppHandle) {
         let state = shell_state(&app);
         let mut shell = state.lock().expect("shell state");
         let op = shell.talk.operation.take();
-        if matches!(
-            shell.talk.phase,
-            TalkPhase::Thinking | TalkPhase::Streaming
-        ) {
+        if matches!(shell.talk.phase, TalkPhase::Thinking | TalkPhase::Streaming) {
             shell.talk.phase = TalkPhase::Idle;
             shell.talk.error.clear();
             // The turn is over for good: a request still being started must not come back to life when it returns.
@@ -387,10 +374,7 @@ pub fn clear(app: &AppHandle) {
     {
         let state = shell_state(app);
         let mut shell = state.lock().expect("shell state");
-        if matches!(
-            shell.talk.phase,
-            TalkPhase::Thinking | TalkPhase::Streaming
-        ) {
+        if matches!(shell.talk.phase, TalkPhase::Thinking | TalkPhase::Streaming) {
             return;
         }
         shell.talk.history.clear();
@@ -424,10 +408,7 @@ pub fn write_handoff(app: &AppHandle) -> Result<(), String> {
     let history = {
         let state = shell_state(app);
         let shell = state.lock().expect("shell state");
-        if matches!(
-            shell.talk.phase,
-            TalkPhase::Thinking | TalkPhase::Streaming
-        ) {
+        if matches!(shell.talk.phase, TalkPhase::Thinking | TalkPhase::Streaming) {
             return Err("Wait for the reply, or stop it.".into());
         }
         if shell.talk.history.is_empty() {
@@ -446,7 +427,12 @@ pub fn write_handoff(app: &AppHandle) -> Result<(), String> {
         })
         .collect();
     let path = handoff_path();
-    write_private_file(&path, serde_json::json!({ "messages": messages }).to_string().as_bytes())?;
+    write_private_file(
+        &path,
+        serde_json::json!({ "messages": messages })
+            .to_string()
+            .as_bytes(),
+    )?;
     {
         let state = shell_state(app);
         let mut shell = state.lock().expect("shell state");
@@ -464,7 +450,11 @@ fn write_private_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), String
     use std::io::Write;
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     if let Some(parent) = path.parent() {
-        std::fs::DirBuilder::new().recursive(true).mode(0o700).create(parent).map_err(|e| e.to_string())?;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(parent)
+            .map_err(|e| e.to_string())?;
     }
     let temporary = path.with_extension("json.tmp");
     {
@@ -487,12 +477,23 @@ mod handoff_tests {
 
     #[test]
     fn the_handoff_file_is_private_and_atomic() {
-        let dir = std::env::temp_dir().join(format!("handoff-{}", std::process::id())).join("nested");
+        let dir = std::env::temp_dir()
+            .join(format!("handoff-{}", std::process::id()))
+            .join("nested");
         let path = dir.join("mobius-bar-handoff.json");
         super::write_private_file(&path, b"{\"messages\":[]}").unwrap();
-        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
-        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
-        assert!(!path.with_extension("json.tmp").exists(), "no half-written leftover");
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        assert!(
+            !path.with_extension("json.tmp").exists(),
+            "no half-written leftover"
+        );
         let _ = std::fs::remove_dir_all(dir.parent().unwrap());
     }
 }

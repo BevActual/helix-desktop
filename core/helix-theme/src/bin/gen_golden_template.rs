@@ -36,7 +36,10 @@ fn collect_files(root: &Path) -> Vec<PathBuf> {
 fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 {
-        eprintln!("usage: {} <assets/templates> <synthetic.tpl> [full-output-dir]", args[0]);
+        eprintln!(
+            "usage: {} <assets/templates> <synthetic.tpl> [full-output-dir]",
+            args[0]
+        );
         std::process::exit(1);
     }
     let templates_dir = Path::new(&args[1]);
@@ -94,12 +97,20 @@ fn main() -> io::Result<()> {
             };
 
             let synthetic_result = render(&theme_data, &options, &synthetic);
-            emit("synthetic.tpl", &synthetic_result.text, synthetic_result.error_count)?;
+            emit(
+                "synthetic.tpl",
+                &synthetic_result.text,
+                synthetic_result.error_count,
+            )?;
 
             for rel in &files {
                 let source = fs::read_to_string(templates_dir.join(rel))?;
                 let result = render(&theme_data, &options, &source);
-                emit(&format!("t:{}", rel.display()), &result.text, result.error_count)?;
+                emit(
+                    &format!("t:{}", rel.display()),
+                    &result.text,
+                    result.error_count,
+                )?;
             }
         }
     }

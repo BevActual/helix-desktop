@@ -32,7 +32,15 @@ pub struct DockPrefs {
 
 impl Default for DockPrefs {
     fn default() -> Self {
-        DockPrefs { icon_size: ICON_DEFAULT, magnify: true, magnification: MAGNIFY_DEFAULT, auto_hide: true, reserve_space: true, indicators: true, running: true }
+        DockPrefs {
+            icon_size: ICON_DEFAULT,
+            magnify: true,
+            magnification: MAGNIFY_DEFAULT,
+            auto_hide: true,
+            reserve_space: true,
+            indicators: true,
+            running: true,
+        }
     }
 }
 
@@ -49,10 +57,20 @@ impl DockPrefs {
         if let Some(n) = value.get("icon_size").and_then(Value::as_u64) {
             prefs.icon_size = (n.min(1000) as u32).clamp(ICON_MIN, ICON_MAX);
         }
-        if let Some(n) = value.get("magnification").and_then(Value::as_f64).filter(|n| n.is_finite()) {
+        if let Some(n) = value
+            .get("magnification")
+            .and_then(Value::as_f64)
+            .filter(|n| n.is_finite())
+        {
             prefs.magnification = round2(n.clamp(MAGNIFY_MIN, MAGNIFY_MAX));
         }
-        for (key, slot) in [("magnify", &mut prefs.magnify), ("auto_hide", &mut prefs.auto_hide), ("reserve_space", &mut prefs.reserve_space), ("indicators", &mut prefs.indicators), ("running", &mut prefs.running)] {
+        for (key, slot) in [
+            ("magnify", &mut prefs.magnify),
+            ("auto_hide", &mut prefs.auto_hide),
+            ("reserve_space", &mut prefs.reserve_space),
+            ("indicators", &mut prefs.indicators),
+            ("running", &mut prefs.running),
+        ] {
             if let Some(b) = value.get(key).and_then(Value::as_bool) {
                 *slot = b;
             }
@@ -78,7 +96,10 @@ impl DockPrefs {
                 next.icon_size = n as u32;
             }
             "magnification" => {
-                let n = value.as_f64().filter(|n| n.is_finite() && (MAGNIFY_MIN..=MAGNIFY_MAX).contains(n)).ok_or(PrefsError::BadValue)?;
+                let n = value
+                    .as_f64()
+                    .filter(|n| n.is_finite() && (MAGNIFY_MIN..=MAGNIFY_MAX).contains(n))
+                    .ok_or(PrefsError::BadValue)?;
                 next.magnification = round2(n);
             }
             "magnify" => next.magnify = value.as_bool().ok_or(PrefsError::BadValue)?,
@@ -101,14 +122,15 @@ impl DockPrefs {
 
     /// The rows the Dock page draws, in order.
     pub fn rows(&self) -> Vec<RowView> {
-        let row = |id: &str, title: &str, group: &str, description: &str, control: Control| RowView {
-            id: id.into(),
-            title: title.into(),
-            group: group.into(),
-            description: description.into(),
-            overridden: false,
-            control,
-        };
+        let row =
+            |id: &str, title: &str, group: &str, description: &str, control: Control| RowView {
+                id: id.into(),
+                title: title.into(),
+                group: group.into(),
+                description: description.into(),
+                overridden: false,
+                control,
+            };
         vec![
             row("auto_hide", "Automatically hide", "Dock", "Shows when the pointer reaches the bottom edge. When off, the dock stays visible and windows can sit behind it.", Control::Switch { on: self.auto_hide }),
             row("reserve_space", "Reserve space for the dock", "Dock", "Windows stop above the dock instead of behind it. Used while Automatically hide is off.", Control::Switch { on: self.reserve_space }),
@@ -154,7 +176,9 @@ mod tests {
 
     #[test]
     fn reading_clamps_and_ignores_what_is_wrong() {
-        let p = DockPrefs::parse(r#"{"icon_size": 9999, "magnification": 7.0, "auto_hide": false, "magnify": "yes", "indicators": false}"#);
+        let p = DockPrefs::parse(
+            r#"{"icon_size": 9999, "magnification": 7.0, "auto_hide": false, "magnify": "yes", "indicators": false}"#,
+        );
         assert_eq!((p.icon_size, p.magnification), (ICON_MAX, MAGNIFY_MAX));
         assert!(!p.auto_hide && !p.indicators);
         assert!(p.magnify, "a value of the wrong type keeps the default");
@@ -169,42 +193,111 @@ mod tests {
         assert_eq!(p.set("icon_size", &json!(73)), Err(PrefsError::BadValue));
         assert_eq!(p.set("icon_size", &json!(40.5)), Err(PrefsError::BadValue));
         assert_eq!(p.set("icon_size", &json!(-1)), Err(PrefsError::BadValue));
-        assert_eq!(p.set("magnification", &json!(1.234)).unwrap().magnification, 1.23);
-        assert_eq!(p.set("magnification", &json!(2.5)), Err(PrefsError::BadValue));
-        assert_eq!(p.set("magnification", &json!("big")), Err(PrefsError::BadValue));
+        assert_eq!(
+            p.set("magnification", &json!(1.234)).unwrap().magnification,
+            1.23
+        );
+        assert_eq!(
+            p.set("magnification", &json!(2.5)),
+            Err(PrefsError::BadValue)
+        );
+        assert_eq!(
+            p.set("magnification", &json!("big")),
+            Err(PrefsError::BadValue)
+        );
         assert!(!p.set("auto_hide", &json!(false)).unwrap().auto_hide);
         assert_eq!(p.set("auto_hide", &json!(1)), Err(PrefsError::BadValue));
-        assert_eq!(p.set("position", &json!("left")), Err(PrefsError::UnknownSetting));
+        assert_eq!(
+            p.set("position", &json!("left")),
+            Err(PrefsError::UnknownSetting)
+        );
     }
 
     #[test]
     fn the_page_shows_every_setting_once_and_applies_what_it_sends() {
         let p = DockPrefs::default();
         let ids: Vec<String> = p.rows().into_iter().map(|r| r.id).collect();
-        assert_eq!(ids, ["auto_hide", "reserve_space", "running", "indicators", "icon_size", "magnify", "magnification"]);
+        assert_eq!(
+            ids,
+            [
+                "auto_hide",
+                "reserve_space",
+                "running",
+                "indicators",
+                "icon_size",
+                "magnify",
+                "magnification"
+            ]
+        );
         for id in &ids {
-            assert!(p.set(id, &json!(true)).is_ok() || p.set(id, &json!(40)).is_ok() || p.set(id, &json!(1.5)).is_ok(), "{id} is writable");
+            assert!(
+                p.set(id, &json!(true)).is_ok()
+                    || p.set(id, &json!(40)).is_ok()
+                    || p.set(id, &json!(1.5)).is_ok(),
+                "{id} is writable"
+            );
         }
-        assert_eq!(p.apply("icon_size", &Change::Number(40.0)).unwrap().icon_size, 40);
-        assert_eq!(p.apply("icon_size", &Change::Number(40.5)), Err(PrefsError::BadValue));
-        assert!(!p.apply("auto_hide", &Change::Switch(false)).unwrap().auto_hide);
-        assert_eq!(p.apply("auto_hide", &Change::Number(1.0)), Err(PrefsError::BadValue));
-        assert_eq!(p.apply("icon_size", &Change::Text("9".into())), Err(PrefsError::BadValue));
+        assert_eq!(
+            p.apply("icon_size", &Change::Number(40.0))
+                .unwrap()
+                .icon_size,
+            40
+        );
+        assert_eq!(
+            p.apply("icon_size", &Change::Number(40.5)),
+            Err(PrefsError::BadValue)
+        );
+        assert!(
+            !p.apply("auto_hide", &Change::Switch(false))
+                .unwrap()
+                .auto_hide
+        );
+        assert_eq!(
+            p.apply("auto_hide", &Change::Number(1.0)),
+            Err(PrefsError::BadValue)
+        );
+        assert_eq!(
+            p.apply("icon_size", &Change::Text("9".into())),
+            Err(PrefsError::BadValue)
+        );
     }
 
     #[test]
     fn space_is_reserved_only_for_a_dock_that_stays() {
         let p = DockPrefs::default();
-        assert_eq!(p.reserved_height(), None, "an auto-hiding dock reserves nothing");
+        assert_eq!(
+            p.reserved_height(),
+            None,
+            "an auto-hiding dock reserves nothing"
+        );
         let shown = p.set("auto_hide", &json!(false)).unwrap();
         assert_eq!(shown.reserved_height(), Some(52 + 33));
-        assert_eq!(shown.set("icon_size", &json!(72)).unwrap().reserved_height(), Some(72 + 33), "it follows the icon size");
-        assert_eq!(shown.set("reserve_space", &json!(false)).unwrap().reserved_height(), None);
+        assert_eq!(
+            shown
+                .set("icon_size", &json!(72))
+                .unwrap()
+                .reserved_height(),
+            Some(72 + 33),
+            "it follows the icon size"
+        );
+        assert_eq!(
+            shown
+                .set("reserve_space", &json!(false))
+                .unwrap()
+                .reserved_height(),
+            None
+        );
     }
 
     #[test]
     fn what_is_written_reads_back() {
-        let p = DockPrefs::default().set("icon_size", &json!(64)).unwrap().set("running", &json!(false)).unwrap().set("magnification", &json!(1.8)).unwrap();
+        let p = DockPrefs::default()
+            .set("icon_size", &json!(64))
+            .unwrap()
+            .set("running", &json!(false))
+            .unwrap()
+            .set("magnification", &json!(1.8))
+            .unwrap();
         assert_eq!(DockPrefs::parse(&p.to_json()), p);
     }
 }

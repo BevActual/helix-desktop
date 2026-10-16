@@ -229,8 +229,7 @@ impl Appearance {
                 "Appearance exports require Helix desktop".into(),
             ));
         }
-        helix_config::color_spec::validate_accent_hex(value)
-            .map_err(fdo::Error::InvalidArgs)?;
+        helix_config::color_spec::validate_accent_hex(value).map_err(fdo::Error::InvalidArgs)?;
         let inputs = crate::theme_palette::Inputs::capture(&state.config, &state.wallpaper);
         drop(state);
         let hex_color = value.to_string();
@@ -259,8 +258,7 @@ impl Appearance {
                 "Appearance exports require Helix desktop".into(),
             ));
         }
-        helix_config::color_spec::validate_accent_hex(color)
-            .map_err(fdo::Error::InvalidArgs)?;
+        helix_config::color_spec::validate_accent_hex(color).map_err(fdo::Error::InvalidArgs)?;
         let inputs = crate::theme_palette::Inputs::capture(&state.config, &state.wallpaper);
         drop(state);
         let hex_color = color.to_string();

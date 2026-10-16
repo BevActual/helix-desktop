@@ -27,7 +27,9 @@ fn lower_tone(argb: u32, shift: f64) -> u32 {
 
 /// `applyPureBlackDark(TokenMap&)`: shifts the elevation ramp so `surface` lands on tone 0.
 pub fn apply_pure_black_dark(dark: &mut TokenMap) {
-    let Some(base) = dark.get("surface").copied() else { return };
+    let Some(base) = dark.get("surface").copied() else {
+        return;
+    };
     let shift = Hct::from_argb(base).tone();
     if shift <= 0.0 {
         return;
@@ -45,7 +47,11 @@ pub fn apply_high_contrast(tokens: &mut TokenMap, is_dark: bool) {
         let mut hct = Hct::from_argb(*value);
         let mut tone = hct.tone();
         if key == "outline" || key == "outline_variant" {
-            tone = if is_dark { tone.max(80.0) } else { tone.min(20.0) };
+            tone = if is_dark {
+                tone.max(80.0)
+            } else {
+                tone.min(20.0)
+            };
         } else if tone < 50.0 {
             tone = (tone - 20.0).max(0.0);
         } else {

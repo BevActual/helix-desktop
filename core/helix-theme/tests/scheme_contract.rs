@@ -62,7 +62,10 @@ fn soft_generation_relationships() {
         assert!(soft.dark.contains_key(name), "soft dark missing {name}");
         assert!(soft.light.contains_key(name), "soft light missing {name}");
     }
-    assert_eq!(token(&soft.dark, "source_color"), token(&faithful.dark, "source_color"));
+    assert_eq!(
+        token(&soft.dark, "source_color"),
+        token(&faithful.dark, "source_color")
+    );
 
     let muted_primary = saturation(token(&muted.dark, "primary"));
     let soft_primary = saturation(token(&soft.dark, "primary"));

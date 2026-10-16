@@ -46,7 +46,8 @@ struct Root {
 
 /// The msg commands, in the order the CLI table lists them.
 pub fn msg_commands() -> Vec<Command> {
-    let root: Root = serde_json::from_str(include_str!("msg_schema.json")).expect("bundled msg_schema.json");
+    let root: Root =
+        serde_json::from_str(include_str!("msg_schema.json")).expect("bundled msg_schema.json");
     root.commands
 }
 
@@ -58,7 +59,9 @@ pub struct ToolHints {
 
 impl ToolHints {
     pub fn parse(text: &str) -> Result<Self, String> {
-        let table: toml::Table = text.parse().map_err(|error| format!("tool hints: {error}"))?;
+        let table: toml::Table = text
+            .parse()
+            .map_err(|error| format!("tool hints: {error}"))?;
         let section = table
             .get("hints")
             .and_then(toml::Value::as_table)
@@ -82,7 +85,8 @@ impl ToolHints {
     }
 
     pub fn embedded() -> Self {
-        Self::parse(include_str!("../../../protocols/ipc/tool-hints.toml")).expect("bundled tool-hints.toml")
+        Self::parse(include_str!("../../../protocols/ipc/tool-hints.toml"))
+            .expect("bundled tool-hints.toml")
     }
 
     pub fn find(&self, command: &str) -> Option<&str> {
@@ -95,7 +99,10 @@ impl ToolHints {
 fn meaningful_optional(command: &str, positional: &str) -> bool {
     matches!(
         (command, positional),
-        ("panel-open", "context") | ("panel-toggle", "context") | ("settings-open", "context") | ("settings-toggle", "context")
+        ("panel-open", "context")
+            | ("panel-toggle", "context")
+            | ("settings-open", "context")
+            | ("settings-toggle", "context")
     )
 }
 
@@ -103,7 +110,9 @@ fn offered_positionals(command: &Command) -> Vec<&Positional> {
     command
         .positionals
         .iter()
-        .filter(|p| p.required || !p.choices.is_empty() || meaningful_optional(&command.name, &p.name))
+        .filter(|p| {
+            p.required || !p.choices.is_empty() || meaningful_optional(&command.name, &p.name)
+        })
         .collect()
 }
 
@@ -151,7 +160,11 @@ fn call_schema(command: &Command, allowed_first: Option<&BTreeSet<String>>) -> V
     if !prefix.is_empty() {
         args["prefixItems"] = Value::Array(prefix.clone());
     }
-    args["items"] = if open { string_schema(&[], None) } else { Value::Bool(false) };
+    args["items"] = if open {
+        string_schema(&[], None)
+    } else {
+        Value::Bool(false)
+    };
     if !open {
         args["maxItems"] = json!(prefix.len());
     }
@@ -261,7 +274,11 @@ pub fn tool_catalog(
             }
         }
         if !command.subcommands.is_empty() {
-            let names: Vec<&str> = command.subcommands.iter().map(|s| s.name.as_str()).collect();
+            let names: Vec<&str> = command
+                .subcommands
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect();
             out.push_str(&format!(" <{}> ...", names.join("|")));
         }
         match hints.and_then(|h| h.find(name)) {
@@ -309,7 +326,12 @@ mod tests {
             ),
             (
                 "all_decline",
-                tiers(&[Tier::Observe, Tier::ObservePrivate, Tier::Act, Tier::Confirm]),
+                tiers(&[
+                    Tier::Observe,
+                    Tier::ObservePrivate,
+                    Tier::Act,
+                    Tier::Confirm,
+                ]),
                 true,
                 false,
             ),
@@ -320,8 +342,19 @@ mod tests {
             assert_eq!(entry["name"], name);
             let schema = tool_call_schema(&commands, &policy, &set, None, decline);
             assert_eq!(schema, entry["schema"], "schema for {name}");
-            let catalog = tool_catalog(&commands, &policy, &set, None, decline, use_hints.then_some(&hints));
-            assert_eq!(catalog, entry["catalog"].as_str().unwrap(), "catalog for {name}");
+            let catalog = tool_catalog(
+                &commands,
+                &policy,
+                &set,
+                None,
+                decline,
+                use_hints.then_some(&hints),
+            );
+            assert_eq!(
+                catalog,
+                entry["catalog"].as_str().unwrap(),
+                "catalog for {name}"
+            );
         }
     }
 }

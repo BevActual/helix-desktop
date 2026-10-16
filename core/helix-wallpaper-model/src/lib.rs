@@ -177,9 +177,20 @@ mod tests {
         let new = parse_config("[wallpaper.default]\npath=\"/new.jpg\"\n[wallpaper.monitors.B]\npath=\"color:#000000\"", "/h");
         let merged = old.clone().overlay(new);
         assert_eq!(merged.default, Some(Source::Image("/new.jpg".into())));
-        assert!(!merged.monitors.contains_key("A"), "a new default replaces older per-monitor lines");
-        assert_eq!(merged.monitors["B"], Source::Color([0, 0, 0]), "a monitor the choice names is kept");
-        assert_eq!(old.clone().overlay(Config::default()), old, "an empty choice changes nothing");
+        assert!(
+            !merged.monitors.contains_key("A"),
+            "a new default replaces older per-monitor lines"
+        );
+        assert_eq!(
+            merged.monitors["B"],
+            Source::Color([0, 0, 0]),
+            "a monitor the choice names is kept"
+        );
+        assert_eq!(
+            old.clone().overlay(Config::default()),
+            old,
+            "an empty choice changes nothing"
+        );
     }
 
     #[test]

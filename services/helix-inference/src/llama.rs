@@ -44,7 +44,9 @@ unsafe fn take(text: *mut c_char) -> String {
         return String::new();
     }
     // SAFETY: not null, and by the contract above a NUL-terminated string owned by the caller until `hx_free`.
-    let owned = unsafe { CStr::from_ptr(text) }.to_string_lossy().into_owned();
+    let owned = unsafe { CStr::from_ptr(text) }
+        .to_string_lossy()
+        .into_owned();
     // SAFETY: `text` came from the shim's allocator and is not used again.
     unsafe { hx_free(text) };
     owned
@@ -66,7 +68,10 @@ impl LlamaBackend {
         let dir = CString::new(model_dir.to_string_lossy().as_bytes()).unwrap_or_default();
         // SAFETY: `dir` is a valid C string for the call.
         let handle = unsafe { hx_llama_create(dir.as_ptr()) };
-        Self { handle, progress: Mutex::new(None) }
+        Self {
+            handle,
+            progress: Mutex::new(None),
+        }
     }
 }
 
@@ -155,12 +160,18 @@ impl Backend for LlamaBackend {
         })
         .to_string();
         let Ok(body) = CString::new(body) else {
-            return Outcome { error: "the request could not be encoded".into(), ..Outcome::default() };
+            return Outcome {
+                error: "the request could not be encoded".into(),
+                ..Outcome::default()
+            };
         };
         let pointers: Vec<*const u8> = request.images.iter().map(|i| i.rgb.as_ptr()).collect();
         let widths: Vec<u32> = request.images.iter().map(|i| i.width).collect();
         let heights: Vec<u32> = request.images.iter().map(|i| i.height).collect();
-        let mut callbacks = ChatCallbacks { on_delta, cancelled };
+        let mut callbacks = ChatCallbacks {
+            on_delta,
+            cancelled,
+        };
         // SAFETY: every pointer is valid for the call; `callbacks` outlives it; the result is owned by us.
         let text = unsafe {
             take(hx_llama_chat(
@@ -175,7 +186,8 @@ impl Backend for LlamaBackend {
                 &mut callbacks as *mut ChatCallbacks<'_> as *mut c_void,
             ))
         };
-        let value: Value = serde_json::from_str(&text).unwrap_or_else(|_| json!({"error": "the engine gave no answer"}));
+        let value: Value = serde_json::from_str(&text)
+            .unwrap_or_else(|_| json!({"error": "the engine gave no answer"}));
         Outcome {
             ok: value["ok"].as_bool().unwrap_or(false),
             text: value["text"].as_str().unwrap_or("").into(),

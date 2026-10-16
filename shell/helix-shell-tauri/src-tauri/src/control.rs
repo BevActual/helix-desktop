@@ -129,8 +129,7 @@ impl Control {
                 "bar visibility is served by the bar process".into(),
             ));
         }
-        crate::bar::set_visible(&self.app, true)
-            .map_err(zbus::fdo::Error::Failed)
+        crate::bar::set_visible(&self.app, true).map_err(zbus::fdo::Error::Failed)
     }
 
     async fn bar_hide(&self) -> zbus::fdo::Result<()> {
@@ -139,8 +138,7 @@ impl Control {
                 "bar visibility is served by the bar process".into(),
             ));
         }
-        crate::bar::set_visible(&self.app, false)
-            .map_err(zbus::fdo::Error::Failed)
+        crate::bar::set_visible(&self.app, false).map_err(zbus::fdo::Error::Failed)
     }
 
     async fn bar_toggle(&self) -> zbus::fdo::Result<()> {
@@ -167,7 +165,10 @@ impl Control {
                 "request is longer than {MAX_REQUEST_CHARS} characters"
             )));
         }
-        if trimmed.chars().any(|c| c.is_control() && c != '\n' && c != '\t') {
+        if trimmed
+            .chars()
+            .any(|c| c.is_control() && c != '\n' && c != '\t')
+        {
             return Err(zbus::fdo::Error::InvalidArgs(
                 "request contains control characters".into(),
             ));
@@ -179,9 +180,9 @@ impl Control {
             if crate::role::ShellRole::from_env().forwards_panels() {
                 match crate::panels_bridge::assistant_submit(&request).await {
                     Ok(true) => {}
-                    Ok(false) => eprintln!(
-                        "PANELS assistant_submit missed (no in-process Overlay on bar)"
-                    ),
+                    Ok(false) => {
+                        eprintln!("PANELS assistant_submit missed (no in-process Overlay on bar)")
+                    }
                     Err(error) => eprintln!("PANELS assistant_submit: {error}"),
                 }
                 return;

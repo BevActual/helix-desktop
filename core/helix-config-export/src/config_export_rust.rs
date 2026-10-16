@@ -16,7 +16,9 @@ use super::config_export_defaults::{
     write_lockscreen_widgets_defaults, write_widget_defaults, EXTRA_EXPORT_ROOT_WRITERS,
     SCHEMA_EXPORT_SECTIONS,
 };
-use super::config_export_serialize::{finalize_serialized_export, f32_bits, serialize_default_config};
+use super::config_export_serialize::{
+    f32_bits, finalize_serialized_export, serialize_default_config,
+};
 use super::config_export_typed::export_typed_schema_section;
 use super::settings::{ConfigPaths, ConfigStore};
 
@@ -179,10 +181,7 @@ fn is_merged_leaf_exported(path: &str, default: &Toml) -> bool {
 fn is_wallpaper_runtime_merged_path(path: &str) -> bool {
     matches!(
         path,
-        "wallpaper.default"
-            | "wallpaper.last"
-            | "wallpaper.monitors"
-            | "wallpaper.favorite"
+        "wallpaper.default" | "wallpaper.last" | "wallpaper.monitors" | "wallpaper.favorite"
     )
 }
 
@@ -287,10 +286,7 @@ fn rebuild_placement_widgets_from_merged(section: &str, root: &mut Toml, merged:
         .or_insert_with(|| Toml::Table(toml::map::Map::new()));
     let widgets = widgets.as_table_mut().unwrap();
     for (name, spec) in merged_widgets {
-        let type_name = spec
-            .get("type")
-            .and_then(Toml::as_str)
-            .unwrap_or("clock");
+        let type_name = spec.get("type").and_then(Toml::as_str).unwrap_or("clock");
         widgets
             .entry(name.clone())
             .or_insert_with(|| Toml::Table(default_placement_widget_table(type_name)));
@@ -391,7 +387,9 @@ fn is_merged_widget_path(path: &str, merged: &Toml) -> bool {
     if parts.first().copied() != Some("widget") || parts.len() < 2 {
         return false;
     }
-    merged_widget_names(merged).iter().any(|name| name == parts[1])
+    merged_widget_names(merged)
+        .iter()
+        .any(|name| name == parts[1])
 }
 
 /// Merged config may only touch export paths, or extra `bar.<name>` / `widget.<name>` subtrees from user config.
@@ -485,9 +483,12 @@ fn rebuild_idle_from_merged(root: &mut Toml, merged: &Toml) {
         export_behavior.remove(&key);
     }
     for name in &names {
-        export_behavior
-            .entry(name.clone())
-            .or_insert_with(|| templates.get(name).cloned().unwrap_or_else(|| fallback.clone()));
+        export_behavior.entry(name.clone()).or_insert_with(|| {
+            templates
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| fallback.clone())
+        });
     }
     export_idle.insert(
         "behavior_order".to_string(),
@@ -580,17 +581,15 @@ fn rebuild_bar_monitors_from_merged(root: &mut Toml, merged: &Toml) {
             .or_insert_with(|| Toml::Table(toml::map::Map::new()));
         let monitors = monitors.as_table_mut().unwrap();
         for mon_name in merged_monitors.keys() {
-            monitors
-                .entry(mon_name.clone())
-                .or_insert_with(|| {
-                    let mut seeded = template.clone();
-                    if let Toml::Table(table) = &mut seeded {
-                        table.insert("match".to_string(), Toml::String(mon_name.clone()));
-                        // Monitor overrides only emit `position` when the override sets it.
-                        table.remove("position");
-                    }
-                    seeded
-                });
+            monitors.entry(mon_name.clone()).or_insert_with(|| {
+                let mut seeded = template.clone();
+                if let Toml::Table(table) = &mut seeded {
+                    table.insert("match".to_string(), Toml::String(mon_name.clone()));
+                    // Monitor overrides only emit `position` when the override sets it.
+                    table.remove("position");
+                }
+                seeded
+            });
         }
     }
 }
@@ -676,13 +675,9 @@ pub(crate) fn merge_export_subtree(
                     format!("{path_prefix}.{key}")
                 };
                 let merged_value = match out.get(key) {
-                    Some(template_value) => merge_export_subtree(
-                        template_value,
-                        patch_value,
-                        merged,
-                        default,
-                        &path,
-                    ),
+                    Some(template_value) => {
+                        merge_export_subtree(template_value, patch_value, merged, default, &path)
+                    }
                     None if is_allowed_merged_extra_leaf(&path, merged, default)
                         || is_merged_widget_path(&path, merged)
                         || is_allowed_extra_bar_path(&path, merged) =>
@@ -724,10 +719,9 @@ pub(crate) fn merged_overlay_for_parsed_section(section: &str, merged_section: &
             }
             Toml::Table(table)
         }
-        "wallpaper" => strip_table_keys(
-            merged_section,
-            &["default", "last", "monitors", "favorite"],
-        ),
+        "wallpaper" => {
+            strip_table_keys(merged_section, &["default", "last", "monitors", "favorite"])
+        }
         "calendar" => strip_table_keys(merged_section, &["account"]),
         "idle" => strip_table_keys(merged_section, &["behavior", "behavior_order"]),
         "shell" => {
@@ -780,12 +774,7 @@ pub(crate) fn coerce_patch_value(template: &Toml, patch: &Toml) -> Toml {
     }
 }
 
-fn apply_merged_export_leaf(
-    root: &mut Toml,
-    path: &str,
-    merged: &Toml,
-    default: &Toml,
-) -> bool {
+fn apply_merged_export_leaf(root: &mut Toml, path: &str, merged: &Toml, default: &Toml) -> bool {
     if !is_merged_leaf_exported(path, default)
         || is_wallpaper_runtime_merged_path(path)
         || is_calendar_account_parse_only_path(path)
@@ -876,9 +865,7 @@ fn apply_deferred_parsed_section_leaves_from_merged(
     let mut leaves = Vec::new();
     collect_leaf_paths(merged, "", &mut leaves);
     for path in leaves {
-        if path.starts_with("calendar.account.")
-            && !is_calendar_account_parse_only_path(&path)
-        {
+        if path.starts_with("calendar.account.") && !is_calendar_account_parse_only_path(&path) {
             apply_merged_export_leaf(root, &path, merged, default);
             continue;
         }
@@ -971,11 +958,7 @@ fn merge_export_root_from_merged(
     }
 }
 
-fn apply_deferred_placement_leaves_from_merged(
-    root: &mut Toml,
-    merged: &Toml,
-    default: &Toml,
-) {
+fn apply_deferred_placement_leaves_from_merged(root: &mut Toml, merged: &Toml, default: &Toml) {
     let mut leaves = Vec::new();
     collect_leaf_paths(merged, "", &mut leaves);
     for path in leaves {
@@ -1101,11 +1084,7 @@ mod tests {
         let state_dir = root.join("state").join("helix");
         std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::create_dir_all(&state_dir).unwrap();
-        std::fs::write(
-            config_dir.join("config.toml"),
-            "[shell]\nlist = [\"a\"]\n",
-        )
-        .unwrap();
+        std::fs::write(config_dir.join("config.toml"), "[shell]\nlist = [\"a\"]\n").unwrap();
         std::fs::write(state_dir.join("settings.toml"), "\n").unwrap();
         let paths = ConfigPaths {
             config_dir,
@@ -1139,8 +1118,8 @@ mod tests {
 
     #[test]
     fn example_toml_is_rust_export_patchable() {
-        let example = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../example.toml");
+        let example =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../example.toml");
         if !example.is_file() {
             return;
         }

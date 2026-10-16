@@ -36,9 +36,7 @@ fn round_export_floats(value: &mut Toml) {
 }
 
 fn normalize_keybinds_export(root: &mut Toml) {
-    let keybinds = root
-        .get_mut("keybinds")
-        .and_then(Toml::as_table_mut);
+    let keybinds = root.get_mut("keybinds").and_then(Toml::as_table_mut);
     if let Some(table) = keybinds {
         let keys: Vec<String> = table.keys().cloned().collect();
         for key in keys {

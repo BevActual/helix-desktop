@@ -47,7 +47,9 @@ pub const KEYBIND_IDS: &[&str] = &[
 ];
 
 fn entry<'a>(catalog: &'a [Value], id: &str) -> Option<&'a Value> {
-    catalog.iter().find(|e| e.get("id").and_then(Value::as_str) == Some(id))
+    catalog
+        .iter()
+        .find(|e| e.get("id").and_then(Value::as_str) == Some(id))
 }
 
 /// Rows for the Keyboard page from a GetSettings catalog array.
@@ -67,9 +69,15 @@ pub fn view(catalog: &[Value]) -> Vec<KeybindRow> {
                 .collect::<Vec<_>>();
             Some(KeybindRow {
                 id: (*id).to_string(),
-                title: sanitize_for_display(entry.get("title").and_then(Value::as_str).unwrap_or(id), 80),
+                title: sanitize_for_display(
+                    entry.get("title").and_then(Value::as_str).unwrap_or(id),
+                    80,
+                ),
                 chords,
-                overridden: entry.get("overridden").and_then(Value::as_bool).unwrap_or(false),
+                overridden: entry
+                    .get("overridden")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
             })
         })
         .collect()
@@ -79,7 +87,18 @@ pub fn view(catalog: &[Value]) -> Vec<KeybindRow> {
 fn is_modifier(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
-        "ctrl" | "control" | "ctl" | "alt" | "option" | "shift" | "super" | "meta" | "logo" | "win" | "mod4" | "mod"
+        "ctrl"
+            | "control"
+            | "ctl"
+            | "alt"
+            | "option"
+            | "shift"
+            | "super"
+            | "meta"
+            | "logo"
+            | "win"
+            | "mod4"
+            | "mod"
     )
 }
 
@@ -93,7 +112,11 @@ fn identity(spec: &str) -> Option<String> {
     {
         return None;
     }
-    let parts: Vec<&str> = trimmed.split('+').map(str::trim).filter(|p| !p.is_empty()).collect();
+    let parts: Vec<&str> = trimmed
+        .split('+')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
     if parts.is_empty() || parts.len() != trimmed.matches('+').count() + 1 {
         return None; // empty token between pluses
     }
@@ -149,7 +172,11 @@ fn has_super(spec: &str) -> bool {
 }
 
 /// Validates a replacement chord list for one id the page shows. Returns the candidate strings to send.
-pub fn update(catalog: &[Value], id: &str, candidate: &[String]) -> Result<Vec<String>, KeybindError> {
+pub fn update(
+    catalog: &[Value],
+    id: &str,
+    candidate: &[String],
+) -> Result<Vec<String>, KeybindError> {
     if !KEYBIND_IDS.contains(&id) {
         return Err(KeybindError::NotShown);
     }
@@ -227,31 +254,63 @@ mod tests {
 
     #[test]
     fn a_valid_replacement_is_accepted() {
-        let next = update(&catalog(), "keybinds.copy", &["Alt+F9".into(), "Ctrl+F8".into()]).unwrap();
+        let next = update(
+            &catalog(),
+            "keybinds.copy",
+            &["Alt+F9".into(), "Ctrl+F8".into()],
+        )
+        .unwrap();
         assert_eq!(next, ["Alt+F9", "Ctrl+F8"]);
     }
 
     #[test]
     fn empty_too_many_super_and_duplicates_are_refused() {
-        assert_eq!(update(&catalog(), "keybinds.copy", &[]), Err(KeybindError::Empty));
+        assert_eq!(
+            update(&catalog(), "keybinds.copy", &[]),
+            Err(KeybindError::Empty)
+        );
         let many: Vec<String> = (0..17).map(|i| format!("Ctrl+F{i}")).collect();
-        assert_eq!(update(&catalog(), "keybinds.copy", &many), Err(KeybindError::TooMany));
+        assert_eq!(
+            update(&catalog(), "keybinds.copy", &many),
+            Err(KeybindError::TooMany)
+        );
         assert_eq!(
             update(&catalog(), "keybinds.copy", &["Super+c".into()]),
             Err(KeybindError::SuperNotAllowed)
         );
         assert_eq!(
-            update(&catalog(), "keybinds.copy", &["Ctrl+c".into(), "Control+c".into()]),
+            update(
+                &catalog(),
+                "keybinds.copy",
+                &["Ctrl+c".into(), "Control+c".into()]
+            ),
             Err(KeybindError::Duplicate)
         );
-        assert_eq!(update(&catalog(), "theme.mode", &["Ctrl+c".into()]), Err(KeybindError::NotShown));
-        assert_eq!(update(&catalog(), "keybinds.missing", &["Ctrl+c".into()]), Err(KeybindError::NotShown));
+        assert_eq!(
+            update(&catalog(), "theme.mode", &["Ctrl+c".into()]),
+            Err(KeybindError::NotShown)
+        );
+        assert_eq!(
+            update(&catalog(), "keybinds.missing", &["Ctrl+c".into()]),
+            Err(KeybindError::NotShown)
+        );
     }
 
     #[test]
     fn bad_chords_are_refused() {
-        for bad in ["", "+++", "Ctrl+", "+c", "Foo+c", "Ctrl+c\u{7}", "not a key"] {
-            assert!(update(&catalog(), "keybinds.copy", &[bad.into()]).is_err(), "{bad:?}");
+        for bad in [
+            "",
+            "+++",
+            "Ctrl+",
+            "+c",
+            "Foo+c",
+            "Ctrl+c\u{7}",
+            "not a key",
+        ] {
+            assert!(
+                update(&catalog(), "keybinds.copy", &[bad.into()]).is_err(),
+                "{bad:?}"
+            );
         }
     }
 }

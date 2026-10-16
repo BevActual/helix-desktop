@@ -323,8 +323,23 @@ pub(crate) fn bar_table(store: &ConfigStore) -> Option<toml::map::Map<String, To
 
 /// Widget instances a pristine C++ config defines (`Config::widgets`).
 const DEFAULT_WIDGETS: [&str; 17] = [
-    "active_window", "clock", "cpu", "date", "group:status", "input_volume", "keyboard_layout", "lock_keys",
-    "media", "network_rx", "network_tx", "notifications", "output_volume", "ram", "spacer", "temp", "tray",
+    "active_window",
+    "clock",
+    "cpu",
+    "date",
+    "group:status",
+    "input_volume",
+    "keyboard_layout",
+    "lock_keys",
+    "media",
+    "network_rx",
+    "network_tx",
+    "notifications",
+    "output_volume",
+    "ram",
+    "spacer",
+    "temp",
+    "tray",
 ];
 
 fn widget_names(store: &ConfigStore) -> Vec<String> {
@@ -344,7 +359,10 @@ fn widget_names(store: &ConfigStore) -> Vec<String> {
             }
             let bar_table = bar.as_table();
             for field in ["start", "center", "end"] {
-                if let Some(array) = bar_table.and_then(|t| t.get(field)).and_then(Toml::as_array) {
+                if let Some(array) = bar_table
+                    .and_then(|t| t.get(field))
+                    .and_then(Toml::as_array)
+                {
                     for item in array {
                         if let Some(text) = item.as_str() {
                             names.insert(text.to_string());
@@ -362,7 +380,10 @@ fn uses_default_bar(store: &ConfigStore) -> bool {
     let Some(bars) = bar_table(store) else {
         return true;
     };
-    if bars.keys().any(|name| *name != "order" && *name != "default") {
+    if bars
+        .keys()
+        .any(|name| *name != "order" && *name != "default")
+    {
         return false;
     }
     if bars.contains_key("default") {
@@ -371,9 +392,7 @@ fn uses_default_bar(store: &ConfigStore) -> bool {
     match bars.get("order").and_then(Toml::as_array) {
         None => true,
         Some(order) if order.is_empty() => true,
-        Some(order) => order
-            .iter()
-            .all(|item| item.as_str() == Some("default")),
+        Some(order) => order.iter().all(|item| item.as_str() == Some("default")),
     }
 }
 
@@ -406,10 +425,7 @@ pub(crate) fn bar_names(store: &ConfigStore) -> Vec<String> {
 fn bar_widget_entry(store: &ConfigStore, bar_name: &str, field: &str, title: &str) -> Value {
     let id = format!("bar:{bar_name}:{field}");
     let storage = super::settings::storage_path(&id);
-    let options: Vec<Value> = widget_names(store)
-        .into_iter()
-        .map(Value::String)
-        .collect();
+    let options: Vec<Value> = widget_names(store).into_iter().map(Value::String).collect();
     let default_widgets: &[&str] = if uses_default_bar(store) {
         match field {
             "start" => &["clock"],
@@ -437,11 +453,7 @@ fn bar_widget_entry(store: &ConfigStore, bar_name: &str, field: &str, title: &st
 }
 
 /// Static and config-backed ordered-list rows (display lists, templates, bar widgets).
-pub fn entries(
-    store: &ConfigStore,
-    include_desktop: bool,
-    display_names: &[String],
-) -> Vec<Value> {
+pub fn entries(store: &ConfigStore, include_desktop: bool, display_names: &[String]) -> Vec<Value> {
     let mut out = Vec::new();
     if include_desktop {
         for meta in DISPLAY_LISTS {
@@ -460,7 +472,12 @@ pub fn entries(
         ));
         for bar_name in bar_names(store) {
             out.push(bar_widget_entry(store, &bar_name, "start", "Start widgets"));
-            out.push(bar_widget_entry(store, &bar_name, "center", "Center widgets"));
+            out.push(bar_widget_entry(
+                store,
+                &bar_name,
+                "center",
+                "Center widgets",
+            ));
             out.push(bar_widget_entry(store, &bar_name, "end", "End widgets"));
         }
     }

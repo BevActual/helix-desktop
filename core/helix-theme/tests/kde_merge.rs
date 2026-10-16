@@ -71,14 +71,22 @@ fn merge_preserves_unrelated_settings() {
 
     assert_eq!(key_value(&globals, "General", "ExistingKey"), "keep");
     assert_eq!(key_value(&globals, "General", "ColorScheme"), "Helix");
-    assert_eq!(key_value(&globals, "Colors:Button", "ForegroundNormal"), "9,8,7");
-    assert_eq!(key_value(&globals, "Colors:Button", "BackgroundNormal"), "4,5,6");
+    assert_eq!(
+        key_value(&globals, "Colors:Button", "ForegroundNormal"),
+        "9,8,7"
+    );
+    assert_eq!(
+        key_value(&globals, "Colors:Button", "BackgroundNormal"),
+        "4,5,6"
+    );
     assert_eq!(key_value(&globals, "Unrelated", "MixedCase"), "Yes");
     assert_eq!(
         key_value(&globals, "Colors:Header][Inactive", "ForegroundNormal"),
         "6,5,4"
     );
-    assert!(fs::read_to_string(&globals).unwrap().contains("# keep this comment"));
+    assert!(fs::read_to_string(&globals)
+        .unwrap()
+        .contains("# keep this comment"));
     let mode = fs::metadata(&globals).unwrap().permissions().mode() & 0o7777;
     assert_eq!(mode, 0o600);
     let _ = fs::remove_dir_all(&root);
@@ -102,7 +110,8 @@ fn invalid_scheme_does_not_overwrite_globals() {
 #[test]
 fn missing_scheme_fails_without_creating_globals() {
     let root = temp_dir();
-    let err = merge_color_scheme(&root.join("missing.colors"), &root.join("kdeglobals")).unwrap_err();
+    let err =
+        merge_color_scheme(&root.join("missing.colors"), &root.join("kdeglobals")).unwrap_err();
     assert!(!err.is_empty());
     assert!(!root.join("kdeglobals").exists());
     let _ = fs::remove_dir_all(&root);

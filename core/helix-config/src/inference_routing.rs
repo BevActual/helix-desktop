@@ -202,7 +202,9 @@ impl Routing {
                     "local" => self.backends.iter().find(|b| b.kind == BackendKind::Local),
                     // A route that says "lan" must never end up at a cloud service: only an OpenAI-style backend that really is on
                     // this computer or the local network qualifies. Without one the route has no backend and the turn is refused.
-                    _ => self.backends.iter().find(|b| b.kind == BackendKind::Openai && is_local_network_url(&b.base_url)),
+                    _ => self.backends.iter().find(|b| {
+                        b.kind == BackendKind::Openai && is_local_network_url(&b.base_url)
+                    }),
                 });
         }
         self.backends.iter().find(|b| b.id == id)
@@ -224,7 +226,12 @@ impl Routing {
 /// loopback / unique-local / link-local literal. A name that merely begins like an address (`10.0.0.5.evil.example`) is not one.
 pub fn is_local_network_url(url: &str) -> bool {
     let url = url.trim();
-    let Some(rest) = url.strip_prefix("http://").or_else(|| url.strip_prefix("https://")) else { return false };
+    let Some(rest) = url
+        .strip_prefix("http://")
+        .or_else(|| url.strip_prefix("https://"))
+    else {
+        return false;
+    };
     let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
     if authority.contains('@') {
         return false;
@@ -233,16 +240,29 @@ pub fn is_local_network_url(url: &str) -> bool {
         Some(v6) => v6.split(']').next().unwrap_or("").to_string(),
         None => authority
             .rsplit_once(':')
-            .map_or(authority, |(h, port)| if port.chars().all(|c| c.is_ascii_digit()) { h } else { authority })
+            .map_or(authority, |(h, port)| {
+                if port.chars().all(|c| c.is_ascii_digit()) {
+                    h
+                } else {
+                    authority
+                }
+            })
             .to_string(),
     };
     let host = host.to_ascii_lowercase();
-    if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") || host == "::1" {
+    if host == "localhost"
+        || host.ends_with(".localhost")
+        || host.ends_with(".local")
+        || host == "::1"
+    {
         return true;
     }
     let octets: Vec<u8> = host.split('.').filter_map(|p| p.parse().ok()).collect();
     if octets.len() == 4 && host.split('.').count() == 4 {
-        return matches!(octets[..], [127, ..] | [10, ..] | [192, 168, ..] | [169, 254, ..]) || (octets[0] == 172 && (16..=31).contains(&octets[1]));
+        return matches!(
+            octets[..],
+            [127, ..] | [10, ..] | [192, 168, ..] | [169, 254, ..]
+        ) || (octets[0] == 172 && (16..=31).contains(&octets[1]));
     }
     (host.starts_with("fd") && host.contains(':')) || host.starts_with("fe80:")
 }
@@ -330,7 +350,10 @@ mod tests {
             label: "OpenRouter".into(),
             api_key_ref: "k".into(),
         });
-        assert!(r.backend("lan").is_none(), "no LAN backend: the route has nothing to go to");
+        assert!(
+            r.backend("lan").is_none(),
+            "no LAN backend: the route has nothing to go to"
+        );
         r.backends.push(Backend {
             id: "studio".into(),
             kind: BackendKind::Openai,
@@ -343,10 +366,27 @@ mod tests {
 
     #[test]
     fn local_network_addresses_are_told_apart() {
-        for ok in ["http://localhost:1/v1", "http://127.0.0.1/v1", "http://192.168.0.2:80", "https://10.1.2.3/v1", "http://172.20.0.1", "http://[::1]:9", "http://a.local"] {
+        for ok in [
+            "http://localhost:1/v1",
+            "http://127.0.0.1/v1",
+            "http://192.168.0.2:80",
+            "https://10.1.2.3/v1",
+            "http://172.20.0.1",
+            "http://[::1]:9",
+            "http://a.local",
+        ] {
             assert!(is_local_network_url(ok), "{ok}");
         }
-        for bad in ["https://api.openai.com/v1", "http://8.8.8.8", "http://172.32.0.1", "http://10.0.0.5.evil.example", "http://user@192.168.0.2", "ftp://192.168.0.2", "192.168.0.2", ""] {
+        for bad in [
+            "https://api.openai.com/v1",
+            "http://8.8.8.8",
+            "http://172.32.0.1",
+            "http://10.0.0.5.evil.example",
+            "http://user@192.168.0.2",
+            "ftp://192.168.0.2",
+            "192.168.0.2",
+            "",
+        ] {
             assert!(!is_local_network_url(bad), "{bad}");
         }
     }

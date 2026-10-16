@@ -183,9 +183,15 @@ impl SettingDef {
 
     pub fn options(&self) -> Option<(&'static [&'static str], &'static [&'static str])> {
         match self.kind {
-            SettingKind::Mode => Some((&["dark", "light", "auto"], &["Dark", "Light", "Automatic"])),
-            SettingKind::Material => Some((&["solid", "soft", "glass"], &["Solid", "Soft", "Glass"])),
-            SettingKind::ShellLayer => Some((&["top", "overlay"], &["Normal", "Above fullscreen windows"])),
+            SettingKind::Mode => {
+                Some((&["dark", "light", "auto"], &["Dark", "Light", "Automatic"]))
+            }
+            SettingKind::Material => {
+                Some((&["solid", "soft", "glass"], &["Solid", "Soft", "Glass"]))
+            }
+            SettingKind::ShellLayer => {
+                Some((&["top", "overlay"], &["Normal", "Above fullscreen windows"]))
+            }
             SettingKind::ScreenPosition => Some((
                 &[
                     "top_left",
@@ -204,22 +210,42 @@ impl SettingDef {
                     "Bottom right",
                 ],
             )),
-            SettingKind::Orientation => Some((&["horizontal", "vertical"], &["Horizontal", "Vertical"])),
+            SettingKind::Orientation => {
+                Some((&["horizontal", "vertical"], &["Horizontal", "Vertical"]))
+            }
             SettingKind::Position => Some((
                 &["bottom", "left", "right", "top"],
                 &["Bottom", "Left", "Right", "Top"],
             )),
-            SettingKind::DockLauncher => Some((&["none", "start", "end"], &["None", "Start", "End"])),
+            SettingKind::DockLauncher => {
+                Some((&["none", "start", "end"], &["None", "Start", "End"]))
+            }
             SettingKind::HotCornerAction => Some((
-                &["none", "launcher", "control_center", "window_switcher", "command"],
-                &["None", "Launcher", "Control Center", "Window switcher", "Custom command"],
+                &[
+                    "none",
+                    "launcher",
+                    "control_center",
+                    "window_switcher",
+                    "command",
+                ],
+                &[
+                    "None",
+                    "Launcher",
+                    "Control Center",
+                    "Window switcher",
+                    "Custom command",
+                ],
             )),
             SettingKind::WallpaperFit => Some((
                 &["center", "crop", "fit", "stretch", "repeat", "span"],
                 &["Center", "Fill", "Fit", "Stretch", "Tile", "Span displays"],
             )),
-            SettingKind::WallpaperSource => Some((&["folder", "daily"], &["Folder", "Daily image"])),
-            SettingKind::WallpaperOrder => Some((&["random", "alphabetical"], &["Random", "Alphabetical"])),
+            SettingKind::WallpaperSource => {
+                Some((&["folder", "daily"], &["Folder", "Daily image"]))
+            }
+            SettingKind::WallpaperOrder => {
+                Some((&["random", "alphabetical"], &["Random", "Alphabetical"]))
+            }
             SettingKind::DailyProvider => Some((&["bing", "nasa"], &["Bing", "NASA"])),
             SettingKind::VideoPause => Some((
                 &["off", "max", "full"],
@@ -229,14 +255,12 @@ impl SettingDef {
                 &["off", "auto", "ctrl_v", "ctrl_shift_v", "shift_insert"],
                 &["Off", "Automatic", "Ctrl+V", "Ctrl+Shift+V", "Shift+Insert"],
             )),
-            SettingKind::PasswordMask => Some((
-                &["default", "random"],
-                &["Filled circles", "Random icons"],
-            )),
-            SettingKind::PanelPlacement => Some((
-                &["attached", "floating"],
-                &["Attached to bar", "Floating"],
-            )),
+            SettingKind::PasswordMask => {
+                Some((&["default", "random"], &["Filled circles", "Random icons"]))
+            }
+            SettingKind::PanelPlacement => {
+                Some((&["attached", "floating"], &["Attached to bar", "Floating"]))
+            }
             SettingKind::PanelPosition => Some((
                 &[
                     "auto",
@@ -326,10 +350,9 @@ impl SettingDef {
                 &["full", "compact", "none"],
                 &["Full sidebar", "Compact sidebar", "No sidebar"],
             )),
-            SettingKind::StorageKey => Some((
-                &["secret-service", "file"],
-                &["Secret Service", "Key file"],
-            )),
+            SettingKind::StorageKey => {
+                Some((&["secret-service", "file"], &["Secret Service", "Key file"]))
+            }
             SettingKind::WifiBand => Some((
                 &["all", "2.4", "5", "6"],
                 &["All bands", "2.4 GHz", "5 GHz", "6 GHz"],
@@ -341,24 +364,56 @@ impl SettingDef {
             )),
             SettingKind::Color => Some((
                 &[
-                    "", "primary", "on_primary", "secondary", "on_secondary", "tertiary", "on_tertiary", "error",
-                    "on_error", "surface", "on_surface", "surface_variant", "on_surface_variant", "outline",
-                    "shadow", "hover", "on_hover",
+                    "",
+                    "primary",
+                    "on_primary",
+                    "secondary",
+                    "on_secondary",
+                    "tertiary",
+                    "on_tertiary",
+                    "error",
+                    "on_error",
+                    "surface",
+                    "on_surface",
+                    "surface_variant",
+                    "on_surface_variant",
+                    "outline",
+                    "shadow",
+                    "hover",
+                    "on_hover",
                 ],
                 &[
-                    "Default", "Primary", "On primary", "Secondary", "On secondary", "Tertiary", "On tertiary",
-                    "Error", "On error", "Surface", "On surface", "Surface variant", "On surface variant",
-                    "Outline", "Shadow", "Hover", "On hover",
+                    "Default",
+                    "Primary",
+                    "On primary",
+                    "Secondary",
+                    "On secondary",
+                    "Tertiary",
+                    "On tertiary",
+                    "Error",
+                    "On error",
+                    "Surface",
+                    "On surface",
+                    "Surface variant",
+                    "On surface variant",
+                    "Outline",
+                    "Shadow",
+                    "Hover",
+                    "On hover",
                 ],
             )),
-            SettingKind::Directory | SettingKind::CommunityPalette | SettingKind::CustomPalette => None,
+            SettingKind::Directory | SettingKind::CommunityPalette | SettingKind::CustomPalette => {
+                None
+            }
             _ => None,
         }
     }
 }
 
 fn bootstrap_defs() -> impl Iterator<Item = &'static SettingDef> {
-    BOOTSTRAP.iter().chain(settings_bootstrap_extra::BOOTSTRAP_EXTRA.iter())
+    BOOTSTRAP
+        .iter()
+        .chain(settings_bootstrap_extra::BOOTSTRAP_EXTRA.iter())
 }
 
 /// Subset needed for shell volume + Settings appearance/accessibility pages.
@@ -2657,7 +2712,9 @@ pub const BOOTSTRAP: &[SettingDef] = &[
 /// Integer settings report integral JSON numbers (C++ `is_number_integer`), never `34.0`.
 pub(crate) fn as_integer(value: Value) -> Value {
     match value.as_f64() {
-        Some(number) if number.fract() == 0.0 && number.abs() < 9.0e15 => Value::from(number as i64),
+        Some(number) if number.fract() == 0.0 && number.abs() < 9.0e15 => {
+            Value::from(number as i64)
+        }
         _ => value,
     }
 }
@@ -2686,7 +2743,12 @@ pub struct ConfigPaths {
 impl ConfigPaths {
     pub fn from_env() -> Self {
         let config_dir = named_dir("HELIX_CONFIG_HOME", "XDG_CONFIG_HOME", ".config", "helix");
-        let state_dir = named_dir("HELIX_STATE_HOME", "XDG_STATE_HOME", ".local/state", "helix");
+        let state_dir = named_dir(
+            "HELIX_STATE_HOME",
+            "XDG_STATE_HOME",
+            ".local/state",
+            "helix",
+        );
         Self {
             config_dir,
             settings_toml: state_dir.join("settings.toml"),
@@ -2726,7 +2788,8 @@ pub struct ConfigStore {
 impl ConfigStore {
     pub fn load(paths: ConfigPaths) -> Self {
         let base = load_merged_config(&paths.config_dir);
-        let overrides = read_toml_file(&paths.settings_toml).unwrap_or_else(|| Toml::Table(Default::default()));
+        let overrides =
+            read_toml_file(&paths.settings_toml).unwrap_or_else(|| Toml::Table(Default::default()));
         let signature = config_signature(&paths);
         Self {
             base,
@@ -2791,7 +2854,9 @@ impl ConfigStore {
                 "ai.act_model" => Value::String(mirror.act_model),
                 "ai.chat_model" => Value::String(mirror.chat_model),
                 "ai.lan_endpoint" => Value::String(mirror.lan_endpoint),
-                "ai.allow_remote_on_battery_saver" => Value::Bool(mirror.allow_remote_on_battery_saver),
+                "ai.allow_remote_on_battery_saver" => {
+                    Value::Bool(mirror.allow_remote_on_battery_saver)
+                }
                 _ => effective_default(def).to_json(),
             };
         }
@@ -3023,13 +3088,17 @@ impl ConfigStore {
     pub fn force_reload(&mut self) {
         // Mutations see the latest hand edits of config.toml too (C++ re-reads before writing).
         self.base = load_merged_config(&self.paths.config_dir);
-        self.overrides =
-            read_toml_file(&self.paths.settings_toml).unwrap_or_else(|| Toml::Table(Default::default()));
+        self.overrides = read_toml_file(&self.paths.settings_toml)
+            .unwrap_or_else(|| Toml::Table(Default::default()));
         self.signature = config_signature(&self.paths);
     }
 
     /// Optimistic concurrency for `Configuration1.CommitOverrides` (C++ `commitRemoteOverrides`).
-    pub fn commit_remote_overrides(&mut self, baseline: &str, candidate: &str) -> Result<(), String> {
+    pub fn commit_remote_overrides(
+        &mut self,
+        baseline: &str,
+        candidate: &str,
+    ) -> Result<(), String> {
         self.force_reload();
         let baseline_table = toml::from_str::<Toml>(baseline)
             .map_err(|_| "Invalid settings document".to_string())?;
@@ -3087,7 +3156,8 @@ impl ConfigStore {
     }
 
     pub fn get_raw_list(&self, id: &str) -> Option<Value> {
-        self.get_json_value(id).and_then(|value| value.as_array().cloned().map(Value::Array))
+        self.get_json_value(id)
+            .and_then(|value| value.as_array().cloned().map(Value::Array))
     }
 
     pub fn set_raw_list(&mut self, id: &str, value: Value) -> Result<(), String> {
@@ -3104,7 +3174,12 @@ impl ConfigStore {
     /// Bootstrap catalog plus ordered-list extensions (key-chords, Control Center tabs, …).
     pub fn full_catalog(&self, include_desktop: bool, display_names: &[String]) -> Vec<Value> {
         // Desktop-only settings (whole pages) exist only once a shell has registered.
-        let state_dir = self.paths.settings_toml.parent().unwrap_or(&self.paths.config_dir).to_path_buf();
+        let state_dir = self
+            .paths
+            .settings_toml
+            .parent()
+            .unwrap_or(&self.paths.config_dir)
+            .to_path_buf();
         let community = super::palette_names::list_community_palette_names(&state_dir);
         let custom = super::palette_names::list_custom_palette_names(&self.paths.config_dir);
         let mut rows: Vec<Value> = bootstrap_defs()
@@ -3118,7 +3193,11 @@ impl ConfigStore {
             .map(|def| {
                 let mut entry = self.catalog_entry(def);
                 if def.kind == SettingKind::Language {
-                    let current = entry.get("value").and_then(Value::as_str).unwrap_or("").to_string();
+                    let current = entry
+                        .get("value")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
                     let mut options = vec![String::new()];
                     let mut labels = vec!["Automatic".to_string()];
                     for (code, name) in SUPPORTED_LANGUAGES {
@@ -3182,7 +3261,10 @@ impl ConfigStore {
         });
         if def.id == "theme.community_palette" {
             let names = super::palette_names::list_community_palette_names(
-                self.paths.settings_toml.parent().unwrap_or(&self.paths.config_dir),
+                self.paths
+                    .settings_toml
+                    .parent()
+                    .unwrap_or(&self.paths.config_dir),
             );
             let current = entry.get("value").and_then(|v| v.as_str()).unwrap_or("");
             let mut options: Vec<Value> = names.iter().map(|n| Value::String(n.clone())).collect();
@@ -3194,8 +3276,7 @@ impl ConfigStore {
             entry["options"] = Value::Array(options);
             entry["option-labels"] = Value::Array(labels);
         } else if def.id == "theme.custom_palette" {
-            let names =
-                super::palette_names::list_custom_palette_names(&self.paths.config_dir);
+            let names = super::palette_names::list_custom_palette_names(&self.paths.config_dir);
             let current = entry.get("value").and_then(|v| v.as_str()).unwrap_or("");
             let mut options: Vec<Value> = names.iter().map(|n| Value::String(n.clone())).collect();
             let mut labels = options.clone();
@@ -3220,7 +3301,8 @@ impl ConfigStore {
             entry["options"] = Value::Array(options);
             entry["option-labels"] = Value::Array(labels);
         } else if let Some((options, labels)) = def.options() {
-            entry["options"] = Value::Array(options.iter().map(|o| Value::String((*o).into())).collect());
+            entry["options"] =
+                Value::Array(options.iter().map(|o| Value::String((*o).into())).collect());
             entry["option-labels"] =
                 Value::Array(labels.iter().map(|o| Value::String((*o).into())).collect());
         }
@@ -3288,11 +3370,7 @@ pub fn storage_path(id: &str) -> Cow<'_, str> {
         if let Some((name, field)) = rest.rsplit_once(':') {
             if matches!(
                 field,
-                "enabled"
-                    | "timeout"
-                    | "locked_timeout"
-                    | "action"
-                    | "lock_before_suspend"
+                "enabled" | "timeout" | "locked_timeout" | "action" | "lock_before_suspend"
             ) {
                 return Cow::Owned(format!("idle.behavior.{name}.{field}"));
             }
@@ -3472,7 +3550,12 @@ pub fn toml_to_json_value(value: &Toml) -> Value {
 fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
     match def.kind {
         SettingKind::Boolean => Value::Bool(value.as_bool().unwrap_or(false)),
-        SettingKind::Number => Value::from(value.as_float().or_else(|| value.as_integer().map(|n| n as f64)).unwrap_or(0.0)),
+        SettingKind::Number => Value::from(
+            value
+                .as_float()
+                .or_else(|| value.as_integer().map(|n| n as f64))
+                .unwrap_or(0.0),
+        ),
         SettingKind::Integer => {
             let number = value
                 .as_integer()
@@ -3704,7 +3787,10 @@ fn validate(def: &SettingDef, id: &str, value: Value) -> Result<Value, String> {
                 if text.is_empty() || text.len() > 64 {
                     return Err("Choose a short icon name".into());
                 }
-                if text.bytes().any(|c| c < 32 || c == 127 || c == b'/' || c == b'\\') {
+                if text
+                    .bytes()
+                    .any(|c| c < 32 || c == 127 || c == b'/' || c == b'\\')
+                {
                     return Err("Icon names cannot contain path separators".into());
                 }
             } else if id == "dock.launcher_custom_image" {
@@ -3874,14 +3960,22 @@ mod tests {
         store
             .set("nightlight.temperature_night", json!(9000))
             .unwrap();
-        assert_eq!(store.get("nightlight.temperature_night").as_f64(), Some(9000.0));
+        assert_eq!(
+            store.get("nightlight.temperature_night").as_f64(),
+            Some(9000.0)
+        );
         assert!(store.get("nightlight.temperature_day").as_f64().unwrap() >= 9100.0);
         store
             .set("nightlight.temperature_day", json!(2000))
             .unwrap();
-        assert_eq!(store.get("nightlight.temperature_day").as_f64(), Some(2000.0));
+        assert_eq!(
+            store.get("nightlight.temperature_day").as_f64(),
+            Some(2000.0)
+        );
         assert!(store.get("nightlight.temperature_night").as_f64().unwrap() <= 1900.0);
-        assert!(store.set("nightlight.temperature_day", json!(1000)).is_err());
+        assert!(store
+            .set("nightlight.temperature_day", json!(1000))
+            .is_err());
         store.reset("nightlight.temperature_night").unwrap();
         assert_eq!(store.get("nightlight.temperature_day"), original_day);
         assert_eq!(store.get("nightlight.temperature_night"), original_night);
@@ -3899,7 +3993,9 @@ mod tests {
     fn launcher_provider_prefix_validation() {
         let paths = temp_paths();
         let mut store = ConfigStore::load(paths);
-        store.set("shell.launcher.provider_prefix", json!(">")).unwrap();
+        store
+            .set("shell.launcher.provider_prefix", json!(">"))
+            .unwrap();
         assert_eq!(store.get("shell.launcher.provider_prefix"), json!(">"));
         let too_long = "x".repeat(17);
         assert!(store

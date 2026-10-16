@@ -9,9 +9,9 @@ use std::sync::Mutex;
 
 use gtk::prelude::*;
 use gtk_layer_shell::{Edge, LayerShell};
+use helix_shell_model::shell_surface::Plan;
 use helix_shell_model::shell_surface::{InputRegion, BAR_HEIGHT};
 use helix_shell_model::surfaces::{KeyboardMode, Layer};
-use helix_shell_model::shell_surface::Plan;
 use tauri::{AppHandle, Manager, WebviewWindow};
 
 pub const WINDOW: &str = "shell";
@@ -141,12 +141,19 @@ pub fn set_dock_strut(height: Option<i32>) {
         window.set_decorated(false);
         window.set_accept_focus(false);
         window.set_app_paintable(true);
-        if let Some(visual) = gtk::prelude::WidgetExt::screen(&window).and_then(|screen| screen.rgba_visual()) {
+        if let Some(visual) =
+            gtk::prelude::WidgetExt::screen(&window).and_then(|screen| screen.rgba_visual())
+        {
             window.set_visual(Some(&visual));
         }
         let css = gtk::CssProvider::new();
-        if css.load_from_data(b"window, window * { background: transparent; }").is_ok() {
-            window.style_context().add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        if css
+            .load_from_data(b"window, window * { background: transparent; }")
+            .is_ok()
+        {
+            window
+                .style_context()
+                .add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
         }
         window.set_size_request(1, height);
         window.init_layer_shell();

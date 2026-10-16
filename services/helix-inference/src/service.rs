@@ -145,20 +145,35 @@ fn parse_chat(
     routing: &RoutingTable,
     images: Vec<ImageInput>,
 ) -> Result<ChatRequest, InferenceError> {
-    const KNOWN: [&str; 7] = ["messages", "model", "schema", "max_tokens", "temperature", "priority", "task"];
+    const KNOWN: [&str; 7] = [
+        "messages",
+        "model",
+        "schema",
+        "max_tokens",
+        "temperature",
+        "priority",
+        "task",
+    ];
     for key in args.keys() {
         if !KNOWN.contains(&key.as_str()) {
             return Err(invalid(format!("unknown argument: {key}")));
         }
     }
-    let mut request = ChatRequest { client: client.to_string(), ..ChatRequest::default() };
-    let messages = args.get("messages").ok_or_else(|| invalid("messages is required"))?;
+    let mut request = ChatRequest {
+        client: client.to_string(),
+        ..ChatRequest::default()
+    };
+    let messages = args
+        .get("messages")
+        .ok_or_else(|| invalid("messages is required"))?;
     request.messages = messages.clone(); // the queue validates the shape
     request.images = images;
     // Every image part must name a picture that was sent, and every picture must be used.
     let mut referenced = BTreeSet::new();
     for message in messages.as_array().into_iter().flatten() {
-        let Some(parts) = message.get("content").and_then(Json::as_array) else { continue };
+        let Some(parts) = message.get("content").and_then(Json::as_array) else {
+            continue;
+        };
         for part in parts {
             let Some(part) = part.as_object() else {
                 return Err(invalid("message parts must be objects"));
@@ -174,7 +189,9 @@ fn parse_chat(
                 return Err(invalid("an image part needs an index"));
             };
             if index as usize >= request.images.len() {
-                return Err(invalid("an image part refers to a picture that was not sent"));
+                return Err(invalid(
+                    "an image part refers to a picture that was not sent",
+                ));
             }
             referenced.insert(index);
         }
@@ -184,14 +201,18 @@ fn parse_chat(
     }
     let mut task = "chat".to_string();
     if let Some(value) = args.get("task") {
-        let Some(text) = value.as_str() else { return Err(invalid("task must be a string")) };
+        let Some(text) = value.as_str() else {
+            return Err(invalid("task must be a string"));
+        };
         task = text.to_string();
         if !["act", "chat", "summarize", "vision", "code"].contains(&task.as_str()) {
             return Err(invalid("task must be act, chat, summarize, vision or code"));
         }
     }
     if let Some(value) = args.get("model") {
-        let Some(text) = value.as_str() else { return Err(invalid("model must be a string")) };
+        let Some(text) = value.as_str() else {
+            return Err(invalid("model must be a string"));
+        };
         request.model = text.to_string();
     }
     // Local model slots: when the client omits model, use the profile from inference-routing.toml.
@@ -205,7 +226,9 @@ fn parse_chat(
         request.model = routing.route(&task).model;
     }
     if let Some(value) = args.get("schema") {
-        let Some(text) = value.as_str() else { return Err(invalid("schema must be a string of JSON")) };
+        let Some(text) = value.as_str() else {
+            return Err(invalid("schema must be a string of JSON"));
+        };
         // Only the on-device Act slot may emit tool JSON (grammar). Refuse schemas on talk tasks.
         if task != "act" {
             return Err(invalid("schema is only allowed for task \"act\""));
@@ -216,13 +239,22 @@ fn parse_chat(
         request.json_schema = text.to_string();
     }
     if let Some(value) = args.get("max_tokens") {
-        let Some(number) = value.as_i64().or_else(|| value.as_u64().map(|u| u.min(i64::MAX as u64) as i64)) else {
+        let Some(number) = value
+            .as_i64()
+            .or_else(|| value.as_u64().map(|u| u.min(i64::MAX as u64) as i64))
+        else {
             return Err(invalid("max_tokens must be an integer"));
         };
-        request.max_tokens = if number < 1 { 1 } else { number.min(1_000_000) as u32 };
+        request.max_tokens = if number < 1 {
+            1
+        } else {
+            number.min(1_000_000) as u32
+        };
     }
     if let Some(value) = args.get("temperature") {
-        let Some(number) = value.as_f64() else { return Err(invalid("temperature must be a number")) };
+        let Some(number) = value.as_f64() else {
+            return Err(invalid("temperature must be a number"));
+        };
         request.temperature = number;
     }
     if let Some(value) = args.get("priority") {
@@ -258,7 +290,12 @@ impl Inner {
                 let _ = events.send(Event::Done(operation, outcome.clone()));
             })
         };
-        let queue = Arc::new(InferenceQueue::new(backend, config.limits, on_delta, on_done));
+        let queue = Arc::new(InferenceQueue::new(
+            backend,
+            config.limits,
+            on_delta,
+            on_done,
+        ));
         {
             let events = events.clone();
             queue.on_loading(Arc::new(move |operation, model: &str, fraction| {
@@ -294,11 +331,19 @@ impl Inner {
                     }
                 };
                 let Some(sender) = sender else { continue };
-                let Ok(destination) = BusName::try_from(sender) else { continue };
+                let Ok(destination) = BusName::try_from(sender) else {
+                    continue;
+                };
                 let result = match event {
                     Event::Delta(op, text) => {
                         dispatch_connection
-                            .emit_signal(Some(destination), OBJECT_PATH, INTERFACE, name, &(op, text))
+                            .emit_signal(
+                                Some(destination),
+                                OBJECT_PATH,
+                                INTERFACE,
+                                name,
+                                &(op, text),
+                            )
                             .await
                     }
                     Event::Done(op, outcome) => {
@@ -314,12 +359,24 @@ impl Inner {
                     }
                     Event::Loading(op, model, fraction) => {
                         dispatch_connection
-                            .emit_signal(Some(destination), OBJECT_PATH, INTERFACE, name, &(op, model, fraction))
+                            .emit_signal(
+                                Some(destination),
+                                OBJECT_PATH,
+                                INTERFACE,
+                                name,
+                                &(op, model, fraction),
+                            )
                             .await
                     }
                     Event::Progress(op, fraction, stage) => {
                         dispatch_connection
-                            .emit_signal(Some(destination), OBJECT_PATH, INTERFACE, name, &(op, fraction, stage))
+                            .emit_signal(
+                                Some(destination),
+                                OBJECT_PATH,
+                                INTERFACE,
+                                name,
+                                &(op, fraction, stage),
+                            )
                             .await
                     }
                 };
@@ -368,29 +425,45 @@ impl Inner {
         let proxy = zbus::fdo::DBusProxy::new(&self.connection)
             .await
             .map_err(|e| InferenceError::Failed(e.to_string()))?;
-        let name = BusName::try_from(sender.to_string()).map_err(|e| InferenceError::Failed(e.to_string()))?;
+        let name = BusName::try_from(sender.to_string())
+            .map_err(|e| InferenceError::Failed(e.to_string()))?;
         let pid = proxy
             .get_connection_unix_process_id(name.clone())
             .await
-            .map_err(|_| InferenceError::Failed("the bus did not report the caller's process".into()))?;
-        let uid = proxy
-            .get_connection_unix_user(name)
-            .await
-            .map_err(|_| InferenceError::Failed("the bus did not report the caller's process".into()))?;
+            .map_err(|_| {
+                InferenceError::Failed("the bus did not report the caller's process".into())
+            })?;
+        let uid = proxy.get_connection_unix_user(name).await.map_err(|_| {
+            InferenceError::Failed("the bus did not report the caller's process".into())
+        })?;
         // SAFETY: geteuid has no preconditions.
         if uid != unsafe { libc::geteuid() } {
             return Err(invalid("callers must run as the same user"));
         }
         let client = format!("pid:{pid}");
-        self.clients.lock().unwrap().insert(sender.to_string(), client.clone());
+        self.clients
+            .lock()
+            .unwrap()
+            .insert(sender.to_string(), client.clone());
         Ok(client)
     }
 
-    fn register(&self, request: ChatRequest, sender: &str, client: &str) -> Result<u64, InferenceError> {
+    fn register(
+        &self,
+        request: ChatRequest,
+        sender: &str,
+        client: &str,
+    ) -> Result<u64, InferenceError> {
         // Held across submit so the dispatcher cannot look the operation up before it is recorded.
         let mut owners = self.owners.lock().unwrap();
         let operation = self.queue.submit(request).map_err(invalid)?;
-        owners.insert(operation, Owner { sender: sender.to_string(), client: client.to_string() });
+        owners.insert(
+            operation,
+            Owner {
+                sender: sender.to_string(),
+                client: client.to_string(),
+            },
+        );
         Ok(operation)
     }
 }
@@ -414,7 +487,10 @@ impl Service {
         );
         let mut profiles = Map::new();
         for (profile, route) in &routing.profiles {
-            profiles.insert(profile.clone(), json!({"backend": route.backend, "model": route.model}));
+            profiles.insert(
+                profile.clone(),
+                json!({"backend": route.backend, "model": route.model}),
+            );
         }
         snapshot["profiles"] = Json::Object(profiles);
         snapshot["allow_remote_on_battery_saver"] = json!(routing.allow_remote_on_battery_saver);
@@ -429,12 +505,15 @@ impl Service {
     }
 
     async fn list_models(&self) -> Vec<OwnedValue> {
-        self.0.queue
+        self.0
+            .queue
             .backend()
             .models()
             .iter()
             .filter_map(|m| {
-                to_variant(&json!({"id": m.id, "bytes": m.bytes, "loaded": m.loaded, "vision": m.vision}))
+                to_variant(
+                    &json!({"id": m.id, "bytes": m.bytes, "loaded": m.loaded, "vision": m.vision}),
+                )
             })
             .collect()
     }
@@ -463,14 +542,17 @@ impl Service {
             let mut total = 0usize;
             for bytes in &list {
                 total += bytes.len();
-                if bytes.len() > pictures::MAX_IMAGE_BYTES || total > pictures::MAX_IMAGE_BYTES_TOTAL {
+                if bytes.len() > pictures::MAX_IMAGE_BYTES
+                    || total > pictures::MAX_IMAGE_BYTES_TOTAL
+                {
                     return Err(invalid("the pictures are too large"));
                 }
             }
             encoded_pictures = list;
         }
         if let Some(value) = args.remove("audio") {
-            let bytes = Vec::<u8>::try_from(value).map_err(|_| invalid("audio must be a byte array"))?;
+            let bytes =
+                Vec::<u8>::try_from(value).map_err(|_| invalid("audio must be a byte array"))?;
             if bytes.len() > MAX_AUDIO_BYTES {
                 return Err(invalid("the recording is too long"));
             }
@@ -485,10 +567,14 @@ impl Service {
         match action.as_str() {
             "image" => {
                 if recording.is_some() || !encoded_pictures.is_empty() {
-                    return Err(invalid("image generation currently accepts a text prompt only"));
+                    return Err(invalid(
+                        "image generation currently accepts a text prompt only",
+                    ));
                 }
                 for key in options.keys() {
-                    if !["prompt", "model", "width", "height", "steps", "seed"].contains(&key.as_str()) {
+                    if !["prompt", "model", "width", "height", "steps", "seed"]
+                        .contains(&key.as_str())
+                    {
                         return Err(invalid(format!("unknown image argument: {key}")));
                     }
                 }
@@ -512,7 +598,9 @@ impl Service {
                         None => Ok(fallback),
                         Some(value) => match value.as_u64() {
                             Some(n) if n <= max => Ok(n),
-                            _ => Err(invalid(format!("{key} must be a bounded non-negative integer"))),
+                            _ => Err(invalid(format!(
+                                "{key} must be a bounded non-negative integer"
+                            ))),
                         },
                     }
                 };
@@ -548,7 +636,8 @@ impl Service {
                 if let Some(value) = options.get("language") {
                     let plain = value.as_str().is_some_and(|text| {
                         text == "auto"
-                            || ((2..=3).contains(&text.len()) && text.bytes().all(|c| c.is_ascii_lowercase()))
+                            || ((2..=3).contains(&text.len())
+                                && text.bytes().all(|c| c.is_ascii_lowercase()))
                     });
                     if !plain {
                         return Err(invalid("language must be auto or a language code like en"));
@@ -597,7 +686,11 @@ impl Service {
     }
 
     #[zbus(signal)]
-    async fn delta(emitter: &zbus::object_server::SignalEmitter<'_>, operation: u64, text: &str) -> zbus::Result<()>;
+    async fn delta(
+        emitter: &zbus::object_server::SignalEmitter<'_>,
+        operation: u64,
+        text: &str,
+    ) -> zbus::Result<()>;
 
     #[zbus(signal)]
     async fn completed(

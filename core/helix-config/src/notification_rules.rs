@@ -16,7 +16,12 @@ pub fn read_rules(store: &ConfigStore) -> Value {
             let order: Vec<String> = store
                 .get_json_value("notification.filter_order")
                 .and_then(|v| v.as_array().cloned())
-                .map(|items| items.iter().filter_map(|i| i.as_str().map(str::to_string)).collect())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|i| i.as_str().map(str::to_string))
+                        .collect()
+                })
                 .unwrap_or_default();
             let mut names: Vec<String> = Vec::new();
             for name in order {
@@ -40,14 +45,24 @@ pub fn read_rules(store: &ConfigStore) -> Value {
 
 fn rule_from_table(name: &str, rule: &serde_json::Map<String, Value>) -> Value {
     let flag = |key: &str, default: bool| rule.get(key).and_then(Value::as_bool).unwrap_or(default);
-    let text = |key: &str| rule.get(key).and_then(Value::as_str).unwrap_or("").to_string();
+    let text = |key: &str| {
+        rule.get(key)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
     // Legacy `matches = [..]` fills `match` when it is empty.
     let mut match_app = text("match");
     if match_app.is_empty() {
         if let Some(first) = rule
             .get("matches")
             .and_then(Value::as_array)
-            .and_then(|items| items.iter().filter_map(Value::as_str).find(|t| !t.trim().is_empty()))
+            .and_then(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .find(|t| !t.trim().is_empty())
+            })
         {
             match_app = first.trim().to_lowercase();
         }
@@ -80,16 +95,33 @@ fn rule_from_table(name: &str, rule: &serde_json::Map<String, Value>) -> Value {
 pub fn to_named_tables(rules: &Value) -> Value {
     let mut named = serde_json::Map::new();
     for rule in rules.as_array().into_iter().flatten() {
-        let Some(object) = rule.as_object() else { continue };
-        let Some(name) = object.get("name").and_then(Value::as_str) else { continue };
+        let Some(object) = rule.as_object() else {
+            continue;
+        };
+        let Some(name) = object.get("name").and_then(Value::as_str) else {
+            continue;
+        };
         let mut row = serde_json::Map::new();
-        row.insert("enabled".into(), object.get("enabled").cloned().unwrap_or(Value::Bool(true)));
+        row.insert(
+            "enabled".into(),
+            object.get("enabled").cloned().unwrap_or(Value::Bool(true)),
+        );
         for key in ["match", "match_content"] {
-            if let Some(text) = object.get(key).and_then(Value::as_str).filter(|t| !t.is_empty()) {
+            if let Some(text) = object
+                .get(key)
+                .and_then(Value::as_str)
+                .filter(|t| !t.is_empty())
+            {
                 row.insert(key.into(), Value::String(text.to_string()));
             }
         }
-        for key in ["show_toast", "save_history", "play_sound", "bypass_dnd", "allow_permanent"] {
+        for key in [
+            "show_toast",
+            "save_history",
+            "play_sound",
+            "bypass_dnd",
+            "allow_permanent",
+        ] {
             if let Some(flag) = object.get(key) {
                 row.insert(key.into(), flag.clone());
             }
@@ -137,7 +169,11 @@ pub fn catalog_entry(store: &ConfigStore) -> Value {
     })
 }
 
-fn read_text(object: &serde_json::Map<String, Value>, key: &str, limit: usize) -> Result<String, String> {
+fn read_text(
+    object: &serde_json::Map<String, Value>,
+    key: &str,
+    limit: usize,
+) -> Result<String, String> {
     let text = object
         .get(key)
         .and_then(Value::as_str)
@@ -275,7 +311,9 @@ mod tests {
         let validated = validate(&value).unwrap();
         let store = temp_store();
         let mut store = store;
-        store.set_json_value("notification.filter", validated).unwrap();
+        store
+            .set_json_value("notification.filter", validated)
+            .unwrap();
         let rules = read_rules(&store);
         assert_eq!(rules.as_array().unwrap().len(), 1);
     }

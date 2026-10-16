@@ -10,27 +10,27 @@
 //! client grants. Confirmer Overlay is opt-in (`HELIX_SHELL_CONFIRMER`).
 
 mod act_feed;
+mod admin_auth;
+mod agent_ipc;
 mod apps;
 mod backlight;
+mod bar;
 mod battery;
 mod blur;
-mod confirmer;
-mod admin_auth;
-mod bar;
-mod polkit_agent;
-mod polkit_helper;
-mod agent_ipc;
 mod capture;
+mod confirmer;
 mod control;
 mod desktop_action;
 mod dock;
 mod insert;
 mod island;
-mod niri_query;
 mod layer;
 mod mobius_talk;
+mod niri_query;
 mod notify;
 mod panels_bridge;
+mod polkit_agent;
+mod polkit_helper;
 mod role;
 mod strut;
 mod tray;
@@ -38,10 +38,16 @@ mod tray;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use helix_desktop_api::{sound_volume_label, Desktop, Domain};
 use helix_agent::activity::{
     Activity, ActivityView, Request as ActivityRequest, RequestError as ActivityError,
 };
+use helix_agent::assistant::Phase;
+use helix_agent::assistant::Session;
+use helix_agent::assistant::Spawn;
+use helix_agent::confirm::Confirmation;
+use helix_agent::confirm::ARMING_MS;
+use helix_agent::confirmer::ConfirmerView;
+use helix_desktop_api::{sound_volume_label, Desktop, Domain};
 use helix_models::audio::{Audio, AudioView, Request, RequestError};
 use helix_models::bluetooth::{
     Bluetooth, BluetoothView, Request as BluetoothRequest, RequestError as BluetoothError,
@@ -51,17 +57,11 @@ use helix_models::network::{
 };
 use helix_models::power::view as power_view;
 use helix_models::quick::{Quick, QuickView, RequestError as QuickError, SettingUpdate};
-use helix_agent::confirm::Confirmation;
-use helix_agent::confirmer::ConfirmerView;
-use helix_shell_model::shell_surface::Escape;
-use helix_agent::assistant::Phase;
-use helix_agent::assistant::Session;
-use helix_shell_model::shell_surface::ShellSurface;
-use helix_agent::assistant::Spawn;
-use helix_agent::confirm::ARMING_MS;
 use helix_shell_model::bar_surface::BAR_PLAN;
 use helix_shell_model::panel_surface::PANEL_CLOSED;
 use helix_shell_model::panels_ipc::{PanelsReply, PanelsRequest};
+use helix_shell_model::shell_surface::Escape;
+use helix_shell_model::shell_surface::ShellSurface;
 use role::ShellRole;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -289,7 +289,9 @@ fn open_mobius_panel(app: &AppHandle, mode: MobiusMode) {
         tauri::async_runtime::spawn(async move {
             match panels_bridge::open_panel("assistant", Some(&mode_str)).await {
                 Ok(true) => {}
-                Ok(false) => eprintln!("PANELS forward missed for mobius/{mode_str} (no in-process Overlay on bar)"),
+                Ok(false) => eprintln!(
+                    "PANELS forward missed for mobius/{mode_str} (no in-process Overlay on bar)"
+                ),
                 Err(error) => eprintln!("PANELS forward: {error}"),
             }
         });
@@ -371,7 +373,9 @@ fn open_panel(app: &AppHandle, id: &str) {
         tauri::async_runtime::spawn(async move {
             match panels_bridge::open_panel(&id, None).await {
                 Ok(true) => {}
-                Ok(false) => eprintln!("PANELS forward missed for {id} (no in-process Overlay on bar)"),
+                Ok(false) => {
+                    eprintln!("PANELS forward missed for {id} (no in-process Overlay on bar)")
+                }
                 Err(error) => eprintln!("PANELS forward: {error}"),
             }
         });
@@ -751,7 +755,10 @@ async fn network_connect_password(
     path: String,
     password: String,
 ) -> Result<(), String> {
-    send_network(network_request(&app, |n| n.connect_with_password(&path, &password))).await
+    send_network(network_request(&app, |n| {
+        n.connect_with_password(&path, &password)
+    }))
+    .await
 }
 
 #[tauri::command]

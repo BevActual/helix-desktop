@@ -27,7 +27,9 @@ pub fn request_json(line: &str) -> Option<Value> {
     let path = std::env::var_os("NIRI_SOCKET")?;
     let mut stream = UnixStream::connect(path).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
-    stream.set_write_timeout(Some(Duration::from_secs(2))).ok()?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .ok()?;
     stream.write_all(format!("{line}\n").as_bytes()).ok()?;
     let mut reply = String::new();
     BufReader::new(stream).read_line(&mut reply).ok()?;
@@ -70,7 +72,8 @@ pub fn place_on_agent_desk(count: u8) -> Result<(), String> {
     if !helix_capabilities().agent_desk {
         return Err("agent desk is not available on this compositor".into());
     }
-    let line = serde_json::json!({"Action": {"HelixPlaceOnAgentDesk": {"count": count.max(1)}}}).to_string();
+    let line = serde_json::json!({"Action": {"HelixPlaceOnAgentDesk": {"count": count.max(1)}}})
+        .to_string();
     if request_json(&line).is_none() {
         return Err("the compositor did not accept agent desk placement".into());
     }
@@ -106,7 +109,11 @@ mod tests {
         let root = std::env::temp_dir().join(format!("helix-place-off-{}", std::process::id()));
         let helix = root.join("helix");
         std::fs::create_dir_all(&helix).unwrap();
-        std::fs::write(helix.join("compositor-prefs.toml"), "agent_desk_placement = false\n").unwrap();
+        std::fs::write(
+            helix.join("compositor-prefs.toml"),
+            "agent_desk_placement = false\n",
+        )
+        .unwrap();
         let prev_cfg = std::env::var("XDG_CONFIG_HOME").ok();
         let prev_env = std::env::var("HELIX_AGENT_DESK").ok();
         std::env::set_var("XDG_CONFIG_HOME", root.to_string_lossy().as_ref());
