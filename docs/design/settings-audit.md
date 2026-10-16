@@ -28,6 +28,9 @@ the setting on the live service and seeing which files changed.
 * **Interface scale** (Accessibility, 0.8 to 1.5) is followed by Settings, Software, System Monitor and Mobius: each watches the
   setting through `helix_desktop_api::Desktop::watch_ui_scale` and zooms its own windows. The shell's bar, dock and panels do not
   follow it yet. `tools/nested/ui-scale-test.sh`.
+* **Appearance mode** (dark, light, automatic) is followed by Settings, Software, System Monitor and Mobius through
+  `helix_desktop_api::Desktop::watch_theme_dark`: `auto` is resolved with the same day and night schedule the service uses and
+  re-checked each minute. They set `data-theme` on the page, and again after each page load. `tools/nested/ui-theme-test.sh`.
 * **Dock** and **Wallpaper** are described elsewhere.
 
 ## Still to build, with their owners

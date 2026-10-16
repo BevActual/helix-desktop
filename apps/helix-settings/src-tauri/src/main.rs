@@ -1606,8 +1606,21 @@ fn startup_page() -> Option<String> {
     None
 }
 
-/// Applies the person's interface scale (Settings > Accessibility) to this application's windows now and whenever it changes.
-fn follow_ui_scale(app: tauri::AppHandle) {
+/// 0 until the desktop service has said, then 1 for dark and 2 for light.
+static APP_THEME: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn theme_script() -> Option<&'static str> {
+    match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => Some("document.documentElement.dataset.theme = 'dark'"),
+        2 => Some("document.documentElement.dataset.theme = 'light'"),
+        _ => None,
+    }
+}
+
+/// Applies the person's interface scale and light or dark theme (Settings) to this application's windows now and whenever they change.
+/// A page that loads later gets the theme from `on_page_load`.
+fn follow_appearance(app: tauri::AppHandle) {
+    let scale_app = app.clone();
     tauri::async_runtime::spawn(async move {
         let Ok(desktop) = helix_desktop_api::Desktop::session().await else {
             return;
@@ -1615,7 +1628,7 @@ fn follow_ui_scale(app: tauri::AppHandle) {
         let _ = desktop
             .watch_ui_scale(move |scale| {
                 eprintln!("UI scale {scale}");
-                let app = app.clone();
+                let app = scale_app.clone();
                 // The window may not exist yet at startup: try for a few seconds.
                 std::thread::spawn(move || {
                     for _ in 0..40 {
@@ -1629,6 +1642,22 @@ fn follow_ui_scale(app: tauri::AppHandle) {
                         std::thread::sleep(std::time::Duration::from_millis(250));
                     }
                 });
+            })
+            .await;
+    });
+    tauri::async_runtime::spawn(async move {
+        let Ok(desktop) = helix_desktop_api::Desktop::session().await else {
+            return;
+        };
+        let _ = desktop
+            .watch_theme_dark(move |dark| {
+                eprintln!("UI theme {}", if dark { "dark" } else { "light" });
+                APP_THEME.store(if dark { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
+                if let Some(script) = theme_script() {
+                    for window in app.webview_windows().values() {
+                        let _ = window.eval(script);
+                    }
+                }
             })
             .await;
     });
@@ -1711,8 +1740,15 @@ fn main() {
             layout_reporting,
             report_layout
         ])
+        .on_page_load(|webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                if let Some(script) = theme_script() {
+                    let _ = webview.eval(script);
+                }
+            }
+        })
         .setup(move |app| {
-            follow_ui_scale(app.handle().clone());
+            follow_appearance(app.handle().clone());
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 grants: Grants::default(),
                 catalog: Catalog::default(),

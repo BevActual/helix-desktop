@@ -67,6 +67,62 @@ pub fn ui_scale(entries: &[OwnedValue]) -> f64 {
     1.0
 }
 
+fn dict_bool(dict: &Dict<'_, '_>, key: &str) -> Option<bool> {
+    let key = Value::from(key);
+    let mut value = dict.iter().find(|(candidate, _)| *candidate == &key)?.1;
+    while let Value::Value(inner) = value {
+        value = inner;
+    }
+    match value {
+        Value::Bool(flag) => Some(*flag),
+        _ => None,
+    }
+}
+
+fn entry_of<'a>(entries: &'a [OwnedValue], id: &str) -> Option<Dict<'a, 'a>> {
+    entries.iter().find_map(|entry| {
+        let dict = as_dict(entry)?;
+        (dict_string(&dict, "id").as_deref() == Some(id)).then_some(dict)
+    })
+}
+
+/// Whether applications should draw dark now: `theme.mode` (`dark`, `light`, or `auto`, which follows the day and night schedule
+/// the way the desktop service resolves it). Dark when the setting is missing or odd.
+pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTime) -> bool {
+    let mode = entry_of(entries, "theme.mode").and_then(|dict| dict_string(&dict, "value"));
+    match mode.as_deref() {
+        Some("light") => false,
+        Some("auto") => {
+            let text = |id: &str| entry_of(entries, id).and_then(|dict| dict_string(&dict, "value")).unwrap_or_default();
+            let number = |id: &str| entry_of(entries, id).and_then(|dict| dict_number(&dict, "value"));
+            let location = helix_theme::schedule::LocationConfig {
+                custom_schedule: entry_of(entries, "location.custom_schedule").and_then(|dict| dict_bool(&dict, "value")).unwrap_or(false),
+                sunset: text("location.sunset"),
+                sunrise: text("location.sunrise"),
+                latitude: number("location.latitude"),
+                longitude: number("location.longitude"),
+            };
+            helix_theme::schedule::evaluate(&location, now).night
+        }
+        _ => true,
+    }
+}
+
+fn local_time() -> helix_theme::schedule::LocalTime {
+    // SAFETY: `time` and `localtime_r` are called with valid pointers; `tm` is plain data.
+    unsafe {
+        let now = libc::time(std::ptr::null_mut());
+        let mut tm: libc::tm = std::mem::zeroed();
+        libc::localtime_r(&now, &mut tm);
+        helix_theme::schedule::LocalTime {
+            minute_of_day: tm.tm_hour * 60 + tm.tm_min,
+            second: tm.tm_sec,
+            day_of_year: tm.tm_yday + 1,
+            gmt_offset_secs: tm.tm_gmtoff,
+        }
+    }
+}
+
 pub fn sound_volume_label(volume: Option<f64>) -> String {
     match volume {
         Some(volume) => {
@@ -470,6 +526,37 @@ impl Desktop {
         Ok(())
     }
 
+    /// Calls `on_dark` with whether applications should draw dark now, then again whenever that changes: after a settings change, and
+    /// once a minute so an automatic theme turns at sunset and sunrise.
+    pub async fn watch_theme_dark<F>(&self, mut on_dark: F) -> zbus::Result<()>
+    where
+        F: FnMut(bool) + Send,
+    {
+        let proxy = ConfigurationProxy::new(&self.connection).await?;
+        let mut entries = proxy.get_settings().await?;
+        let mut last = theme_is_dark(&entries, local_time());
+        on_dark(last);
+        let mut changes = proxy.receive_changed().await?;
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+        tick.tick().await;
+        loop {
+            tokio::select! {
+                changed = changes.next() => {
+                    if changed.is_none() {
+                        return Ok(());
+                    }
+                    entries = proxy.get_settings().await?;
+                }
+                _ = tick.tick() => {}
+            }
+            let dark = theme_is_dark(&entries, local_time());
+            if dark != last {
+                last = dark;
+                on_dark(dark);
+            }
+        }
+    }
+
     pub async fn sound_volume(&self) -> zbus::Result<Option<f64>> {
         let proxy = ConfigurationProxy::new(&self.connection).await?;
         Ok(sound_volume(&proxy.get_settings().await?))
@@ -494,7 +581,7 @@ impl Desktop {
 mod tests {
     use zbus::zvariant::{Dict, OwnedValue, Signature, Value};
 
-    use super::{sound_volume, sound_volume_label, ui_scale, BUS_NAME, OBJECT_PATH};
+    use super::{sound_volume, sound_volume_label, theme_is_dark, ui_scale, BUS_NAME, OBJECT_PATH};
 
     fn setting(id: &str, value: impl Into<Value<'static>>) -> OwnedValue {
         let mut dict = Dict::new(
@@ -530,6 +617,23 @@ mod tests {
         assert_eq!(ui_scale(&with(0.1)), 0.8);
         assert_eq!(ui_scale(&with(f64::NAN)), 1.0);
         assert_eq!(ui_scale(&[setting("audio.sound_volume", Value::from(0.5f64))]), 1.0, "a missing row means no scaling");
+    }
+
+    #[test]
+    fn applications_follow_the_theme_mode_and_the_schedule() {
+        use helix_theme::schedule::LocalTime;
+        let at = |minute_of_day| LocalTime { minute_of_day, second: 0, day_of_year: 100, gmt_offset_secs: 0 };
+        let mode = |mode: &str| vec![setting("theme.mode", Value::from(mode.to_string()))];
+        assert!(theme_is_dark(&mode("dark"), at(12 * 60)));
+        assert!(!theme_is_dark(&mode("light"), at(23 * 60)));
+        assert!(theme_is_dark(&[], at(12 * 60)), "no setting means dark");
+        let mut auto = mode("auto");
+        auto.push(setting("location.custom_schedule", Value::from(true)));
+        auto.push(setting("location.sunset", Value::from("19:00".to_string())));
+        auto.push(setting("location.sunrise", Value::from("07:00".to_string())));
+        assert!(!theme_is_dark(&auto, at(12 * 60)), "light by day");
+        assert!(theme_is_dark(&auto, at(21 * 60)), "dark by night");
+        assert!(theme_is_dark(&auto, at(3 * 60)), "dark before sunrise");
     }
 
     #[test]

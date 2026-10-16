@@ -45,6 +45,7 @@ pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nes
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh tauri-shell.sh
 pick ui-scale          && run ui-scale ui-scale-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick ui-theme          && run ui-theme ui-theme-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
 pick mobius         && run mobius mobius-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick greeter        && run greeter greeter-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
