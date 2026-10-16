@@ -1937,11 +1937,11 @@
   "value": 1.0
  },
  {
-  "description": "Scales Helix Shell. Applications use the device’s native scaling.",
+  "description": "Makes the text and controls in Helix applications larger or smaller.",
   "group": "Presentation",
   "id": "accessibility.ui_scale",
-  "maximum": 3.0,
-  "minimum": 0.5,
+  "maximum": 1.5,
+  "minimum": 0.8,
   "option-labels": [],
   "options": [],
   "overridden": false,

@@ -49,6 +49,24 @@ pub fn sound_volume(entries: &[OwnedValue]) -> Option<f64> {
     None
 }
 
+/// The smallest and largest interface scale an application applies. The catalog row has the same bounds.
+pub const UI_SCALE_MIN: f64 = 0.8;
+pub const UI_SCALE_MAX: f64 = 1.5;
+
+/// `accessibility.ui_scale` from a GetSettings catalog, kept within bounds; 1.0 when the row is missing.
+pub fn ui_scale(entries: &[OwnedValue]) -> f64 {
+    for entry in entries {
+        let Some(dict) = as_dict(entry) else { continue };
+        if dict_string(&dict, "id").as_deref() != Some("accessibility.ui_scale") {
+            continue;
+        }
+        if let Some(scale) = dict_number(&dict, "value").filter(|scale| scale.is_finite()) {
+            return scale.clamp(UI_SCALE_MIN, UI_SCALE_MAX);
+        }
+    }
+    1.0
+}
+
 pub fn sound_volume_label(volume: Option<f64>) -> String {
     match volume {
         Some(volume) => {
@@ -432,6 +450,26 @@ impl Desktop {
         self.watch(Domain::Audio, on_change).await
     }
 
+    /// Calls `on_scale` with the interface scale now, then again after every Configuration1.Changed where it differs.
+    /// An application applies it to its own windows; the shell's own chrome does not follow it.
+    pub async fn watch_ui_scale<F>(&self, mut on_scale: F) -> zbus::Result<()>
+    where
+        F: FnMut(f64) + Send,
+    {
+        let proxy = ConfigurationProxy::new(&self.connection).await?;
+        let mut last = ui_scale(&proxy.get_settings().await?);
+        on_scale(last);
+        let mut changes = proxy.receive_changed().await?;
+        while changes.next().await.is_some() {
+            let scale = ui_scale(&proxy.get_settings().await?);
+            if (scale - last).abs() > f64::EPSILON {
+                last = scale;
+                on_scale(scale);
+            }
+        }
+        Ok(())
+    }
+
     pub async fn sound_volume(&self) -> zbus::Result<Option<f64>> {
         let proxy = ConfigurationProxy::new(&self.connection).await?;
         Ok(sound_volume(&proxy.get_settings().await?))
@@ -456,7 +494,7 @@ impl Desktop {
 mod tests {
     use zbus::zvariant::{Dict, OwnedValue, Signature, Value};
 
-    use super::{sound_volume, sound_volume_label, BUS_NAME, OBJECT_PATH};
+    use super::{sound_volume, sound_volume_label, ui_scale, BUS_NAME, OBJECT_PATH};
 
     fn setting(id: &str, value: impl Into<Value<'static>>) -> OwnedValue {
         let mut dict = Dict::new(
@@ -482,6 +520,16 @@ mod tests {
         assert_eq!(sound_volume_label(None), "Sound unavailable");
         assert_eq!(BUS_NAME, "org.helix.Desktop");
         assert_eq!(OBJECT_PATH, "/org/helix/Desktop");
+    }
+
+    #[test]
+    fn the_interface_scale_is_read_and_kept_in_bounds() {
+        let with = |value: f64| vec![setting("accessibility.ui_scale", Value::from(value))];
+        assert_eq!(ui_scale(&with(1.25)), 1.25);
+        assert_eq!(ui_scale(&with(3.0)), 1.5);
+        assert_eq!(ui_scale(&with(0.1)), 0.8);
+        assert_eq!(ui_scale(&with(f64::NAN)), 1.0);
+        assert_eq!(ui_scale(&[setting("audio.sound_volume", Value::from(0.5f64))]), 1.0, "a missing row means no scaling");
     }
 
     #[test]

@@ -18,7 +18,7 @@ log_path = os.path.join(state_dir, "fake-network-actions.log")
 bt_log_path = os.path.join(state_dir, "fake-bluetooth-actions.log")
 settings_log_path = os.path.join(state_dir, "fake-settings-actions.log")
 audio_log_path = os.path.join(state_dir, "fake-audio-actions.log")
-settings = {"theme.mode": "dark", "nightlight.enabled": False, "theme.pure_black_dark": False}
+settings = {"theme.mode": "dark", "nightlight.enabled": False, "theme.pure_black_dark": False, "accessibility.ui_scale": 1.0}
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
 
 world = {
@@ -199,13 +199,14 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             entries = [entry(id="audio.sound_volume", type="number", value=0.5),
                        entry(id="theme.mode", title="Appearance", group="Colors", type="mode", value=settings["theme.mode"], options=["dark", "light", "auto"], **{"option-labels": ["Dark", "Light", "Automatic"]}),
                        entry(id="theme.pure_black_dark", title="Pure black in dark mode", group="Colors", description="Darker surfaces on OLED screens.", type="boolean", value=settings["theme.pure_black_dark"]),
-                       entry(id="nightlight.enabled", title="Night Light", group="Night Light", type="boolean", value=settings["nightlight.enabled"])]
+                       entry(id="nightlight.enabled", title="Night Light", group="Night Light", type="boolean", value=settings["nightlight.enabled"]),
+                       entry(id="accessibility.ui_scale", title="Interface scale", group="Presentation", type="number", value=float(settings["accessibility.ui_scale"]))]
             invocation.return_value(GLib.Variant("(av)", (entries,)))
         elif method == "Update" and short == "Configuration1":
             setting_id, value = params.unpack()
             if isinstance(value, GLib.Variant): value = value.unpack()
             with open(settings_log_path, "a") as log: log.write(f"UPDATE {setting_id} {json.dumps(value)}\n")
-            ok = (setting_id == "theme.mode" and value in ("dark", "light", "auto")) or (setting_id in ("nightlight.enabled", "theme.pure_black_dark") and isinstance(value, bool))
+            ok = (setting_id == "theme.mode" and value in ("dark", "light", "auto")) or (setting_id in ("nightlight.enabled", "theme.pure_black_dark") and isinstance(value, bool)) or (setting_id == "accessibility.ui_scale" and isinstance(value, (int, float)) and not isinstance(value, bool))
             if not ok:
                 with open(settings_log_path, "a") as log: log.write(f"REFUSED {setting_id} {json.dumps(value)}\n")
                 invocation.return_dbus_error("org.helix.Desktop.Error.InvalidArgument", "Setting could not be saved"); return

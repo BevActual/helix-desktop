@@ -38,8 +38,8 @@ const APPEARANCE: &[&str] = &[
     "shell.greeter_sync.privilege_command",
 ];
 
-/// Only what something on this desktop acts on (the service applies high contrast to GTK applications).
-const ACCESSIBILITY: &[&str] = &["accessibility.high_contrast"];
+/// Only what something on this desktop acts on (the service applies high contrast to GTK applications; Helix applications apply the interface scale themselves).
+const ACCESSIBILITY: &[&str] = &["accessibility.high_contrast", "accessibility.ui_scale"];
 
 /// Every page that is only rows of service settings: its name (the page's id in the window) and the ids it shows.
 const ROW_PAGES: [(&str, &[&str]); 2] =
@@ -1606,6 +1606,34 @@ fn startup_page() -> Option<String> {
     None
 }
 
+/// Applies the person's interface scale (Settings > Accessibility) to this application's windows now and whenever it changes.
+fn follow_ui_scale(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let Ok(desktop) = helix_desktop_api::Desktop::session().await else {
+            return;
+        };
+        let _ = desktop
+            .watch_ui_scale(move |scale| {
+                eprintln!("UI scale {scale}");
+                let app = app.clone();
+                // The window may not exist yet at startup: try for a few seconds.
+                std::thread::spawn(move || {
+                    for _ in 0..40 {
+                        let windows = app.webview_windows();
+                        if !windows.is_empty() {
+                            for window in windows.values() {
+                                let _ = window.set_zoom(scale);
+                            }
+                            return;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(250));
+                    }
+                });
+            })
+            .await;
+    });
+}
+
 fn main() {
     // The web view's JIT costs memory this app does not need (same choice as the shell).
     // The window announces this application id, which is what the desktop file org.helix.Settings.desktop (name and icon) is matched by.
@@ -1684,6 +1712,7 @@ fn main() {
             report_layout
         ])
         .setup(move |app| {
+            follow_ui_scale(app.handle().clone());
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 grants: Grants::default(),
                 catalog: Catalog::default(),
