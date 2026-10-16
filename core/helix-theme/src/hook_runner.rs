@@ -42,7 +42,11 @@ fn compact_hook_error(stderr: &str, stdout: &str, code: Option<i32>) -> String {
 
 impl HookRunner {
     pub fn new(max_concurrent: usize) -> Self {
-        let max = if max_concurrent > 0 { max_concurrent } else { DEFAULT_MAX_CONCURRENT };
+        let max = if max_concurrent > 0 {
+            max_concurrent
+        } else {
+            DEFAULT_MAX_CONCURRENT
+        };
         Self {
             inner: Arc::new((
                 Mutex::new(Inner {
@@ -75,7 +79,11 @@ impl HookRunner {
             if guard.shutdown || generation < guard.current_generation {
                 return;
             }
-            guard.queue.push_back(QueuedHook { command, template_id, generation });
+            guard.queue.push_back(QueuedHook {
+                command,
+                template_id,
+                generation,
+            });
         }
         self.inner.1.notify_all();
         Self::pump(Arc::clone(&self.inner));
@@ -116,7 +124,12 @@ impl HookRunner {
         std::mem::take(&mut self.inner.0.lock().unwrap().failures)
     }
 
-    fn record_failure(inner: &Arc<(Mutex<Inner>, Condvar)>, generation: u64, template_id: String, error: String) {
+    fn record_failure(
+        inner: &Arc<(Mutex<Inner>, Condvar)>,
+        generation: u64,
+        template_id: String,
+        error: String,
+    ) {
         if template_id.is_empty() {
             return;
         }
@@ -148,7 +161,12 @@ impl HookRunner {
                     HookRunner::record_failure(&inner, generation, template_id, msg);
                 }
                 Err(_) => {
-                    HookRunner::record_failure(&inner, generation, template_id, "failed to start".into());
+                    HookRunner::record_failure(
+                        &inner,
+                        generation,
+                        template_id,
+                        "failed to start".into(),
+                    );
                 }
             }
             {
@@ -165,7 +183,10 @@ impl HookRunner {
             let hook = {
                 let mut guard = inner.0.lock().unwrap();
                 let mut picked = None;
-                while !guard.shutdown && guard.running < guard.max_concurrent && !guard.queue.is_empty() {
+                while !guard.shutdown
+                    && guard.running < guard.max_concurrent
+                    && !guard.queue.is_empty()
+                {
                     let next = guard.queue.pop_front().unwrap();
                     if next.generation < guard.current_generation {
                         continue;

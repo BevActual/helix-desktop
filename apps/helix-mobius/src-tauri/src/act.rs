@@ -25,11 +25,24 @@ struct Handoff {
     after: usize,
 }
 
-static MINE: Mutex<Handoff> = Mutex::new(Handoff { request: String::new(), chat: String::new(), after: 0 });
-static TRACK: Mutex<Track> = Mutex::new(Track { task: 0, recorded: 0, in_progress: false, description: String::new() });
+static MINE: Mutex<Handoff> = Mutex::new(Handoff {
+    request: String::new(),
+    chat: String::new(),
+    after: 0,
+});
+static TRACK: Mutex<Track> = Mutex::new(Track {
+    task: 0,
+    recorded: 0,
+    in_progress: false,
+    description: String::new(),
+});
 
 pub fn remember(request: &str, chat: &str, after: usize) {
-    *MINE.lock().expect("act request") = Handoff { request: request.to_string(), chat: chat.to_string(), after };
+    *MINE.lock().expect("act request") = Handoff {
+        request: request.to_string(),
+        chat: chat.to_string(),
+        after,
+    };
     *TRACK.lock().expect("act track") = Track::default();
 }
 
@@ -80,8 +93,16 @@ pub fn advance(track: &mut Track, view: &ActView) -> Option<Finished> {
             }
             track.recorded = view.task;
             track.in_progress = false;
-            let summary = if !view.description.is_empty() { view.description.clone() } else { track.description.clone() };
-            let detail = if !view.text.is_empty() { view.text.clone() } else { view.reason.clone() };
+            let summary = if !view.description.is_empty() {
+                view.description.clone()
+            } else {
+                track.description.clone()
+            };
+            let detail = if !view.text.is_empty() {
+                view.text.clone()
+            } else {
+                view.reason.clone()
+            };
             Some(Finished {
                 task: view.task,
                 outcome: if view.failed { "failed" } else { "done" },
@@ -143,9 +164,18 @@ pub fn view_from(map: &HashMap<String, OwnedValue>, mine: &str) -> ActView {
         Some(Value::U64(task)) => *task,
         _ => 0,
     };
-    let failed = matches!(map.get("failed").map(|value| &**value), Some(Value::Bool(true)));
-    let undoable = matches!(map.get("undoable").map(|value| &**value), Some(Value::Bool(true)));
-    let restored = matches!(map.get("restored").map(|value| &**value), Some(Value::Bool(true)));
+    let failed = matches!(
+        map.get("failed").map(|value| &**value),
+        Some(Value::Bool(true))
+    );
+    let undoable = matches!(
+        map.get("undoable").map(|value| &**value),
+        Some(Value::Bool(true))
+    );
+    let restored = matches!(
+        map.get("restored").map(|value| &**value),
+        Some(Value::Bool(true))
+    );
     ActView {
         mine: !mine.is_empty() && request == mine,
         task,
@@ -326,7 +356,13 @@ mod tests {
     }
 
     fn state(phase: &str, task: u64) -> ActView {
-        ActView { mine: true, task, phase: phase.into(), request: "Dim the screen".into(), ..ActView::default() }
+        ActView {
+            mine: true,
+            task,
+            phase: phase.into(),
+            request: "Dim the screen".into(),
+            ..ActView::default()
+        }
     }
 
     #[test]
@@ -341,10 +377,21 @@ mod tests {
         result.text = "Done. The screen is dimmer.".into();
         let done = advance(&mut track, &result).expect("finished");
         assert_eq!((done.task, done.outcome), (1, "done"));
-        assert_eq!(done.summary, "Make the screen dimmer", "what was confirmed, though the result has no description");
+        assert_eq!(
+            done.summary, "Make the screen dimmer",
+            "what was confirmed, though the result has no description"
+        );
         assert_eq!(done.detail, "Done. The screen is dimmer.");
-        assert_eq!(advance(&mut track, &result), None, "the same result again records nothing");
-        assert_eq!(advance(&mut track, &state("idle", 1)), None, "dismissing it afterwards records nothing");
+        assert_eq!(
+            advance(&mut track, &result),
+            None,
+            "the same result again records nothing"
+        );
+        assert_eq!(
+            advance(&mut track, &state("idle", 1)),
+            None,
+            "dismissing it afterwards records nothing"
+        );
     }
 
     #[test]
@@ -355,7 +402,10 @@ mod tests {
         failed.failed = true;
         failed.reason = "no such setting".into();
         let done = advance(&mut track, &failed).unwrap();
-        assert_eq!((done.outcome, done.detail.as_str()), ("failed", "no such setting"));
+        assert_eq!(
+            (done.outcome, done.detail.as_str()),
+            ("failed", "no such setting")
+        );
     }
 
     #[test]
@@ -365,7 +415,10 @@ mod tests {
         confirm.description = "Make the screen dimmer".into();
         advance(&mut track, &confirm);
         let done = advance(&mut track, &state("idle", 2)).expect("stopped");
-        assert_eq!((done.outcome, done.summary.as_str(), done.detail.as_str()), ("stopped", "Make the screen dimmer", ""));
+        assert_eq!(
+            (done.outcome, done.summary.as_str(), done.detail.as_str()),
+            ("stopped", "Make the screen dimmer", "")
+        );
         assert_eq!(advance(&mut track, &state("idle", 2)), None);
     }
 

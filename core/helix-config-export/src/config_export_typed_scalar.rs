@@ -4,12 +4,11 @@ use toml::Value as Toml;
 
 use super::config_export_defaults::{
     write_audio_defaults, write_backdrop_defaults, write_brightness_defaults,
-    write_calendar_defaults, write_hooks_defaults, write_hot_corners_defaults,
-    write_idle_defaults, write_location_defaults, write_nightlight_defaults,
-    write_control_center_defaults, write_dock_defaults, write_keybinds_defaults,
-    write_lockscreen_defaults, write_notification_defaults, write_osd_defaults,
-    write_system_defaults, write_tailscale_defaults, write_wallpaper_defaults, write_weather_defaults,
-    HOOK_EVENT_KEYS,
+    write_calendar_defaults, write_control_center_defaults, write_dock_defaults,
+    write_hooks_defaults, write_hot_corners_defaults, write_idle_defaults, write_keybinds_defaults,
+    write_location_defaults, write_lockscreen_defaults, write_nightlight_defaults,
+    write_notification_defaults, write_osd_defaults, write_system_defaults,
+    write_tailscale_defaults, write_wallpaper_defaults, write_weather_defaults, HOOK_EVENT_KEYS,
 };
 use super::config_export_rust::merged_overlay_for_parsed_section;
 use super::config_export_serialize::f32_bits;
@@ -42,7 +41,10 @@ impl CalendarExport {
     fn from_export_table(table: &Toml) -> Self {
         let table = table.as_table().expect("calendar export table");
         Self {
-            enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(false),
+            enabled: table
+                .get("enabled")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
             event_date_format: table
                 .get("event_date_format")
                 .and_then(Toml::as_str)
@@ -92,7 +94,10 @@ impl CalendarExport {
             "event_time_format".to_string(),
             Toml::String(self.event_time_format.clone()),
         );
-        table.insert("refresh_minutes".to_string(), Toml::Integer(self.refresh_minutes));
+        table.insert(
+            "refresh_minutes".to_string(),
+            Toml::Integer(self.refresh_minutes),
+        );
         Toml::Table(table)
     }
 }
@@ -157,9 +162,18 @@ impl AudioExport {
 
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
-        table.insert("enable_overdrive".to_string(), Toml::Boolean(self.enable_overdrive));
-        table.insert("enable_sounds".to_string(), Toml::Boolean(self.enable_sounds));
-        table.insert("sound_theme".to_string(), Toml::String(self.sound_theme.clone()));
+        table.insert(
+            "enable_overdrive".to_string(),
+            Toml::Boolean(self.enable_overdrive),
+        );
+        table.insert(
+            "enable_sounds".to_string(),
+            Toml::Boolean(self.enable_sounds),
+        );
+        table.insert(
+            "sound_theme".to_string(),
+            Toml::String(self.sound_theme.clone()),
+        );
         table.insert("sound_volume".to_string(), Toml::Float(self.sound_volume));
         Toml::Table(table)
     }
@@ -192,7 +206,10 @@ impl BackdropExport {
                 .and_then(|v| v.as_float())
                 .map(f32_bits)
                 .unwrap_or(0.5),
-            enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(false),
+            enabled: table
+                .get("enabled")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
             tint_intensity: table
                 .get("tint_intensity")
                 .and_then(|v| v.as_float())
@@ -221,9 +238,15 @@ impl BackdropExport {
 
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
-        table.insert("blur_intensity".to_string(), Toml::Float(self.blur_intensity));
+        table.insert(
+            "blur_intensity".to_string(),
+            Toml::Float(self.blur_intensity),
+        );
         table.insert("enabled".to_string(), Toml::Boolean(self.enabled));
-        table.insert("tint_intensity".to_string(), Toml::Float(self.tint_intensity));
+        table.insert(
+            "tint_intensity".to_string(),
+            Toml::Float(self.tint_intensity),
+        );
         Toml::Table(table)
     }
 }
@@ -291,10 +314,19 @@ impl BrightnessExport {
 
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
-        table.insert("enable_ddcutil".to_string(), Toml::Boolean(self.enable_ddcutil));
+        table.insert(
+            "enable_ddcutil".to_string(),
+            Toml::Boolean(self.enable_ddcutil),
+        );
         table.insert(
             "ignore_mmids".to_string(),
-            Toml::Array(self.ignore_mmids.iter().cloned().map(Toml::String).collect()),
+            Toml::Array(
+                self.ignore_mmids
+                    .iter()
+                    .cloned()
+                    .map(Toml::String)
+                    .collect(),
+            ),
         );
         table.insert(
             "minimum_brightness".to_string(),
@@ -338,7 +370,10 @@ impl NightlightExport {
     fn from_export_table(table: &Toml) -> Self {
         let table = table.as_table().expect("nightlight export table");
         Self {
-            enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(false),
+            enabled: table
+                .get("enabled")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
             force: table.get("force").and_then(Toml::as_bool).unwrap_or(false),
             temperature_day: table
                 .get("temperature_day")
@@ -376,7 +411,10 @@ impl NightlightExport {
         let mut table = toml::map::Map::new();
         table.insert("enabled".to_string(), Toml::Boolean(self.enabled));
         table.insert("force".to_string(), Toml::Boolean(self.force));
-        table.insert("temperature_day".to_string(), Toml::Integer(self.temperature_day));
+        table.insert(
+            "temperature_day".to_string(),
+            Toml::Integer(self.temperature_day),
+        );
         table.insert(
             "temperature_night".to_string(),
             Toml::Integer(self.temperature_night),
@@ -447,7 +485,10 @@ impl WeatherExport {
         let mut table = toml::map::Map::new();
         table.insert("effects".to_string(), Toml::Boolean(self.effects));
         table.insert("enabled".to_string(), Toml::Boolean(self.enabled));
-        table.insert("refresh_minutes".to_string(), Toml::Integer(self.refresh_minutes));
+        table.insert(
+            "refresh_minutes".to_string(),
+            Toml::Integer(self.refresh_minutes),
+        );
         table.insert("unit".to_string(), Toml::String(self.unit.clone()));
         Toml::Table(table)
     }
@@ -514,7 +555,10 @@ impl TailscaleExport {
 
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
-        table.insert("admin_url".to_string(), Toml::String(self.admin_url.clone()));
+        table.insert(
+            "admin_url".to_string(),
+            Toml::String(self.admin_url.clone()),
+        );
         table.insert(
             "notify_on_peer_change".to_string(),
             Toml::Boolean(self.notify_on_peer_change),
@@ -622,12 +666,7 @@ pub(crate) fn export_location_section_from_merged(merged: &Toml) -> Toml {
         .unwrap_or_else(|| LocationExport::export_defaults().write_export_table())
 }
 
-const HOT_CORNER_NAMES: &[&str] = &[
-    "bottom_left",
-    "bottom_right",
-    "top_left",
-    "top_right",
-];
+const HOT_CORNER_NAMES: &[&str] = &["bottom_left", "bottom_right", "top_left", "top_right"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct HotCornerActionExport {
@@ -692,8 +731,14 @@ impl HotCornersExport {
     fn from_export_table(table: &Toml) -> Self {
         let table = table.as_table().expect("hot_corners export table");
         let mut out = Self {
-            delay_ms: table.get("delay_ms").and_then(Toml::as_integer).unwrap_or(0),
-            enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(false),
+            delay_ms: table
+                .get("delay_ms")
+                .and_then(Toml::as_integer)
+                .unwrap_or(0),
+            enabled: table
+                .get("enabled")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
             bottom_left: HotCornerActionExport::none(),
             bottom_right: HotCornerActionExport::none(),
             top_left: HotCornerActionExport::none(),
@@ -787,12 +832,10 @@ impl IdleExport {
 
     fn write_export_table(&self) -> Toml {
         let mut out = write_idle_defaults();
-        out.as_table_mut()
-            .expect("idle export table")
-            .insert(
-                "pre_action_fade_seconds".to_string(),
-                Toml::Float(self.pre_action_fade_seconds),
-            );
+        out.as_table_mut().expect("idle export table").insert(
+            "pre_action_fade_seconds".to_string(),
+            Toml::Float(self.pre_action_fade_seconds),
+        );
         out
     }
 }
@@ -927,8 +970,14 @@ impl NotificationExport {
                 .and_then(Toml::as_integer)
                 .unwrap_or(0),
             monitors: string_array(table.get("monitors")),
-            offset_x: table.get("offset_x").and_then(Toml::as_integer).unwrap_or(20),
-            offset_y: table.get("offset_y").and_then(Toml::as_integer).unwrap_or(8),
+            offset_x: table
+                .get("offset_x")
+                .and_then(Toml::as_integer)
+                .unwrap_or(20),
+            offset_y: table
+                .get("offset_y")
+                .and_then(Toml::as_integer)
+                .unwrap_or(8),
             position: table
                 .get("position")
                 .and_then(Toml::as_str)
@@ -1024,7 +1073,10 @@ impl NotificationExport {
             "collapse_on_dismiss".to_string(),
             Toml::Boolean(self.collapse_on_dismiss),
         );
-        table.insert("enable_daemon".to_string(), Toml::Boolean(self.enable_daemon));
+        table.insert(
+            "enable_daemon".to_string(),
+            Toml::Boolean(self.enable_daemon),
+        );
         table.insert(
             "filter_replace".to_string(),
             Toml::Boolean(self.filter_replace),
@@ -1053,7 +1105,10 @@ impl NotificationExport {
         table.insert("position".to_string(), Toml::String(self.position.clone()));
         table.insert("scale".to_string(), Toml::Float(self.scale));
         table.insert("show_actions".to_string(), Toml::Boolean(self.show_actions));
-        table.insert("show_app_name".to_string(), Toml::Boolean(self.show_app_name));
+        table.insert(
+            "show_app_name".to_string(),
+            Toml::Boolean(self.show_app_name),
+        );
         Toml::Table(table)
     }
 }
@@ -1101,8 +1156,14 @@ impl OsdExport {
             border: table.get("border").and_then(Toml::as_bool).unwrap_or(true),
             enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(true),
             monitors: string_array(table.get("monitors")),
-            offset_x: table.get("offset_x").and_then(Toml::as_integer).unwrap_or(20),
-            offset_y: table.get("offset_y").and_then(Toml::as_integer).unwrap_or(8),
+            offset_x: table
+                .get("offset_x")
+                .and_then(Toml::as_integer)
+                .unwrap_or(20),
+            offset_y: table
+                .get("offset_y")
+                .and_then(Toml::as_integer)
+                .unwrap_or(8),
             orientation: table
                 .get("orientation")
                 .and_then(Toml::as_str)
@@ -1186,7 +1247,10 @@ impl OsdExport {
         );
         table.insert("offset_x".to_string(), Toml::Integer(self.offset_x));
         table.insert("offset_y".to_string(), Toml::Integer(self.offset_y));
-        table.insert("orientation".to_string(), Toml::String(self.orientation.clone()));
+        table.insert(
+            "orientation".to_string(),
+            Toml::String(self.orientation.clone()),
+        );
         table.insert("position".to_string(), Toml::String(self.position.clone()));
         table.insert(
             "position_vertical".to_string(),
@@ -1315,7 +1379,10 @@ impl LockscreenExport {
             "allow_empty_password".to_string(),
             Toml::Boolean(self.allow_empty_password),
         );
-        table.insert("blur_intensity".to_string(), Toml::Float(self.blur_intensity));
+        table.insert(
+            "blur_intensity".to_string(),
+            Toml::Float(self.blur_intensity),
+        );
         table.insert(
             "blurred_desktop".to_string(),
             Toml::Boolean(self.blurred_desktop),
@@ -1339,8 +1406,14 @@ impl LockscreenExport {
                     .collect(),
             ),
         );
-        table.insert("tint_intensity".to_string(), Toml::Float(self.tint_intensity));
-        table.insert("wallpaper".to_string(), Toml::String(self.wallpaper.clone()));
+        table.insert(
+            "tint_intensity".to_string(),
+            Toml::Float(self.tint_intensity),
+        );
+        table.insert(
+            "wallpaper".to_string(),
+            Toml::String(self.wallpaper.clone()),
+        );
         Toml::Table(table)
     }
 }
@@ -1389,9 +1462,9 @@ pub(crate) fn export_hooks_section_from_merged(merged: &Toml) -> Toml {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::config_export_rust::export_filtered_schema_section;
     use super::super::config_export_serialize::serialize_default_config;
+    use super::*;
 
     #[test]
     fn scalar_exports_match_default_writers() {
@@ -1514,14 +1587,16 @@ copy = ["Ctrl+Shift+c"]
             &default,
             write_wallpaper_defaults,
         );
-        assert_eq!(export_wallpaper_section_from_merged(&merged), wallpaper_filtered);
-        let keybinds_filtered = export_filtered_schema_section(
-            "keybinds",
-            &merged,
-            &default,
-            write_keybinds_defaults,
+        assert_eq!(
+            export_wallpaper_section_from_merged(&merged),
+            wallpaper_filtered
         );
-        assert_eq!(export_keybinds_section_from_merged(&merged), keybinds_filtered);
+        let keybinds_filtered =
+            export_filtered_schema_section("keybinds", &merged, &default, write_keybinds_defaults);
+        assert_eq!(
+            export_keybinds_section_from_merged(&merged),
+            keybinds_filtered
+        );
     }
 
     #[test]

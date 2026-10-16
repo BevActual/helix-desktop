@@ -109,7 +109,10 @@ fn truncate(text: &str, max: usize) -> String {
     if text.len() <= max {
         return text.to_string();
     }
-    format!("{}…", text.chars().take(max.saturating_sub(1)).collect::<String>())
+    format!(
+        "{}…",
+        text.chars().take(max.saturating_sub(1)).collect::<String>()
+    )
 }
 
 fn parse_time(value: Option<&Value>) -> u64 {
@@ -131,9 +134,7 @@ fn iso_utc(when: SystemTime) -> String {
     let minute = (rem % 3600) / 60;
     let second = rem % 60;
     let (year, month, day) = civil_from_days(days);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z"
-    )
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
 }
 
 fn parse_iso_utc(text: &str) -> Option<u64> {

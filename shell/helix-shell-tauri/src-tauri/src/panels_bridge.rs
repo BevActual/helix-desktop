@@ -49,9 +49,12 @@ async fn read_line(stream: &mut UnixStream) -> Result<String, String> {
     use tokio::io::AsyncReadExt;
     let mut reader = BufReader::new((&mut *stream).take(MAX_LINE as u64 + 1));
     let mut line = String::new();
-    let read = tokio::time::timeout(std::time::Duration::from_secs(3), reader.read_line(&mut line))
-        .await
-        .map_err(|_| "panels socket timed out".to_string())?;
+    let read = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        reader.read_line(&mut line),
+    )
+    .await
+    .map_err(|_| "panels socket timed out".to_string())?;
     let n = read.map_err(|e| e.to_string())?;
     if n == 0 {
         return Err("panels socket closed".into());

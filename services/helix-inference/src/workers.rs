@@ -92,7 +92,8 @@ impl ProcessTranscriber {
             .filter(|p| {
                 p.is_file()
                     && p.extension().is_some_and(|e| e == "bin")
-                    && p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("ggml-"))
+                    && p.file_name()
+                        .is_some_and(|n| n.to_string_lossy().starts_with("ggml-"))
             })
             .collect();
         found.sort();
@@ -116,7 +117,10 @@ impl Transcriber for ProcessTranscriber {
             return outcome;
         }
         let model_arg = model.to_string_lossy().into_owned();
-        let Ok(mut worker) = spawn(&self.worker, &["--model", &model_arg, "--language", language]) else {
+        let Ok(mut worker) = spawn(
+            &self.worker,
+            &["--model", &model_arg, "--language", language],
+        ) else {
             outcome.error = "could not start the speech worker".into();
             return outcome;
         };
@@ -165,8 +169,16 @@ impl Transcriber for ProcessTranscriber {
         match serde_json::from_slice::<Value>(&reply) {
             Ok(value) if value.get("ok").and_then(Value::as_bool) == Some(true) => {
                 outcome.ok = true;
-                outcome.text = value.get("text").and_then(Value::as_str).unwrap_or("").into();
-                outcome.language = value.get("language").and_then(Value::as_str).unwrap_or("").into();
+                outcome.text = value
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .into();
+                outcome.language = value
+                    .get("language")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .into();
             }
             Ok(value) => {
                 outcome.error = value
@@ -232,7 +244,8 @@ impl ImageGenerator for ProcessImageGenerator {
             std::fs::symlink_metadata(m).is_ok_and(|meta| meta.file_type().is_file())
         });
         let Some(model) = model.filter(|_| usable) else {
-            outcome.error = "no image model is installed; download SD-Turbo from the Models library".into();
+            outcome.error =
+                "no image model is installed; download SD-Turbo from the Models library".into();
             return outcome;
         };
         if !self.worker.is_file() {
@@ -319,9 +332,9 @@ impl ImageGenerator for ProcessImageGenerator {
                 }
                 let decoded = pictures::decode_base64(encoded)
                     .and_then(|bytes| pictures::decode_image_input(&bytes).ok());
-                let Some(decoded) = decoded.filter(|d| {
-                    d.width == request.image_width && d.height == request.image_height
-                }) else {
+                let Some(decoded) = decoded
+                    .filter(|d| d.width == request.image_width && d.height == request.image_height)
+                else {
                     outcome.error = "image worker returned an invalid PNG or dimensions".into();
                     return outcome;
                 };

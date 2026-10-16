@@ -664,12 +664,20 @@ mod tests {
         timed.timeout_ms = 9_000;
         n.expire(5_000);
         n.notify(timed, 5_000);
-        assert_eq!(n.next_deadline(), Some(14_000), "an application that asks for a time keeps it");
+        assert_eq!(
+            n.next_deadline(),
+            Some(14_000),
+            "an application that asks for a time keeps it"
+        );
         n.set_toast_prefs(0, 99);
         for (i, app) in ["D", "E", "F"].iter().enumerate() {
             n.notify(incoming(app, "w"), 6_000 + i as u64);
         }
-        assert_eq!(n.view(6_010).toasts.len(), MAX_TOASTS, "the count stays within the model's bound");
+        assert_eq!(
+            n.view(6_010).toasts.len(),
+            MAX_TOASTS,
+            "the count stays within the model's bound"
+        );
     }
 
     #[test]

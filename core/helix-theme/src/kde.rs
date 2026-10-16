@@ -42,7 +42,10 @@ fn parse(path: &Path, required: bool) -> Result<Document, String> {
         Ok(t) => t,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             return if required {
-                Err(format!("failed to load {}: file does not exist", path.display()))
+                Err(format!(
+                    "failed to load {}: file does not exist",
+                    path.display()
+                ))
             } else {
                 Ok(doc)
             };
@@ -76,10 +79,17 @@ fn parse(path: &Path, required: bool) -> Result<Document, String> {
             }
             let name = trimmed[1..trimmed.len() - 1].to_string();
             if name.is_empty() || doc.section_indices.contains_key(&name) {
-                return Err(format!("duplicate or empty group at {}:{line_number}", path.display()));
+                return Err(format!(
+                    "duplicate or empty group at {}:{line_number}",
+                    path.display()
+                ));
             }
             doc.section_indices.insert(name.clone(), doc.sections.len());
-            doc.sections.push(Section { name, header: line, ..Default::default() });
+            doc.sections.push(Section {
+                name,
+                header: line,
+                ..Default::default()
+            });
             current = Some(doc.sections.len() - 1);
             continue;
         }
@@ -90,13 +100,20 @@ fn parse(path: &Path, required: bool) -> Result<Document, String> {
         let key_name = trim(&trimmed[..equals]).to_string();
         let sec = &mut doc.sections[section];
         if key_name.is_empty() || sec.key_indices.contains_key(&key_name) {
-            return Err(format!("duplicate or empty key at {}:{line_number}", path.display()));
+            return Err(format!(
+                "duplicate or empty key at {}:{line_number}",
+                path.display()
+            ));
         }
         let value = trim(&trimmed[equals + 1..]).to_string();
         let line_index = sec.lines.len();
         sec.lines.push(line);
         sec.key_indices.insert(key_name.clone(), sec.keys.len());
-        sec.keys.push(Key { name: key_name, value, line_index });
+        sec.keys.push(Key {
+            name: key_name,
+            value,
+            line_index,
+        });
     }
     Ok(doc)
 }
@@ -106,17 +123,24 @@ fn append_key(section: &mut Section, key: &Key) {
     while insert_at > 0 && is_comment_or_blank(&section.lines[insert_at - 1]) {
         insert_at -= 1;
     }
-    section.lines.insert(insert_at, format!("{}={}", key.name, key.value));
+    section
+        .lines
+        .insert(insert_at, format!("{}={}", key.name, key.value));
 }
 
 fn merge(dest: &mut Document, source: &Document) {
     for src in &source.sections {
         let Some(&di) = dest.section_indices.get(&src.name) else {
-            let mut section = Section { name: src.name.clone(), header: format!("[{}]", src.name), ..Default::default() };
+            let mut section = Section {
+                name: src.name.clone(),
+                header: format!("[{}]", src.name),
+                ..Default::default()
+            };
             for key in &src.keys {
                 append_key(&mut section, key);
             }
-            dest.section_indices.insert(section.name.clone(), dest.sections.len());
+            dest.section_indices
+                .insert(section.name.clone(), dest.sections.len());
             dest.sections.push(section);
             continue;
         };
@@ -165,7 +189,9 @@ fn write_atomic(path: &Path, content: &str) -> bool {
             return false;
         }
     }
-    let mode = fs::metadata(&target).ok().map(|m| m.permissions().mode() & 0o7777);
+    let mode = fs::metadata(&target)
+        .ok()
+        .map(|m| m.permissions().mode() & 0o7777);
     let tmp = std::path::PathBuf::from(format!("{}.tmp", target.display()));
     if fs::write(&tmp, content).is_err() {
         return false;
@@ -188,7 +214,10 @@ fn write_atomic(path: &Path, content: &str) -> bool {
 pub fn merge_color_scheme(scheme: &Path, kdeglobals: &Path) -> Result<(), String> {
     let scheme_doc = parse(scheme, true)?;
     if scheme_doc.sections.is_empty() {
-        return Err(format!("color scheme contains no groups: {}", scheme.display()));
+        return Err(format!(
+            "color scheme contains no groups: {}",
+            scheme.display()
+        ));
     }
     let mut globals = parse(kdeglobals, false)?;
     merge(&mut globals, &scheme_doc);

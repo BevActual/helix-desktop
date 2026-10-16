@@ -12,7 +12,10 @@ fn sentinel(name: &str) -> PathBuf {
 }
 
 fn read_sentinel(path: &PathBuf) -> String {
-    fs::read_to_string(path).unwrap_or_default().trim().to_string()
+    fs::read_to_string(path)
+        .unwrap_or_default()
+        .trim()
+        .to_string()
 }
 
 #[test]
@@ -38,8 +41,16 @@ fn drops_hooks_from_superseded_generations() {
     {
         let runner = HookRunner::new(2);
         runner.invalidate_before(2);
-        runner.enqueue(format!("printf stale > {}", path.display()), 1, String::new());
-        runner.enqueue(format!("printf current > {}", path.display()), 2, String::new());
+        runner.enqueue(
+            format!("printf stale > {}", path.display()),
+            1,
+            String::new(),
+        );
+        runner.enqueue(
+            format!("printf current > {}", path.display()),
+            2,
+            String::new(),
+        );
         runner.wait_idle();
         assert_eq!(runner.pending_count(), 0);
     }
@@ -73,7 +84,11 @@ fn invalidate_drops_queued_hooks() {
     {
         let runner = HookRunner::new(1);
         runner.enqueue("sleep 0.2".into(), 1, String::new());
-        runner.enqueue(format!("printf stale > {}", path.display()), 1, String::new());
+        runner.enqueue(
+            format!("printf stale > {}", path.display()),
+            1,
+            String::new(),
+        );
         runner.invalidate_before(2);
         runner.wait_idle();
         assert_eq!(runner.pending_count(), 0);
@@ -94,7 +109,11 @@ fn shutdown_drops_backlog_and_awaits_running() {
             1,
             String::new(),
         );
-        runner.enqueue(format!("printf ran > {}", queued.display()), 1, String::new());
+        runner.enqueue(
+            format!("printf ran > {}", queued.display()),
+            1,
+            String::new(),
+        );
         runner.request_shutdown();
         runner.wait_idle();
     }
@@ -109,7 +128,11 @@ fn async_post_hook_returns_before_slow_hook_finishes() {
     let _ = fs::remove_file(&marker);
     let runner = HookRunner::new(4);
     let start = Instant::now();
-    runner.enqueue(format!("sleep 1; touch {}", marker.display()), 1, String::new());
+    runner.enqueue(
+        format!("sleep 1; touch {}", marker.display()),
+        1,
+        String::new(),
+    );
     assert!(start.elapsed().as_secs_f64() < 0.5);
     assert!(!marker.exists());
     runner.wait_idle();

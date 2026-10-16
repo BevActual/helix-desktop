@@ -13,7 +13,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str("full"),
     },
-
     SettingDef {
         id: "control_center.sidebar_section",
         page: "desktop-dock",
@@ -25,7 +24,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str("full"),
     },
-
     SettingDef {
         id: "idle.pre_action_fade_seconds",
         page: "power",
@@ -37,7 +35,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 120.0,
         default: DefaultValue::Number(2.0),
     },
-
     SettingDef {
         id: "shell.shadow.direction",
         page: "appearance",
@@ -49,7 +46,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str("down"),
     },
-
     SettingDef {
         id: "shell.shadow.alpha",
         page: "appearance",
@@ -61,7 +57,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 1.0,
         default: DefaultValue::Number(1.0),
     },
-
     SettingDef {
         id: "shell.app_icon_colorize",
         page: "appearance",
@@ -73,7 +68,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.app_icon_color",
         page: "appearance",
@@ -85,7 +79,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.started",
         page: "desktop-dock",
@@ -97,7 +90,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.session_locked",
         page: "desktop-dock",
@@ -109,7 +101,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.session_unlocked",
         page: "desktop-dock",
@@ -121,7 +112,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.logging_out",
         page: "desktop-dock",
@@ -133,7 +123,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.rebooting",
         page: "desktop-dock",
@@ -145,7 +134,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.shutting_down",
         page: "desktop-dock",
@@ -157,7 +145,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.wallpaper_changed",
         page: "desktop-dock",
@@ -169,7 +156,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.colors_changed",
         page: "desktop-dock",
@@ -181,7 +167,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.theme_mode_changed",
         page: "desktop-dock",
@@ -193,7 +178,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.wifi_enabled",
         page: "desktop-dock",
@@ -205,7 +189,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.wifi_disabled",
         page: "desktop-dock",
@@ -217,7 +200,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.bluetooth_enabled",
         page: "desktop-dock",
@@ -229,7 +211,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.bluetooth_disabled",
         page: "desktop-dock",
@@ -241,7 +222,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.battery_charging",
         page: "desktop-dock",
@@ -253,7 +233,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.battery_discharging",
         page: "desktop-dock",
@@ -265,7 +244,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.battery_plugged",
         page: "desktop-dock",
@@ -277,7 +255,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.battery_percentage_changed",
         page: "desktop-dock",
@@ -289,7 +266,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "hooks.power_profile_changed",
         page: "desktop-dock",
@@ -301,7 +277,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.lang",
         page: "system",
@@ -313,7 +288,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "wallpaper.fill_color",
         page: "appearance",
@@ -325,7 +299,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "wallpaper.directory",
         page: "appearance",
@@ -337,7 +310,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "wallpaper.directory_light",
         page: "appearance",
@@ -349,7 +321,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "wallpaper.directory_dark",
         page: "appearance",
@@ -361,7 +332,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "wallpaper.per_monitor_directories",
         page: "appearance",
@@ -373,7 +343,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "wallpaper.wallhaven.download_dir",
         page: "appearance",
@@ -385,7 +354,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "wallpaper.daily.download_dir",
         page: "appearance",
@@ -397,7 +365,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "wallpaper.video.directory",
         page: "appearance",
@@ -409,7 +376,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "weather.enabled",
         page: "privacy-security",
@@ -421,7 +387,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(true),
     },
-
     SettingDef {
         id: "shell.show_location",
         page: "privacy-security",
@@ -433,7 +398,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "weather.unit",
         page: "privacy-security",
@@ -445,7 +409,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str("metric"),
     },
-
     SettingDef {
         id: "weather.effects",
         page: "privacy-security",
@@ -457,7 +420,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "weather.refresh_minutes",
         page: "privacy-security",
@@ -469,7 +431,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 240.0,
         default: DefaultValue::Number(30.0),
     },
-
     SettingDef {
         id: "shell.privacy.mic_filter_regex",
         page: "privacy-security",
@@ -481,7 +442,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.privacy.cam_filter_regex",
         page: "privacy-security",
@@ -493,7 +453,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.privacy.screen_filter_regex",
         page: "privacy-security",
@@ -505,7 +464,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.avatar_path",
         page: "privacy-security",
@@ -517,7 +475,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "storage.key_source",
         page: "privacy-security",
@@ -529,7 +486,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str("secret-service"),
     },
-
     SettingDef {
         id: "storage.key_file",
         page: "privacy-security",
@@ -541,7 +497,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.greeter_sync.auto_sync",
         page: "privacy-security",
@@ -553,7 +508,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.greeter_sync.privilege_command",
         page: "privacy-security",
@@ -565,7 +519,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.clipboard_placement",
         page: "desktop-dock",
@@ -577,7 +530,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.clipboard_position",
         page: "desktop-dock",
@@ -589,7 +541,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.open_near_click_clipboard",
         page: "desktop-dock",
@@ -601,7 +552,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.panel.session_placement",
         page: "desktop-dock",
@@ -613,7 +563,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.session_position",
         page: "desktop-dock",
@@ -625,7 +574,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.open_near_click_session",
         page: "desktop-dock",
@@ -637,7 +585,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.panel.wallpaper_placement",
         page: "desktop-dock",
@@ -649,7 +596,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.wallpaper_position",
         page: "desktop-dock",
@@ -661,7 +607,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.open_near_click_wallpaper",
         page: "desktop-dock",
@@ -673,7 +618,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.panel.polkit_placement",
         page: "desktop-dock",
@@ -685,7 +629,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.polkit_position",
         page: "desktop-dock",
@@ -697,7 +640,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.quick_insert_placement",
         page: "desktop-dock",
@@ -709,7 +651,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.quick_insert_position",
         page: "desktop-dock",
@@ -721,7 +662,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.open_near_click_quick_insert",
         page: "desktop-dock",
@@ -733,7 +673,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.panel_anchor_bar",
         page: "desktop-dock",
@@ -745,7 +684,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.panel.floating_layer",
         page: "desktop-dock",
@@ -757,7 +695,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "desktop_widgets.enabled",
         page: "desktop-dock",
@@ -769,7 +706,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(true),
     },
-
     SettingDef {
         id: "lockscreen_widgets.enabled",
         page: "privacy-security",
@@ -781,7 +717,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(true),
     },
-
     SettingDef {
         id: "shell.screen_corners.enabled",
         page: "desktop-dock",
@@ -793,7 +728,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(true),
     },
-
     SettingDef {
         id: "shell.screen_corners.size",
         page: "desktop-dock",
@@ -805,7 +739,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 100.0,
         default: DefaultValue::Number(12.0),
     },
-
     SettingDef {
         id: "dock.border",
         page: "desktop-dock",
@@ -817,7 +750,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.launch_apps_as_systemd_services",
         page: "desktop-dock",
@@ -829,7 +761,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.launch_apps_custom_command",
         page: "desktop-dock",
@@ -841,7 +772,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.screenshot.save_to_file",
         page: "desktop-dock",
@@ -853,7 +783,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.copy_to_clipboard",
         page: "desktop-dock",
@@ -865,7 +794,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.directory",
         page: "desktop-dock",
@@ -877,7 +805,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.screenshot.filename_pattern",
         page: "desktop-dock",
@@ -889,7 +816,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.screenshot.pipe_to_command",
         page: "desktop-dock",
@@ -901,7 +827,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.pipe_command",
         page: "desktop-dock",
@@ -913,7 +838,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.screenshot.freeze_screen",
         page: "desktop-dock",
@@ -925,7 +849,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.confirm_region",
         page: "desktop-dock",
@@ -937,7 +860,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.remember_last_region",
         page: "desktop-dock",
@@ -949,7 +871,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.show_cursor",
         page: "desktop-dock",
@@ -961,7 +882,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.annotate",
         page: "desktop-dock",
@@ -973,7 +893,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.skip_annotate_on_copy_save",
         page: "desktop-dock",
@@ -985,7 +904,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.close_on_copy",
         page: "desktop-dock",
@@ -997,7 +915,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screenshot.close_on_save",
         page: "desktop-dock",
@@ -1009,7 +926,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screen_record.audio",
         page: "desktop-dock",
@@ -1021,7 +937,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screen_record.show_cursor",
         page: "desktop-dock",
@@ -1033,7 +948,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "shell.screen_record.directory",
         page: "desktop-dock",
@@ -1045,7 +959,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.screen_record.filename_pattern",
         page: "desktop-dock",
@@ -1057,7 +970,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.screen_record.replay_duration",
         page: "desktop-dock",
@@ -1069,7 +981,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 600.0,
         default: DefaultValue::Number(30.0),
     },
-
     SettingDef {
         id: "shell.niri_overview_type_to_launch_enabled",
         page: "desktop-dock",
@@ -1081,7 +992,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(true),
     },
-
     SettingDef {
         id: "audio.sound_theme",
         page: "sound",
@@ -1093,7 +1003,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "brightness.enable_ddcutil",
         page: "displays",
@@ -1105,7 +1014,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "brightness.sync_all_monitors",
         page: "displays",
@@ -1117,7 +1025,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "brightness.minimum_brightness",
         page: "displays",
@@ -1129,7 +1036,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 1.0,
         default: DefaultValue::Number(1.0),
     },
-
     SettingDef {
         id: "control_center.network.wifi_band",
         page: "network",
@@ -1141,7 +1047,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str("all"),
     },
-
     SettingDef {
         id: "control_center.network.custom_dns",
         page: "network",
@@ -1153,7 +1058,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "control_center.network.nextdns_id",
         page: "network",
@@ -1165,7 +1069,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "control_center.bluetooth.hide_unnamed",
         page: "bluetooth",
@@ -1177,7 +1080,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "control_center.bluetooth.discovery_seconds",
         page: "bluetooth",
@@ -1189,7 +1091,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 60.0,
         default: DefaultValue::Number(5.0),
     },
-
     SettingDef {
         id: "shell.time_format",
         page: "system",
@@ -1201,7 +1102,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.date_format",
         page: "system",
@@ -1213,7 +1113,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "calendar.enabled",
         page: "system",
@@ -1225,7 +1124,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(true),
     },
-
     SettingDef {
         id: "calendar.refresh_minutes",
         page: "system",
@@ -1237,7 +1135,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 240.0,
         default: DefaultValue::Number(15.0),
     },
-
     SettingDef {
         id: "calendar.event_date_format",
         page: "system",
@@ -1249,7 +1146,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "calendar.event_time_format",
         page: "system",
@@ -1261,7 +1157,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.setup_wizard_enabled",
         page: "system",
@@ -1273,7 +1168,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(true),
     },
-
     SettingDef {
         id: "shell.settings_show_advanced",
         page: "system",
@@ -1285,7 +1179,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "notification.filter_replace",
         page: "notifications",
@@ -1297,7 +1190,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "tailscale.refresh_interval_seconds",
         page: "network",
@@ -1309,7 +1201,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 120.0,
         default: DefaultValue::Number(60.0),
     },
-
     SettingDef {
         id: "tailscale.notify_on_peer_change",
         page: "network",
@@ -1321,7 +1212,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
-
     SettingDef {
         id: "tailscale.admin_url",
         page: "network",
@@ -1333,7 +1223,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.session.power.suspend",
         page: "power",
@@ -1345,7 +1234,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.session.power.reboot",
         page: "power",
@@ -1357,7 +1245,6 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
     SettingDef {
         id: "shell.session.power.shutdown",
         page: "power",
@@ -1369,5 +1256,4 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Str(""),
     },
-
 ];

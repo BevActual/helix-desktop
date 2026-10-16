@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use helix_monitor_model::monitor::{
-    parse_cpu, parse_memory, parse_net, parse_process, parse_screen_time, Monitor, Overview, ProcessRow,
-    ProcessSort, ScreenTimeRow,
+    parse_cpu, parse_memory, parse_net, parse_process, parse_screen_time, Monitor, Overview,
+    ProcessRow, ProcessSort, ScreenTimeRow,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -96,7 +96,9 @@ fn sample(state: &mut State) {
                 .map(|b| b.join("helix/screen-time/report"))
         });
     if let Some(path) = report {
-        state.monitor.set_screen_time(parse_screen_time(&read(&path)));
+        state
+            .monitor
+            .set_screen_time(parse_screen_time(&read(&path)));
     }
 }
 
@@ -109,7 +111,9 @@ fn startup_page() -> Option<String> {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         if arg == "--page" {
-            return args.next().filter(|p| matches!(p.as_str(), "overview" | "processes" | "screen-time"));
+            return args
+                .next()
+                .filter(|p| matches!(p.as_str(), "overview" | "processes" | "screen-time"));
         }
         if let Some(page) = arg.strip_prefix("--page=") {
             if matches!(page, "overview" | "processes" | "screen-time") {
@@ -245,7 +249,10 @@ fn follow_appearance(app: tauri::AppHandle) {
         let _ = desktop
             .watch_theme_dark(move |dark| {
                 eprintln!("UI theme {}", if dark { "dark" } else { "light" });
-                APP_THEME.store(if dark { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
+                APP_THEME.store(
+                    if dark { 1 } else { 2 },
+                    std::sync::atomic::Ordering::Relaxed,
+                );
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
                         let _ = window.eval(script);

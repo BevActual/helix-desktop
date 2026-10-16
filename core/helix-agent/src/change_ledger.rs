@@ -211,14 +211,7 @@ mod tests {
         ledger.record(4, SettingKey::Volume, "45 0", "50 0", "45%", "50%");
         assert!(ledger.get(3).is_none(), "the older volume undo is retired");
         assert_eq!(ledger.get(4).unwrap().after, "50%");
-        assert!(ledger.record(
-            4,
-            SettingKey::Brightness,
-            "30%",
-            "40%",
-            "30%",
-            "40%"
-        ));
+        assert!(ledger.record(4, SettingKey::Brightness, "30%", "40%", "30%", "40%"));
         assert_eq!(
             ledger.get(4).unwrap().key,
             SettingKey::Brightness,

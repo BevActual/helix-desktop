@@ -71,27 +71,21 @@ mod tests {
 
     #[test]
     fn default_prefers_agent_desk_when_enabled() {
-        assert_eq!(
-            default_scope(true, true),
-            CaptureScope::AgentDesk
-        );
-        assert_eq!(
-            default_scope(true, false),
-            CaptureScope::FocusedOutput
-        );
+        assert_eq!(default_scope(true, true), CaptureScope::AgentDesk);
+        assert_eq!(default_scope(true, false), CaptureScope::FocusedOutput);
     }
 
     #[test]
     fn parses_targets() {
-        assert_eq!(
-            resolve_scope(None, true, true),
-            CaptureScope::AgentDesk
-        );
+        assert_eq!(resolve_scope(None, true, true), CaptureScope::AgentDesk);
         assert_eq!(
             resolve_scope(Some("agent-desk"), false, false),
             CaptureScope::AgentDesk
         );
-        assert_eq!(resolve_scope(Some("all"), true, true), CaptureScope::AllOutputs);
+        assert_eq!(
+            resolve_scope(Some("all"), true, true),
+            CaptureScope::AllOutputs
+        );
         assert_eq!(
             resolve_scope(Some("DP-1"), true, true),
             CaptureScope::Output("DP-1".into())

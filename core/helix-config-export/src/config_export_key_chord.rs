@@ -61,7 +61,10 @@ mod tests {
     fn export_matches_cpp_navigation_keybinds() {
         assert_eq!(export_key_chord_spec("escape"), "Escape");
         assert_eq!(export_key_chord_spec("return"), "Return");
-        assert_eq!(export_key_chord_spec("shift+iso_left_tab"), "Shift+ISO_Left_Tab");
+        assert_eq!(
+            export_key_chord_spec("shift+iso_left_tab"),
+            "Shift+ISO_Left_Tab"
+        );
         assert_eq!(export_key_chord_spec("ctrl+c"), "Ctrl+c");
     }
 }

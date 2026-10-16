@@ -95,7 +95,10 @@ pub const CATEGORIES: [(&str, &str); 9] = [
 
 /// A package belongs to a store category when any of its appstream categories maps to it (Audio and Video count as AudioVideo).
 fn in_category(package: &Package, category: &str) -> bool {
-    package.categories.iter().any(|c| c == category || (category == "AudioVideo" && (c == "Audio" || c == "Video")))
+    package
+        .categories
+        .iter()
+        .any(|c| c == category || (category == "AudioVideo" && (c == "Audio" || c == "Video")))
 }
 
 /// One page of a result list (the catalog is thousands of rows; the page asks for a window).
@@ -143,7 +146,12 @@ impl Store {
                 version: sanitize_for_display(&p.version, 40),
                 size: p.size,
                 installation: sanitize_for_display(&p.installation, 16),
-                categories: p.categories.into_iter().take(8).map(|c| sanitize_for_display(&c, 32)).collect(),
+                categories: p
+                    .categories
+                    .into_iter()
+                    .take(8)
+                    .map(|c| sanitize_for_display(&c, 32))
+                    .collect(),
                 released: p.released,
                 verified: p.verified,
             })
@@ -171,7 +179,14 @@ impl Store {
     }
 
     /// As `explore_page`, limited to one store category (an appstream name from [`CATEGORIES`]; empty = all).
-    pub fn explore_in(&self, kind: Kind, query: &str, category: &str, offset: usize, limit: usize) -> Page {
+    pub fn explore_in(
+        &self,
+        kind: Kind,
+        query: &str,
+        category: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Page {
         let q = sanitize_for_display(query, MAX_QUERY).to_ascii_lowercase();
         let mut ranked: Vec<(u8, String, &Package)> = self
             .packages
@@ -184,7 +199,10 @@ impl Store {
                     0
                 } else if title.starts_with(&q) {
                     1
-                } else if title.split(|c: char| !c.is_alphanumeric()).any(|word| word.starts_with(&q)) {
+                } else if title
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|word| word.starts_with(&q))
+                {
                     2
                 } else if title.contains(&q) {
                     3
@@ -201,18 +219,33 @@ impl Store {
         ranked.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
         Page {
             total: ranked.len(),
-            rows: ranked.into_iter().skip(offset).take(limit).map(|(_, _, p)| view_of(p)).collect(),
+            rows: ranked
+                .into_iter()
+                .skip(offset)
+                .take(limit)
+                .map(|(_, _, p)| view_of(p))
+                .collect(),
         }
     }
 
     pub fn library(&self, kind: Kind) -> Vec<PackageView> {
-        let mut rows: Vec<PackageView> = self.packages.iter().filter(|p| p.kind == kind && p.installed).map(view_of).collect();
+        let mut rows: Vec<PackageView> = self
+            .packages
+            .iter()
+            .filter(|p| p.kind == kind && p.installed)
+            .map(view_of)
+            .collect();
         rows.sort_by_key(|row| row.title.to_ascii_lowercase());
         rows
     }
 
     pub fn updates(&self) -> Vec<PackageView> {
-        let mut rows: Vec<PackageView> = self.packages.iter().filter(|p| p.update).map(view_of).collect();
+        let mut rows: Vec<PackageView> = self
+            .packages
+            .iter()
+            .filter(|p| p.update)
+            .map(view_of)
+            .collect();
         rows.sort_by_key(|row| row.title.to_ascii_lowercase());
         rows
     }
@@ -221,7 +254,12 @@ impl Store {
     pub fn apply_meta(&mut self, meta: &std::collections::HashMap<String, Meta>) {
         for package in &mut self.packages {
             if let Some(found) = meta.get(&package.id) {
-                package.categories = found.categories.iter().take(8).map(|c| sanitize_for_display(c, 32)).collect();
+                package.categories = found
+                    .categories
+                    .iter()
+                    .take(8)
+                    .map(|c| sanitize_for_display(c, 32))
+                    .collect();
                 package.released = found.released;
                 package.verified = found.verified;
             }
@@ -230,18 +268,44 @@ impl Store {
 
     /// The Discover page: one hero and a shelf per category, built from the index. `day` rotates the hero daily; `has_icon` keeps apps
     /// that would show a lettered tile off the shelves.
-    pub fn discover(&self, kind: Kind, day: u64, per_shelf: usize, has_icon: &dyn Fn(&Package) -> bool) -> Discover {
-        let good = |p: &&Package| p.kind == kind && !p.title.is_empty() && !p.summary.is_empty() && has_icon(p);
+    pub fn discover(
+        &self,
+        kind: Kind,
+        day: u64,
+        per_shelf: usize,
+        has_icon: &dyn Fn(&Package) -> bool,
+    ) -> Discover {
+        let good = |p: &&Package| {
+            p.kind == kind && !p.title.is_empty() && !p.summary.is_empty() && has_icon(p)
+        };
         // Quality order: verified first, then the most recently released.
-        let order = |a: &&Package, b: &&Package| (b.verified, b.released).cmp(&(a.verified, a.released));
+        let order =
+            |a: &&Package, b: &&Package| (b.verified, b.released).cmp(&(a.verified, a.released));
         let mut all: Vec<&Package> = self.packages.iter().filter(good).collect();
         all.sort_by(order);
-        let recent_cut = all.iter().map(|p| p.released).max().unwrap_or(0).saturating_sub(180 * 86_400);
-        let heroes: Vec<&&Package> = all.iter().filter(|p| p.verified && p.released >= recent_cut && p.released > 0).take(30).collect();
-        let hero = if heroes.is_empty() { None } else { Some(view_of(heroes[(day as usize) % heroes.len()])) };
+        let recent_cut = all
+            .iter()
+            .map(|p| p.released)
+            .max()
+            .unwrap_or(0)
+            .saturating_sub(180 * 86_400);
+        let heroes: Vec<&&Package> = all
+            .iter()
+            .filter(|p| p.verified && p.released >= recent_cut && p.released > 0)
+            .take(30)
+            .collect();
+        let hero = if heroes.is_empty() {
+            None
+        } else {
+            Some(view_of(heroes[(day as usize) % heroes.len()]))
+        };
         let hero_id = hero.as_ref().map(|h| h.id.clone());
         let mut shelves = Vec::new();
-        let mut recent: Vec<&Package> = all.iter().copied().filter(|p| p.released > 0 && Some(&p.id) != hero_id.as_ref()).collect();
+        let mut recent: Vec<&Package> = all
+            .iter()
+            .copied()
+            .filter(|p| p.released > 0 && Some(&p.id) != hero_id.as_ref())
+            .collect();
         recent.sort_by_key(|p| std::cmp::Reverse(p.released));
         if !recent.is_empty() {
             shelves.push(Shelf {
@@ -259,7 +323,11 @@ impl Store {
                 .map(view_of)
                 .collect();
             if rows.len() >= 3 {
-                shelves.push(Shelf { title: title.into(), category: category.into(), rows });
+                shelves.push(Shelf {
+                    title: title.into(),
+                    category: category.into(),
+                    rows,
+                });
             }
         }
         Discover { hero, shelves }
@@ -278,7 +346,11 @@ impl Store {
         if !valid_id(id) {
             return Err(SoftwareError::BadId);
         }
-        let package = self.packages.iter().find(|p| p.id == id).ok_or(SoftwareError::UnknownPackage)?;
+        let package = self
+            .packages
+            .iter()
+            .find(|p| p.id == id)
+            .ok_or(SoftwareError::UnknownPackage)?;
         match mutation {
             Mutation::Install if package.installed => return Err(SoftwareError::AlreadyInstalled),
             Mutation::Remove if !package.installed => return Err(SoftwareError::NotInstalled),
@@ -290,7 +362,11 @@ impl Store {
 
     /// Applies a successful mutation locally (after the host reports success).
     pub fn apply(&mut self, id: &str, mutation: Mutation) -> Result<(), SoftwareError> {
-        let package = self.packages.iter_mut().find(|p| p.id == id).ok_or(SoftwareError::UnknownPackage)?;
+        let package = self
+            .packages
+            .iter_mut()
+            .find(|p| p.id == id)
+            .ok_or(SoftwareError::UnknownPackage)?;
         match mutation {
             Mutation::Install => {
                 package.installed = true;
@@ -376,7 +452,11 @@ impl Jobs {
     }
 
     pub fn progress(&mut self, id: u64, percent: u8) {
-        if let Some(job) = self.jobs.iter_mut().find(|j| j.id == id && j.state == JobState::Running) {
+        if let Some(job) = self
+            .jobs
+            .iter_mut()
+            .find(|j| j.id == id && j.state == JobState::Running)
+        {
             job.percent = Some(percent.min(100));
         }
     }
@@ -391,7 +471,11 @@ impl Jobs {
                 }
             }
         }
-        let finished = self.jobs.iter().filter(|j| j.state != JobState::Running).count();
+        let finished = self
+            .jobs
+            .iter()
+            .filter(|j| j.state != JobState::Running)
+            .count();
         if finished > KEEP_FINISHED {
             let mut drop = finished - KEEP_FINISHED;
             self.jobs.retain(|j| {
@@ -407,7 +491,8 @@ impl Jobs {
 
     /// Forget a finished job (the person dismissed it).
     pub fn dismiss(&mut self, id: u64) {
-        self.jobs.retain(|j| !(j.id == id && j.state != JobState::Running));
+        self.jobs
+            .retain(|j| !(j.id == id && j.state != JobState::Running));
     }
 
     pub fn running(&self) -> bool {
@@ -415,7 +500,9 @@ impl Jobs {
     }
 
     pub fn is_running_for(&self, package_id: &str) -> bool {
-        self.jobs.iter().any(|j| j.state == JobState::Running && (j.package_id == package_id || j.package_id == "*"))
+        self.jobs.iter().any(|j| {
+            j.state == JobState::Running && (j.package_id == package_id || j.package_id == "*")
+        })
     }
 
     pub fn view(&self) -> Vec<JobView> {
@@ -426,7 +513,9 @@ impl Jobs {
 pub fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= MAX_ID
-        && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'_')
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'_')
 }
 
 #[cfg(test)]
@@ -484,14 +573,23 @@ mod tests {
         let s = store();
         assert_eq!(s.library(Kind::Flatpak).len(), 1);
         assert_eq!(s.updates().len(), 1);
-        assert_eq!(s.detail("org.gnome.Calculator").unwrap().title, "Calculator");
+        assert_eq!(
+            s.detail("org.gnome.Calculator").unwrap().title,
+            "Calculator"
+        );
     }
 
     #[test]
     fn mutations_are_refused_when_illegal_then_applied() {
         let mut s = store();
-        assert_eq!(s.prepare("missing", Mutation::Install), Err(SoftwareError::UnknownPackage));
-        assert_eq!(s.prepare("../x", Mutation::Install), Err(SoftwareError::BadId));
+        assert_eq!(
+            s.prepare("missing", Mutation::Install),
+            Err(SoftwareError::UnknownPackage)
+        );
+        assert_eq!(
+            s.prepare("../x", Mutation::Install),
+            Err(SoftwareError::BadId)
+        );
         assert_eq!(
             s.prepare("org.gnome.TextEditor", Mutation::Install),
             Err(SoftwareError::AlreadyInstalled)
@@ -504,7 +602,8 @@ mod tests {
             s.prepare("org.gnome.Calculator", Mutation::Update),
             Err(SoftwareError::NoUpdate)
         );
-        s.prepare("org.gnome.Calculator", Mutation::Install).unwrap();
+        s.prepare("org.gnome.Calculator", Mutation::Install)
+            .unwrap();
         s.apply("org.gnome.Calculator", Mutation::Install).unwrap();
         assert!(s.detail("org.gnome.Calculator").unwrap().installed);
         s.apply("org.gnome.TextEditor", Mutation::Update).unwrap();
@@ -529,13 +628,23 @@ mod tests {
         ]);
         let page = s.explore_page(Kind::Flatpak, "calc", 0, 10);
         let titles: Vec<_> = page.rows.iter().map(|r| r.title.as_str()).collect();
-        assert_eq!(titles, vec!["Calc", "Calculator", "Zebra Calc", "Spreadsheet"]);
+        assert_eq!(
+            titles,
+            vec!["Calc", "Calculator", "Zebra Calc", "Spreadsheet"]
+        );
         assert_eq!(page.total, 4);
         let window = s.explore_page(Kind::Flatpak, "calc", 1, 2);
         assert_eq!(window.rows.len(), 2);
         assert_eq!(window.total, 4);
         // No query: every package, by title.
-        assert_eq!(s.explore_page(Kind::Flatpak, "", 0, 100).rows.first().unwrap().title, "Calc");
+        assert_eq!(
+            s.explore_page(Kind::Flatpak, "", 0, 100)
+                .rows
+                .first()
+                .unwrap()
+                .title,
+            "Calc"
+        );
     }
 
     #[test]
@@ -558,18 +667,33 @@ mod tests {
             );
             meta.insert(
                 id,
-                Meta { categories: vec![if i % 2 == 0 { "Game".into() } else { "Utility".into() }], released: 1_700_000_000 + i * 1000, verified: i != 0 },
+                Meta {
+                    categories: vec![if i % 2 == 0 {
+                        "Game".into()
+                    } else {
+                        "Utility".into()
+                    }],
+                    released: 1_700_000_000 + i * 1000,
+                    verified: i != 0,
+                },
             );
         }
         s.apply_meta(&meta);
         let found = s.discover(Kind::Flatpak, 3, 12, &|_| true);
         let hero = found.hero.expect("a hero");
         assert!(hero.verified);
-        let titles: Vec<_> = found.shelves.iter().map(|shelf| shelf.title.as_str()).collect();
+        let titles: Vec<_> = found
+            .shelves
+            .iter()
+            .map(|shelf| shelf.title.as_str())
+            .collect();
         assert_eq!(titles.first(), Some(&"Recently updated"));
         assert!(titles.contains(&"Games") && titles.contains(&"Utilities"));
         // The hero is not repeated on a shelf.
-        assert!(found.shelves.iter().all(|shelf| shelf.rows.iter().all(|r| r.id != hero.id)));
+        assert!(found
+            .shelves
+            .iter()
+            .all(|shelf| shelf.rows.iter().all(|r| r.id != hero.id)));
         // An app without an icon is kept off the shelves.
         let none = s.discover(Kind::Flatpak, 0, 12, &|_| false);
         assert!(none.hero.is_none() && none.shelves.is_empty());

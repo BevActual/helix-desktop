@@ -45,7 +45,10 @@ pub fn decode_image_input(data: &[u8]) -> Result<ImageInput, String> {
     if width == 0 || height == 0 {
         return Err("the picture is empty".into());
     }
-    if width > MAX_IMAGE_SIDE || height > MAX_IMAGE_SIDE || u64::from(width) * u64::from(height) > MAX_IMAGE_PIXELS {
+    if width > MAX_IMAGE_SIDE
+        || height > MAX_IMAGE_SIDE
+        || u64::from(width) * u64::from(height) > MAX_IMAGE_PIXELS
+    {
         return Err("the picture is too large".into());
     }
     let picture = image::DynamicImage::from_decoder(decoder)
@@ -59,7 +62,10 @@ pub fn decode_image_input(data: &[u8]) -> Result<ImageInput, String> {
             rgb.push(((u32::from(pixel[c]) * alpha + 255 * (255 - alpha) + 127) / 255) as u8);
         }
     }
-    Ok(scale_down(&ImageInput { width, height, rgb }, ENGINE_IMAGE_SIDE))
+    Ok(scale_down(
+        &ImageInput { width, height, rgb },
+        ENGINE_IMAGE_SIDE,
+    ))
 }
 
 /// Scales an RGB picture so neither side exceeds `max_side`, averaging source pixels.
@@ -76,10 +82,12 @@ pub fn scale_down(picture: &ImageInput, max_side: u32) -> ImageInput {
     let mut rgb = vec![0u8; width as usize * height as usize * 3];
     for y in 0..height {
         let y0 = (u64::from(y) * u64::from(picture.height) / u64::from(height)) as u32;
-        let y1 = (y0 + 1).max((u64::from(y + 1) * u64::from(picture.height) / u64::from(height)) as u32);
+        let y1 =
+            (y0 + 1).max((u64::from(y + 1) * u64::from(picture.height) / u64::from(height)) as u32);
         for x in 0..width {
             let x0 = (u64::from(x) * u64::from(picture.width) / u64::from(width)) as u32;
-            let x1 = (x0 + 1).max((u64::from(x + 1) * u64::from(picture.width) / u64::from(width)) as u32);
+            let x1 = (x0 + 1)
+                .max((u64::from(x + 1) * u64::from(picture.width) / u64::from(width)) as u32);
             let mut sum = [0u64; 3];
             for sy in y0..y1.min(picture.height) {
                 for sx in x0..x1.min(picture.width) {
@@ -101,7 +109,12 @@ pub fn scale_down(picture: &ImageInput, max_side: u32) -> ImageInput {
 
 /// Base64 PNG of 8-bit RGB pixels; empty when the input is out of bounds.
 pub fn encode_png(rgb: &[u8], width: u32, height: u32) -> String {
-    if width == 0 || height == 0 || width > 768 || height > 768 || rgb.len() != width as usize * height as usize * 3 {
+    if width == 0
+        || height == 0
+        || width > 768
+        || height > 768
+        || rgb.len() != width as usize * height as usize * 3
+    {
         return String::new();
     }
     let mut bytes = Vec::new();
@@ -171,7 +184,11 @@ mod tests {
     fn refuses_unknown_formats_and_scales_large_pictures() {
         assert!(decode_image_input(b"not a picture").is_err());
         assert!(decode_image_input(&[]).is_err());
-        let big = ImageInput { width: 3136, height: 1568, rgb: vec![7; 3136 * 1568 * 3] };
+        let big = ImageInput {
+            width: 3136,
+            height: 1568,
+            rgb: vec![7; 3136 * 1568 * 3],
+        };
         let small = scale_down(&big, 1568);
         assert_eq!((small.width, small.height), (1568, 784));
         assert_eq!(small.rgb[0], 7);

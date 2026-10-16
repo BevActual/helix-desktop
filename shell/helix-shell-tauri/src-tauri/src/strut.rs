@@ -9,7 +9,12 @@ pub fn strut_unit_active() -> bool {
         return false;
     }
     std::process::Command::new("systemctl")
-        .args(["--user", "is-active", "--quiet", "helix-shell-strut.service"])
+        .args([
+            "--user",
+            "is-active",
+            "--quiet",
+            "helix-shell-strut.service",
+        ])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)

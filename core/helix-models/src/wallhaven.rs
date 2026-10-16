@@ -61,7 +61,12 @@ pub struct Search {
 
 impl Search {
     /// `query` is free text of letters, digits, spaces and a few marks (wallhaven's own `+tag -tag` and `"phrase"` forms are fine).
-    pub fn new(query: &str, sorting: &str, minimum: &str, page: u32) -> Result<Search, SearchError> {
+    pub fn new(
+        query: &str,
+        sorting: &str,
+        minimum: &str,
+        page: u32,
+    ) -> Result<Search, SearchError> {
         let query = query.split_whitespace().collect::<Vec<_>>().join(" ");
         let allowed = |c: char| c.is_alphanumeric() || " +-_\"'.".contains(c);
         if query.chars().count() > 80 || !query.chars().all(allowed) {
@@ -78,7 +83,12 @@ impl Search {
             "2160" => "2160",
             _ => return Err(SearchError::BadSize),
         };
-        Ok(Search { query, sorting, minimum, page })
+        Ok(Search {
+            query,
+            sorting,
+            minimum,
+            page,
+        })
     }
 
     /// The query pairs to send, already in final form (the caller percent-encodes them). General and anime categories, never people;
@@ -131,16 +141,23 @@ pub struct Results {
 
 /// An id is what wallhaven uses in file names: 5 to 8 lowercase letters and digits.
 pub fn valid_id(id: &str) -> bool {
-    (5..=8).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+    (5..=8).contains(&id.len())
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
 }
 
 /// Only the two hosts that serve wallhaven's pictures, over https, with no credentials or port.
 pub fn trusted_picture_url(url: &str) -> bool {
-    let Some(rest) = url.strip_prefix("https://") else { return false };
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
     let (host, path) = rest.split_once('/').unwrap_or((rest, ""));
     (host == "w.wallhaven.cc" || host == "th.wallhaven.cc")
         && !path.is_empty()
-        && path.bytes().all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b))
+        && path
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b))
         && !path.contains("..")
 }
 
@@ -154,19 +171,35 @@ fn extension_of(mime: &str) -> Option<&'static str> {
 
 fn color(text: &str) -> Option<String> {
     let hex = text.strip_prefix('#')?;
-    (hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit())).then(|| text.to_ascii_lowercase())
+    (hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit()))
+        .then(|| text.to_ascii_lowercase())
 }
 
 /// Reads a search answer; entries that are not safe-for-work, not a picture type we can use, or carry an address off wallhaven are dropped.
 pub fn parse_results(body: &Value) -> Results {
     let mut hits = Vec::new();
-    for item in body.get("data").and_then(Value::as_array).into_iter().flatten().take(64) {
+    for item in body
+        .get("data")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(64)
+    {
         let text = |key: &str| item.get(key).and_then(Value::as_str).unwrap_or("");
         let id = text("id");
-        let Some(extension) = extension_of(text("file_type")) else { continue };
-        let thumb = item.pointer("/thumbs/large").and_then(Value::as_str).unwrap_or("");
+        let Some(extension) = extension_of(text("file_type")) else {
+            continue;
+        };
+        let thumb = item
+            .pointer("/thumbs/large")
+            .and_then(Value::as_str)
+            .unwrap_or("");
         let full = text("path");
-        if !valid_id(id) || text("purity") != "sfw" || !trusted_picture_url(thumb) || !trusted_picture_url(full) {
+        if !valid_id(id)
+            || text("purity") != "sfw"
+            || !trusted_picture_url(thumb)
+            || !trusted_picture_url(full)
+        {
             continue;
         }
         let bytes = item.get("file_size").and_then(Value::as_u64).unwrap_or(0);
@@ -174,14 +207,31 @@ pub fn parse_results(body: &Value) -> Results {
             id: id.to_string(),
             resolution: sanitize_for_display(text("resolution"), 12),
             size_mb: format!("{:.1} MB", bytes as f64 / 1_048_576.0),
-            colors: item.get("colors").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).filter_map(color).take(5).collect(),
+            colors: item
+                .get("colors")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter_map(color)
+                .take(5)
+                .collect(),
             thumb: thumb.to_string(),
             full: full.to_string(),
             extension,
         });
     }
-    let meta = |key: &str| body.pointer(&format!("/meta/{key}")).and_then(Value::as_u64).unwrap_or(1).clamp(1, 1000) as u32;
-    Results { hits, page: meta("current_page"), last_page: meta("last_page") }
+    let meta = |key: &str| {
+        body.pointer(&format!("/meta/{key}"))
+            .and_then(Value::as_u64)
+            .unwrap_or(1)
+            .clamp(1, 1000) as u32
+    };
+    Results {
+        hits,
+        page: meta("current_page"),
+        last_page: meta("last_page"),
+    }
 }
 
 impl Hit {
@@ -221,19 +271,56 @@ mod tests {
         assert!(p.contains(&("purity", "100".into())));
         assert!(p.contains(&("q", "mountain lake".into())));
         assert!(p.contains(&("topRange", "1y".into())));
-        assert!(p.contains(&("categories", "110".into())), "no people category");
+        assert!(
+            p.contains(&("categories", "110".into())),
+            "no people category"
+        );
         assert!(p.contains(&("atleast", "2560x1440".into())));
-        assert!(!Search::new("x", "latest", "any", 1).unwrap().parameters().iter().any(|(k, _)| *k == "atleast"));
-        assert_eq!(Search::new("x", "latest", "9999x", 1), Err(SearchError::BadSize));
-        assert!(!Search::new("", "latest", "any", 1).unwrap().parameters().iter().any(|(k, _)| *k == "q" || *k == "topRange"));
+        assert!(!Search::new("x", "latest", "any", 1)
+            .unwrap()
+            .parameters()
+            .iter()
+            .any(|(k, _)| *k == "atleast"));
+        assert_eq!(
+            Search::new("x", "latest", "9999x", 1),
+            Err(SearchError::BadSize)
+        );
+        assert!(!Search::new("", "latest", "any", 1)
+            .unwrap()
+            .parameters()
+            .iter()
+            .any(|(k, _)| *k == "q" || *k == "topRange"));
         let injected = Search::new("cat&purity=111", "toplist", "any", 1);
-        assert_eq!(injected, Err(SearchError::BadQuery), "a query cannot add parameters");
-        assert_eq!(Search::new("a\nb", "toplist", "any", 1).unwrap().query, "a b", "line breaks are just spaces");
-        assert_eq!(Search::new("a\u{0}b", "toplist", "any", 1), Err(SearchError::BadQuery));
-        assert_eq!(Search::new(&"x".repeat(81), "toplist", "any", 1), Err(SearchError::BadQuery));
-        assert_eq!(Search::new("x", "nsfw", "any", 1), Err(SearchError::BadSorting));
-        assert_eq!(Search::new("x", "latest", "any", 0), Err(SearchError::BadPage));
-        assert_eq!(Search::new("x", "latest", "any", 101), Err(SearchError::BadPage));
+        assert_eq!(
+            injected,
+            Err(SearchError::BadQuery),
+            "a query cannot add parameters"
+        );
+        assert_eq!(
+            Search::new("a\nb", "toplist", "any", 1).unwrap().query,
+            "a b",
+            "line breaks are just spaces"
+        );
+        assert_eq!(
+            Search::new("a\u{0}b", "toplist", "any", 1),
+            Err(SearchError::BadQuery)
+        );
+        assert_eq!(
+            Search::new(&"x".repeat(81), "toplist", "any", 1),
+            Err(SearchError::BadQuery)
+        );
+        assert_eq!(
+            Search::new("x", "nsfw", "any", 1),
+            Err(SearchError::BadSorting)
+        );
+        assert_eq!(
+            Search::new("x", "latest", "any", 0),
+            Err(SearchError::BadPage)
+        );
+        assert_eq!(
+            Search::new("x", "latest", "any", 101),
+            Err(SearchError::BadPage)
+        );
         assert!(Search::new("+forest -city \"night sky\"", "random", "any", 1).is_ok());
     }
 
@@ -254,20 +341,43 @@ mod tests {
         assert_eq!(r.hits.len(), 1);
         assert_eq!((r.page, r.last_page), (2, 9));
         let hit = &r.hits[0];
-        assert_eq!((hit.id.as_str(), hit.resolution.as_str(), hit.size_mb.as_str()), ("3q797y", "3840x2160", "3.0 MB"));
-        assert_eq!(hit.colors, ["#424153", "#abbcda"], "a bad colour is dropped");
+        assert_eq!(
+            (
+                hit.id.as_str(),
+                hit.resolution.as_str(),
+                hit.size_mb.as_str()
+            ),
+            ("3q797y", "3840x2160", "3.0 MB")
+        );
+        assert_eq!(
+            hit.colors,
+            ["#424153", "#abbcda"],
+            "a bad colour is dropped"
+        );
         assert_eq!(file_name(hit), "wallhaven-3q797y.jpg");
         assert_eq!(parse_results(&json!({"nonsense": 1})).hits.len(), 0);
     }
 
     #[test]
     fn only_wallhavens_picture_hosts_are_trusted() {
-        assert!(trusted_picture_url("https://w.wallhaven.cc/full/3q/wallhaven-3q797y.jpg"));
-        assert!(trusted_picture_url("https://th.wallhaven.cc/lg/3q/3q797y.jpg"));
+        assert!(trusted_picture_url(
+            "https://w.wallhaven.cc/full/3q/wallhaven-3q797y.jpg"
+        ));
+        assert!(trusted_picture_url(
+            "https://th.wallhaven.cc/lg/3q/3q797y.jpg"
+        ));
         for bad in [
-            "http://w.wallhaven.cc/full/a.jpg", "https://wallhaven.cc/x.jpg", "https://w.wallhaven.cc.evil.com/a.jpg",
-            "https://user@w.wallhaven.cc/a.jpg", "https://w.wallhaven.cc:444/a.jpg", "https://w.wallhaven.cc/", "https://w.wallhaven.cc/a b.jpg",
-            "https://w.wallhaven.cc/a?x=1", "https://w.wallhaven.cc/../a.jpg", "file:///etc/passwd", "",
+            "http://w.wallhaven.cc/full/a.jpg",
+            "https://wallhaven.cc/x.jpg",
+            "https://w.wallhaven.cc.evil.com/a.jpg",
+            "https://user@w.wallhaven.cc/a.jpg",
+            "https://w.wallhaven.cc:444/a.jpg",
+            "https://w.wallhaven.cc/",
+            "https://w.wallhaven.cc/a b.jpg",
+            "https://w.wallhaven.cc/a?x=1",
+            "https://w.wallhaven.cc/../a.jpg",
+            "file:///etc/passwd",
+            "",
         ] {
             assert!(!trusted_picture_url(bad), "{bad}");
         }
@@ -276,7 +386,16 @@ mod tests {
     #[test]
     fn ids_are_file_name_safe() {
         assert!(valid_id("3q797y") && valid_id("abcde") && valid_id("abcdefgh"));
-        for bad in ["", "abcd", "abcdefghi", "ABCDEF", "ab/cde", "ab.cde", "ab cde", "ábcdef"] {
+        for bad in [
+            "",
+            "abcd",
+            "abcdefghi",
+            "ABCDEF",
+            "ab/cde",
+            "ab.cde",
+            "ab cde",
+            "ábcdef",
+        ] {
             assert!(!valid_id(bad), "{bad}");
         }
     }

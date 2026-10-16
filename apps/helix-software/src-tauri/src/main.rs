@@ -1252,7 +1252,10 @@ fn follow_appearance(app: tauri::AppHandle) {
         let _ = desktop
             .watch_theme_dark(move |dark| {
                 eprintln!("UI theme {}", if dark { "dark" } else { "light" });
-                APP_THEME.store(if dark { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
+                APP_THEME.store(
+                    if dark { 1 } else { 2 },
+                    std::sync::atomic::Ordering::Relaxed,
+                );
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
                         let _ = window.eval(script);

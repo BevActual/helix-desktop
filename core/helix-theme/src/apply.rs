@@ -18,7 +18,6 @@ use crate::color::Color;
 use crate::hct::{Hct, TonalPalette};
 use crate::template::{render, Options, ThemeData};
 
-
 #[derive(Clone, Debug)]
 pub struct CommunityTemplate {
     pub id: String,
@@ -74,7 +73,10 @@ fn trim(s: &str) -> &str {
 }
 
 pub fn is_safe_template_id(id: &str) -> bool {
-    !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
+    !id.is_empty()
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
 }
 
 fn expand_xdg_base_dir(path: &str) -> String {
@@ -85,7 +87,9 @@ fn expand_xdg_base_dir(path: &str) -> String {
         ("$XDG_CACHE_HOME", "XDG_CACHE_HOME", ".cache"),
     ];
     for (token, env, home_default) in BASES {
-        let Some(rest) = path.strip_prefix(token) else { continue };
+        let Some(rest) = path.strip_prefix(token) else {
+            continue;
+        };
         if !rest.is_empty() && !rest.starts_with('/') {
             continue;
         }
@@ -105,7 +109,9 @@ fn expand_user_path(path: &str) -> PathBuf {
     if !path.starts_with('~') {
         return PathBuf::from(path);
     }
-    let Ok(home) = std::env::var("HOME") else { return PathBuf::from(path) };
+    let Ok(home) = std::env::var("HOME") else {
+        return PathBuf::from(path);
+    };
     if home.is_empty() {
         return PathBuf::from(path);
     }
@@ -130,7 +136,9 @@ fn resolve_config_path(config_path: &Path, path: &str) -> PathBuf {
 }
 
 fn parent_string(path: &Path) -> String {
-    path.parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default()
+    path.parent()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 // ---- Lab nearest colour (compare_to / colors_to_compare) -----------------------------
@@ -163,12 +171,17 @@ fn find_closest_color(compare_to: &str, colors: &[(String, String)]) -> String {
     if colors.is_empty() {
         return String::new();
     }
-    let Some(target) = Color::from_hex(compare_to).map(lab) else { return String::new() };
+    let Some(target) = Color::from_hex(compare_to).map(lab) else {
+        return String::new();
+    };
     let mut closest = String::new();
     let mut best = f64::INFINITY;
     for (name, color) in colors {
-        let Some(c) = Color::from_hex(color).map(lab) else { continue };
-        let d = ((target.0 - c.0).powi(2) + (target.1 - c.1).powi(2) + (target.2 - c.2).powi(2)).sqrt();
+        let Some(c) = Color::from_hex(color).map(lab) else {
+            continue;
+        };
+        let d =
+            ((target.0 - c.0).powi(2) + (target.1 - c.1).powi(2) + (target.2 - c.2).powi(2)).sqrt();
         if d < best {
             best = d;
             closest = name.clone();
@@ -253,9 +266,15 @@ fn str_field(tpl: &Table, key: &str) -> Option<String> {
 
 fn parse_entry(config_path: &Path, name: &str, tpl: &Table, default_mode: &str) -> Option<Entry> {
     let mut input_path = String::new();
-    let modes = tpl.get("input_path_modes").and_then(Value::as_table).and_then(|t| {
-        Some((t.get("dark")?.as_str()?.to_string(), t.get("light")?.as_str()?.to_string()))
-    });
+    let modes = tpl
+        .get("input_path_modes")
+        .and_then(Value::as_table)
+        .and_then(|t| {
+            Some((
+                t.get("dark")?.as_str()?.to_string(),
+                t.get("light")?.as_str()?.to_string(),
+            ))
+        });
     if let Some((dark, light)) = modes {
         input_path = if default_mode == "light" { light } else { dark };
     } else if let Some(p) = str_field(tpl, "input_path") {
@@ -266,7 +285,11 @@ fn parse_entry(config_path: &Path, name: &str, tpl: &Table, default_mode: &str) 
         return None;
     }
 
-    let resolve = |p: &str| resolve_config_path(config_path, p).to_string_lossy().into_owned();
+    let resolve = |p: &str| {
+        resolve_config_path(config_path, p)
+            .to_string_lossy()
+            .into_owned()
+    };
     let output_paths = match tpl.get("output_path") {
         Some(Value::String(s)) => vec![resolve(s)],
         Some(Value::Array(a)) => a.iter().filter_map(Value::as_str).map(resolve).collect(),
@@ -278,14 +301,23 @@ fn parse_entry(config_path: &Path, name: &str, tpl: &Table, default_mode: &str) 
         .map(|a| {
             a.iter()
                 .filter_map(Value::as_table)
-                .filter_map(|t| Some((t.get("name")?.as_str()?.to_string(), t.get("color")?.as_str()?.to_string())))
+                .filter_map(|t| {
+                    Some((
+                        t.get("name")?.as_str()?.to_string(),
+                        t.get("color")?.as_str()?.to_string(),
+                    ))
+                })
                 .collect()
         })
         .unwrap_or_default();
 
     Some(Entry {
         name: name.to_string(),
-        input_path: if input_path.is_empty() { String::new() } else { resolve(&input_path) },
+        input_path: if input_path.is_empty() {
+            String::new()
+        } else {
+            resolve(&input_path)
+        },
         input_path_dynamic,
         output_paths,
         output_path_dynamic: str_field(tpl, "output_path_dynamic").unwrap_or_default(),
@@ -294,10 +326,15 @@ fn parse_entry(config_path: &Path, name: &str, tpl: &Table, default_mode: &str) 
         pre_hook: str_field(tpl, "pre_hook").unwrap_or_default(),
         post_hook: str_field(tpl, "post_hook").unwrap_or_default(),
         post_action: str_field(tpl, "post_action").unwrap_or_default(),
-        requires_path: str_field(tpl, "requires_path").map(|p| resolve(&p)).unwrap_or_default(),
+        requires_path: str_field(tpl, "requires_path")
+            .map(|p| resolve(&p))
+            .unwrap_or_default(),
         gate_by_client_root: false,
         index: tpl.get("index").and_then(Value::as_integer).unwrap_or(0),
-        hook_async: tpl.get("hook_async").and_then(Value::as_bool).unwrap_or(true),
+        hook_async: tpl
+            .get("hook_async")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
     })
 }
 
@@ -309,7 +346,10 @@ fn mark_multi_client_gated(entries: &mut [Entry]) {
         }
         for out in &e.output_paths {
             if let Some(root) = infer_client_config_root(Path::new(out)) {
-                roots.entry(e.input_path.clone()).or_default().insert(root.to_string_lossy().into_owned());
+                roots
+                    .entry(e.input_path.clone())
+                    .or_default()
+                    .insert(root.to_string_lossy().into_owned());
             }
         }
     }
@@ -356,20 +396,34 @@ pub fn build_user_template_root(templates_cfg: &Table) -> Table {
                 continue;
             }
             let mut t = Table::new();
-            let modes = src.get("input_path_modes").and_then(Value::as_table).and_then(|m| {
-                Some((m.get("dark")?.as_str()?.to_string(), m.get("light")?.as_str()?.to_string()))
-            });
+            let modes = src
+                .get("input_path_modes")
+                .and_then(Value::as_table)
+                .and_then(|m| {
+                    Some((
+                        m.get("dark")?.as_str()?.to_string(),
+                        m.get("light")?.as_str()?.to_string(),
+                    ))
+                });
             if let Some((dark, light)) = modes {
                 let mut m = Table::new();
                 m.insert("dark".into(), Value::String(dark));
                 m.insert("light".into(), Value::String(light));
                 t.insert("input_path_modes".into(), Value::Table(m));
-            } else if let Some(p) = src.get("input_path").and_then(Value::as_str).filter(|p| !p.is_empty()) {
+            } else if let Some(p) = src
+                .get("input_path")
+                .and_then(Value::as_str)
+                .filter(|p| !p.is_empty())
+            {
                 t.insert("input_path".into(), Value::String(p.to_string()));
             }
             let outputs: Vec<String> = match src.get("output_path") {
                 Some(Value::String(s)) => vec![s.clone()],
-                Some(Value::Array(a)) => a.iter().filter_map(Value::as_str).map(str::to_string).collect(),
+                Some(Value::Array(a)) => a
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect(),
                 _ => vec![],
             };
             match outputs.len() {
@@ -384,8 +438,18 @@ pub fn build_user_template_root(templates_cfg: &Table) -> Table {
                     );
                 }
             }
-            for key in ["output_path_dynamic", "compare_to", "pre_hook", "post_hook", "post_action"] {
-                if let Some(v) = src.get(key).and_then(Value::as_str).filter(|v| !v.is_empty()) {
+            for key in [
+                "output_path_dynamic",
+                "compare_to",
+                "pre_hook",
+                "post_hook",
+                "post_action",
+            ] {
+                if let Some(v) = src
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .filter(|v| !v.is_empty())
+                {
                     t.insert(key.into(), Value::String(v.to_string()));
                 }
             }
@@ -395,8 +459,14 @@ pub fn build_user_template_root(templates_cfg: &Table) -> Table {
                     .filter_map(Value::as_table)
                     .filter_map(|c| {
                         let mut out = Table::new();
-                        out.insert("name".into(), Value::String(c.get("name")?.as_str()?.to_string()));
-                        out.insert("color".into(), Value::String(c.get("color")?.as_str()?.to_string()));
+                        out.insert(
+                            "name".into(),
+                            Value::String(c.get("name")?.as_str()?.to_string()),
+                        );
+                        out.insert(
+                            "color".into(),
+                            Value::String(c.get("color")?.as_str()?.to_string()),
+                        );
                         Some(Value::Table(out))
                     })
                     .collect();
@@ -404,7 +474,11 @@ pub fn build_user_template_root(templates_cfg: &Table) -> Table {
                     t.insert("colors_to_compare".into(), Value::Array(colors));
                 }
             }
-            if let Some(i) = src.get("index").and_then(Value::as_integer).filter(|i| *i != 0) {
+            if let Some(i) = src
+                .get("index")
+                .and_then(Value::as_integer)
+                .filter(|i| *i != 0)
+            {
                 t.insert("index".into(), Value::Integer(i));
             }
             if src.get("hook_async").and_then(Value::as_bool) == Some(false) {
@@ -434,13 +508,25 @@ fn harmonize_hex(src_hex: &str, target_hex: &str) -> Option<String> {
     if diff < 0.0 {
         rotation = -rotation;
     }
-    let result = Hct::new((src.hue() + rotation + 360.0) % 360.0, src.chroma(), src.tone());
+    let result = Hct::new(
+        (src.hue() + rotation + 360.0) % 360.0,
+        src.chroma(),
+        src.tone(),
+    );
     Some(Color::from_argb(result.to_argb()).to_hex())
 }
 
 fn scheme_primary_palette(scheme_type: &str, source: Hct) -> TonalPalette {
     let hue = source.hue();
-    let sanitize = |d: f64| if d < 0.0 { (d % 360.0) + 360.0 } else if d >= 360.0 { d % 360.0 } else { d };
+    let sanitize = |d: f64| {
+        if d < 0.0 {
+            (d % 360.0) + 360.0
+        } else if d >= 360.0 {
+            d % 360.0
+        } else {
+            d
+        }
+    };
     match scheme_type {
         "tonal-spot" => TonalPalette::from_hue_chroma(hue, 36.0),
         "fruit-salad" => TonalPalette::from_hue_chroma(sanitize(hue - 50.0), 48.0),
@@ -452,8 +538,17 @@ fn scheme_primary_palette(scheme_type: &str, source: Hct) -> TonalPalette {
 
 /// C++ `TemplateEngine::applyCustomColors`. `Err` when a colour is not a valid hex string
 /// (the C++ code throws there), so the caller falls back.
-fn apply_custom_colors(root: &Table, data: &mut ThemeData, default_mode: &str, scheme_type: &str) -> Result<(), String> {
-    let Some(custom) = root.get("config").and_then(Value::as_table).and_then(|c| c.get("custom_colors")).and_then(Value::as_table)
+fn apply_custom_colors(
+    root: &Table,
+    data: &mut ThemeData,
+    default_mode: &str,
+    scheme_type: &str,
+) -> Result<(), String> {
+    let Some(custom) = root
+        .get("config")
+        .and_then(Value::as_table)
+        .and_then(|c| c.get("custom_colors"))
+        .and_then(Value::as_table)
     else {
         return Ok(());
     };
@@ -469,7 +564,13 @@ fn apply_custom_colors(root: &Table, data: &mut ThemeData, default_mode: &str, s
             Value::Table(t) => {
                 let get = |k: &str| t.get(k).and_then(Value::as_str).unwrap_or("").to_string();
                 let (base, dark_o, light_o) = (get("color"), get("color_dark"), get("color_light"));
-                let pick = |cands: [&String; 3]| cands.into_iter().find(|c| !c.is_empty()).cloned().unwrap_or_default();
+                let pick = |cands: [&String; 3]| {
+                    cands
+                        .into_iter()
+                        .find(|c| !c.is_empty())
+                        .cloned()
+                        .unwrap_or_default()
+                };
                 (
                     pick([&dark_o, &base, &light_o]),
                     pick([&light_o, &base, &dark_o]),
@@ -482,7 +583,11 @@ fn apply_custom_colors(root: &Table, data: &mut ThemeData, default_mode: &str, s
             continue;
         }
         for mode in ["dark", "light"] {
-            let color_hex = if mode == "dark" { &dark_hex } else { &light_hex };
+            let color_hex = if mode == "dark" {
+                &dark_hex
+            } else {
+                &light_hex
+            };
             let palette_hex = if blend && !source_hex.is_empty() {
                 harmonize_hex(color_hex, &source_hex).ok_or("invalid custom color")?
             } else {
@@ -495,8 +600,11 @@ fn apply_custom_colors(root: &Table, data: &mut ThemeData, default_mode: &str, s
             let mode_data = data.entry(mode.to_string()).or_default();
             mode_data.insert(format!("{name}_source"), color_hex.clone());
             mode_data.insert(format!("{name}_value"), color_hex.clone());
-            let (base, on_base, container, on_container) =
-                if mode == "dark" { (80.0, 20.0, 30.0, 90.0) } else { (40.0, 100.0, 90.0, 10.0) };
+            let (base, on_base, container, on_container) = if mode == "dark" {
+                (80.0, 20.0, 30.0, 90.0)
+            } else {
+                (40.0, 100.0, 90.0, 10.0)
+            };
             mode_data.insert(name.clone(), at(base));
             mode_data.insert(format!("on_{name}"), at(on_base));
             mode_data.insert(format!("{name}_container"), at(container));
@@ -555,21 +663,34 @@ impl Planner<'_> {
             self.unsupported.get_or_insert_with(|| why.to_string());
         }
         if r.needs_config {
-            self.unsupported.get_or_insert_with(|| "template reads config.* / icon_theme".to_string());
+            self.unsupported
+                .get_or_insert_with(|| "template reads config.* / icon_theme".to_string());
         }
         if r.needs_image && self.inputs.image_path.is_none() {
-            self.unsupported.get_or_insert_with(|| "template reads the wallpaper path".to_string());
+            self.unsupported
+                .get_or_insert_with(|| "template reads the wallpaper path".to_string());
         }
         r
     }
 
-    fn plan_config(&mut self, root: &Table, config_path: &Path, enabled: Option<&HashSet<String>>) -> Vec<EntryPlan> {
+    fn plan_config(
+        &mut self,
+        root: &Table,
+        config_path: &Path,
+        enabled: Option<&HashSet<String>>,
+    ) -> Vec<EntryPlan> {
         self.data = self.inputs.theme_data.clone();
-        if let Err(why) = apply_custom_colors(root, &mut self.data, &self.inputs.default_mode, &self.inputs.scheme_type)
-        {
+        if let Err(why) = apply_custom_colors(
+            root,
+            &mut self.data,
+            &self.inputs.default_mode,
+            &self.inputs.scheme_type,
+        ) {
             self.unsupported.get_or_insert(why);
         }
-        let Some(templates) = root.get("templates").and_then(Value::as_table) else { return vec![] };
+        let Some(templates) = root.get("templates").and_then(Value::as_table) else {
+            return vec![];
+        };
 
         let mut entries = Vec::new();
         // toml++ iterates tables in key order; sort explicitly so feature flags cannot change it.
@@ -581,7 +702,9 @@ impl Planner<'_> {
                     continue;
                 }
             }
-            let Some(tpl) = templates[name].as_table() else { continue };
+            let Some(tpl) = templates[name].as_table() else {
+                continue;
+            };
             if let Some(entry) = parse_entry(config_path, name, tpl, &self.inputs.default_mode) {
                 entries.push(entry);
             }
@@ -606,7 +729,11 @@ impl Planner<'_> {
                 if r.error_count != 0 || r.text.is_empty() {
                     return None;
                 }
-                let out = Command::new("/bin/sh").arg("-lc").arg(&r.text).output().ok()?;
+                let out = Command::new("/bin/sh")
+                    .arg("-lc")
+                    .arg(&r.text)
+                    .output()
+                    .ok()?;
                 if !out.status.success() {
                     return None;
                 }
@@ -615,7 +742,11 @@ impl Planner<'_> {
                         .lines()
                         .map(trim)
                         .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                        .map(|l| resolve_config_path(config_path, l).to_string_lossy().into_owned())
+                        .map(|l| {
+                            resolve_config_path(config_path, l)
+                                .to_string_lossy()
+                                .into_owned()
+                        })
                         .collect(),
                 )
             };
@@ -647,7 +778,11 @@ impl Planner<'_> {
                 }
             };
             let has_outputs = !outputs.is_empty();
-            let pre = if has_outputs { render_hook(self, &entry.pre_hook) } else { Ok(None) };
+            let pre = if has_outputs {
+                render_hook(self, &entry.pre_hook)
+            } else {
+                Ok(None)
+            };
             let post = render_hook(self, &entry.post_hook);
 
             // Render the input once per output path set.
@@ -657,7 +792,11 @@ impl Planner<'_> {
                 match std::fs::read_to_string(&effective_input) {
                     Ok(source) => {
                         let r = self.render(&opts, &source);
-                        Some(if r.error_count == 0 { Some(r.text) } else { None })
+                        Some(if r.error_count == 0 {
+                            Some(r.text)
+                        } else {
+                            None
+                        })
                     }
                     Err(_) => Some(None),
                 }
@@ -673,7 +812,11 @@ impl Planner<'_> {
                     (Some(Some(text)), _) => (Some(text.clone()), None),
                     _ => (None, Some("failed to render template")),
                 };
-                out_plans.push(OutputPlan { path: PathBuf::from(output), text, error });
+                out_plans.push(OutputPlan {
+                    path: PathBuf::from(output),
+                    text,
+                    error,
+                });
             }
 
             plans.push(EntryPlan {
@@ -685,7 +828,11 @@ impl Planner<'_> {
                 post_action: entry.post_action.clone(),
                 outputs_for_action: outputs.iter().map(PathBuf::from).collect(),
                 post_hook: post.clone().ok().flatten(),
-                hook_render_failed: if post.is_err() { vec!["failed to render hook"] } else { vec![] },
+                hook_render_failed: if post.is_err() {
+                    vec!["failed to render hook"]
+                } else {
+                    vec![]
+                },
                 hook_async: entry.hook_async,
             });
             let _ = &entry.post_hook;
@@ -707,7 +854,11 @@ fn run_sync_hook(command: &str) -> Result<(), String> {
             let stdout = String::from_utf8_lossy(&out.stdout);
             let text = if stderr.is_empty() { stdout } else { stderr };
             let first = trim(text.split('\n').next().unwrap_or("")).to_string();
-            Err(if first.is_empty() { format!("exit {}", out.status.code().unwrap_or(-1)) } else { first })
+            Err(if first.is_empty() {
+                format!("exit {}", out.status.code().unwrap_or(-1))
+            } else {
+                first
+            })
         }
         Err(_) => Err("exit -1".into()),
     }
@@ -807,7 +958,14 @@ fn run_post_action(
                 true
             }
             Err(message) => {
-                report(&plan.name, if message.is_empty() { "post action failed" } else { &message });
+                report(
+                    &plan.name,
+                    if message.is_empty() {
+                        "post action failed"
+                    } else {
+                        &message
+                    },
+                );
                 false
             }
         };
@@ -832,7 +990,14 @@ fn run_post_action(
             true
         }
         Err(message) => {
-            report(&plan.name, if message.is_empty() { "post action failed" } else { &message });
+            report(
+                &plan.name,
+                if message.is_empty() {
+                    "post action failed"
+                } else {
+                    &message
+                },
+            );
             false
         }
     }
@@ -843,17 +1008,27 @@ fn run_post_action(
 /// One-shot application: undo hooks for built-ins that were turned off, then built-in,
 /// community and user templates, then wait for background hooks.
 pub fn apply(inputs: &ApplyInputs) -> Outcome {
-    let mut planner = Planner { inputs, data: inputs.theme_data.clone(), unsupported: None };
+    let mut planner = Planner {
+        inputs,
+        data: inputs.theme_data.clone(),
+        unsupported: None,
+    };
 
     let enabled: BTreeSet<String> = if inputs.enable_builtin {
         inputs.builtin_ids.iter().cloned().collect()
     } else {
         BTreeSet::new()
     };
-    let owed: Vec<String> = inputs.applied_before.iter().filter(|id| !enabled.contains(*id)).cloned().collect();
+    let owed: Vec<String> = inputs
+        .applied_before
+        .iter()
+        .filter(|id| !enabled.contains(*id))
+        .cloned()
+        .collect();
 
-    let builtin_root: Option<Table> =
-        std::fs::read_to_string(&inputs.builtin_config).ok().and_then(|t| t.parse::<Table>().ok());
+    let builtin_root: Option<Table> = std::fs::read_to_string(&inputs.builtin_config)
+        .ok()
+        .and_then(|t| t.parse::<Table>().ok());
 
     // Undo hooks (planning: render only).
     let mut undo: Vec<(String, Option<String>)> = Vec::new(); // (id, command)
@@ -867,10 +1042,17 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
             config_table: inputs.config_table.clone(),
             icon_theme: inputs.icon_theme.clone(),
         };
-        let templates = builtin_root.as_ref().and_then(|r| r.get("templates")).and_then(Value::as_table);
+        let templates = builtin_root
+            .as_ref()
+            .and_then(|r| r.get("templates"))
+            .and_then(Value::as_table);
         if let Some(templates) = templates {
             for id in &owed {
-                let hook = templates.get(id).and_then(Value::as_table).and_then(|t| t.get("undo_hook")).and_then(Value::as_str);
+                let hook = templates
+                    .get(id)
+                    .and_then(Value::as_table)
+                    .and_then(|t| t.get("undo_hook"))
+                    .and_then(Value::as_str);
                 match hook {
                     None => undo.push((id.clone(), None)),
                     Some(h) => {
@@ -907,16 +1089,23 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
                 continue;
             }
             if !t.config_path.exists() {
-                missing_failures.insert(t.id.clone(), "community template is not downloaded yet".into());
+                missing_failures.insert(
+                    t.id.clone(),
+                    "community template is not downloaded yet".into(),
+                );
                 continue;
             }
-            match std::fs::read_to_string(&t.config_path).ok().and_then(|s| s.parse::<Table>().ok()) {
+            match std::fs::read_to_string(&t.config_path)
+                .ok()
+                .and_then(|s| s.parse::<Table>().ok())
+            {
                 Some(root) => {
                     let p = planner.plan_config(&root, &t.config_path, None);
                     plans.push((t.id.clone(), p, true));
                 }
                 None => {
-                    missing_failures.insert(t.id.clone(), "failed to apply community template".into());
+                    missing_failures
+                        .insert(t.id.clone(), "failed to apply community template".into());
                 }
             }
         }
@@ -951,13 +1140,21 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
 
     let hooks = HookRunner::new(crate::hook_runner::DEFAULT_MAX_CONCURRENT);
     for (label, entry_plans, parsed) in plans {
-        let ok =
-            execute_entries(entry_plans, &hooks, &mut failures, inputs.notify_kde, &inputs.default_mode) && parsed;
+        let ok = execute_entries(
+            entry_plans,
+            &hooks,
+            &mut failures,
+            inputs.notify_kde,
+            &inputs.default_mode,
+        ) && parsed;
         if !ok {
             // `TemplateApplyService` records one aggregate failure per failed config.
             match label.as_str() {
                 "builtin" => {
-                    failures.insert("builtin".into(), "failed to apply built-in templates".into());
+                    failures.insert(
+                        "builtin".into(),
+                        "failed to apply built-in templates".into(),
+                    );
                 }
                 "user" => {}
                 id => {
@@ -971,7 +1168,10 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
 
     let mut applied: BTreeSet<String> = enabled;
     applied.extend(still_owed);
-    Outcome::Applied(Report { failures, applied_builtin_ids: applied.into_iter().collect() })
+    Outcome::Applied(Report {
+        failures,
+        applied_builtin_ids: applied.into_iter().collect(),
+    })
 }
 
 fn tracing_warn(_id: &str, _msg: &str) {}

@@ -41,7 +41,20 @@ pub const MAX_STARTER_CHARS: usize = 80;
 pub const MAX_DESCRIPTION_CHARS: usize = 120;
 /// The symbols a persona may pick from (all exist in the shared icon set).
 pub const ICONS: [&str; 14] = [
-    "sparkle", "music", "palette", "fork", "clipboard", "eye", "shield", "sun", "moon", "bolt", "pin", "image", "folder", "lock",
+    "sparkle",
+    "music",
+    "palette",
+    "fork",
+    "clipboard",
+    "eye",
+    "shield",
+    "sun",
+    "moon",
+    "bolt",
+    "pin",
+    "image",
+    "folder",
+    "lock",
 ];
 
 fn default_task() -> String {
@@ -208,7 +221,14 @@ mod tests {
             model: String::new(),
             icon: "not-an-icon".into(),
             description: "Writes code".into(),
-            starters: vec!["a".into(), "".into(), "b".into(), "c".into(), "d".into(), "e".into()],
+            starters: vec![
+                "a".into(),
+                "".into(),
+                "b".into(),
+                "c".into(),
+                "d".into(),
+                "e".into(),
+            ],
         })
         .unwrap();
         let coder = s.personas.iter().find(|p| p.id == "coder").unwrap();

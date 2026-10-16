@@ -81,21 +81,23 @@ async fn run_authentication(
     cookie: String,
     uid: Uid,
 ) -> Result<(), PolkitError> {
-    let session = Arc::new(Mutex::new(
-        HelperSession::new(uid, &cookie).map_err(|error| match error {
+    let session = Arc::new(Mutex::new(HelperSession::new(uid, &cookie).map_err(
+        |error| match error {
             HelperError::NoSocket => PolkitError::NotSupported,
             other => PolkitError::FailedReason(other.to_string()),
-        })?,
-    ));
+        },
+    )?));
 
     let mut retries = 3;
     while retries >= 0 {
         while !session.lock().expect("polkit session").is_complete() {
             let event = {
                 let session = Arc::clone(&session);
-                tokio::task::spawn_blocking(move || session.lock().expect("polkit session").dispatch())
-                    .await
-                    .map_err(|_| PolkitError::FailedReason("polkit helper task failed".into()))?
+                tokio::task::spawn_blocking(move || {
+                    session.lock().expect("polkit session").dispatch()
+                })
+                .await
+                .map_err(|_| PolkitError::FailedReason("polkit helper task failed".into()))?
             }
             .map_err(|error| PolkitError::FailedReason(error.to_string()))?;
 
@@ -122,7 +124,9 @@ async fn run_authentication(
                                 .respond_password(&password)
                         })
                         .await
-                        .map_err(|_| PolkitError::FailedReason("polkit response task failed".into()))?
+                        .map_err(|_| {
+                            PolkitError::FailedReason("polkit response task failed".into())
+                        })?
                     }
                     .map_err(|error| PolkitError::FailedReason(error.to_string()))?;
                 }

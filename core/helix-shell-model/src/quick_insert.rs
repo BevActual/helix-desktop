@@ -603,7 +603,10 @@ mod tests {
             "no Ask row without a query"
         );
         p.query(Source::Actions, "agent desk");
-        assert_eq!(p.activate(p.generation(), 0), Ok(Outcome::Do(Action::FocusAgentDesk)));
+        assert_eq!(
+            p.activate(p.generation(), 0),
+            Ok(Outcome::Do(Action::FocusAgentDesk))
+        );
     }
 
     #[test]

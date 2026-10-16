@@ -34,7 +34,11 @@ fn linearize(c: i32) -> f64 {
 }
 
 fn delinearize(v: f64) -> i32 {
-    let n = if v <= 0.0031308 { v * 12.92 } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 };
+    let n = if v <= 0.0031308 {
+        v * 12.92
+    } else {
+        1.055 * v.powf(1.0 / 2.4) - 0.055
+    };
     ((n * 255.0).round() as i64).clamp(0, 255) as i32
 }
 
@@ -60,7 +64,11 @@ fn rgb_to_lab(c: Color) -> Lab {
     let y = (0.2126729 * lr + 0.7151522 * lg + 0.0721750 * lb) * 100.0;
     let z = (0.0193339 * lr + 0.1191920 * lg + 0.9503041 * lb) * 100.0;
     let (fx, fy, fz) = (lab_f(x / WHITE_X), lab_f(y / WHITE_Y), lab_f(z / WHITE_Z));
-    Lab { l: 116.0 * fy - 16.0, a: 500.0 * (fx - fy), b: 200.0 * (fy - fz) }
+    Lab {
+        l: 116.0 * fy - 16.0,
+        a: 500.0 * (fx - fy),
+        b: 200.0 * (fy - fz),
+    }
 }
 
 fn lab_to_rgb(lab: Lab) -> Color {
@@ -89,7 +97,11 @@ struct HctValues {
 
 fn color_to_hct(c: Color) -> HctValues {
     let h = Hct::from_argb(c.to_argb());
-    HctValues { hue: h.hue(), chroma: h.chroma(), tone: h.tone() }
+    HctValues {
+        hue: h.hue(),
+        chroma: h.chroma(),
+        tone: h.tone(),
+    }
 }
 
 // ---- downsample + k-means ------------------------------------------------------------------------------------------------
@@ -99,7 +111,13 @@ fn downsample_pixels(rgb: &[u8], factor: usize) -> Vec<Color> {
     let npix = rgb.len() / 3;
     (0..npix)
         .step_by(step)
-        .map(|i| Color::new(i32::from(rgb[i * 3]), i32::from(rgb[i * 3 + 1]), i32::from(rgb[i * 3 + 2])))
+        .map(|i| {
+            Color::new(
+                i32::from(rgb[i * 3]),
+                i32::from(rgb[i * 3 + 1]),
+                i32::from(rgb[i * 3 + 2]),
+            )
+        })
         .collect()
 }
 
@@ -126,7 +144,11 @@ fn kmeans_cluster(colors: &[Color], k: usize, iterations: usize) -> Vec<Cluster>
         let mut out = Vec::new();
         for argb in order.into_iter().rev() {
             let c = Color::from_argb(argb);
-            out.push(Cluster { centroid: c, representative: c, count: counts[&argb] });
+            out.push(Cluster {
+                centroid: c,
+                representative: c,
+                count: counts[&argb],
+            });
             if out.len() >= k {
                 break;
             }
@@ -136,7 +158,12 @@ fn kmeans_cluster(colors: &[Color], k: usize, iterations: usize) -> Vec<Cluster>
 
     let labs: Vec<Lab> = colors.iter().map(|c| rgb_to_lab(*c)).collect();
     let mut sorted: Vec<usize> = (0..n).collect();
-    sorted.sort_by(|a, b| labs[*a].l.partial_cmp(&labs[*b].l).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| {
+        labs[*a]
+            .l
+            .partial_cmp(&labs[*b].l)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let step = n / k;
     let mut centroids: Vec<Lab> = (0..k).map(|i| labs[sorted[i * step]]).collect();
@@ -154,7 +181,14 @@ fn kmeans_cluster(colors: &[Color], k: usize, iterations: usize) -> Vec<Cluster>
             }
             assignments[idx] = min_cluster;
         }
-        let mut acc = vec![Lab { l: 0.0, a: 0.0, b: 0.0 }; k];
+        let mut acc = vec![
+            Lab {
+                l: 0.0,
+                a: 0.0,
+                b: 0.0
+            };
+            k
+        ];
         let mut cnt = vec![0i32; k];
         for idx in 0..n {
             let ci = assignments[idx];
@@ -166,7 +200,11 @@ fn kmeans_cluster(colors: &[Color], k: usize, iterations: usize) -> Vec<Cluster>
         for ci in 0..k {
             if cnt[ci] > 0 {
                 let nd = f64::from(cnt[ci]);
-                centroids[ci] = Lab { l: acc[ci].l / nd, a: acc[ci].a / nd, b: acc[ci].b / nd };
+                centroids[ci] = Lab {
+                    l: acc[ci].l / nd,
+                    a: acc[ci].a / nd,
+                    b: acc[ci].b / nd,
+                };
             }
         }
     }
@@ -226,7 +264,11 @@ struct Scored {
 }
 
 fn sort_scored(out: &mut [Scored]) {
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 }
 
 struct Entry {
@@ -243,7 +285,11 @@ fn group_by_family(input: &[(Color, i32)], min_chroma: f64) -> Vec<(i32, Vec<Ent
         let hct = color_to_hct(*color);
         if hct.chroma >= min_chroma {
             let family = hue_to_family(hct.hue);
-            let entry = Entry { color: *color, chroma: hct.chroma, count: *count };
+            let entry = Entry {
+                color: *color,
+                chroma: hct.chroma,
+                count: *count,
+            };
             match families.iter_mut().find(|(f, _)| *f == family) {
                 Some((_, list)) => list.push(entry),
                 None => families.push((family, vec![entry])),
@@ -255,8 +301,13 @@ fn group_by_family(input: &[(Color, i32)], min_chroma: f64) -> Vec<(i32, Vec<Ent
 }
 
 fn count_only(input: &[(Color, i32)]) -> Vec<Scored> {
-    let mut result: Vec<Scored> =
-        input.iter().map(|(color, count)| Scored { color: *color, score: f64::from(*count) }).collect();
+    let mut result: Vec<Scored> = input
+        .iter()
+        .map(|(color, count)| Scored {
+            color: *color,
+            score: f64::from(*count),
+        })
+        .collect();
     sort_scored(&mut result);
     result
 }
@@ -277,9 +328,16 @@ fn score_chroma(input: &[(Color, i32)]) -> Vec<Scored> {
             } else {
                 0.0
             };
-            let hue_penalty = if hct.hue > 80.0 && hct.hue < 110.0 { 5.0 } else { 0.0 };
+            let hue_penalty = if hct.hue > 80.0 && hct.hue < 110.0 {
+                5.0
+            } else {
+                0.0
+            };
             let score = (hct.chroma - tone_penalty - hue_penalty) * f64::from(*count).powf(0.3);
-            Scored { color: *color, score }
+            Scored {
+                color: *color,
+                score,
+            }
         })
         .collect();
     sort_scored(&mut out);
@@ -305,12 +363,18 @@ fn score_count(input: &[(Color, i32)]) -> Vec<Scored> {
             if a.count != b.count {
                 b.count.cmp(&a.count)
             } else {
-                b.chroma.partial_cmp(&a.chroma).unwrap_or(std::cmp::Ordering::Equal)
+                b.chroma
+                    .partial_cmp(&a.chroma)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             }
         });
         for e in entries.iter() {
-            let score = (family_count - rank) as f64 * 1_000_000.0 + f64::from(e.count) * 1000.0 + e.chroma;
-            result.push(Scored { color: e.color, score });
+            let score =
+                (family_count - rank) as f64 * 1_000_000.0 + f64::from(e.count) * 1000.0 + e.chroma;
+            result.push(Scored {
+                color: e.color,
+                score,
+            });
         }
     }
     sort_scored(&mut result);
@@ -346,8 +410,15 @@ fn score_dysfunctional(input: &[(Color, i32)]) -> Vec<Scored> {
         let center = family_center_hue(families[*index].0);
         let hue_diff = circular_hue_diff(dominant_center, center);
         if hue_diff >= MIN_HUE_DISTANCE && f64::from(*count) >= min_count {
-            let max_chroma = families[*index].1.iter().fold(0.0f64, |m, e| m.max(e.chroma));
-            distant.push(Distant { index: *index, hue_diff, max_chroma });
+            let max_chroma = families[*index]
+                .1
+                .iter()
+                .fold(0.0f64, |m, e| m.max(e.chroma));
+            distant.push(Distant {
+                index: *index,
+                hue_diff,
+                max_chroma,
+            });
         } else {
             close.push(*index);
         }
@@ -363,14 +434,21 @@ fn score_dysfunctional(input: &[(Color, i32)]) -> Vec<Scored> {
         let entries = &mut families[d.index].1;
         entries.sort_by(|a, b| {
             if a.chroma != b.chroma {
-                b.chroma.partial_cmp(&a.chroma).unwrap_or(std::cmp::Ordering::Equal)
+                b.chroma
+                    .partial_cmp(&a.chroma)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             } else {
                 b.count.cmp(&a.count)
             }
         });
         for e in entries.iter() {
-            let score = (distant.len() - rank) as f64 * 1_000_000.0 + e.chroma * 1000.0 + f64::from(e.count);
-            result.push(Scored { color: e.color, score });
+            let score = (distant.len() - rank) as f64 * 1_000_000.0
+                + e.chroma * 1000.0
+                + f64::from(e.count);
+            result.push(Scored {
+                color: e.color,
+                score,
+            });
         }
     }
     for index in close {
@@ -379,11 +457,16 @@ fn score_dysfunctional(input: &[(Color, i32)]) -> Vec<Scored> {
             if a.count != b.count {
                 b.count.cmp(&a.count)
             } else {
-                b.chroma.partial_cmp(&a.chroma).unwrap_or(std::cmp::Ordering::Equal)
+                b.chroma
+                    .partial_cmp(&a.chroma)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             }
         });
         for e in entries.iter() {
-            result.push(Scored { color: e.color, score: f64::from(e.count) * 1000.0 + e.chroma });
+            result.push(Scored {
+                color: e.color,
+                score: f64::from(e.count) * 1000.0 + e.chroma,
+            });
         }
     }
     sort_scored(&mut result);
@@ -397,8 +480,16 @@ fn extract_palette(rgb112: &[u8], scheme: Scheme, k: usize) -> Vec<Color> {
     match scheme {
         Scheme::Vibrant => {
             cluster_count = 20;
-            let kept: Vec<Color> = sampled.iter().copied().filter(|c| color_to_hct(*c).chroma >= 5.0).collect();
-            filtered = if kept.len() >= cluster_count * 2 { kept } else { sampled.clone() };
+            let kept: Vec<Color> = sampled
+                .iter()
+                .copied()
+                .filter(|c| color_to_hct(*c).chroma >= 5.0)
+                .collect();
+            filtered = if kept.len() >= cluster_count * 2 {
+                kept
+            } else {
+                sampled.clone()
+            };
         }
         Scheme::Faithful | Scheme::Soft | Scheme::Dysfunctional => cluster_count = 48,
         Scheme::Muted => cluster_count = 24,
@@ -408,7 +499,16 @@ fn extract_palette(rgb112: &[u8], scheme: Scheme, k: usize) -> Vec<Color> {
     // Vibrant is scored from averaged centroids; the other schemes from representative pixels (actual image colours).
     let input: Vec<(Color, i32)> = clusters
         .iter()
-        .map(|c| (if scheme == Scheme::Vibrant { c.centroid } else { c.representative }, c.count))
+        .map(|c| {
+            (
+                if scheme == Scheme::Vibrant {
+                    c.centroid
+                } else {
+                    c.representative
+                },
+                c.count,
+            )
+        })
         .collect();
     let scored = match scheme {
         Scheme::Vibrant => score_chroma(&input),
@@ -525,7 +625,10 @@ impl Roles {
         set("secondary_fixed", self.secondary_fixed);
         set("secondary_fixed_dim", self.secondary_fixed_dim);
         set("on_secondary_fixed", self.on_secondary_fixed);
-        set("on_secondary_fixed_variant", self.on_secondary_fixed_variant);
+        set(
+            "on_secondary_fixed_variant",
+            self.on_secondary_fixed_variant,
+        );
         set("tertiary", self.tertiary);
         set("on_tertiary", self.on_tertiary);
         set("tertiary_container", self.tertiary_container);
@@ -586,11 +689,17 @@ fn pick_seeds(palette: &[Color], default_primary: Color) -> Seeds {
     if palette.len() > 2 {
         let (th, _, _) = palette[2].to_hsl();
         let (sh, _, _) = secondary.to_hsl();
-        if hue_distance(primary_h, th) > MIN_HUE_DISTANCE && hue_distance(sh, th) > MIN_HUE_DISTANCE {
+        if hue_distance(primary_h, th) > MIN_HUE_DISTANCE && hue_distance(sh, th) > MIN_HUE_DISTANCE
+        {
             tertiary = palette[2];
         }
     }
-    Seeds { primary, secondary, tertiary, error: find_error_color(palette) }
+    Seeds {
+        primary,
+        secondary,
+        tertiary,
+        error: find_error_color(palette),
+    }
 }
 
 fn hs(c: Color) -> (f64, f64) {
@@ -599,7 +708,12 @@ fn hs(c: Color) -> (f64, f64) {
 }
 
 fn normal_dark(palette: &[Color]) -> TokenMap {
-    let Seeds { primary, secondary, tertiary, error } = pick_seeds(palette, Color::new(255, 245, 155));
+    let Seeds {
+        primary,
+        secondary,
+        tertiary,
+        error,
+    } = pick_seeds(palette, Color::new(255, 245, 155));
     let (primary_h, primary_s) = hs(primary);
     let (sec_h, sec_s) = hs(secondary);
     let (ter_h, ter_s) = hs(tertiary);
@@ -660,19 +774,39 @@ fn normal_dark(palette: &[Color]) -> TokenMap {
         primary: primary_adjusted,
         on_primary: ensure_contrast(dark_fg, primary_adjusted, 4.5, 0),
         primary_container,
-        on_primary_container: ensure_contrast(hsl(primary_h, primary_s, 0.90), primary_container, 4.5, 1),
+        on_primary_container: ensure_contrast(
+            hsl(primary_h, primary_s, 0.90),
+            primary_container,
+            4.5,
+            1,
+        ),
         primary_fixed,
         primary_fixed_dim,
         on_primary_fixed: ensure_contrast(hsl(primary_h, 0.15, 0.15), primary_fixed, 4.5, 0),
-        on_primary_fixed_variant: ensure_contrast(hsl(primary_h, 0.15, 0.20), primary_fixed_dim, 4.5, 0),
+        on_primary_fixed_variant: ensure_contrast(
+            hsl(primary_h, 0.15, 0.20),
+            primary_fixed_dim,
+            4.5,
+            0,
+        ),
         secondary: secondary_adjusted,
         on_secondary: ensure_contrast(dark_fg, secondary_adjusted, 4.5, 0),
         secondary_container,
-        on_secondary_container: ensure_contrast(hsl(sec_h, sec_s, 0.90), secondary_container, 4.5, 1),
+        on_secondary_container: ensure_contrast(
+            hsl(sec_h, sec_s, 0.90),
+            secondary_container,
+            4.5,
+            1,
+        ),
         secondary_fixed,
         secondary_fixed_dim,
         on_secondary_fixed: ensure_contrast(hsl(sec_h, 0.15, 0.15), secondary_fixed, 4.5, 0),
-        on_secondary_fixed_variant: ensure_contrast(hsl(sec_h, 0.15, 0.20), secondary_fixed_dim, 4.5, 0),
+        on_secondary_fixed_variant: ensure_contrast(
+            hsl(sec_h, 0.15, 0.20),
+            secondary_fixed_dim,
+            4.5,
+            0,
+        ),
         tertiary: tertiary_adjusted,
         on_tertiary: ensure_contrast(dark_fg, tertiary_adjusted, 4.5, 0),
         tertiary_container,
@@ -680,7 +814,12 @@ fn normal_dark(palette: &[Color]) -> TokenMap {
         tertiary_fixed,
         tertiary_fixed_dim,
         on_tertiary_fixed: ensure_contrast(hsl(ter_h, 0.15, 0.15), tertiary_fixed, 4.5, 0),
-        on_tertiary_fixed_variant: ensure_contrast(hsl(ter_h, 0.15, 0.20), tertiary_fixed_dim, 4.5, 0),
+        on_tertiary_fixed_variant: ensure_contrast(
+            hsl(ter_h, 0.15, 0.20),
+            tertiary_fixed_dim,
+            4.5,
+            0,
+        ),
         error,
         on_error: ensure_contrast(dark_fg, error, 4.5, 0),
         error_container,
@@ -710,7 +849,12 @@ fn normal_dark(palette: &[Color]) -> TokenMap {
 }
 
 fn normal_light(palette: &[Color]) -> TokenMap {
-    let Seeds { primary, secondary, tertiary, error } = pick_seeds(palette, Color::new(93, 101, 245));
+    let Seeds {
+        primary,
+        secondary,
+        tertiary,
+        error,
+    } = pick_seeds(palette, Color::new(93, 101, 245));
     let (primary_h, primary_s) = hs(primary);
     let (sec_h, sec_s) = hs(secondary);
     let (ter_h, ter_s) = hs(tertiary);
@@ -752,27 +896,57 @@ fn normal_light(palette: &[Color]) -> TokenMap {
         primary: primary_adjusted,
         on_primary: ensure_contrast(light_fg, primary_adjusted, 4.5, 0),
         primary_container,
-        on_primary_container: ensure_contrast(hsl(primary_h, primary_s, 0.15), primary_container, 4.5, -1),
+        on_primary_container: ensure_contrast(
+            hsl(primary_h, primary_s, 0.15),
+            primary_container,
+            4.5,
+            -1,
+        ),
         primary_fixed,
         primary_fixed_dim,
         on_primary_fixed: ensure_contrast(hsl(primary_h, 0.15, 0.90), primary_fixed, 4.5, 0),
-        on_primary_fixed_variant: ensure_contrast(hsl(primary_h, 0.15, 0.85), primary_fixed_dim, 4.5, 0),
+        on_primary_fixed_variant: ensure_contrast(
+            hsl(primary_h, 0.15, 0.85),
+            primary_fixed_dim,
+            4.5,
+            0,
+        ),
         secondary: secondary_adjusted,
         on_secondary: ensure_contrast(light_fg, secondary_adjusted, 4.5, 0),
         secondary_container,
-        on_secondary_container: ensure_contrast(hsl(sec_h, sec_s, 0.15), secondary_container, 4.5, -1),
+        on_secondary_container: ensure_contrast(
+            hsl(sec_h, sec_s, 0.15),
+            secondary_container,
+            4.5,
+            -1,
+        ),
         secondary_fixed,
         secondary_fixed_dim,
         on_secondary_fixed: ensure_contrast(hsl(sec_h, 0.15, 0.90), secondary_fixed, 4.5, 0),
-        on_secondary_fixed_variant: ensure_contrast(hsl(sec_h, 0.15, 0.85), secondary_fixed_dim, 4.5, 0),
+        on_secondary_fixed_variant: ensure_contrast(
+            hsl(sec_h, 0.15, 0.85),
+            secondary_fixed_dim,
+            4.5,
+            0,
+        ),
         tertiary: tertiary_adjusted,
         on_tertiary: ensure_contrast(light_fg, tertiary_adjusted, 4.5, 0),
         tertiary_container,
-        on_tertiary_container: ensure_contrast(hsl(ter_h, ter_s, 0.15), tertiary_container, 4.5, -1),
+        on_tertiary_container: ensure_contrast(
+            hsl(ter_h, ter_s, 0.15),
+            tertiary_container,
+            4.5,
+            -1,
+        ),
         tertiary_fixed,
         tertiary_fixed_dim,
         on_tertiary_fixed: ensure_contrast(hsl(ter_h, 0.15, 0.90), tertiary_fixed, 4.5, 0),
-        on_tertiary_fixed_variant: ensure_contrast(hsl(ter_h, 0.15, 0.85), tertiary_fixed_dim, 4.5, 0),
+        on_tertiary_fixed_variant: ensure_contrast(
+            hsl(ter_h, 0.15, 0.85),
+            tertiary_fixed_dim,
+            4.5,
+            0,
+        ),
         error,
         on_error: ensure_contrast(light_fg, error, 4.5, 0),
         error_container,
@@ -788,8 +962,18 @@ fn normal_light(palette: &[Color]) -> TokenMap {
         surface_container: adjust_surface(p0, 0.80, 0.86),
         surface_container_high: adjust_surface(p0, 0.75, 0.84),
         surface_container_highest: adjust_surface(p0, 0.70, 0.80),
-        outline: ensure_contrast(hsl(text_h, (surface_s * 0.4).max(0.25), 0.65), surface, 3.0, 0),
-        outline_variant: ensure_contrast(hsl(text_h, (surface_s * 0.3).max(0.20), 0.75), surface, 3.0, 0),
+        outline: ensure_contrast(
+            hsl(text_h, (surface_s * 0.4).max(0.25), 0.65),
+            surface,
+            3.0,
+            0,
+        ),
+        outline_variant: ensure_contrast(
+            hsl(text_h, (surface_s * 0.3).max(0.20), 0.75),
+            surface,
+            3.0,
+            0,
+        ),
         shadow: hsl(text_h, (surface_s * 0.3).max(0.15), 0.80),
         scrim: Color::new(0, 0, 0),
         inverse_surface: hsl(text_h, 0.08, 0.15),
@@ -802,7 +986,12 @@ fn normal_light(palette: &[Color]) -> TokenMap {
 }
 
 fn soft_dark(palette: &[Color]) -> TokenMap {
-    let Seeds { primary, secondary, tertiary, error } = pick_seeds(palette, Color::new(255, 245, 155));
+    let Seeds {
+        primary,
+        secondary,
+        tertiary,
+        error,
+    } = pick_seeds(palette, Color::new(255, 245, 155));
     let (primary_h, primary_s) = hs(primary);
     let (sec_h, sec_s) = hs(secondary);
     let (ter_h, ter_s) = hs(tertiary);
@@ -833,7 +1022,10 @@ fn soft_dark(palette: &[Color]) -> TokenMap {
 
     let fixed = |base: Color| {
         let (h, s, _) = base.to_hsl();
-        (hsl(h, clamp(s, 0.30, 0.55), 0.85), hsl(h, clamp(s, 0.26, 0.48), 0.75))
+        (
+            hsl(h, clamp(s, 0.30, 0.55), 0.85),
+            hsl(h, clamp(s, 0.26, 0.48), 0.75),
+        )
     };
     let (primary_fixed, primary_fixed_dim) = fixed(primary_adjusted);
     let (secondary_fixed, secondary_fixed_dim) = fixed(secondary_adjusted);
@@ -843,31 +1035,66 @@ fn soft_dark(palette: &[Color]) -> TokenMap {
         primary: primary_adjusted,
         on_primary: ensure_contrast(dark_fg, primary_adjusted, 4.5, 0),
         primary_container,
-        on_primary_container: ensure_contrast(hsl(primary_h, 0.20, 0.90), primary_container, 4.5, 1),
+        on_primary_container: ensure_contrast(
+            hsl(primary_h, 0.20, 0.90),
+            primary_container,
+            4.5,
+            1,
+        ),
         primary_fixed,
         primary_fixed_dim,
         on_primary_fixed: ensure_contrast(hsl(primary_h, 0.10, 0.15), primary_fixed, 4.5, 0),
-        on_primary_fixed_variant: ensure_contrast(hsl(primary_h, 0.10, 0.20), primary_fixed_dim, 4.5, 0),
+        on_primary_fixed_variant: ensure_contrast(
+            hsl(primary_h, 0.10, 0.20),
+            primary_fixed_dim,
+            4.5,
+            0,
+        ),
         secondary: secondary_adjusted,
         on_secondary: ensure_contrast(dark_fg, secondary_adjusted, 4.5, 0),
         secondary_container,
-        on_secondary_container: ensure_contrast(hsl(sec_h, sec_s.min(0.20), 0.90), secondary_container, 4.5, 1),
+        on_secondary_container: ensure_contrast(
+            hsl(sec_h, sec_s.min(0.20), 0.90),
+            secondary_container,
+            4.5,
+            1,
+        ),
         secondary_fixed,
         secondary_fixed_dim,
         on_secondary_fixed: ensure_contrast(hsl(sec_h, 0.10, 0.15), secondary_fixed, 4.5, 0),
-        on_secondary_fixed_variant: ensure_contrast(hsl(sec_h, 0.10, 0.20), secondary_fixed_dim, 4.5, 0),
+        on_secondary_fixed_variant: ensure_contrast(
+            hsl(sec_h, 0.10, 0.20),
+            secondary_fixed_dim,
+            4.5,
+            0,
+        ),
         tertiary: tertiary_adjusted,
         on_tertiary: ensure_contrast(dark_fg, tertiary_adjusted, 4.5, 0),
         tertiary_container,
-        on_tertiary_container: ensure_contrast(hsl(ter_h, ter_s.min(0.20), 0.90), tertiary_container, 4.5, 1),
+        on_tertiary_container: ensure_contrast(
+            hsl(ter_h, ter_s.min(0.20), 0.90),
+            tertiary_container,
+            4.5,
+            1,
+        ),
         tertiary_fixed,
         tertiary_fixed_dim,
         on_tertiary_fixed: ensure_contrast(hsl(ter_h, 0.10, 0.15), tertiary_fixed, 4.5, 0),
-        on_tertiary_fixed_variant: ensure_contrast(hsl(ter_h, 0.10, 0.20), tertiary_fixed_dim, 4.5, 0),
+        on_tertiary_fixed_variant: ensure_contrast(
+            hsl(ter_h, 0.10, 0.20),
+            tertiary_fixed_dim,
+            4.5,
+            0,
+        ),
         error,
         on_error: ensure_contrast(dark_fg, error, 4.5, 0),
         error_container,
-        on_error_container: ensure_contrast(hsl(err_h, err_s.min(0.25), 0.90), error_container, 4.5, 1),
+        on_error_container: ensure_contrast(
+            hsl(err_h, err_s.min(0.25), 0.90),
+            error_container,
+            4.5,
+            1,
+        ),
         surface,
         on_surface,
         surface_variant,
@@ -893,7 +1120,12 @@ fn soft_dark(palette: &[Color]) -> TokenMap {
 }
 
 fn soft_light(palette: &[Color]) -> TokenMap {
-    let Seeds { primary, secondary, tertiary, error } = pick_seeds(palette, Color::new(93, 101, 245));
+    let Seeds {
+        primary,
+        secondary,
+        tertiary,
+        error,
+    } = pick_seeds(palette, Color::new(93, 101, 245));
     let (primary_h, primary_s) = hs(primary);
     let (sec_h, sec_s) = hs(secondary);
     let (ter_h, ter_s) = hs(tertiary);
@@ -924,7 +1156,10 @@ fn soft_light(palette: &[Color]) -> TokenMap {
 
     let fixed = |base: Color| {
         let (h, s, _) = base.to_hsl();
-        (hsl(h, clamp(s, 0.30, 0.55), 0.40), hsl(h, clamp(s, 0.26, 0.48), 0.30))
+        (
+            hsl(h, clamp(s, 0.30, 0.55), 0.40),
+            hsl(h, clamp(s, 0.26, 0.48), 0.30),
+        )
     };
     let (primary_fixed, primary_fixed_dim) = fixed(primary_adjusted);
     let (secondary_fixed, secondary_fixed_dim) = fixed(secondary_adjusted);
@@ -934,31 +1169,66 @@ fn soft_light(palette: &[Color]) -> TokenMap {
         primary: primary_adjusted,
         on_primary: ensure_contrast(light_fg, primary_adjusted, 4.5, 0),
         primary_container,
-        on_primary_container: ensure_contrast(hsl(primary_h, 0.20, 0.15), primary_container, 4.5, -1),
+        on_primary_container: ensure_contrast(
+            hsl(primary_h, 0.20, 0.15),
+            primary_container,
+            4.5,
+            -1,
+        ),
         primary_fixed,
         primary_fixed_dim,
         on_primary_fixed: ensure_contrast(hsl(primary_h, 0.10, 0.90), primary_fixed, 4.5, 0),
-        on_primary_fixed_variant: ensure_contrast(hsl(primary_h, 0.10, 0.85), primary_fixed_dim, 4.5, 0),
+        on_primary_fixed_variant: ensure_contrast(
+            hsl(primary_h, 0.10, 0.85),
+            primary_fixed_dim,
+            4.5,
+            0,
+        ),
         secondary: secondary_adjusted,
         on_secondary: ensure_contrast(light_fg, secondary_adjusted, 4.5, 0),
         secondary_container,
-        on_secondary_container: ensure_contrast(hsl(sec_h, sec_s.min(0.20), 0.15), secondary_container, 4.5, -1),
+        on_secondary_container: ensure_contrast(
+            hsl(sec_h, sec_s.min(0.20), 0.15),
+            secondary_container,
+            4.5,
+            -1,
+        ),
         secondary_fixed,
         secondary_fixed_dim,
         on_secondary_fixed: ensure_contrast(hsl(sec_h, 0.10, 0.90), secondary_fixed, 4.5, 0),
-        on_secondary_fixed_variant: ensure_contrast(hsl(sec_h, 0.10, 0.85), secondary_fixed_dim, 4.5, 0),
+        on_secondary_fixed_variant: ensure_contrast(
+            hsl(sec_h, 0.10, 0.85),
+            secondary_fixed_dim,
+            4.5,
+            0,
+        ),
         tertiary: tertiary_adjusted,
         on_tertiary: ensure_contrast(light_fg, tertiary_adjusted, 4.5, 0),
         tertiary_container,
-        on_tertiary_container: ensure_contrast(hsl(ter_h, ter_s.min(0.20), 0.15), tertiary_container, 4.5, -1),
+        on_tertiary_container: ensure_contrast(
+            hsl(ter_h, ter_s.min(0.20), 0.15),
+            tertiary_container,
+            4.5,
+            -1,
+        ),
         tertiary_fixed,
         tertiary_fixed_dim,
         on_tertiary_fixed: ensure_contrast(hsl(ter_h, 0.10, 0.90), tertiary_fixed, 4.5, 0),
-        on_tertiary_fixed_variant: ensure_contrast(hsl(ter_h, 0.10, 0.85), tertiary_fixed_dim, 4.5, 0),
+        on_tertiary_fixed_variant: ensure_contrast(
+            hsl(ter_h, 0.10, 0.85),
+            tertiary_fixed_dim,
+            4.5,
+            0,
+        ),
         error,
         on_error: ensure_contrast(light_fg, error, 4.5, 0),
         error_container,
-        on_error_container: ensure_contrast(hsl(err_h, err_s.min(0.25), 0.15), error_container, 4.5, -1),
+        on_error_container: ensure_contrast(
+            hsl(err_h, err_s.min(0.25), 0.15),
+            error_container,
+            4.5,
+            -1,
+        ),
         surface,
         on_surface,
         surface_variant,
@@ -989,7 +1259,10 @@ const MUTED_SAT_TERTIARY: f64 = 0.10;
 const MUTED_SAT_SURFACE: f64 = 0.08;
 
 fn muted_dark(palette: &[Color]) -> TokenMap {
-    let primary = palette.first().copied().unwrap_or(Color::new(128, 128, 128));
+    let primary = palette
+        .first()
+        .copied()
+        .unwrap_or(Color::new(128, 128, 128));
     let secondary = shift_hue(primary, 15.0);
     let tertiary = shift_hue(primary, 30.0);
     let error = find_error_color(palette);
@@ -1023,7 +1296,10 @@ fn muted_dark(palette: &[Color]) -> TokenMap {
 
     let fixed = |base: Color| {
         let (h, s, _) = base.to_hsl();
-        (hsl(h, s.min(MUTED_SAT_PRIMARY), 0.85), hsl(h, s.min(MUTED_SAT_PRIMARY), 0.75))
+        (
+            hsl(h, s.min(MUTED_SAT_PRIMARY), 0.85),
+            hsl(h, s.min(MUTED_SAT_PRIMARY), 0.75),
+        )
     };
     let (primary_fixed, primary_fixed_dim) = fixed(primary_adjusted);
     let (secondary_fixed, secondary_fixed_dim) = fixed(secondary_adjusted);
@@ -1033,19 +1309,39 @@ fn muted_dark(palette: &[Color]) -> TokenMap {
         primary: primary_adjusted,
         on_primary: ensure_contrast(dark_fg, primary_adjusted, 4.5, 0),
         primary_container,
-        on_primary_container: ensure_contrast(hsl(primary_h, 0.05, 0.90), primary_container, 4.5, 1),
+        on_primary_container: ensure_contrast(
+            hsl(primary_h, 0.05, 0.90),
+            primary_container,
+            4.5,
+            1,
+        ),
         primary_fixed,
         primary_fixed_dim,
         on_primary_fixed: ensure_contrast(hsl(primary_h, 0.05, 0.15), primary_fixed, 4.5, 0),
-        on_primary_fixed_variant: ensure_contrast(hsl(primary_h, 0.05, 0.20), primary_fixed_dim, 4.5, 0),
+        on_primary_fixed_variant: ensure_contrast(
+            hsl(primary_h, 0.05, 0.20),
+            primary_fixed_dim,
+            4.5,
+            0,
+        ),
         secondary: secondary_adjusted,
         on_secondary: ensure_contrast(dark_fg, secondary_adjusted, 4.5, 0),
         secondary_container,
-        on_secondary_container: ensure_contrast(hsl(sec_h, 0.05, 0.90), secondary_container, 4.5, 1),
+        on_secondary_container: ensure_contrast(
+            hsl(sec_h, 0.05, 0.90),
+            secondary_container,
+            4.5,
+            1,
+        ),
         secondary_fixed,
         secondary_fixed_dim,
         on_secondary_fixed: ensure_contrast(hsl(sec_h, 0.05, 0.15), secondary_fixed, 4.5, 0),
-        on_secondary_fixed_variant: ensure_contrast(hsl(sec_h, 0.05, 0.20), secondary_fixed_dim, 4.5, 0),
+        on_secondary_fixed_variant: ensure_contrast(
+            hsl(sec_h, 0.05, 0.20),
+            secondary_fixed_dim,
+            4.5,
+            0,
+        ),
         tertiary: tertiary_adjusted,
         on_tertiary: ensure_contrast(dark_fg, tertiary_adjusted, 4.5, 0),
         tertiary_container,
@@ -1053,7 +1349,12 @@ fn muted_dark(palette: &[Color]) -> TokenMap {
         tertiary_fixed,
         tertiary_fixed_dim,
         on_tertiary_fixed: ensure_contrast(hsl(ter_h, 0.05, 0.15), tertiary_fixed, 4.5, 0),
-        on_tertiary_fixed_variant: ensure_contrast(hsl(ter_h, 0.05, 0.20), tertiary_fixed_dim, 4.5, 0),
+        on_tertiary_fixed_variant: ensure_contrast(
+            hsl(ter_h, 0.05, 0.20),
+            tertiary_fixed_dim,
+            4.5,
+            0,
+        ),
         error,
         on_error: ensure_contrast(dark_fg, error, 4.5, 0),
         error_container,
@@ -1083,7 +1384,10 @@ fn muted_dark(palette: &[Color]) -> TokenMap {
 }
 
 fn muted_light(palette: &[Color]) -> TokenMap {
-    let primary = palette.first().copied().unwrap_or(Color::new(128, 128, 128));
+    let primary = palette
+        .first()
+        .copied()
+        .unwrap_or(Color::new(128, 128, 128));
     let secondary = shift_hue(primary, 15.0);
     let tertiary = shift_hue(primary, 30.0);
     let error = find_error_color(palette);
@@ -1116,7 +1420,10 @@ fn muted_light(palette: &[Color]) -> TokenMap {
 
     let fixed = |base: Color| {
         let (h, s, _) = base.to_hsl();
-        (hsl(h, s.min(MUTED_SAT_PRIMARY), 0.40), hsl(h, s.min(MUTED_SAT_PRIMARY), 0.30))
+        (
+            hsl(h, s.min(MUTED_SAT_PRIMARY), 0.40),
+            hsl(h, s.min(MUTED_SAT_PRIMARY), 0.30),
+        )
     };
     let (primary_fixed, primary_fixed_dim) = fixed(primary_adjusted);
     let (secondary_fixed, secondary_fixed_dim) = fixed(secondary_adjusted);
@@ -1126,19 +1433,39 @@ fn muted_light(palette: &[Color]) -> TokenMap {
         primary: primary_adjusted,
         on_primary: ensure_contrast(light_fg, primary_adjusted, 4.5, 0),
         primary_container,
-        on_primary_container: ensure_contrast(hsl(primary_h, 0.05, 0.15), primary_container, 4.5, -1),
+        on_primary_container: ensure_contrast(
+            hsl(primary_h, 0.05, 0.15),
+            primary_container,
+            4.5,
+            -1,
+        ),
         primary_fixed,
         primary_fixed_dim,
         on_primary_fixed: ensure_contrast(hsl(primary_h, 0.05, 0.90), primary_fixed, 4.5, 0),
-        on_primary_fixed_variant: ensure_contrast(hsl(primary_h, 0.05, 0.85), primary_fixed_dim, 4.5, 0),
+        on_primary_fixed_variant: ensure_contrast(
+            hsl(primary_h, 0.05, 0.85),
+            primary_fixed_dim,
+            4.5,
+            0,
+        ),
         secondary: secondary_adjusted,
         on_secondary: ensure_contrast(light_fg, secondary_adjusted, 4.5, 0),
         secondary_container,
-        on_secondary_container: ensure_contrast(hsl(sec_h, 0.05, 0.15), secondary_container, 4.5, -1),
+        on_secondary_container: ensure_contrast(
+            hsl(sec_h, 0.05, 0.15),
+            secondary_container,
+            4.5,
+            -1,
+        ),
         secondary_fixed,
         secondary_fixed_dim,
         on_secondary_fixed: ensure_contrast(hsl(sec_h, 0.05, 0.90), secondary_fixed, 4.5, 0),
-        on_secondary_fixed_variant: ensure_contrast(hsl(sec_h, 0.05, 0.85), secondary_fixed_dim, 4.5, 0),
+        on_secondary_fixed_variant: ensure_contrast(
+            hsl(sec_h, 0.05, 0.85),
+            secondary_fixed_dim,
+            4.5,
+            0,
+        ),
         tertiary: tertiary_adjusted,
         on_tertiary: ensure_contrast(light_fg, tertiary_adjusted, 4.5, 0),
         tertiary_container,
@@ -1146,7 +1473,12 @@ fn muted_light(palette: &[Color]) -> TokenMap {
         tertiary_fixed,
         tertiary_fixed_dim,
         on_tertiary_fixed: ensure_contrast(hsl(ter_h, 0.05, 0.90), tertiary_fixed, 4.5, 0),
-        on_tertiary_fixed_variant: ensure_contrast(hsl(ter_h, 0.05, 0.85), tertiary_fixed_dim, 4.5, 0),
+        on_tertiary_fixed_variant: ensure_contrast(
+            hsl(ter_h, 0.05, 0.85),
+            tertiary_fixed_dim,
+            4.5,
+            0,
+        ),
         error,
         on_error: ensure_contrast(light_fg, error, 4.5, 0),
         error_container,

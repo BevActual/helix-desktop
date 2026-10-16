@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::agent_desk::DEFAULT_NAME;
 
 pub const SETUP_INCLUDE: &str = "helix-setup.kdl";
-const SETUP_HEADER: &str = "// Managed by Helix Settings. Safe to edit by hand; Settings may rewrite this file.\n";
+const SETUP_HEADER: &str =
+    "// Managed by Helix Settings. Safe to edit by hand; Settings may rewrite this file.\n";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompositorPrefs {
@@ -119,10 +120,7 @@ pub fn read_view() -> CompositorConfigView {
         .and_then(|d| read_include_present(&d.join("config.kdl"), SETUP_INCLUDE))
         .unwrap_or(false);
     let snippet = read_snippet(niri_dir.as_deref());
-    let includes = niri_dir
-        .as_deref()
-        .map(list_includes)
-        .unwrap_or_default();
+    let includes = niri_dir.as_deref().map(list_includes).unwrap_or_default();
     CompositorConfigView {
         niri_dir: niri_dir
             .map(|p| p.to_string_lossy().into_owned())
@@ -195,7 +193,12 @@ pub fn list_includes(niri_dir: &Path) -> Vec<CompositorIncludeView> {
 pub fn resolve_include_path(niri_dir: &Path, which: &str) -> Option<PathBuf> {
     let filename = match which {
         "setup" => SETUP_INCLUDE,
-        "main" => return niri_dir.join("config.kdl").is_file().then(|| niri_dir.join("config.kdl")),
+        "main" => {
+            return niri_dir
+                .join("config.kdl")
+                .is_file()
+                .then(|| niri_dir.join("config.kdl"))
+        }
         other if other.ends_with(".kdl") => other,
         other => KNOWN_INCLUDES
             .iter()
@@ -263,14 +266,20 @@ fn parse_agent_desk_name(text: &str) -> Option<String> {
 
 fn read_include_present(config: &Path, filename: &str) -> Option<bool> {
     let text = fs::read_to_string(config).ok()?;
-    Some(text.lines().any(|line| include_line_matches(line, filename)))
+    Some(
+        text.lines()
+            .any(|line| include_line_matches(line, filename)),
+    )
 }
 
 pub fn ensure_include(config: &Path, filename: &str) -> Result<(), String> {
     let include_line = format!("include \"{filename}\"");
     if config.is_file() {
         let text = fs::read_to_string(config).map_err(|e| e.to_string())?;
-        if text.lines().any(|line| include_line_matches(line, filename)) {
+        if text
+            .lines()
+            .any(|line| include_line_matches(line, filename))
+        {
             return Ok(());
         }
         let mut next = text;
@@ -300,9 +309,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path.parent().ok_or("no parent directory")?;
     let tmp = parent.join(format!(
         ".{}.tmp",
-        path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("helix")
+        path.file_name().and_then(|n| n.to_str()).unwrap_or("helix")
     ));
     fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
     fs::rename(&tmp, path).map_err(|e| e.to_string())?;
@@ -316,10 +323,7 @@ mod tests {
     #[test]
     fn parses_agent_desk_name() {
         let text = "helix {\n  agent-desk-name \"Mobius desk\"\n}\n";
-        assert_eq!(
-            parse_agent_desk_name(text).as_deref(),
-            Some("Mobius desk")
-        );
+        assert_eq!(parse_agent_desk_name(text).as_deref(), Some("Mobius desk"));
     }
 
     #[test]
@@ -334,7 +338,10 @@ mod tests {
         assert_eq!(text.matches("helix-setup.kdl").count(), 1);
         ensure_include(&config, SETUP_INCLUDE).unwrap();
         assert_eq!(
-            fs::read_to_string(&config).unwrap().matches("helix-setup.kdl").count(),
+            fs::read_to_string(&config)
+                .unwrap()
+                .matches("helix-setup.kdl")
+                .count(),
             1
         );
         let _ = fs::remove_dir_all(&dir);
@@ -342,8 +349,14 @@ mod tests {
 
     #[test]
     fn include_detection() {
-        assert!(include_line_matches("include \"helix-setup.kdl\"", SETUP_INCLUDE));
-        assert!(!include_line_matches("include \"helix.kdl\"", SETUP_INCLUDE));
+        assert!(include_line_matches(
+            "include \"helix-setup.kdl\"",
+            SETUP_INCLUDE
+        ));
+        assert!(!include_line_matches(
+            "include \"helix.kdl\"",
+            SETUP_INCLUDE
+        ));
     }
 
     #[test]
@@ -354,7 +367,9 @@ mod tests {
         fs::write(dir.join("config.kdl"), "include \"helix-setup.kdl\"\n").unwrap();
         fs::write(dir.join(SETUP_INCLUDE), "helix {}\n").unwrap();
         let views = list_includes(&dir);
-        assert!(views.iter().any(|v| v.filename == SETUP_INCLUDE && v.included && v.exists));
+        assert!(views
+            .iter()
+            .any(|v| v.filename == SETUP_INCLUDE && v.included && v.exists));
         let _ = fs::remove_dir_all(&dir);
     }
 }

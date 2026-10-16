@@ -229,12 +229,18 @@ pub fn safe_file_name(name: &str) -> bool {
         Some(rest) => (true, rest),
         None => (false, name.strip_prefix("image/").unwrap_or(name)),
     };
-    let extension_ok = if speech { plain.ends_with(".bin") } else { plain.ends_with(".gguf") };
+    let extension_ok = if speech {
+        plain.ends_with(".bin")
+    } else {
+        plain.ends_with(".gguf")
+    };
     !plain.is_empty()
         && name.len() <= 200
         && extension_ok
         && !plain.starts_with('.')
-        && plain.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
+        && plain
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
 }
 
 #[cfg(test)]
@@ -247,19 +253,29 @@ mod tests {
         for model in CATALOG {
             assert!(ids.insert(model.id), "duplicate id {}", model.id);
             assert!(!model.files.is_empty());
-            assert_eq!(model.vision, model.files.len() > 1 && model.files[1].name.starts_with("mmproj-"));
+            assert_eq!(
+                model.vision,
+                model.files.len() > 1 && model.files[1].name.starts_with("mmproj-")
+            );
             for file in model.files {
                 assert!(safe_file_name(file.name), "{}", file.name);
                 assert!(file.url.starts_with(HOST), "{}", file.url);
                 assert_eq!(file.sha256.len(), 64);
-                assert!(file.sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
+                assert!(file
+                    .sha256
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
                 assert!(file.bytes > 1_000_000);
             }
             if model.vision {
                 // The service pairs a projector with the model whose base name follows `mmproj-`.
                 let base = model.files[0].name.trim_end_matches(".gguf");
                 let base = base.rsplit_once('-').map_or(base, |(b, _)| b);
-                assert!(model.files[1].name.starts_with(&format!("mmproj-{base}")), "{}", model.id);
+                assert!(
+                    model.files[1].name.starts_with(&format!("mmproj-{base}")),
+                    "{}",
+                    model.id
+                );
             }
         }
     }

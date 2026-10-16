@@ -73,23 +73,34 @@ pub struct Card {
 }
 
 fn installed_size(dir: &Path, file: &str) -> Option<u64> {
-    std::fs::metadata(dir.join(file)).ok().filter(|m| m.is_file()).map(|m| m.len())
+    std::fs::metadata(dir.join(file))
+        .ok()
+        .filter(|m| m.is_file())
+        .map(|m| m.len())
 }
 
 fn complete(dir: &Path, model: &CatalogModel) -> bool {
-    model.files.iter().all(|f| installed_size(dir, f.name) == Some(f.bytes))
+    model
+        .files
+        .iter()
+        .all(|f| installed_size(dir, f.name) == Some(f.bytes))
 }
 
 /// Models in the folder that the catalog does not know: listed by file (a sharded model once, by its first shard).
 fn unknown_models(dir: &Path) -> Vec<(String, u64)> {
     let mut out = Vec::new();
-    let Ok(entries) = std::fs::read_dir(dir) else { return out };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         if !model_catalog::safe_file_name(&name) || name.starts_with("mmproj-") {
             continue;
         }
-        if model_catalog::CATALOG.iter().any(|m| m.files.iter().any(|f| f.name == name)) {
+        if model_catalog::CATALOG
+            .iter()
+            .any(|m| m.files.iter().any(|f| f.name == name))
+        {
             continue;
         }
         if name.contains("-of-") && !name.contains("-00001-of-") {
@@ -166,11 +177,19 @@ fn sha256_of(path: &Path, cancel: &AtomicBool) -> Result<String, String> {
         }
         hasher.update(&buffer[..n]);
     }
-    Ok(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect())
 }
 
 /// Starts the download of a catalog model. Returns an error if it is unknown, already installed, or already running.
-pub fn start(downloads: &Arc<Downloads>, id: &str, notify: impl Fn() + Send + Sync + 'static) -> Result<(), String> {
+pub fn start(
+    downloads: &Arc<Downloads>,
+    id: &str,
+    notify: impl Fn() + Send + Sync + 'static,
+) -> Result<(), String> {
     let model = model_catalog::find(id).ok_or("That model is not in the library.")?;
     let dir = models_dir();
     if complete(&dir, model) {
@@ -179,12 +198,23 @@ pub fn start(downloads: &Arc<Downloads>, id: &str, notify: impl Fn() + Send + Sy
     let cancel = Arc::new(AtomicBool::new(false));
     {
         let mut jobs = downloads.jobs.lock().expect("downloads");
-        if jobs.get(id).is_some_and(|j| j.progress.phase != Phase::Failed) {
+        if jobs
+            .get(id)
+            .is_some_and(|j| j.progress.phase != Phase::Failed)
+        {
             return Err("Already downloading.".into());
         }
         jobs.insert(
             id.to_string(),
-            Job { progress: Progress { phase: Phase::Downloading, done: 0, total: model.bytes(), error: String::new() }, cancel: cancel.clone() },
+            Job {
+                progress: Progress {
+                    phase: Phase::Downloading,
+                    done: 0,
+                    total: model.bytes(),
+                    error: String::new(),
+                },
+                cancel: cancel.clone(),
+            },
         );
     }
     let downloads = downloads.clone();
@@ -199,7 +229,16 @@ pub fn start(downloads: &Arc<Downloads>, id: &str, notify: impl Fn() + Send + Sy
                 let _ = error;
                 downloads.jobs.lock().expect("downloads").remove(&id);
             }
-            Err(error) => set_progress(&downloads, &id, Progress { phase: Phase::Failed, done: 0, total: model.bytes(), error }),
+            Err(error) => set_progress(
+                &downloads,
+                &id,
+                Progress {
+                    phase: Phase::Failed,
+                    done: 0,
+                    total: model.bytes(),
+                    error,
+                },
+            ),
         }
         notify();
     });
@@ -229,7 +268,8 @@ async fn run(
         }
         let part = dir.join(format!("{}.part", file.name));
         if let Some(parent) = part.parent() {
-            std::fs::create_dir_all(parent).map_err(|_| "Could not create the models folder.".to_string())?;
+            std::fs::create_dir_all(parent)
+                .map_err(|_| "Could not create the models folder.".to_string())?;
         }
         let mut have = std::fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
         if have > file.bytes {
@@ -241,15 +281,25 @@ async fn run(
             if have > 0 {
                 request = request.header("Range", format!("bytes={have}-"));
             }
-            let mut response = request.send().await.map_err(|_| "Could not reach the download server.".to_string())?;
+            let mut response = request
+                .send()
+                .await
+                .map_err(|_| "Could not reach the download server.".to_string())?;
             if have > 0 && response.status().as_u16() != 206 {
                 // The server did not honour the range: start again rather than append the wrong bytes.
                 let _ = std::fs::remove_file(&part);
                 have = 0;
-                response = client.get(file.url).send().await.map_err(|_| "Could not reach the download server.".to_string())?;
+                response = client
+                    .get(file.url)
+                    .send()
+                    .await
+                    .map_err(|_| "Could not reach the download server.".to_string())?;
             }
             if !response.status().is_success() {
-                return Err(format!("The download server refused the request ({}).", response.status().as_u16()));
+                return Err(format!(
+                    "The download server refused the request ({}).",
+                    response.status().as_u16()
+                ));
             }
             let mut out = std::fs::OpenOptions::new()
                 .create(true)
@@ -258,7 +308,11 @@ async fn run(
                 .map_err(|_| "Could not write to the models folder.".to_string())?;
             let mut done = have;
             let mut last_note = std::time::Instant::now();
-            while let Some(chunk) = response.chunk().await.map_err(|_| "The download was interrupted. Try again to resume.".to_string())? {
+            while let Some(chunk) = response
+                .chunk()
+                .await
+                .map_err(|_| "The download was interrupted. Try again to resume.".to_string())?
+            {
                 if cancel.load(Ordering::Relaxed) {
                     return Err("Cancelled.".into());
                 }
@@ -267,7 +321,11 @@ async fn run(
                     return Err("The file is larger than expected; it was discarded.".into());
                 }
                 out.write_all(&chunk).map_err(|e| {
-                    if e.raw_os_error() == Some(28) { "There is not enough disk space.".to_string() } else { "Could not write to the models folder.".to_string() }
+                    if e.raw_os_error() == Some(28) {
+                        "There is not enough disk space.".to_string()
+                    } else {
+                        "Could not write to the models folder.".to_string()
+                    }
                 })?;
                 done += chunk.len() as u64;
                 if last_note.elapsed() >= std::time::Duration::from_millis(250) {
@@ -275,20 +333,41 @@ async fn run(
                     set_progress(
                         downloads,
                         model.id,
-                        Progress { phase: Phase::Downloading, done: finished + done, total, error: String::new() },
+                        Progress {
+                            phase: Phase::Downloading,
+                            done: finished + done,
+                            total,
+                            error: String::new(),
+                        },
                     );
                     notify();
                 }
             }
-            out.flush().map_err(|_| "Could not write to the models folder.".to_string())?;
+            out.flush()
+                .map_err(|_| "Could not write to the models folder.".to_string())?;
             if done != file.bytes {
                 return Err("The download ended early. Try again to resume.".into());
             }
         }
-        set_progress(downloads, model.id, Progress { phase: Phase::Verifying, done: finished + file.bytes, total, error: String::new() });
+        set_progress(
+            downloads,
+            model.id,
+            Progress {
+                phase: Phase::Verifying,
+                done: finished + file.bytes,
+                total,
+                error: String::new(),
+            },
+        );
         notify();
         let part_for_hash = part.clone();
-        let flag = downloads.jobs.lock().expect("downloads").get(model.id).map(|j| j.cancel.clone()).unwrap_or_default();
+        let flag = downloads
+            .jobs
+            .lock()
+            .expect("downloads")
+            .get(model.id)
+            .map(|j| j.cancel.clone())
+            .unwrap_or_default();
         let sum = tauri::async_runtime::spawn_blocking(move || sha256_of(&part_for_hash, &flag))
             .await
             .map_err(|_| "Checking the file failed.".to_string())??;
@@ -296,7 +375,8 @@ async fn run(
             let _ = std::fs::remove_file(&part);
             return Err("The file did not match its checksum and was discarded.".into());
         }
-        std::fs::rename(&part, &target).map_err(|_| "Could not finish saving the model.".to_string())?;
+        std::fs::rename(&part, &target)
+            .map_err(|_| "Could not finish saving the model.".to_string())?;
         finished += file.bytes;
     }
     Ok(())
@@ -310,7 +390,8 @@ pub fn cancel(downloads: &Downloads, id: &str) {
 
 /// Removes a catalog model's files (and any half-finished download of it).
 pub fn remove(id: &str) -> Result<(), String> {
-    let model = model_catalog::find(id).ok_or("Only models from the library can be removed here.")?;
+    let model =
+        model_catalog::find(id).ok_or("Only models from the library can be removed here.")?;
     let dir = models_dir();
     for file in model.files {
         let _ = std::fs::remove_file(dir.join(file.name));
@@ -333,10 +414,17 @@ mod tests {
         std::fs::write(dir.join("mmproj-my-own-model.gguf"), b"1").unwrap();
         std::env::set_var("HELIX_MODEL_DIR", &dir);
         let cards = list(&Downloads::default(), &["my-own-model-q4.gguf".to_string()]);
-        let own = cards.iter().find(|c| !c.in_catalog).expect("the hand-added model is listed");
+        let own = cards
+            .iter()
+            .find(|c| !c.in_catalog)
+            .expect("the hand-added model is listed");
         assert_eq!(own.file, "my-own-model-q4.gguf");
         assert!(own.installed && own.loaded);
-        assert_eq!(cards.iter().filter(|c| !c.in_catalog).count(), 1, "partials and projectors are not models");
+        assert_eq!(
+            cards.iter().filter(|c| !c.in_catalog).count(),
+            1,
+            "partials and projectors are not models"
+        );
         assert!(cards.iter().filter(|c| c.in_catalog).all(|c| !c.installed));
         std::env::remove_var("HELIX_MODEL_DIR");
         let _ = std::fs::remove_dir_all(&dir);

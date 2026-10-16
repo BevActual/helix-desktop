@@ -14,7 +14,9 @@ pub fn shell_runtime_dir() -> Option<PathBuf> {
             return Some(PathBuf::from(dir));
         }
     }
-    std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| !p.as_os_str().is_empty())
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .map(PathBuf::from)
+        .filter(|p| !p.as_os_str().is_empty())
 }
 
 fn clean_token(text: &str) -> bool {
@@ -134,12 +136,8 @@ pub fn exchange(line: &str, socket: Option<&Path>) -> Result<String, String> {
         .or_else(shell_socket_path)
         .ok_or_else(|| "helix is not running".to_string())?;
     let mut stream = UnixStream::connect(&path).map_err(|_| "helix is not running".to_string())?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(2)))
-        .ok();
-    stream
-        .set_write_timeout(Some(Duration::from_secs(2)))
-        .ok();
+    stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(2))).ok();
     stream
         .write_all(line.as_bytes())
         .map_err(|error| error.to_string())?;

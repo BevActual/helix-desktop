@@ -67,7 +67,9 @@ impl Output {
 }
 
 fn ask_yes_no(question: &str) -> bool {
-    if !std::io::stdin().is_terminal() && std::env::var_os("HELIX_ASSISTANT_ANSWER_FROM_STDIN").is_none() {
+    if !std::io::stdin().is_terminal()
+        && std::env::var_os("HELIX_ASSISTANT_ANSWER_FROM_STDIN").is_none()
+    {
         eprintln!("Not asking: no terminal to answer on. Nothing was changed.");
         return false;
     }
@@ -79,7 +81,11 @@ fn ask_yes_no(question: &str) -> bool {
 }
 
 fn state_dir() -> PathBuf {
-    let var = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty()).map(PathBuf::from);
+    let var = |name: &str| {
+        std::env::var_os(name)
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+    };
     if let Some(helix) = var("HELIX_STATE_HOME") {
         return helix.join("helix");
     }
@@ -110,7 +116,10 @@ fn routed_model(task: &str) -> String {
 }
 
 fn load_policy() -> Result<RiskPolicy, String> {
-    match std::env::var("HELIX_RISK_POLICY").ok().filter(|v| !v.is_empty()) {
+    match std::env::var("HELIX_RISK_POLICY")
+        .ok()
+        .filter(|v| !v.is_empty())
+    {
         Some(path) => {
             let text = std::fs::read_to_string(&path)
                 .map_err(|_| format!("risk policy: cannot read {path}"))?;
@@ -121,7 +130,10 @@ fn load_policy() -> Result<RiskPolicy, String> {
 }
 
 fn load_hints() -> Result<ToolHints, String> {
-    match std::env::var("HELIX_TOOL_HINTS").ok().filter(|v| !v.is_empty()) {
+    match std::env::var("HELIX_TOOL_HINTS")
+        .ok()
+        .filter(|v| !v.is_empty())
+    {
         Some(path) => ToolHints::load(std::path::Path::new(&path)),
         None => Ok(ToolHints::embedded()),
     }
@@ -206,15 +218,27 @@ impl Desk<'_> {
             .map_err(|e| e.to_string())?;
         let result = self.agent_done.wait(operation, 90).await; // a confirm-tier call can wait for the person
         if !result.ok {
-            let error = result.result.get("error").and_then(Json::as_str).unwrap_or("failed");
+            let error = result
+                .result
+                .get("error")
+                .and_then(Json::as_str)
+                .unwrap_or("failed");
             return Ok(self.out.fail(&format!("Not done: {error}"), 1));
         }
-        let content = result.result.get("content").and_then(Json::as_str).unwrap_or("");
+        let content = result
+            .result
+            .get("content")
+            .and_then(Json::as_str)
+            .unwrap_or("");
         let untrusted = result.result.get("trust").and_then(Json::as_str) == Some("untrusted");
         let shown = if content.is_empty() { "Done." } else { content };
         self.out.say(&format!(
             "{}{shown}",
-            if untrusted { "(from outside sources, not verified)\n" } else { "" }
+            if untrusted {
+                "(from outside sources, not verified)\n"
+            } else {
+                ""
+            }
         ));
         self.out.result(
             "done",
@@ -241,8 +265,18 @@ async fn run(args: Args, out: &Output) -> Result<i32, String> {
         .await
         .map_err(|e| e.to_string())?;
     // Subscribed before any call, so a fast reply is never missed.
-    let mut agent_done = Waiter::new(agent.receive_signal("Completed").await.map_err(|e| e.to_string())?);
-    let mut chat_done = Waiter::new(inference.receive_signal("Completed").await.map_err(|e| e.to_string())?);
+    let mut agent_done = Waiter::new(
+        agent
+            .receive_signal("Completed")
+            .await
+            .map_err(|e| e.to_string())?,
+    );
+    let mut chat_done = Waiter::new(
+        inference
+            .receive_signal("Completed")
+            .await
+            .map_err(|e| e.to_string())?,
+    );
 
     let session: std::collections::HashMap<String, zbus::zvariant::OwnedValue> = agent
         .call("Hello", &("Helix assistant", "1"))
@@ -267,13 +301,22 @@ async fn run(args: Args, out: &Output) -> Result<i32, String> {
             .map_err(|e| e.to_string())?;
         let answer = agent_done.wait(operation, 90).await;
         if !answer.ok {
-            let error = answer.result.get("error").and_then(Json::as_str).unwrap_or("denied");
+            let error = answer
+                .result
+                .get("error")
+                .and_then(Json::as_str)
+                .unwrap_or("denied");
             return Ok(out.fail(&format!("No permission was given: {error}"), 1));
         }
         granted = tiers_of(&answer.result["granted"]);
     }
 
-    let mut desk = Desk { agent: &agent, agent_done: &mut agent_done, out, hints: &hints };
+    let mut desk = Desk {
+        agent: &agent,
+        agent_done: &mut agent_done,
+        out,
+        hints: &hints,
+    };
 
     if args.execute {
         // A call the person has just been shown and approved. It gets the same checks as a model's reply: the tool must exist
@@ -290,7 +333,11 @@ async fn run(args: Args, out: &Output) -> Result<i32, String> {
             out.result("explain", json!({"text": text}));
             return Ok(3);
         }
-        let why = if args.request_text.is_empty() { "approved in the assistant panel" } else { &args.request_text };
+        let why = if args.request_text.is_empty() {
+            "approved in the assistant panel"
+        } else {
+            &args.request_text
+        };
         return desk.run(&reply, why).await;
     }
 
@@ -323,7 +370,11 @@ async fn run(args: Args, out: &Output) -> Result<i32, String> {
     if !chosen.error.is_empty() {
         return Ok(out.fail(&chosen.error, 1));
     }
-    let request = if args.warm { "Turn the volume up.".to_string() } else { args.request.clone() };
+    let request = if args.warm {
+        "Turn the volume up.".to_string()
+    } else {
+        args.request.clone()
+    };
     let options = json!({
         "messages": build_messages(&catalog, &request),
         "schema": schema.to_string(),
@@ -339,9 +390,17 @@ async fn run(args: Args, out: &Output) -> Result<i32, String> {
         .map_err(|e| e.to_string())?;
     let answer = chat_done.wait(chat, 300).await;
     if args.warm {
-        let truncated = answer.result.get("truncated").and_then(Json::as_bool).unwrap_or(false);
+        let truncated = answer
+            .result
+            .get("truncated")
+            .and_then(Json::as_bool)
+            .unwrap_or(false);
         if !answer.ok && !truncated {
-            let error = answer.result.get("error").and_then(Json::as_str).unwrap_or("unknown error");
+            let error = answer
+                .result
+                .get("error")
+                .and_then(Json::as_str)
+                .unwrap_or("unknown error");
             return Ok(out.fail(&format!("Could not warm the model: {error}"), 1));
         }
         let text = format!("Model {} is ready.", chosen.id);
@@ -350,16 +409,32 @@ async fn run(args: Args, out: &Output) -> Result<i32, String> {
         return Ok(0);
     }
     if !answer.ok {
-        let error = answer.result.get("error").and_then(Json::as_str).unwrap_or("unknown error");
+        let error = answer
+            .result
+            .get("error")
+            .and_then(Json::as_str)
+            .unwrap_or("unknown error");
         return Ok(out.fail(&format!("The model could not answer: {error}"), 1));
     }
 
-    let mut reply = parse_reply(answer.result.get("text").and_then(Json::as_str).unwrap_or(""));
-    if reply.kind == ReplyKind::Call && !carried_out.is_empty() && !carried_out.contains(&reply.tool) {
+    let mut reply = parse_reply(
+        answer
+            .result
+            .get("text")
+            .and_then(Json::as_str)
+            .unwrap_or(""),
+    );
+    if reply.kind == ReplyKind::Call
+        && !carried_out.is_empty()
+        && !carried_out.contains(&reply.tool)
+    {
         // A real tool, but not one this desktop's shell can carry out: say so, and do nothing.
         reply.kind = ReplyKind::Decline;
         reply.args.clear();
-        reply.reason = format!("this desktop cannot do that yet ({})", describe(&reply, Some(&hints)));
+        reply.reason = format!(
+            "this desktop cannot do that yet ({})",
+            describe(&reply, Some(&hints))
+        );
     }
     match step_for(&policy, &granted, &reply) {
         Step::Explain => {

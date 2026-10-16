@@ -11,8 +11,8 @@ use std::time::Duration;
 
 use gtk::prelude::*;
 use gtk_layer_shell::{Edge, LayerShell};
-use helix_shell_model::bar_visibility::read as read_top_strut;
 use helix_config::dock_prefs::DockPrefs;
+use helix_shell_model::bar_visibility::read as read_top_strut;
 
 fn dock_prefs_path() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")

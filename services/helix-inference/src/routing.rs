@@ -20,7 +20,10 @@ pub struct ProfileRoute {
 
 impl Default for ProfileRoute {
     fn default() -> Self {
-        Self { backend: "local".into(), model: String::new() }
+        Self {
+            backend: "local".into(),
+            model: String::new(),
+        }
     }
 }
 
@@ -78,12 +81,16 @@ impl RoutingTable {
         let mut backend_open = false;
 
         for raw in text.lines() {
-            let line = raw.trim_end_matches(['\r', ' ', '\t']).trim_start_matches([' ', '\t']);
+            let line = raw
+                .trim_end_matches(['\r', ' ', '\t'])
+                .trim_start_matches([' ', '\t']);
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
             if line.starts_with("[[") && line.len() >= 4 {
-                let Some(end) = line.rfind("]]") else { continue };
+                let Some(end) = line.rfind("]]") else {
+                    continue;
+                };
                 if backend_open {
                     out.upsert_backend(std::mem::take(&mut current));
                 }
@@ -191,6 +198,9 @@ mod tests {
         assert_eq!(table.route("act").model, "small.gguf");
         assert!(table.is_local("act"));
         assert!(!table.is_local("chat"));
-        assert!(table.backends.iter().any(|b| b.id == "lan" && b.kind == "openai"));
+        assert!(table
+            .backends
+            .iter()
+            .any(|b| b.id == "lan" && b.kind == "openai"));
     }
 }

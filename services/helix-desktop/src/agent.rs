@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use helix_agent::audit_log::AuditRecord;
 use helix_agent::grant_store::evaluate;
 use helix_agent::grant_store::result_is_untrusted;
-use helix_agent::shell_ipc;
-use helix_agent::audit_log::AuditRecord;
 use helix_agent::grant_store::Decision;
-use helix_agent::risk::Tier as RiskTier;
 use helix_agent::grant_store::Verdict;
+use helix_agent::risk::Tier as RiskTier;
+use helix_agent::shell_ipc;
 use serde_json::json;
 use tokio::sync::Mutex;
 use zbus::fdo;

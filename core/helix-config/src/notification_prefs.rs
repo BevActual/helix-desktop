@@ -25,7 +25,10 @@ pub struct NotificationPrefs {
 
 impl Default for NotificationPrefs {
     fn default() -> Self {
-        NotificationPrefs { toast_seconds: SECONDS_DEFAULT, max_toasts: TOASTS_DEFAULT }
+        NotificationPrefs {
+            toast_seconds: SECONDS_DEFAULT,
+            max_toasts: TOASTS_DEFAULT,
+        }
     }
 }
 
@@ -49,7 +52,8 @@ impl NotificationPrefs {
     }
 
     pub fn to_json(&self) -> String {
-        json!({"version": 1, "toast_seconds": self.toast_seconds, "max_toasts": self.max_toasts}).to_string()
+        json!({"version": 1, "toast_seconds": self.toast_seconds, "max_toasts": self.max_toasts})
+            .to_string()
     }
 
     /// Changes one setting by name. Numbers outside the range are refused, not quietly clamped, so the page never shows what was not kept.
@@ -110,7 +114,11 @@ mod tests {
     #[test]
     fn a_missing_or_broken_file_means_the_defaults() {
         for text in ["", "{", "[]", "null", "{\"toast_seconds\":\"long\"}"] {
-            assert_eq!(NotificationPrefs::parse(text), NotificationPrefs::default(), "{text}");
+            assert_eq!(
+                NotificationPrefs::parse(text),
+                NotificationPrefs::default(),
+                "{text}"
+            );
         }
     }
 
@@ -118,19 +126,34 @@ mod tests {
     fn reading_clamps_and_ignores_what_is_wrong() {
         let p = NotificationPrefs::parse(r#"{"toast_seconds": 9999, "max_toasts": 0}"#);
         assert_eq!((p.toast_seconds, p.max_toasts), (SECONDS_MAX, TOASTS_MIN));
-        assert_eq!(NotificationPrefs::parse(r#"{"toast_seconds": 0}"#).toast_seconds, SECONDS_MIN);
+        assert_eq!(
+            NotificationPrefs::parse(r#"{"toast_seconds": 0}"#).toast_seconds,
+            SECONDS_MIN
+        );
     }
 
     #[test]
     fn writing_is_exact() {
         let p = NotificationPrefs::default();
-        assert_eq!(p.set("toast_seconds", &json!(10)).unwrap().toast_seconds, 10);
+        assert_eq!(
+            p.set("toast_seconds", &json!(10)).unwrap().toast_seconds,
+            10
+        );
         assert_eq!(p.set("toast_seconds", &json!(1)), Err(PrefsError::BadValue));
-        assert_eq!(p.set("toast_seconds", &json!(16)), Err(PrefsError::BadValue));
-        assert_eq!(p.set("toast_seconds", &json!(5.5)), Err(PrefsError::BadValue));
+        assert_eq!(
+            p.set("toast_seconds", &json!(16)),
+            Err(PrefsError::BadValue)
+        );
+        assert_eq!(
+            p.set("toast_seconds", &json!(5.5)),
+            Err(PrefsError::BadValue)
+        );
         assert_eq!(p.set("max_toasts", &json!(4)), Err(PrefsError::BadValue));
         assert_eq!(p.set("max_toasts", &json!("2")), Err(PrefsError::BadValue));
-        assert_eq!(p.set("position", &json!(1)), Err(PrefsError::UnknownSetting));
+        assert_eq!(
+            p.set("position", &json!(1)),
+            Err(PrefsError::UnknownSetting)
+        );
     }
 
     #[test]
@@ -138,14 +161,28 @@ mod tests {
         let p = NotificationPrefs::default();
         let ids: Vec<String> = p.rows().into_iter().map(|r| r.id).collect();
         assert_eq!(ids, ["toast_seconds", "max_toasts"]);
-        assert_eq!(p.apply("max_toasts", &Change::Number(2.0)).unwrap().max_toasts, 2);
-        assert_eq!(p.apply("max_toasts", &Change::Number(2.5)), Err(PrefsError::BadValue));
-        assert_eq!(p.apply("max_toasts", &Change::Switch(true)), Err(PrefsError::BadValue));
+        assert_eq!(
+            p.apply("max_toasts", &Change::Number(2.0))
+                .unwrap()
+                .max_toasts,
+            2
+        );
+        assert_eq!(
+            p.apply("max_toasts", &Change::Number(2.5)),
+            Err(PrefsError::BadValue)
+        );
+        assert_eq!(
+            p.apply("max_toasts", &Change::Switch(true)),
+            Err(PrefsError::BadValue)
+        );
     }
 
     #[test]
     fn what_is_written_reads_back() {
-        let p = NotificationPrefs { toast_seconds: 12, max_toasts: 1 };
+        let p = NotificationPrefs {
+            toast_seconds: 12,
+            max_toasts: 1,
+        };
         assert_eq!(NotificationPrefs::parse(&p.to_json()), p);
     }
 }

@@ -33,7 +33,13 @@ fn fail(why: &str) -> ExitCode {
     ExitCode::from(1)
 }
 
-fn validate(prompt: &str, width: u32, height: u32, steps: u32, seed: u64) -> Result<(), &'static str> {
+fn validate(
+    prompt: &str,
+    width: u32,
+    height: u32,
+    steps: u32,
+    seed: u64,
+) -> Result<(), &'static str> {
     if prompt.is_empty() || prompt.len() > 4000 || prompt.contains('\0') {
         return Err("image prompt must be UTF-8 text up to 4000 bytes");
     }
@@ -74,7 +80,9 @@ unsafe extern "C" fn on_progress(fraction: f64, stage: *const c_char) {
     let stage = if stage.is_null() {
         ""
     } else {
-        unsafe { std::ffi::CStr::from_ptr(stage) }.to_str().unwrap_or("")
+        unsafe { std::ffi::CStr::from_ptr(stage) }
+            .to_str()
+            .unwrap_or("")
     };
     say(&serde_json::json!({"progress": fraction, "stage": stage}));
 }
@@ -82,7 +90,9 @@ unsafe extern "C" fn on_progress(fraction: f64, stage: *const c_char) {
 fn main() -> ExitCode {
     #[cfg(not(helix_sd))]
     {
-        return fail("image worker built without stable-diffusion (install third_party/sd-install)");
+        return fail(
+            "image worker built without stable-diffusion (install third_party/sd-install)",
+        );
     }
     #[cfg(helix_sd)]
     {
@@ -104,7 +114,10 @@ fn main() -> ExitCode {
         let width = json.get("width").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
         let height = json.get("height").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
         let steps = json.get("steps").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-        let seed = json.get("seed").and_then(|v| v.as_u64()).unwrap_or(u64::MAX);
+        let seed = json
+            .get("seed")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(u64::MAX);
         if let Err(error) = validate(prompt, width, height, steps, seed) {
             return fail(error);
         }

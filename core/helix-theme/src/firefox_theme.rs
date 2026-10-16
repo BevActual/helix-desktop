@@ -42,15 +42,19 @@ pub fn apply(colors_json: &Path, mode: &str) -> Result<ApplyResult, String> {
 }
 
 fn validate_colors_json(path: &Path) -> Result<(), String> {
-    let text = fs::read_to_string(path).map_err(|_| format!("Could not read colors from: {}", path.display()))?;
-    let root: Value = serde_json::from_str(&text)
-        .map_err(|error| format!("Failed to read colors: {error}"))?;
+    let text = fs::read_to_string(path)
+        .map_err(|_| format!("Could not read colors from: {}", path.display()))?;
+    let root: Value =
+        serde_json::from_str(&text).map_err(|error| format!("Failed to read colors: {error}"))?;
     let colors = root
         .get("colors")
         .and_then(Value::as_object)
         .ok_or_else(|| format!("{} does not contain any color values", path.display()))?;
     if !root.get("wallpaper").and_then(Value::as_str).is_some() {
-        return Err(format!("{} does not contain a wallpaper path", path.display()));
+        return Err(format!(
+            "{} does not contain a wallpaper path",
+            path.display()
+        ));
     }
     let mut entries: Vec<String> = Vec::new();
     for i in 0..16 {
@@ -77,7 +81,9 @@ fn validate_colors_json(path: &Path) -> Result<(), String> {
 }
 
 fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from).filter(|p| !p.as_os_str().is_empty())
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .filter(|p| !p.as_os_str().is_empty())
 }
 
 fn xdg_config_home() -> Option<PathBuf> {
@@ -139,13 +145,18 @@ fn notify_running_hosts(command: &str, warning: &mut Option<String>) {
     }
     if warning.is_none() {
         *warning = Some(
-            "Firefox theme host is not running; colors will apply when the extension connects".into(),
+            "Firefox theme host is not running; colors will apply when the extension connects"
+                .into(),
         );
     }
 }
 
 fn user_manifest_path() -> Option<PathBuf> {
-    home_dir().map(|h| h.join(".mozilla").join("native-messaging-hosts").join("pywalfox.json"))
+    home_dir().map(|h| {
+        h.join(".mozilla")
+            .join("native-messaging-hosts")
+            .join("pywalfox.json")
+    })
 }
 
 fn resolve_host_executable() -> Option<PathBuf> {
@@ -174,16 +185,13 @@ fn read_existing_manifest_host() -> Option<PathBuf> {
     let manifest = user_manifest_path()?;
     let text = fs::read_to_string(manifest).ok()?;
     let root: Value = serde_json::from_str(&text).ok()?;
-    root.get("path")
-        .and_then(Value::as_str)
-        .map(PathBuf::from)
+    root.get("path").and_then(Value::as_str).map(PathBuf::from)
 }
 
 fn install_manifest(host: &Path) -> Result<(), String> {
     let manifest = user_manifest_path().ok_or_else(|| "HOME is not set".to_string())?;
-    fs::create_dir_all(manifest.parent().unwrap()).map_err(|error| {
-        format!("failed to create native-messaging-hosts directory: {error}")
-    })?;
+    fs::create_dir_all(manifest.parent().unwrap())
+        .map_err(|error| format!("failed to create native-messaging-hosts directory: {error}"))?;
     let canonical = host.canonicalize().unwrap_or_else(|_| host.to_path_buf());
     let body = serde_json::json!({
         "name": MANIFEST_NAME,
@@ -192,8 +200,11 @@ fn install_manifest(host: &Path) -> Result<(), String> {
         "type": "stdio",
         "allowed_extensions": [EXTENSION_ID],
     });
-    fs::write(&manifest, format!("{}\n", serde_json::to_string_pretty(&body).unwrap()))
-        .map_err(|error| format!("failed to write {}: {error}", manifest.display()))?;
+    fs::write(
+        &manifest,
+        format!("{}\n", serde_json::to_string_pretty(&body).unwrap()),
+    )
+    .map_err(|error| format!("failed to write {}: {error}", manifest.display()))?;
     Ok(())
 }
 
@@ -201,7 +212,10 @@ fn ensure_manifest_owned_by_helix(warning: &mut Option<String>) -> Result<(), St
     let host = resolve_host_executable().ok_or_else(|| "helix executable not found".to_string())?;
     if let Some(existing) = read_existing_manifest_host() {
         if !path_looks_like_helix_host(&existing) {
-            *warning = Some(format!("leaving existing native messaging host at {}", existing.display()));
+            *warning = Some(format!(
+                "leaving existing native messaging host at {}",
+                existing.display()
+            ));
             return Ok(());
         }
     }
@@ -223,8 +237,11 @@ fn set_theme_mode(mode: &str) -> Result<(), String> {
         table.insert("theme_mode".into(), Value::String(mode.to_string()));
     }
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    fs::write(&path, format!("{}\n", serde_json::to_string_pretty(&root).unwrap()))
-        .map_err(|e| e.to_string())?;
+    fs::write(
+        &path,
+        format!("{}\n", serde_json::to_string_pretty(&root).unwrap()),
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 

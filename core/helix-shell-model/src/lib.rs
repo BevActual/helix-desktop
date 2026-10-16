@@ -19,6 +19,6 @@ pub mod surfaces;
 pub mod tray;
 
 // Modules that live in other crates but are named `crate::<module>` throughout this crate.
-pub use helix_compositor::agent_desk;
 pub use helix_base::display;
+pub use helix_compositor::agent_desk;
 pub use helix_compositor::niri;

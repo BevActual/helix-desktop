@@ -62,7 +62,9 @@ pub enum Protection {
     Unknown,
     Protected,
     /// The compositor does not protect the dialog. `allowed`: the person chose to approve anyway.
-    Unprotected { allowed: bool },
+    Unprotected {
+        allowed: bool,
+    },
 }
 
 pub struct Confirmer {
@@ -103,7 +105,9 @@ impl Confirmer {
         self.protection = if protected {
             Protection::Protected
         } else {
-            Protection::Unprotected { allowed: allow_unprotected }
+            Protection::Unprotected {
+                allowed: allow_unprotected,
+            }
         };
         // Arming starts now, when the person can see a dialog whose state is known.
         if self.queue.front().is_some() {
@@ -201,7 +205,9 @@ impl Confirmer {
             let selected: Vec<String> = self
                 .tiers
                 .iter()
-                .filter(|tier| tier.checked && (tier.name != "confirm" || self.may_hand_out_confirm()))
+                .filter(|tier| {
+                    tier.checked && (tier.name != "confirm" || self.may_hand_out_confirm())
+                })
                 .map(|tier| tier.name.clone())
                 .collect();
             if selected.is_empty() {
@@ -294,7 +300,9 @@ impl Confirmer {
             tainted: request.tainted && !grant,
             waiting: self.queue.size().saturating_sub(1) as u64,
             tiers: self.tiers.clone(),
-            armed: !incomplete && self.protection != Protection::Unknown && self.arming.armed(now_ms),
+            armed: !incomplete
+                && self.protection != Protection::Unknown
+                && self.arming.armed(now_ms),
             operation: request.operation,
         }
     }
@@ -311,7 +319,12 @@ impl Confirmer {
 
     fn sync_shown(&mut self, now_ms: u64) {
         // Without protection (and without the person's say-so) an action that needs confirmation is not shown: it is refused.
-        while self.refuses_actions() && self.queue.front().is_some_and(|front| front.kind != Kind::Grant) {
+        while self.refuses_actions()
+            && self
+                .queue
+                .front()
+                .is_some_and(|front| front.kind != Kind::Grant)
+        {
             self.queue.answer_front(false, Vec::new());
         }
         if self.queue.front().is_none() {
@@ -608,7 +621,10 @@ mod tests {
         panel.set_protection(true, false, 5000);
         assert!(!panel.needs_protection_check());
         assert_eq!(panel.view(5000).protection, "protected");
-        assert!(!panel.allow(1, 5000 + ARMING_MS - 1), "700 ms after the dialog's state is known");
+        assert!(
+            !panel.allow(1, 5000 + ARMING_MS - 1),
+            "700 ms after the dialog's state is known"
+        );
         assert!(panel.allow(1, 5000 + ARMING_MS));
         assert_eq!(log.lock().unwrap()[0], (1, true, Vec::new()));
     }
@@ -622,12 +638,26 @@ mod tests {
         panel.requested(&plain_action(3), 0);
         panel.set_protection(false, false, 100);
         assert_eq!(panel.view(100).protection, "unprotected");
-        assert_eq!(panel.front().unwrap().operation, 1, "the grant is still shown");
+        assert_eq!(
+            panel.front().unwrap().operation,
+            1,
+            "the grant is still shown"
+        );
         assert_eq!(panel.size(), 3, "the actions wait behind it");
         panel.set_tier(1, "confirm", true);
-        assert!(panel.view(100).tiers.iter().all(|t| t.name != "confirm" || !t.checked), "the confirm tier cannot be ticked");
+        assert!(
+            panel
+                .view(100)
+                .tiers
+                .iter()
+                .all(|t| t.name != "confirm" || !t.checked),
+            "the confirm tier cannot be ticked"
+        );
         assert!(panel.allow(1, 100 + ARMING_MS));
-        assert_eq!(log.lock().unwrap()[0], (1, true, vec!["observe".to_string()]));
+        assert_eq!(
+            log.lock().unwrap()[0],
+            (1, true, vec!["observe".to_string()])
+        );
         // With the grant answered, the actions behind it are refused without ever being shown.
         let answers = log.lock().unwrap().clone();
         assert_eq!(answers[1], (2, false, Vec::new()));
@@ -644,7 +674,11 @@ mod tests {
         panel.requested(&plain_action(2), 10);
         assert_eq!(panel.size(), 2, "it waits behind the grant");
         panel.deny(1, 20);
-        assert_eq!(log.lock().unwrap().last().unwrap(), &(2, false, Vec::new()), "refused without being shown");
+        assert_eq!(
+            log.lock().unwrap().last().unwrap(),
+            &(2, false, Vec::new()),
+            "refused without being shown"
+        );
         assert!(!panel.view(20).open);
         assert!(!panel.allow(2, 20 + ARMING_MS), "nothing to allow");
     }
@@ -662,7 +696,14 @@ mod tests {
         assert_eq!(log.lock().unwrap()[0], (1, true, Vec::new()));
         panel.requested(&grant(2), 1000);
         panel.set_tier(2, "confirm", true);
-        assert!(panel.view(1000).tiers.iter().any(|t| t.name == "confirm" && t.checked), "the choice includes the confirm tier");
+        assert!(
+            panel
+                .view(1000)
+                .tiers
+                .iter()
+                .any(|t| t.name == "confirm" && t.checked),
+            "the choice includes the confirm tier"
+        );
     }
 
     #[test]
@@ -674,7 +715,10 @@ mod tests {
         panel.deny(1, 5);
         assert!(!panel.needs_protection_check(), "nothing is waiting");
         panel.requested(&plain_action(2), 6);
-        assert!(panel.needs_protection_check(), "a new dialog starts unknown");
+        assert!(
+            panel.needs_protection_check(),
+            "a new dialog starts unknown"
+        );
         assert_eq!(panel.view(6).protection, "unknown");
     }
 
@@ -685,7 +729,10 @@ mod tests {
         assert_eq!(panel.view(0).protection, "off");
         assert!(!panel.needs_protection_check());
         panel.set_protection(false, false, 0);
-        assert!(panel.allow(1, ARMING_MS), "set_protection does nothing while the requirement is off");
+        assert!(
+            panel.allow(1, ARMING_MS),
+            "set_protection does nothing while the requirement is off"
+        );
         assert_eq!(log.lock().unwrap()[0], (1, true, Vec::new()));
     }
 
@@ -695,7 +742,10 @@ mod tests {
         panel.requested(&json!({"operation": 1, "client": "exe:/a", "tool": "window-close", "args": ["3"], "reason": "tidy up"}), 0);
         assert_eq!(panel.view(0).aside, "The assistant says: “tidy up”");
         panel.set_gloss(1, "This closes a window of Brave.");
-        assert_eq!(panel.view(0).aside, "This closes a window of Brave. The assistant says: “tidy up”");
+        assert_eq!(
+            panel.view(0).aside,
+            "This closes a window of Brave. The assistant says: “tidy up”"
+        );
         panel.deny(1, 0);
         panel.requested(&json!({"operation": 2, "kind": "grant", "client": "exe:/g", "label": "G", "tiers": ["observe"]}), 1);
         panel.set_gloss(2, "ignored for a grant");

@@ -8,21 +8,19 @@ mod wallhaven;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use helix_agent::grants::{Grants, GrantsView, Request, RequestError};
+use helix_compositor::shortcuts::{self, ShortcutGroup};
+use helix_config::catalog::{Catalog, Change, RowView};
+use helix_config::keybinds::{self, KeybindRow};
 use helix_desktop_api::{Desktop, Domain};
-use helix_models::audio::{
-    Audio, AudioView, Request as AudioRequest, RequestError as AudioError,
-};
+use helix_models::audio::{Audio, AudioView, Request as AudioRequest, RequestError as AudioError};
 use helix_models::bluetooth::{
     Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError,
 };
-use helix_config::catalog::{Catalog, Change, RowView};
-use helix_agent::grants::{Grants, GrantsView, Request, RequestError};
-use helix_config::keybinds::{self, KeybindRow};
 use helix_models::network::{
     EnterpriseInput, Network, NetworkView, Request as NetRequest, RequestError as NetError,
 };
 use helix_models::pairing::{Pairing, PairingView};
-use helix_compositor::shortcuts::{self, ShortcutGroup};
 use helix_wallpaper_model::picker::{Picker, PickerView};
 use helix_wallpaper_model::{choice_path, choice_to_toml, load_config, Source};
 use serde::Serialize;
@@ -1172,7 +1170,10 @@ fn notifications_rows() -> Vec<RowView> {
 fn notifications_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
-    let change = match (change.get("kind").and_then(|k| k.as_str()), change.get("value")) {
+    let change = match (
+        change.get("kind").and_then(|k| k.as_str()),
+        change.get("value"),
+    ) {
         (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
         _ => return Err("unknown change".into()),
     };
@@ -1190,7 +1191,8 @@ fn notifications_change(id: String, change: serde_json::Value) -> Result<Vec<Row
             .mode(0o600)
             .open(&temporary)
             .map_err(|e| e.to_string())?;
-        file.write_all(next.to_json().as_bytes()).map_err(|e| e.to_string())?;
+        file.write_all(next.to_json().as_bytes())
+            .map_err(|e| e.to_string())?;
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     eprintln!("SETTINGS notifications {id} changed");
@@ -1439,7 +1441,9 @@ static GREETER_SYNC: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Copy the current theme and wallpaper into the greeter state directory.
 fn greeter_sync_blocking(app: &AppHandle) -> Result<(), String> {
-    let _one_at_a_time = GREETER_SYNC.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _one_at_a_time = GREETER_SYNC
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let bin = apply_bin()?;
     let staging = staging_dir()?;
     let result = greeter_sync_from(app, &bin, &staging);
@@ -1447,7 +1451,11 @@ fn greeter_sync_blocking(app: &AppHandle) -> Result<(), String> {
     result
 }
 
-fn greeter_sync_from(app: &AppHandle, bin: &std::path::Path, staging: &std::path::Path) -> Result<(), String> {
+fn greeter_sync_from(
+    app: &AppHandle,
+    bin: &std::path::Path,
+    staging: &std::path::Path,
+) -> Result<(), String> {
     let staged = command_output(
         bin.as_os_str(),
         &["--stage".into(), staging.as_os_str().to_os_string()],
@@ -1652,7 +1660,10 @@ fn follow_appearance(app: tauri::AppHandle) {
         let _ = desktop
             .watch_theme_dark(move |dark| {
                 eprintln!("UI theme {}", if dark { "dark" } else { "light" });
-                APP_THEME.store(if dark { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
+                APP_THEME.store(
+                    if dark { 1 } else { 2 },
+                    std::sync::atomic::Ordering::Relaxed,
+                );
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
                         let _ = window.eval(script);

@@ -81,13 +81,22 @@ pub fn parse_reply(text: &str) -> Reply {
 
 /// Measured in the evaluation (`tests/eval/desktop_requests.json`), plus the format of a call.
 const EXAMPLES: [(&str, &str); 5] = [
-    ("Set the log level to debug.", r#"{"tool":"log-level-set","args":["debug"]}"#),
+    (
+        "Set the log level to debug.",
+        r#"{"tool":"log-level-set","args":["debug"]}"#,
+    ),
     (
         "Make the bar hide itself unless I move the mouse to the edge.",
         r#"{"tool":"bar-auto-hide-set","args":["smart"]}"#,
     ),
-    ("Reload the configuration.", r#"{"tool":"config-reload","args":[]}"#),
-    ("Turn the on-screen popups off.", r#"{"tool":"osd-disable","args":[]}"#),
+    (
+        "Reload the configuration.",
+        r#"{"tool":"config-reload","args":[]}"#,
+    ),
+    (
+        "Turn the on-screen popups off.",
+        r#"{"tool":"osd-disable","args":[]}"#,
+    ),
     (
         "Set the output audio profile to Music.",
         r#"{"tool":"effects-profile-set","args":["output","Music"]}"#,
@@ -163,7 +172,10 @@ pub struct ModelChoice {
 /// Which installed model to ask. `preferred` (the person's choice) wins if installed; otherwise the largest, the one the
 /// measurements favour. `models` is `ListModels`' reply.
 pub fn choose_model(models: &Value, preferred: &str) -> ModelChoice {
-    let fail = |error: String| ModelChoice { id: String::new(), error };
+    let fail = |error: String| ModelChoice {
+        id: String::new(),
+        error,
+    };
     let Some(list) = models.as_array().filter(|list| !list.is_empty()) else {
         return fail("no model is installed (put one in ~/.local/share/helix/models)".into());
     };
@@ -173,7 +185,10 @@ pub fn choose_model(models: &Value, preferred: &str) -> ModelChoice {
             continue;
         };
         if !preferred.is_empty() && id == preferred {
-            return ModelChoice { id: preferred.to_string(), error: String::new() };
+            return ModelChoice {
+                id: preferred.to_string(),
+                error: String::new(),
+            };
         }
         let bytes = model.get("bytes").and_then(Value::as_u64).unwrap_or(0);
         if best.is_none_or(|(_, most)| bytes > most) {
@@ -184,7 +199,10 @@ pub fn choose_model(models: &Value, preferred: &str) -> ModelChoice {
         return fail(format!("the model '{preferred}' is not installed"));
     }
     match best {
-        Some((id, _)) => ModelChoice { id: id.to_string(), error: String::new() },
+        Some((id, _)) => ModelChoice {
+            id: id.to_string(),
+            error: String::new(),
+        },
         None => fail("no usable model is installed".into()),
     }
 }
@@ -194,15 +212,27 @@ mod tests {
     use super::*;
 
     fn everyday() -> BTreeSet<Tier> {
-        [Tier::Observe, Tier::ObservePrivate, Tier::Act].into_iter().collect()
+        [Tier::Observe, Tier::ObservePrivate, Tier::Act]
+            .into_iter()
+            .collect()
     }
 
     #[test]
     fn replies_are_read_strictly() {
-        let call = parse_reply(r#"{"tool":"panel-open","args":["control-center"],"reason":"you asked"}"#);
+        let call =
+            parse_reply(r#"{"tool":"panel-open","args":["control-center"],"reason":"you asked"}"#);
         assert_eq!(call.kind, ReplyKind::Call);
-        assert_eq!((call.tool.as_str(), call.args.len(), call.reason.as_str()), ("panel-open", 1, "you asked"));
-        for bad in ["not json", r#"{"args":[]}"#, r#"{"tool":"status","args":[1]}"#, r#"{"tool":"status","args":"x"}"#, "[]"] {
+        assert_eq!(
+            (call.tool.as_str(), call.args.len(), call.reason.as_str()),
+            ("panel-open", 1, "you asked")
+        );
+        for bad in [
+            "not json",
+            r#"{"args":[]}"#,
+            r#"{"tool":"status","args":[1]}"#,
+            r#"{"tool":"status","args":"x"}"#,
+            "[]",
+        ] {
             assert_eq!(parse_reply(bad).kind, ReplyKind::Invalid, "{bad}");
         }
     }
@@ -210,37 +240,71 @@ mod tests {
     #[test]
     fn a_decline_cannot_smuggle_arguments() {
         let policy = RiskPolicy::embedded();
-        let decline = parse_reply(r#"{"tool":"decline","args":["session","reboot"],"reason":"no tool for that"}"#);
+        let decline = parse_reply(
+            r#"{"tool":"decline","args":["session","reboot"],"reason":"no tool for that"}"#,
+        );
         assert_eq!(decline.kind, ReplyKind::Decline);
         assert!(decline.args.is_empty());
         assert_eq!(decline.reason, "no tool for that");
         assert_eq!(step_for(&policy, &everyday(), &decline), Step::Explain);
-        assert_eq!(step_for(&policy, &everyday(), &parse_reply("junk")), Step::Explain);
+        assert_eq!(
+            step_for(&policy, &everyday(), &parse_reply("junk")),
+            Step::Explain
+        );
     }
 
     #[test]
     fn reading_runs_and_changing_is_shown_first() {
         let policy = RiskPolicy::embedded();
-        let step = |text: &str, granted: &BTreeSet<Tier>| step_for(&policy, granted, &parse_reply(text));
+        let step =
+            |text: &str, granted: &BTreeSet<Tier>| step_for(&policy, granted, &parse_reply(text));
         let observe: BTreeSet<Tier> = [Tier::Observe].into_iter().collect();
-        assert_eq!(step(r#"{"tool":"status","args":[]}"#, &everyday()), Step::Run);
-        assert_eq!(step(r#"{"tool":"volume-up","args":[]}"#, &everyday()), Step::AskFirst);
-        assert_eq!(step(r#"{"tool":"session","args":["lock"]}"#, &everyday()), Step::AskFirst);
-        assert_eq!(step(r#"{"tool":"session","args":["reboot"]}"#, &everyday()), Step::Refuse);
-        assert_eq!(step(r#"{"tool":"made-up","args":[]}"#, &everyday()), Step::Refuse);
-        assert_eq!(step(r#"{"tool":"volume-up","args":[]}"#, &observe), Step::Refuse);
+        assert_eq!(
+            step(r#"{"tool":"status","args":[]}"#, &everyday()),
+            Step::Run
+        );
+        assert_eq!(
+            step(r#"{"tool":"volume-up","args":[]}"#, &everyday()),
+            Step::AskFirst
+        );
+        assert_eq!(
+            step(r#"{"tool":"session","args":["lock"]}"#, &everyday()),
+            Step::AskFirst
+        );
+        assert_eq!(
+            step(r#"{"tool":"session","args":["reboot"]}"#, &everyday()),
+            Step::Refuse
+        );
+        assert_eq!(
+            step(r#"{"tool":"made-up","args":[]}"#, &everyday()),
+            Step::Refuse
+        );
+        assert_eq!(
+            step(r#"{"tool":"volume-up","args":[]}"#, &observe),
+            Step::Refuse
+        );
         assert_eq!(step(r#"{"tool":"status","args":[]}"#, &observe), Step::Run);
-        assert_eq!(step(r#"{"tool":"status","args":[]}"#, &BTreeSet::new()), Step::Refuse);
+        assert_eq!(
+            step(r#"{"tool":"status","args":[]}"#, &BTreeSet::new()),
+            Step::Refuse
+        );
     }
 
     #[test]
     fn the_person_sees_the_exact_call() {
         let call = parse_reply(r#"{"tool":"panel-open","args":["control-center"]}"#);
         assert_eq!(describe(&call, None), "Run `panel-open control-center`");
-        let hints = ToolHints::parse("[hints]\npower-cycle = \"Step to the next power profile\"\n").unwrap();
+        let hints = ToolHints::parse("[hints]\npower-cycle = \"Step to the next power profile\"\n")
+            .unwrap();
         let restart = parse_reply(r#"{"tool":"power-cycle","args":["next"]}"#);
-        assert_eq!(describe(&restart, Some(&hints)), "Step to the next power profile (`power-cycle next`)");
-        assert_eq!(describe(&call, Some(&hints)), "Run `panel-open control-center`");
+        assert_eq!(
+            describe(&restart, Some(&hints)),
+            "Step to the next power profile (`power-cycle next`)"
+        );
+        assert_eq!(
+            describe(&call, Some(&hints)),
+            "Run `panel-open control-center`"
+        );
     }
 
     #[test]
@@ -256,7 +320,8 @@ mod tests {
 
     #[test]
     fn model_choice_prefers_the_persons_then_the_largest() {
-        let models = json!([{"id": "small.gguf", "bytes": 1000}, {"id": "big.gguf", "bytes": 9000}]);
+        let models =
+            json!([{"id": "small.gguf", "bytes": 1000}, {"id": "big.gguf", "bytes": 9000}]);
         assert_eq!(choose_model(&models, "").id, "big.gguf");
         assert_eq!(choose_model(&models, "small.gguf").id, "small.gguf");
         let missing = choose_model(&models, "missing.gguf");

@@ -1,6 +1,6 @@
 //! Show / hide the painted bar and sync the external top strut exclusive zone.
 
-use helix_shell_model::bar_visibility::{TopStrutState, write as write_strut};
+use helix_shell_model::bar_visibility::{write as write_strut, TopStrutState};
 use tauri::{AppHandle, Manager};
 
 use crate::control::on_main;
@@ -35,7 +35,11 @@ pub fn set_visible(app: &AppHandle, visible: bool) -> Result<(), String> {
     .map_err(|e| e.to_string())?;
     eprintln!(
         "BAR {}",
-        if visible { "shown" } else { "hidden (strut released)" }
+        if visible {
+            "shown"
+        } else {
+            "hidden (strut released)"
+        }
     );
     Ok(())
 }

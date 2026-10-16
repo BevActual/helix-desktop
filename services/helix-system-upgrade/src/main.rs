@@ -11,7 +11,15 @@ const RPM_PATH: &str = "/usr/bin/rpm";
 /// Hardcoded RPM names the privileged helper may pass to dnf. Order is the upgrade order; names not installed are skipped.
 const ALLOWLISTED_PACKAGES: [&str; 3] = ["helix-shell", "helix", "helix-greeter"];
 
-const ATOMIC_VARIANTS: [&str; 7] = ["silverblue", "kinoite", "sericea", "onyx", "cosmic", "coreos", "iot"];
+const ATOMIC_VARIANTS: [&str; 7] = [
+    "silverblue",
+    "kinoite",
+    "sericea",
+    "onyx",
+    "cosmic",
+    "coreos",
+    "iot",
+];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum HostKind {
@@ -38,7 +46,8 @@ struct HelperPlan {
 }
 
 fn trim(text: &str) -> &str {
-    text.trim_start_matches([' ', '\t']).trim_end_matches([' ', '\t', '\r'])
+    text.trim_start_matches([' ', '\t'])
+        .trim_end_matches([' ', '\t', '\r'])
 }
 
 fn unquote(value: &str) -> &str {
@@ -86,7 +95,12 @@ fn select_installed_packages(installed: &[String]) -> Vec<String> {
 }
 
 fn dnf_upgrade_argv(packages: &[String]) -> Vec<String> {
-    let mut argv = vec![DNF_PATH.to_string(), "upgrade".into(), "-y".into(), "--refresh".into()];
+    let mut argv = vec![
+        DNF_PATH.to_string(),
+        "upgrade".into(),
+        "-y".into(),
+        "--refresh".into(),
+    ];
     argv.extend(packages.iter().cloned());
     argv
 }
@@ -99,7 +113,10 @@ fn plan_helper(
     ostree_booted: bool,
     installed: &[String],
 ) -> HelperPlan {
-    let plan = |status| HelperPlan { status, dnf_argv: Vec::new() };
+    let plan = |status| HelperPlan {
+        status,
+        dnf_argv: Vec::new(),
+    };
     if args.len() == 1 && args[0] == "--help" {
         return plan(HelperStatus::Help);
     }
@@ -118,7 +135,10 @@ fn plan_helper(
     if packages.is_empty() {
         return plan(HelperStatus::NoPackages);
     }
-    HelperPlan { status: HelperStatus::Ready, dnf_argv: dnf_upgrade_argv(&packages) }
+    HelperPlan {
+        status: HelperStatus::Ready,
+        dnf_argv: dnf_upgrade_argv(&packages),
+    }
 }
 
 fn os_release_text() -> String {
@@ -181,7 +201,9 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         HelperStatus::Ready => {
-            let error = Command::new(&plan.dnf_argv[0]).args(&plan.dnf_argv[1..]).exec();
+            let error = Command::new(&plan.dnf_argv[0])
+                .args(&plan.dnf_argv[1..])
+                .exec();
             eprintln!("execv {}: {error}", plan.dnf_argv[0]);
             ExitCode::FAILURE
         }
@@ -215,12 +237,21 @@ mod tests {
 
     #[test]
     fn only_allowlisted_packages_in_allowlist_order() {
-        assert_eq!(select_installed_packages(&strings(&["htop", "helix", "firefox"])), strings(&["helix"]));
+        assert_eq!(
+            select_installed_packages(&strings(&["htop", "helix", "firefox"])),
+            strings(&["helix"])
+        );
         assert!(select_installed_packages(&[]).is_empty());
         let all = strings(&["helix-greeter", "helix", "helix-shell"]);
-        assert_eq!(select_installed_packages(&all), strings(&["helix-shell", "helix", "helix-greeter"]));
+        assert_eq!(
+            select_installed_packages(&all),
+            strings(&["helix-shell", "helix", "helix-greeter"])
+        );
         let argv = dnf_upgrade_argv(&strings(&["helix"]));
-        assert_eq!(argv, strings(&["/usr/bin/dnf", "upgrade", "-y", "--refresh", "helix"]));
+        assert_eq!(
+            argv,
+            strings(&["/usr/bin/dnf", "upgrade", "-y", "--refresh", "helix"])
+        );
     }
 
     #[test]
@@ -229,12 +260,30 @@ mod tests {
         let plan = |args: &[&str], root, os: &str, ostree, inst: &[String]| {
             plan_helper(&strings(args), root, os, ostree, inst).status
         };
-        assert_eq!(plan(&["--help"], false, FEDORA, false, &installed), HelperStatus::Help);
-        assert_eq!(plan(&["htop"], true, FEDORA, false, &installed), HelperStatus::ExtraArguments);
-        assert_eq!(plan(&[], false, FEDORA, false, &installed), HelperStatus::NotRoot);
-        assert_eq!(plan(&[], true, "ID=arch\n", false, &installed), HelperStatus::NotFedora);
-        assert_eq!(plan(&[], true, SILVERBLUE, false, &installed), HelperStatus::Atomic);
-        assert_eq!(plan(&[], true, FEDORA, false, &strings(&["htop"])), HelperStatus::NoPackages);
+        assert_eq!(
+            plan(&["--help"], false, FEDORA, false, &installed),
+            HelperStatus::Help
+        );
+        assert_eq!(
+            plan(&["htop"], true, FEDORA, false, &installed),
+            HelperStatus::ExtraArguments
+        );
+        assert_eq!(
+            plan(&[], false, FEDORA, false, &installed),
+            HelperStatus::NotRoot
+        );
+        assert_eq!(
+            plan(&[], true, "ID=arch\n", false, &installed),
+            HelperStatus::NotFedora
+        );
+        assert_eq!(
+            plan(&[], true, SILVERBLUE, false, &installed),
+            HelperStatus::Atomic
+        );
+        assert_eq!(
+            plan(&[], true, FEDORA, false, &strings(&["htop"])),
+            HelperStatus::NoPackages
+        );
         let ready = plan_helper(&[], true, FEDORA, false, &installed);
         assert_eq!(ready.status, HelperStatus::Ready);
         assert_eq!(ready.dnf_argv.last().map(String::as_str), Some("helix"));

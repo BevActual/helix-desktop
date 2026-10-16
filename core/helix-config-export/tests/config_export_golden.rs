@@ -16,11 +16,11 @@ fn unique_temp_dir(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!("helix-export-{label}-{nanos}-{seq}"))
 }
 
+use helix_config::settings::ConfigPaths;
+use helix_config::settings::ConfigStore;
 use helix_config_export::config_export::{
     configure_export_env, discover_rust_config_export_bin, export_effective_toml, rust_export_toml,
 };
-use helix_config::settings::ConfigPaths;
-use helix_config::settings::ConfigStore;
 use toml::Value as Toml;
 
 fn minimal_fixture(root: &Path) -> ConfigPaths {
@@ -128,8 +128,7 @@ fn assert_rust_export_matches_fixture(
     let rust = rust_export_toml(store.paths()).expect("rust export");
     let expected = load_export_fixture(fixture_id);
     assert_eq!(
-        rust,
-        expected,
+        rust, expected,
         "fixture {fixture_id}\nconfig:\n{config_toml}\nsettings:\n{settings_toml}"
     );
     let _ = fs::remove_dir_all(root);
@@ -141,71 +140,106 @@ fn assert_rust_export_matches_fixture_config(fixture_id: &str, config_toml: &str
 
 #[test]
 fn rust_export_matches_cpp_for_bar_thickness_override() {
-    assert_rust_export_matches_fixture_config("bar_thickness_override", "[bar.default]\nthickness = 40\n");
+    assert_rust_export_matches_fixture_config(
+        "bar_thickness_override",
+        "[bar.default]\nthickness = 40\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_negative_bar_radius() {
-    assert_rust_export_matches_fixture_config("legacy_negative_bar_radius", "[bar.default]\nradius = -16\n");
+    assert_rust_export_matches_fixture_config(
+        "legacy_negative_bar_radius",
+        "[bar.default]\nradius = -16\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_sysmon_show_icon() {
-    assert_rust_export_matches_fixture_config("legacy_sysmon_show_icon", "[widget.cpu]\nshow_icon = false\n");
+    assert_rust_export_matches_fixture_config(
+        "legacy_sysmon_show_icon",
+        "[widget.cpu]\nshow_icon = false\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_workspaces_widget() {
-    assert_rust_export_matches_fixture_config("legacy_workspaces_widget", "[widget.workspaces]\ndisplay = \"none\"\n");
+    assert_rust_export_matches_fixture_config(
+        "legacy_workspaces_widget",
+        "[widget.workspaces]\ndisplay = \"none\"\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_custom_named_sysmon_widget() {
-    assert_rust_export_matches_fixture_config("custom_named_sysmon_widget", "[widget.my-cpu]\ntype = \"sysmon\"\nstat = \"cpu_usage\"\n");
+    assert_rust_export_matches_fixture_config(
+        "custom_named_sysmon_widget",
+        "[widget.my-cpu]\ntype = \"sysmon\"\nstat = \"cpu_usage\"\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_location_schedule() {
-    assert_rust_export_matches_fixture_config("legacy_location_schedule", 
+    assert_rust_export_matches_fixture_config(
+        "legacy_location_schedule",
         "[location]\nsunset = \"18:00\"\nsunrise = \"06:00\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_plugins_auto_update_bool() {
-    assert_rust_export_matches_fixture_config("plugins_auto_update_bool", "[plugins]\nauto_update = false\n");
+    assert_rust_export_matches_fixture_config(
+        "plugins_auto_update_bool",
+        "[plugins]\nauto_update = false\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_theme_builtin_override() {
-    assert_rust_export_matches_fixture_config("theme_builtin_override", "[theme]\nbuiltin = \"Qt\"\n");
+    assert_rust_export_matches_fixture_config(
+        "theme_builtin_override",
+        "[theme]\nbuiltin = \"Qt\"\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_with_wallpaper_runtime_state() {
-    assert_rust_export_matches_fixture_config("wallpaper_runtime_state", "[wallpaper]\ndefault = \"/tmp/w.png\"\n");
+    assert_rust_export_matches_fixture_config(
+        "wallpaper_runtime_state",
+        "[wallpaper]\ndefault = \"/tmp/w.png\"\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_calendar_account() {
-    assert_rust_export_matches_fixture_config("calendar_account", 
+    assert_rust_export_matches_fixture_config(
+        "calendar_account",
         "[calendar.account.work]\ntype = \"ics\"\nserver_url = \"https://caldav.example.com\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_bar_monitor_override() {
-    assert_rust_export_matches_fixture_config("bar_monitor_override", "[bar.default.monitor.DP-1]\nthickness = 28\n");
+    assert_rust_export_matches_fixture_config(
+        "bar_monitor_override",
+        "[bar.default.monitor.DP-1]\nthickness = 28\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_legacy_bar_dead_zone_command() {
-    assert_rust_export_matches_fixture_config("legacy_bar_dead_zone_command", "[bar.default.dead_zone]\ncommand = \"notify-send hi\"\n");
+    assert_rust_export_matches_fixture_config(
+        "legacy_bar_dead_zone_command",
+        "[bar.default.dead_zone]\ncommand = \"notify-send hi\"\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_desktop_widgets_disabled() {
-    assert_rust_export_matches_fixture_config("desktop_widgets_disabled", "[desktop_widgets]\nenabled = false\n");
+    assert_rust_export_matches_fixture_config(
+        "desktop_widgets_disabled",
+        "[desktop_widgets]\nenabled = false\n",
+    );
 }
 
 #[test]
@@ -224,7 +258,8 @@ fn rust_export_matches_cpp_for_lockscreen_widget_placement() {
 
 #[test]
 fn rust_export_matches_cpp_for_bar_monitor_match_override() {
-    assert_rust_export_matches_fixture_config("bar_monitor_match_override", 
+    assert_rust_export_matches_fixture_config(
+        "bar_monitor_match_override",
         "[bar.default.monitor.DP-1]\nmatch = \"DP-1\"\nthickness = 28\n",
     );
 }
@@ -238,14 +273,18 @@ fn rust_export_matches_cpp_for_two_desktop_widget_placements() {
 
 #[test]
 fn rust_export_matches_cpp_for_idle_lock_behavior_only() {
-    assert_rust_export_matches_fixture_config("idle_lock_behavior_only", 
+    assert_rust_export_matches_fixture_config(
+        "idle_lock_behavior_only",
         "[idle.behavior.lock]\ntimeout = 300\nenabled = true\naction = \"lock\"\n",
     );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_nightlight_enabled() {
-    assert_rust_export_matches_fixture_config("nightlight_enabled", "[nightlight]\nenabled = true\n");
+    assert_rust_export_matches_fixture_config(
+        "nightlight_enabled",
+        "[nightlight]\nenabled = true\n",
+    );
 }
 
 #[test]
@@ -278,12 +317,18 @@ fn rust_export_matches_cpp_for_desktop_widget_flip_x() {
 
 #[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
-    assert_rust_export_matches_fixture_config("bar_thickness_float_literal", "[bar.default]\nthickness = 40.0\n");
+    assert_rust_export_matches_fixture_config(
+        "bar_thickness_float_literal",
+        "[bar.default]\nthickness = 40.0\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_theme_pure_black_dark() {
-    assert_rust_export_matches_fixture_config("theme_pure_black_dark", "[theme]\npure_black_dark = true\n");
+    assert_rust_export_matches_fixture_config(
+        "theme_pure_black_dark",
+        "[theme]\npure_black_dark = true\n",
+    );
 }
 
 #[test]
@@ -313,17 +358,26 @@ fn rust_export_matches_cpp_for_migrated_settings_sidecar() {
 
 #[test]
 fn rust_export_matches_cpp_for_notification_max_visible() {
-    assert_rust_export_matches_fixture_config("notification_max_visible", "[notification]\nmax_visible = 5\n");
+    assert_rust_export_matches_fixture_config(
+        "notification_max_visible",
+        "[notification]\nmax_visible = 5\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_shell_polkit_agent() {
-    assert_rust_export_matches_fixture_config("shell_polkit_agent", "[shell]\npolkit_agent = true\n");
+    assert_rust_export_matches_fixture_config(
+        "shell_polkit_agent",
+        "[shell]\npolkit_agent = true\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_bar_start_widgets() {
-    assert_rust_export_matches_fixture_config("bar_start_widgets", "[bar.default]\nstart = [\"clock\", \"date\"]\n");
+    assert_rust_export_matches_fixture_config(
+        "bar_start_widgets",
+        "[bar.default]\nstart = [\"clock\", \"date\"]\n",
+    );
 }
 
 #[test]
@@ -338,12 +392,16 @@ fn rust_export_matches_cpp_with_config_include() {
 
 #[test]
 fn rust_export_matches_cpp_for_secondary_bar() {
-    assert_rust_export_matches_fixture_config("secondary_bar", "[bar.secondary]\nenabled = true\nthickness = 28\n");
+    assert_rust_export_matches_fixture_config(
+        "secondary_bar",
+        "[bar.secondary]\nenabled = true\nthickness = 28\n",
+    );
 }
 
 #[test]
 fn rust_export_matches_cpp_for_default_and_secondary_bars() {
-    assert_rust_export_matches_fixture_config("default_and_secondary_bars", 
+    assert_rust_export_matches_fixture_config(
+        "default_and_secondary_bars",
         "[bar.default]\nthickness = 40\n\n[bar.secondary]\nenabled = true\nthickness = 28\n",
     );
 }

@@ -4,10 +4,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use helix_agent::audit_log::AuditLog;
-use helix_config::settings::ConfigStore;
 use helix_agent::grant_store::GrantStore;
-use helix_agent::risk::RiskPolicy;
 use helix_agent::grant_store::TaintTracker;
+use helix_agent::risk::RiskPolicy;
+use helix_config::settings::ConfigStore;
 use serde_json::Value;
 use zbus::Connection;
 

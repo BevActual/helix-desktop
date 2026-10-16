@@ -9,21 +9,21 @@ use super::config_export_defaults::{
     schema_section_default_writer, write_accessibility_defaults, write_battery_defaults,
     write_storage_defaults, write_theme_defaults,
 };
-use super::config_export_typed_shell::export_shell_section_from_merged;
 use super::config_export_rust::export_filtered_schema_section;
 use super::config_export_serialize::f32_bits;
 use super::config_export_typed_scalar::{
     export_audio_section_from_merged, export_backdrop_section_from_merged,
     export_brightness_section_from_merged, export_calendar_section_from_merged,
-    export_hooks_section_from_merged, export_hot_corners_section_from_merged,
     export_control_center_section_from_merged, export_dock_section_from_merged,
+    export_hooks_section_from_merged, export_hot_corners_section_from_merged,
     export_idle_section_from_merged, export_keybinds_section_from_merged,
     export_location_section_from_merged, export_lockscreen_section_from_merged,
-    export_notification_section_from_merged, export_nightlight_section_from_merged,
+    export_nightlight_section_from_merged, export_notification_section_from_merged,
     export_osd_section_from_merged, export_system_section_from_merged,
     export_tailscale_section_from_merged, export_wallpaper_section_from_merged,
     export_weather_section_from_merged,
 };
+use super::config_export_typed_shell::export_shell_section_from_merged;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct StorageExport {
@@ -129,7 +129,10 @@ impl AccessibilityExport {
 
     fn write_export_table(&self) -> Toml {
         let mut table = toml::map::Map::new();
-        table.insert("high_contrast".to_string(), Toml::Boolean(self.high_contrast));
+        table.insert(
+            "high_contrast".to_string(),
+            Toml::Boolean(self.high_contrast),
+        );
         table.insert("ui_scale".to_string(), Toml::Float(self.ui_scale));
         Toml::Table(table)
     }
@@ -354,7 +357,13 @@ impl ThemeTemplatesExport {
         );
         table.insert(
             "community_ids".to_string(),
-            Toml::Array(self.community_ids.iter().cloned().map(Toml::String).collect()),
+            Toml::Array(
+                self.community_ids
+                    .iter()
+                    .cloned()
+                    .map(Toml::String)
+                    .collect(),
+            ),
         );
         table.insert(
             "enable_builtin_templates".to_string(),
@@ -490,14 +499,23 @@ impl ThemeExport {
             Toml::String(self.custom_palette.clone()),
         );
         table.insert("mode".to_string(), Toml::String(self.mode.clone()));
-        table.insert("pure_black_dark".to_string(), Toml::Boolean(self.pure_black_dark));
-        table.insert("shell_mode".to_string(), Toml::String(self.shell_mode.clone()));
+        table.insert(
+            "pure_black_dark".to_string(),
+            Toml::Boolean(self.pure_black_dark),
+        );
+        table.insert(
+            "shell_mode".to_string(),
+            Toml::String(self.shell_mode.clone()),
+        );
         table.insert("source".to_string(), Toml::String(self.source.clone()));
         table.insert(
             "wallpaper_scheme".to_string(),
             Toml::String(self.wallpaper_scheme.clone()),
         );
-        table.insert("niri_layout".to_string(), self.niri_layout.write_export_table());
+        table.insert(
+            "niri_layout".to_string(),
+            self.niri_layout.write_export_table(),
+        );
         table.insert("templates".to_string(), self.templates.write_export_table());
         Toml::Table(table)
     }
@@ -547,14 +565,16 @@ pub(crate) fn export_typed_schema_section(
         return Some(table);
     }
     let writer = schema_section_default_writer(section)?;
-    Some(export_filtered_schema_section(section, merged, default, writer))
+    Some(export_filtered_schema_section(
+        section, merged, default, writer,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::config_export_defaults::{PORTED_SCHEMA_WRITERS, SCHEMA_EXPORT_SECTIONS};
     use super::super::config_export_serialize::serialize_default_config;
+    use super::*;
 
     #[test]
     fn storage_export_defaults_match_writer() {

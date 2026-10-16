@@ -159,7 +159,9 @@ impl Audio {
             muted: current.is_some_and(|device| device.muted),
             outputs: self.outputs.iter().map(show).collect(),
             input: microphone.map(show),
-            input_percent: microphone.map_or(0, |device| (device.volume * 100.0).round().clamp(0.0, 150.0) as u8),
+            input_percent: microphone.map_or(0, |device| {
+                (device.volume * 100.0).round().clamp(0.0, 150.0) as u8
+            }),
             input_muted: microphone.is_some_and(|device| device.muted),
             inputs: self.inputs.iter().map(show).collect(),
         }
@@ -445,8 +447,20 @@ mod tests {
         assert_eq!(view.input.as_ref().unwrap().id, 70);
         assert_eq!((view.input_percent, view.input_muted), (80, true));
         assert_eq!(view.inputs.len(), 1);
-        assert_eq!(audio.set_input_volume(35.0).unwrap(), Request { action: "volume", args: json!({"id": 70, "value": 0.35}) });
-        assert_eq!(audio.set_input_muted(false).unwrap(), Request { action: "mute", args: json!({"id": 70, "value": false}) });
+        assert_eq!(
+            audio.set_input_volume(35.0).unwrap(),
+            Request {
+                action: "volume",
+                args: json!({"id": 70, "value": 0.35})
+            }
+        );
+        assert_eq!(
+            audio.set_input_muted(false).unwrap(),
+            Request {
+                action: "mute",
+                args: json!({"id": 70, "value": false})
+            }
+        );
         // The speakers are never touched by a microphone control, and the other way round.
         assert_eq!(audio.set_volume(35.0).unwrap().args["id"], 48);
     }
@@ -455,7 +469,11 @@ mod tests {
     fn microphone_levels_are_bounded_and_need_a_microphone() {
         let audio = Audio::from_snapshot(&snapshot());
         for bad in [-1.0, 100.5, f64::NAN, f64::INFINITY] {
-            assert_eq!(audio.set_input_volume(bad), Err(RequestError::OutOfRange), "{bad}");
+            assert_eq!(
+                audio.set_input_volume(bad),
+                Err(RequestError::OutOfRange),
+                "{bad}"
+            );
         }
         assert!(audio.set_input_volume(0.0).is_ok() && audio.set_input_volume(100.0).is_ok());
         let mut none = snapshot();
@@ -464,18 +482,46 @@ mod tests {
         assert!(audio.view().input.is_none() && audio.view().inputs.is_empty());
         assert_eq!(audio.set_input_volume(10.0), Err(RequestError::NoInput));
         assert_eq!(audio.set_input_muted(true), Err(RequestError::NoInput));
-        assert_eq!(Audio::from_snapshot(&json!({})).set_input_muted(true), Err(RequestError::Unavailable));
+        assert_eq!(
+            Audio::from_snapshot(&json!({})).set_input_muted(true),
+            Err(RequestError::Unavailable)
+        );
     }
 
     #[test]
     fn only_a_listed_input_can_become_the_default_input() {
         let mut data = snapshot();
-        data["sources"] = json!([sink(70, "Built-in", 0.8, false, true, true), sink(71, "USB mic", 0.5, false, false, true), sink(72, "Gone", 0.5, false, false, false)]);
+        data["sources"] = json!([
+            sink(70, "Built-in", 0.8, false, true, true),
+            sink(71, "USB mic", 0.5, false, false, true),
+            sink(72, "Gone", 0.5, false, false, false)
+        ]);
         let audio = Audio::from_snapshot(&data);
-        assert_eq!(audio.set_default_input(71).unwrap(), Request { action: "default", args: json!({"id": 71, "input": true}) });
-        assert_eq!(audio.set_default_input(72), Err(RequestError::UnknownDevice), "an unplugged one");
-        assert_eq!(audio.set_default_input(48), Err(RequestError::UnknownDevice), "an output is not an input");
-        assert_eq!(audio.set_default(70), Err(RequestError::UnknownDevice), "and an input is not an output");
-        assert_eq!(Audio::from_snapshot(&json!({})).set_default_input(1), Err(RequestError::Unavailable));
+        assert_eq!(
+            audio.set_default_input(71).unwrap(),
+            Request {
+                action: "default",
+                args: json!({"id": 71, "input": true})
+            }
+        );
+        assert_eq!(
+            audio.set_default_input(72),
+            Err(RequestError::UnknownDevice),
+            "an unplugged one"
+        );
+        assert_eq!(
+            audio.set_default_input(48),
+            Err(RequestError::UnknownDevice),
+            "an output is not an input"
+        );
+        assert_eq!(
+            audio.set_default(70),
+            Err(RequestError::UnknownDevice),
+            "and an input is not an output"
+        );
+        assert_eq!(
+            Audio::from_snapshot(&json!({})).set_default_input(1),
+            Err(RequestError::Unavailable)
+        );
     }
 }

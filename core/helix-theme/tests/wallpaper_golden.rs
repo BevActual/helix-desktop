@@ -16,7 +16,11 @@ fn image(kind: u32) -> Vec<u8> {
                 2 => (rng.next() % 256, rng.next() % 256, rng.next() % 256),
                 3 => {
                     let a = (x / 14 + y / 14) % 2 == 1;
-                    if a { (220, 60, 40) } else { (40, 160, 90) }
+                    if a {
+                        (220, 60, 40)
+                    } else {
+                        (40, 160, 90)
+                    }
                 }
                 4 => {
                     let v = (x + y) * 255 / 222;
@@ -117,7 +121,11 @@ fn check(only_material: bool) {
         for (mode, tokens) in [("dark", &palette.dark), ("light", &palette.light)] {
             for (key, want) in entry["palette"][mode].as_object().unwrap() {
                 if &hex(tokens, key) != want {
-                    eprintln!("MISMATCH image {kind} {} {mode} {key}: got {} want {want}", entry["scheme"], hex(tokens, key));
+                    eprintln!(
+                        "MISMATCH image {kind} {} {mode} {key}: got {} want {want}",
+                        entry["scheme"],
+                        hex(tokens, key)
+                    );
                     mismatches += 1;
                 }
             }

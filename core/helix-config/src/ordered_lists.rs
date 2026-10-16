@@ -102,14 +102,12 @@ pub fn supports_ordered_type(type_name: &str) -> bool {
 }
 
 fn string_array(value: &Value) -> Option<Vec<String>> {
-    value
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(str::to_string))
-                .collect()
-        })
+    value.as_array().map(|items| {
+        items
+            .iter()
+            .filter_map(|item| item.as_str().map(str::to_string))
+            .collect()
+    })
 }
 
 fn read_string_list(store: &ConfigStore, toml_id: &str) -> Vec<String> {
@@ -143,14 +141,37 @@ fn default_key_chords(id: &str) -> &'static [&'static str] {
 
 /// Control Center pages shown by default; everything else is hidden until enabled.
 const DEFAULT_VISIBLE_TABS: &[&str] = &[
-    "network", "bluetooth", "tailscale", "notifications", "audio", "screen-time", "privacy-security", "system",
-    "clock", "monitor", "power", "printers", "camera", "calendar", "weather", "media", "capture", "clipboard", "ai",
+    "network",
+    "bluetooth",
+    "tailscale",
+    "notifications",
+    "audio",
+    "screen-time",
+    "privacy-security",
+    "system",
+    "clock",
+    "monitor",
+    "power",
+    "printers",
+    "camera",
+    "calendar",
+    "weather",
+    "media",
+    "capture",
+    "clipboard",
+    "ai",
 ];
 
 fn key_chord_entry(store: &ConfigStore, id: &str, title: &str) -> Value {
-    let chords = match store.get_raw_list(id).and_then(|value| string_array(&value)) {
+    let chords = match store
+        .get_raw_list(id)
+        .and_then(|value| string_array(&value))
+    {
         Some(chords) => chords,
-        None => default_key_chords(id).iter().map(|c| (*c).to_string()).collect(),
+        None => default_key_chords(id)
+            .iter()
+            .map(|c| (*c).to_string())
+            .collect(),
     };
     json!({
         "id": id,
@@ -238,12 +259,18 @@ pub fn extension_entries(
         out.push(super::control_center_shortcuts::catalog_entry(store));
         out.push(super::notification_rules::catalog_entry(store));
     }
-    out.extend(super::ordered_catalog::entries(store, include_desktop, display_names));
+    out.extend(super::ordered_catalog::entries(
+        store,
+        include_desktop,
+        display_names,
+    ));
     out
 }
 
 pub fn catalog_entry<'a>(catalog: &'a [Value], id: &str) -> Option<&'a Value> {
-    catalog.iter().find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+    catalog
+        .iter()
+        .find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
 }
 
 pub fn current_value(_store: &ConfigStore, catalog: &[Value], id: &str) -> Option<Value> {
@@ -260,7 +287,9 @@ fn validate_string_list(
     require_known_options: bool,
     unknown_option_msg: &str,
 ) -> Result<Value, String> {
-    let items = value.as_array().ok_or("Expected at most 256 application IDs")?;
+    let items = value
+        .as_array()
+        .ok_or("Expected at most 256 application IDs")?;
     if items.len() > MAX_LIST {
         return Err("Expected at most 256 application IDs".into());
     }
@@ -297,7 +326,8 @@ fn validate_string_list(
 }
 
 pub fn validate_update(catalog: &[Value], id: &str, value: &Value) -> Result<Value, String> {
-    let entry = catalog_entry(catalog, id).ok_or_else(|| "Unknown ordered desktop list".to_string())?;
+    let entry =
+        catalog_entry(catalog, id).ok_or_else(|| "Unknown ordered desktop list".to_string())?;
     let type_name = entry
         .get("type")
         .and_then(Value::as_str)
@@ -314,27 +344,30 @@ pub fn validate_update(catalog: &[Value], id: &str, value: &Value) -> Result<Val
                         .map(str::to_string)
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let validated = keybinds::update(catalog, id, &strings).map_err(|error| match error {
-                keybinds::KeybindError::NotShown => "Unknown ordered desktop list".to_string(),
-                keybinds::KeybindError::Empty => "Provide between one and sixteen key shortcuts".to_string(),
-                keybinds::KeybindError::TooMany => "Provide between one and sixteen key shortcuts".to_string(),
-                keybinds::KeybindError::BadChord => "Invalid key shortcut".to_string(),
-                keybinds::KeybindError::Duplicate => "Duplicate key shortcut".to_string(),
-                keybinds::KeybindError::SuperNotAllowed => "Invalid key shortcut".to_string(),
-            })?;
+            let validated =
+                keybinds::update(catalog, id, &strings).map_err(|error| match error {
+                    keybinds::KeybindError::NotShown => "Unknown ordered desktop list".to_string(),
+                    keybinds::KeybindError::Empty => {
+                        "Provide between one and sixteen key shortcuts".to_string()
+                    }
+                    keybinds::KeybindError::TooMany => {
+                        "Provide between one and sixteen key shortcuts".to_string()
+                    }
+                    keybinds::KeybindError::BadChord => "Invalid key shortcut".to_string(),
+                    keybinds::KeybindError::Duplicate => "Duplicate key shortcut".to_string(),
+                    keybinds::KeybindError::SuperNotAllowed => "Invalid key shortcut".to_string(),
+                })?;
             Ok(Value::Array(
                 validated.into_iter().map(Value::String).collect(),
             ))
         }
         "application-list" => super::settings::validate_application_list(value.clone()),
-        "tab-list" => validate_string_list(
-            entry,
-            value,
-            false,
-            true,
-            "Unknown Control Center page",
-        ),
-        "display-list" => validate_string_list(entry, value, true, false, "Invalid or duplicate list entry"),
+        "tab-list" => {
+            validate_string_list(entry, value, false, true, "Unknown Control Center page")
+        }
+        "display-list" => {
+            validate_string_list(entry, value, true, false, "Invalid or duplicate list entry")
+        }
         "widget-list" => validate_string_list(entry, value, false, true, "Unknown widget instance"),
         "template-list" => validate_string_list(entry, value, false, true, "Unknown template"),
         "transition-list" => {
@@ -371,9 +404,10 @@ pub fn apply_update(store: &mut ConfigStore, id: &str, value: Value) -> Result<(
                 hidden.push(tab.to_string());
             }
         }
-        return store.set_raw_list("control_center.hidden_tabs", Value::Array(
-            hidden.into_iter().map(Value::String).collect(),
-        ));
+        return store.set_raw_list(
+            "control_center.hidden_tabs",
+            Value::Array(hidden.into_iter().map(Value::String).collect()),
+        );
     }
     if id == "notification.filter" {
         // Persist in the C++ schema: `[notification.filter.<name>]` tables. An empty list is an
@@ -382,7 +416,10 @@ pub fn apply_update(store: &mut ConfigStore, id: &str, value: Value) -> Result<(
             super::settings::storage_path(id).as_ref(),
             super::notification_rules::to_named_tables(&value),
         )?;
-        store.set_json_value("notification.filter_order", super::notification_rules::rule_names(&value))?;
+        store.set_json_value(
+            "notification.filter_order",
+            super::notification_rules::rule_names(&value),
+        )?;
         return store.set_json_value("notification.filter_replace", Value::Bool(true));
     }
     store.set_raw_list(super::settings::storage_path(id).as_ref(), value)
@@ -423,8 +460,7 @@ mod tests {
         let store = ConfigStore::load(paths.clone());
         let catalog = store.full_catalog(true, &[]);
         let value = json!(["output_volume", "clock"]);
-        let validated =
-            validate_update(&catalog, "bar:default:center", &value).unwrap();
+        let validated = validate_update(&catalog, "bar:default:center", &value).unwrap();
         let mut store = store;
         apply_update(&mut store, "bar:default:center", validated).unwrap();
         assert!(paths.settings_toml.is_file());
@@ -440,8 +476,7 @@ mod tests {
         let store = temp_store();
         let catalog = store.full_catalog(true, &[]);
         let value = json!(["fade", "wipe"]);
-        let validated =
-            validate_update(&catalog, "wallpaper.transition", &value).unwrap();
+        let validated = validate_update(&catalog, "wallpaper.transition", &value).unwrap();
         let mut store = store;
         apply_update(&mut store, "wallpaper.transition", validated).unwrap();
         let next = store.full_catalog(true, &[]);
@@ -454,8 +489,7 @@ mod tests {
         let store = temp_store();
         let catalog = store.full_catalog(true, &[]);
         let visible = json!(["network", "bluetooth"]);
-        let validated =
-            validate_update(&catalog, "control_center.visible_tabs", &visible).unwrap();
+        let validated = validate_update(&catalog, "control_center.visible_tabs", &visible).unwrap();
         let mut store = store;
         apply_update(&mut store, "control_center.visible_tabs", validated).unwrap();
         let next = store.full_catalog(true, &[]);

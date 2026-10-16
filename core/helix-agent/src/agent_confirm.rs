@@ -278,7 +278,10 @@ mod tests {
         queue.enqueue(request);
         queue.set_gloss(1, "This closes a window of Brave.\u{202e}");
         let shown = queue.front().unwrap().gloss.clone();
-        assert!(shown.starts_with("This closes a window of Brave.") && !shown.contains('\u{202e}'), "{shown:?}");
+        assert!(
+            shown.starts_with("This closes a window of Brave.") && !shown.contains('\u{202e}'),
+            "{shown:?}"
+        );
         queue.set_gloss(99, "no such request");
         assert_eq!(queue.front().unwrap().gloss, shown);
     }

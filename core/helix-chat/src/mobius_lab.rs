@@ -35,7 +35,12 @@ fn yes() -> bool {
 
 impl Default for Experiments {
     fn default() -> Self {
-        Self { persona_chip: true, style_overlays: true, project_instructions: true, persona_starters: true }
+        Self {
+            persona_chip: true,
+            style_overlays: true,
+            project_instructions: true,
+            persona_starters: true,
+        }
     }
 }
 
@@ -87,9 +92,17 @@ impl Lab {
     pub fn styles(&self) -> Vec<StyleView> {
         let mut out: Vec<StyleView> = BUILTIN_STYLES
             .iter()
-            .map(|(id, label, _)| StyleView { id: (*id).into(), label: (*label).into(), builtin: true })
+            .map(|(id, label, _)| StyleView {
+                id: (*id).into(),
+                label: (*label).into(),
+                builtin: true,
+            })
             .collect();
-        out.extend(self.styles.iter().map(|(id, style)| StyleView { id: id.clone(), label: style.label.clone(), builtin: false }));
+        out.extend(self.styles.iter().map(|(id, style)| StyleView {
+            id: id.clone(),
+            label: style.label.clone(),
+            builtin: false,
+        }));
         out
     }
 
@@ -106,7 +119,9 @@ impl Lab {
     }
 
     pub fn is_style(&self, id: &str) -> bool {
-        id.is_empty() || BUILTIN_STYLES.iter().any(|(known, _, _)| *known == id) || self.styles.contains_key(id)
+        id.is_empty()
+            || BUILTIN_STYLES.iter().any(|(known, _, _)| *known == id)
+            || self.styles.contains_key(id)
     }
 
     pub fn set_project_instructions(&mut self, project: &str, text: &str) -> Result<(), String> {
@@ -150,13 +165,34 @@ pub fn scan(text: &str) -> Vec<String> {
         out.push("Contains invisible characters; they are removed when saved.".to_string());
     }
     for (needle, why) in [
-        ("ignore previous", "Tells the model to ignore earlier instructions."),
-        ("ignore all previous", "Tells the model to ignore earlier instructions."),
-        ("disregard the above", "Tells the model to ignore earlier instructions."),
-        ("you have no restrictions", "Claims the model has no restrictions."),
-        ("reveal your system prompt", "Asks the model to reveal its instructions."),
-        ("without asking", "Asks for actions without confirmation; desktop changes always confirm."),
-        ("do not tell the user", "Asks the model to hide something from the person."),
+        (
+            "ignore previous",
+            "Tells the model to ignore earlier instructions.",
+        ),
+        (
+            "ignore all previous",
+            "Tells the model to ignore earlier instructions.",
+        ),
+        (
+            "disregard the above",
+            "Tells the model to ignore earlier instructions.",
+        ),
+        (
+            "you have no restrictions",
+            "Claims the model has no restrictions.",
+        ),
+        (
+            "reveal your system prompt",
+            "Asks the model to reveal its instructions.",
+        ),
+        (
+            "without asking",
+            "Asks for actions without confirmation; desktop changes always confirm.",
+        ),
+        (
+            "do not tell the user",
+            "Asks the model to hide something from the person.",
+        ),
     ] {
         if lower.contains(needle) && !out.iter().any(|w: &String| w == why) {
             out.push(why.to_string());
@@ -198,12 +234,20 @@ pub fn format_utc(secs: u64) -> String {
     let day = doy - (153 * mp + 2) / 5 + 1;
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = if month <= 2 { year + 1 } else { year };
-    format!("{year:04}-{month:02}-{day:02} {:02}:{:02}", rem / 3600, (rem % 3600) / 60)
+    format!(
+        "{year:04}-{month:02}-{day:02} {:02}:{:02}",
+        rem / 3600,
+        (rem % 3600) / 60
+    )
 }
 
 /// One line of the wishlist (markdown list item): when, what the assistant was set to, and what the person wanted.
 pub fn note_line(now: u64, persona: &str, style: &str, project: &str, text: &str) -> String {
-    let mut line = format!("- {} UTC · {}", format_utc(now), sanitize_for_display(persona, 40));
+    let mut line = format!(
+        "- {} UTC · {}",
+        format_utc(now),
+        sanitize_for_display(persona, 40)
+    );
     if !style.is_empty() {
         line.push_str(&format!(" · style {}", sanitize_for_display(style, 40)));
     }
@@ -233,7 +277,11 @@ pub fn append_line(path: &std::path::Path, line: &str) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path).map_err(|e| e.to_string())?;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|e| e.to_string())?;
     file.write_all(line.as_bytes()).map_err(|e| e.to_string())
 }
 
@@ -245,11 +293,17 @@ pub fn summarize(lines: &str, since: u64) -> String {
     let mut styles: BTreeMap<String, u64> = BTreeMap::new();
     let (mut turns, mut failed, mut total_ms) = (0u64, 0u64, 0u64);
     for line in lines.lines() {
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
         if value.get("t").and_then(|t| t.as_u64()).unwrap_or(0) < since {
             continue;
         }
-        let kind = value.get("kind").and_then(|k| k.as_str()).unwrap_or("?").to_string();
+        let kind = value
+            .get("kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or("?")
+            .to_string();
         if kind == "turn" {
             turns += 1;
             total_ms += value.get("ms").and_then(|m| m.as_u64()).unwrap_or(0);
@@ -261,7 +315,13 @@ pub fn summarize(lines: &str, since: u64) -> String {
                 *personas.entry(p.to_string()).or_default() += 1;
             }
             let style = value.get("style").and_then(|p| p.as_str()).unwrap_or("");
-            *styles.entry(if style.is_empty() { "none".into() } else { style.to_string() }).or_default() += 1;
+            *styles
+                .entry(if style.is_empty() {
+                    "none".into()
+                } else {
+                    style.to_string()
+                })
+                .or_default() += 1;
         }
         *counts.entry(kind).or_default() += 1;
     }
@@ -269,8 +329,14 @@ pub fn summarize(lines: &str, since: u64) -> String {
     if sends == 0 && turns == 0 {
         return "Nothing recorded yet.".into();
     }
-    let redo = counts.get("regenerate").copied().unwrap_or(0) + counts.get("edit").copied().unwrap_or(0);
-    let join = |map: &BTreeMap<String, u64>| map.iter().map(|(k, v)| format!("{k} {v}")).collect::<Vec<_>>().join(", ");
+    let redo =
+        counts.get("regenerate").copied().unwrap_or(0) + counts.get("edit").copied().unwrap_or(0);
+    let join = |map: &BTreeMap<String, u64>| {
+        map.iter()
+            .map(|(k, v)| format!("{k} {v}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
     format!(
         "{sends} messages · {turns} replies ({failed} failed, average {:.1} s) · {redo} regenerated or edited ({:.0}% of messages) · personas: {} · styles: {}",
         if turns == 0 { 0.0 } else { total_ms as f64 / turns as f64 / 1000.0 },
@@ -285,7 +351,10 @@ pub fn lab_path() -> std::path::PathBuf {
 }
 
 pub fn load() -> Lab {
-    std::fs::read_to_string(lab_path()).ok().and_then(|text| Lab::parse(&text).ok()).unwrap_or_default()
+    std::fs::read_to_string(lab_path())
+        .ok()
+        .and_then(|text| Lab::parse(&text).ok())
+        .unwrap_or_default()
 }
 
 pub fn save(lab: &Lab) -> Result<(), String> {
@@ -314,7 +383,13 @@ mod tests {
     #[test]
     fn styles_resolve_builtin_then_custom() {
         let mut lab = Lab::default();
-        lab.styles.insert("pirate".into(), CustomStyle { label: "Pirate".into(), prompt: "Talk\u{200b} like a pirate.".into() });
+        lab.styles.insert(
+            "pirate".into(),
+            CustomStyle {
+                label: "Pirate".into(),
+                prompt: "Talk\u{200b} like a pirate.".into(),
+            },
+        );
         assert!(lab.style_prompt("concise").unwrap().contains("briefly"));
         assert_eq!(lab.style_prompt("pirate").unwrap(), "Talk like a pirate.");
         assert!(lab.style_prompt("").is_none() && lab.style_prompt("nope").is_none());
@@ -325,9 +400,12 @@ mod tests {
     #[test]
     fn project_instructions_are_bounded_cleaned_and_removable() {
         let mut lab = Lab::default();
-        lab.set_project_instructions("Homelab", "Prefer systemd units.\u{202e}").unwrap();
+        lab.set_project_instructions("Homelab", "Prefer systemd units.\u{202e}")
+            .unwrap();
         assert_eq!(lab.project_instructions("Homelab"), "Prefer systemd units.");
-        assert!(lab.set_project_instructions("Homelab", &"x".repeat(MAX_PROJECT_INSTRUCTION_CHARS + 1)).is_err());
+        assert!(lab
+            .set_project_instructions("Homelab", &"x".repeat(MAX_PROJECT_INSTRUCTION_CHARS + 1))
+            .is_err());
         lab.set_project_instructions("Homelab", "  ").unwrap();
         assert_eq!(lab.project_instructions("Homelab"), "");
         assert!(lab.set_project_instructions(" ", "x").is_err());
@@ -346,7 +424,10 @@ mod tests {
         assert_eq!(format_utc(0), "1970-01-01 00:00");
         assert_eq!(format_utc(1_791_000_000), "2026-10-03 04:00");
         let line = note_line(0, "Helix", "concise", "", "wants\nexport to markdown");
-        assert_eq!(line, "- 1970-01-01 00:00 UTC · Helix · style concise · wants export to markdown\n");
+        assert_eq!(
+            line,
+            "- 1970-01-01 00:00 UTC · Helix · style concise · wants export to markdown\n"
+        );
     }
 
     #[test]
@@ -361,9 +442,18 @@ mod tests {
         lines.push_str("not json\n");
         let text = summarize(&lines, 100);
         assert!(text.contains("2 messages"), "{text}");
-        assert!(text.contains("2 replies (1 failed, average 3.0 s)"), "{text}");
-        assert!(text.contains("1 regenerated or edited (50% of messages)"), "{text}");
-        assert!(text.contains("Coder 1") && text.contains("Helix 1") && !text.contains("Old"), "{text}");
+        assert!(
+            text.contains("2 replies (1 failed, average 3.0 s)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("1 regenerated or edited (50% of messages)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("Coder 1") && text.contains("Helix 1") && !text.contains("Old"),
+            "{text}"
+        );
         assert_eq!(summarize("", 0), "Nothing recorded yet.");
     }
 
@@ -373,6 +463,11 @@ mod tests {
         assert!(lab.experiments.persona_chip && lab.experiments.style_overlays);
         let text = lab.to_toml().unwrap();
         assert_eq!(Lab::parse(&text).unwrap(), lab);
-        assert!(Lab::parse("[experiments]\npersona_chip = false\n").unwrap().experiments.style_overlays);
+        assert!(
+            Lab::parse("[experiments]\npersona_chip = false\n")
+                .unwrap()
+                .experiments
+                .style_overlays
+        );
     }
 }

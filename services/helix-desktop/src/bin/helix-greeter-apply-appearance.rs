@@ -215,16 +215,15 @@ fn read_staged(dir: &fs::File, name: &str, max: u64) -> Result<Vec<u8>, Fail> {
         )
     };
     if fd < 0 {
-        return Err(fail(format!(
-            "{name}: {}",
-            io::Error::last_os_error()
-        )));
+        return Err(fail(format!("{name}: {}", io::Error::last_os_error())));
     }
     // SAFETY: `fd` was just returned by openat and is owned by nothing else.
     let file = unsafe { fs::File::from_raw_fd(fd) };
     let meta = file.metadata().map_err(|error| fail(error.to_string()))?;
     if !meta.file_type().is_file() || meta.len() > max {
-        return Err(fail(format!("{name} is missing, not a plain file, or too large")));
+        return Err(fail(format!(
+            "{name} is missing, not a plain file, or too large"
+        )));
     }
     let mut bytes = Vec::new();
     file.take(max + 1)

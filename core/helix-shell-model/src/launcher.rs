@@ -271,10 +271,7 @@ pub fn resolve_launch<'a>(apps: &'a [App], query: &str) -> Option<&'a App> {
     if let Some(app) = apps.iter().find(|app| app.id == with_suffix) {
         return Some(app);
     }
-    if let Some(app) = apps
-        .iter()
-        .find(|app| app.name.eq_ignore_ascii_case(query))
-    {
+    if let Some(app) = apps.iter().find(|app| app.name.eq_ignore_ascii_case(query)) {
         return Some(app);
     }
     let hits = search(apps, query, 2);
@@ -372,7 +369,10 @@ mod tests {
             resolve_launch(&apps, "calc").map(|a| a.name.as_str()),
             Some("Calculator")
         );
-        assert!(resolve_launch(&apps, "cal").is_none(), "Calculator and Calendar both match");
+        assert!(
+            resolve_launch(&apps, "cal").is_none(),
+            "Calculator and Calendar both match"
+        );
         assert!(resolve_launch(&apps, "").is_none());
         assert!(resolve_launch(&apps, "no-such-app").is_none());
     }

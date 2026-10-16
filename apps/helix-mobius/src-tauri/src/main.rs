@@ -2,18 +2,18 @@
 //! Desktop act hands off to the bar Assistant (`Shell1.AssistantSubmit`). Never holds Agent Surface grants.
 
 mod act;
-mod attach;
+mod agent;
 mod analysis;
+mod attach;
 mod dictate;
-mod images;
 mod generation;
+mod images;
 mod lan;
 mod library;
-mod secrets;
-mod web;
-mod terminal;
-mod agent;
 mod output;
+mod secrets;
+mod terminal;
+mod web;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -24,11 +24,11 @@ use helix_chat::chat::{
     valid_id, Chat, ChatError, ChatView, Conversation, Outcome, Role, SearchHit, Summary,
     SYSTEM_PROMPT,
 };
-use helix_config::inference_routing::{self, BackendKind, Routing};
-use helix_chat::model_catalog;
 use helix_chat::markdown::Block;
 use helix_chat::mobius_lab::{self, Experiments, StyleView};
+use helix_chat::model_catalog;
 use helix_chat::personas::{self, Persona, PersonaStore};
+use helix_config::inference_routing::{self, BackendKind, Routing};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use zbus::zvariant::{Array, Signature, Value};
@@ -202,7 +202,9 @@ fn summaries() -> Vec<Summary> {
                 Ok(n) => n,
                 Err(_) => continue,
             };
-            let Some(id) = name.strip_suffix(".json") else { continue };
+            let Some(id) = name.strip_suffix(".json") else {
+                continue;
+            };
             if !seen.insert(id.to_string()) {
                 continue;
             }
@@ -260,23 +262,39 @@ fn chat_args(
     let mut sent: Vec<Vec<u8>> = Vec::new();
     for (position, (role, content)) in messages.iter().enumerate() {
         let mut entry = zbus::zvariant::Dict::new(&string, &any);
-        let own = pictures.iter().find(|(at, _)| *at == position).map(|(_, bytes)| bytes);
+        let own = pictures
+            .iter()
+            .find(|(at, _)| *at == position)
+            .map(|(_, bytes)| bytes);
         // A message with pictures sends its content as parts: the text, then each picture by its place in `images`.
         let content_value = if let Some(own) = own {
             let mut parts = Array::new(&variant);
             let mut part = zbus::zvariant::Dict::new(&string, &any);
             for (key, value) in [("type", "text"), ("text", content.as_str())] {
-                part.append(Value::from(key.to_string()), Value::Value(Box::new(Value::from(value.to_string()))))
-                    .map_err(zbus::Error::from)?;
+                part.append(
+                    Value::from(key.to_string()),
+                    Value::Value(Box::new(Value::from(value.to_string()))),
+                )
+                .map_err(zbus::Error::from)?;
             }
-            parts.append(Value::Value(Box::new(Value::Dict(part)))).map_err(zbus::Error::from)?;
+            parts
+                .append(Value::Value(Box::new(Value::Dict(part))))
+                .map_err(zbus::Error::from)?;
             for bytes in own {
                 let mut part = zbus::zvariant::Dict::new(&string, &any);
-                part.append(Value::from("type".to_string()), Value::Value(Box::new(Value::from("image".to_string()))))
+                part.append(
+                    Value::from("type".to_string()),
+                    Value::Value(Box::new(Value::from("image".to_string()))),
+                )
+                .map_err(zbus::Error::from)?;
+                part.append(
+                    Value::from("index".to_string()),
+                    Value::Value(Box::new(Value::U32(sent.len() as u32))),
+                )
+                .map_err(zbus::Error::from)?;
+                parts
+                    .append(Value::Value(Box::new(Value::Dict(part))))
                     .map_err(zbus::Error::from)?;
-                part.append(Value::from("index".to_string()), Value::Value(Box::new(Value::U32(sent.len() as u32))))
-                    .map_err(zbus::Error::from)?;
-                parts.append(Value::Value(Box::new(Value::Dict(part)))).map_err(zbus::Error::from)?;
                 sent.push(bytes.clone());
             }
             Value::Array(parts)
@@ -302,7 +320,8 @@ fn chat_args(
     let mut args = std::collections::HashMap::new();
     args.insert("messages", Value::Array(list));
     if !sent.is_empty() {
-        let bytes_signature = Signature::try_from("ay").map_err(|e| zbus::Error::Failure(e.to_string()))?;
+        let bytes_signature =
+            Signature::try_from("ay").map_err(|e| zbus::Error::Failure(e.to_string()))?;
         let mut all = Array::new(&bytes_signature);
         for bytes in sent {
             all.append(Value::from(bytes)).map_err(zbus::Error::from)?;
@@ -360,7 +379,11 @@ fn emit_routing(app: &AppHandle) {
 /// Writes a finished desktop task into the chat it was asked in. If that chat is the open one it is updated in place (and saved,
 /// unless a reply is streaming: the turn's own save follows); if another chat is open now, the saved file is updated. A temporary
 /// chat keeps it in memory like everything else in it.
-pub(crate) fn record_desktop_task(app: &AppHandle, chat_id: &str, task: helix_chat::chat::DesktopTask) {
+pub(crate) fn record_desktop_task(
+    app: &AppHandle,
+    chat_id: &str,
+    task: helix_chat::chat::DesktopTask,
+) {
     let task = helix_chat::chat::DesktopTask { at: now(), ..task };
     let open = {
         let shared = shared(app);
@@ -423,7 +446,10 @@ fn record(app: &AppHandle, kind: &str, ms: u64, ok: bool) {
         return;
     }
     let persona = personas::load().active_persona().name.clone();
-    let _ = mobius_lab::append_line(&mobius_lab::usage_path(), &mobius_lab::usage_line(now(), kind, &persona, &style, ms, ok));
+    let _ = mobius_lab::append_line(
+        &mobius_lab::usage_path(),
+        &mobius_lab::usage_line(now(), kind, &persona, &style, ms, ok),
+    );
 }
 
 fn ended(app: &AppHandle, outcome: Outcome) {
@@ -444,7 +470,9 @@ fn follow_signals(app: AppHandle) {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 continue;
             };
-            let Ok(proxy) = proxy(&connection).await else { continue };
+            let Ok(proxy) = proxy(&connection).await else {
+                continue;
+            };
             let (Ok(mut deltas), Ok(mut done), Ok(mut loading), Ok(mut progress)) = (
                 proxy.receive_signal("Delta").await,
                 proxy.receive_signal("Completed").await,
@@ -515,7 +543,10 @@ fn power_saver_active() -> bool {
             return true;
         }
     }
-    if let Ok(output) = std::process::Command::new("powerprofilesctl").arg("get").output() {
+    if let Ok(output) = std::process::Command::new("powerprofilesctl")
+        .arg("get")
+        .output()
+    {
         if let Ok(text) = String::from_utf8(output.stdout) {
             return text.trim() == "power-saver";
         }
@@ -575,11 +606,21 @@ fn chat_set_brief(app: AppHandle, id: String, brief: String) -> Result<(), Strin
     {
         let shared = shared(&app);
         let mut state = shared.lock().expect("state");
-        if state.chat.conversation.id != id { return Err("The chat changed. Open its context again.".into()); }
-        if state.chat.is_streaming() { return Err("Wait for the reply to finish, or stop it, before changing the brief.".into()); }
+        if state.chat.conversation.id != id {
+            return Err("The chat changed. Open its context again.".into());
+        }
+        if state.chat.is_streaming() {
+            return Err(
+                "Wait for the reply to finish, or stop it, before changing the brief.".into(),
+            );
+        }
         let previous_brief = state.chat.conversation.brief.clone();
         let previous_updated = state.chat.conversation.updated;
-        state.chat.conversation.set_brief(&brief).map_err(str::to_string)?;
+        state
+            .chat
+            .conversation
+            .set_brief(&brief)
+            .map_err(str::to_string)?;
         state.chat.conversation.updated = now();
         if !state.chat.temporary && !save(&state.chat.conversation) {
             state.chat.conversation.brief = previous_brief;
@@ -600,7 +641,8 @@ fn chat_list() -> Vec<Summary> {
 #[tauri::command]
 async fn chat_status(app: AppHandle) -> HubStatus {
     let backend = shared(&app).lock().expect("state").last_backend.clone();
-    let left_device = !backend.is_empty() && backend != "On this computer" && !backend.starts_with("local");
+    let left_device =
+        !backend.is_empty() && backend != "On this computer" && !backend.starts_with("local");
     let Ok(connection) = connection().await else {
         return HubStatus {
             inference: "offline",
@@ -639,17 +681,41 @@ fn error_text(error: &ChatError) -> &'static str {
 /// The system prompt for this turn: the persona's identity, then the project's instructions, then the chat's style (each layer only
 /// while its experiment is on). Composed in one place so every send, edit and regenerate agrees.
 fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
-    let using_tools = shared(app).lock().expect("state").chat.conversation.tools_enabled;
+    let using_tools = shared(app)
+        .lock()
+        .expect("state")
+        .chat
+        .conversation
+        .tools_enabled;
     let tools_identity = "You are Mobius, the assistant built into the person's Helix Linux desktop. Tools mode is enabled for this conversation. You can request public web research and reviewed shell commands in a chosen project folder. Use observed results and source references; never invent tool output or claim an unapproved command ran. Desktop settings and application control still require the Act button. Explain errors and declined tools plainly.";
-    let identity = if persona.system_prompt.trim().is_empty() { if using_tools { tools_identity } else { SYSTEM_PROMPT } } else { persona.system_prompt.as_str() };
+    let identity = if persona.system_prompt.trim().is_empty() {
+        if using_tools {
+            tools_identity
+        } else {
+            SYSTEM_PROMPT
+        }
+    } else {
+        persona.system_prompt.as_str()
+    };
     let lab = mobius_lab::load();
     let (project, style) = {
         let shared = shared(app);
         let state = shared.lock().expect("state");
-        (state.chat.conversation.project.clone(), state.chat.conversation.style.clone())
+        (
+            state.chat.conversation.project.clone(),
+            state.chat.conversation.style.clone(),
+        )
     };
-    let project_text = if lab.experiments.project_instructions { lab.project_instructions(&project).to_string() } else { String::new() };
-    let style_text = if lab.experiments.style_overlays { lab.style_prompt(&style).unwrap_or_default() } else { String::new() };
+    let project_text = if lab.experiments.project_instructions {
+        lab.project_instructions(&project).to_string()
+    } else {
+        String::new()
+    };
+    let style_text = if lab.experiments.style_overlays {
+        lab.style_prompt(&style).unwrap_or_default()
+    } else {
+        String::new()
+    };
     mobius_lab::compose_system(identity, &project_text, &style_text)
 }
 
@@ -668,7 +734,8 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
     let analysis_route = {
         let shared = shared(&app);
         let state = shared.lock().expect("state");
-        (!state.chat.conversation.analysis_job.is_empty()).then(|| state.chat.conversation.analysis_model.clone())
+        (!state.chat.conversation.analysis_job.is_empty())
+            .then(|| state.chat.conversation.analysis_model.clone())
     };
     let with_pictures = !turn.images.is_empty();
     if with_pictures {
@@ -678,8 +745,20 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
         task = "vision".into();
         model = profile.model.clone();
         let backend = routing.backend(&profile.backend);
-        is_local = backend.map_or(profile.backend.is_empty() || profile.backend == "local", |b| b.kind == BackendKind::Local);
-        label = backend.map_or_else(|| "On this computer".to_string(), |b| if b.label.is_empty() { b.id.clone() } else { b.label.clone() });
+        is_local = backend.map_or(
+            profile.backend.is_empty() || profile.backend == "local",
+            |b| b.kind == BackendKind::Local,
+        );
+        label = backend.map_or_else(
+            || "On this computer".to_string(),
+            |b| {
+                if b.label.is_empty() {
+                    b.id.clone()
+                } else {
+                    b.label.clone()
+                }
+            },
+        );
     }
     if let Some(analysis_model) = analysis_route {
         if analysis_model.is_empty() || with_pictures {
@@ -806,7 +885,8 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             }
             pictures.push((*at, bytes));
         }
-        let args = chat_args(&turn.messages, &pictures, &task, &model).map_err(|e| e.to_string())?;
+        let args =
+            chat_args(&turn.messages, &pictures, &task, &model).map_err(|e| e.to_string())?;
         let operation: u64 = proxy
             .call("Action", &("chat", args))
             .await
@@ -876,28 +956,49 @@ async fn dictate_stop(app: AppHandle) -> Result<String, String> {
     if audio.len() < 6400 {
         return Ok(String::new()); // under a fifth of a second: nothing to transcribe
     }
-    let connection = connection().await.map_err(|_| "The assistant service is not running.".to_string())?;
-    let proxy = proxy(&connection).await.map_err(|_| "The assistant service is not running.".to_string())?;
-    let mut args: std::collections::HashMap<&str, Value<'static>> = std::collections::HashMap::new();
+    let connection = connection()
+        .await
+        .map_err(|_| "The assistant service is not running.".to_string())?;
+    let proxy = proxy(&connection)
+        .await
+        .map_err(|_| "The assistant service is not running.".to_string())?;
+    let mut args: std::collections::HashMap<&str, Value<'static>> =
+        std::collections::HashMap::new();
     args.insert("audio", Value::from(audio));
     args.insert("language", Value::from("auto".to_string()));
     let hub = app.state::<Arc<dictate::Hub>>().inner().clone();
-    let operation: u64 = proxy.call("Action", &("transcribe", args)).await.map_err(|e| {
-        let text = e.to_string();
-        if text.contains("speech") { "Speech to text is not set up. Get the speech model from Models & routing.".to_string() } else { text }
-    })?;
+    let operation: u64 = proxy
+        .call("Action", &("transcribe", args))
+        .await
+        .map_err(|e| {
+            let text = e.to_string();
+            if text.contains("speech") {
+                "Speech to text is not set up. Get the speech model from Models & routing."
+                    .to_string()
+            } else {
+                text
+            }
+        })?;
     hub.expect(operation);
     let (ok, result) = hub.wait(operation).await?;
     let value: serde_json::Value = serde_json::from_str(&result).unwrap_or_default();
     if !ok || !value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-        let reason = value.get("error").and_then(|v| v.as_str()).unwrap_or("The transcription failed.");
+        let reason = value
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("The transcription failed.");
         return Err(if reason.contains("no speech model") {
             "No speech model is installed. Get “Whisper small” from Models & routing.".to_string()
         } else {
             reason.to_string()
         });
     }
-    let text = value.get("text").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let text = value
+        .get("text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
     eprintln!("MOBIUS dictated {} characters", text.chars().count());
     Ok(text)
 }
@@ -924,20 +1025,50 @@ fn image_discard(id: String) {
 }
 
 #[tauri::command]
-async fn tools_pick_folder() -> Result<Option<String>, String> { agent::pick_folder().await }
+async fn tools_pick_folder() -> Result<Option<String>, String> {
+    agent::pick_folder().await
+}
 
 #[tauri::command]
-fn tools_configure(app: AppHandle, chat_id: String, enabled: bool, workspace: String) -> Result<(), String> {
-    let folder = if workspace.is_empty() { String::new() } else { terminal::workspace(&workspace)?.to_string_lossy().to_string() };
+fn tools_configure(
+    app: AppHandle,
+    chat_id: String,
+    enabled: bool,
+    workspace: String,
+) -> Result<(), String> {
+    let folder = if workspace.is_empty() {
+        String::new()
+    } else {
+        terminal::workspace(&workspace)?
+            .to_string_lossy()
+            .to_string()
+    };
     {
-        let shared = shared(&app); let mut state = shared.lock().expect("state");
-        if state.chat.conversation.id != chat_id || state.chat.is_streaming() { return Err("Stop the current reply before changing Tools mode.".into()); }
-        if enabled && !state.chat.conversation.analysis_job.is_empty() { return Err("Start a separate chat for Tools mode. Software-analysis evidence stays local.".into()); }
-        let old = (state.chat.conversation.tools_enabled, state.chat.conversation.workspace.clone());
-        state.chat.conversation.tools_enabled = enabled; state.chat.conversation.workspace = folder;
-        if !state.chat.temporary && !save(&state.chat.conversation) { state.chat.conversation.tools_enabled = old.0; state.chat.conversation.workspace = old.1; return Err("The tools settings could not be saved.".into()); }
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.conversation.id != chat_id || state.chat.is_streaming() {
+            return Err("Stop the current reply before changing Tools mode.".into());
+        }
+        if enabled && !state.chat.conversation.analysis_job.is_empty() {
+            return Err(
+                "Start a separate chat for Tools mode. Software-analysis evidence stays local."
+                    .into(),
+            );
+        }
+        let old = (
+            state.chat.conversation.tools_enabled,
+            state.chat.conversation.workspace.clone(),
+        );
+        state.chat.conversation.tools_enabled = enabled;
+        state.chat.conversation.workspace = folder;
+        if !state.chat.temporary && !save(&state.chat.conversation) {
+            state.chat.conversation.tools_enabled = old.0;
+            state.chat.conversation.workspace = old.1;
+            return Err("The tools settings could not be saved.".into());
+        }
     }
-    emit_view(&app); Ok(())
+    emit_view(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -955,38 +1086,82 @@ fn tools_open_desk_terminal(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn tools_review(app: AppHandle, activity_id: String, approved: bool) -> Result<(), String> { app.state::<agent::Runtime>().review(&activity_id, approved) }
+fn tools_review(app: AppHandle, activity_id: String, approved: bool) -> Result<(), String> {
+    app.state::<agent::Runtime>().review(&activity_id, approved)
+}
 
 #[tauri::command]
-async fn web_lookup(app: AppHandle, request_id: String, input: String) -> Result<Vec<web::Source>, String> {
-    app.state::<web::Research>().lookup(&request_id, &input).await
+async fn web_lookup(
+    app: AppHandle,
+    request_id: String,
+    input: String,
+) -> Result<Vec<web::Source>, String> {
+    app.state::<web::Research>()
+        .lookup(&request_id, &input)
+        .await
 }
 
 #[tauri::command]
 fn web_cancel(app: AppHandle, request_id: String) {
-    if valid_id(&request_id) { app.state::<web::Research>().cancel(&request_id); }
+    if valid_id(&request_id) {
+        app.state::<web::Research>().cancel(&request_id);
+    }
 }
 
 #[tauri::command]
 async fn web_open_source(url: String) -> Result<(), String> {
     let url = web::public_url(&url)?.to_string();
-    tokio::task::spawn_blocking(move || std::process::Command::new("xdg-open").arg(url).status().map_err(|e| e.to_string())
-        .and_then(|status| if status.success() { Ok(()) } else { Err("The source could not be opened in your browser.".into()) }))
-        .await.map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(move || {
+        std::process::Command::new("xdg-open")
+            .arg(url)
+            .status()
+            .map_err(|e| e.to_string())
+            .and_then(|status| {
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err("The source could not be opened in your browser.".into())
+                }
+            })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-async fn web_answer(app: AppHandle, chat_id: String, question: String, source_ids: Vec<String>) -> Result<(), String> {
+async fn web_answer(
+    app: AppHandle,
+    chat_id: String,
+    question: String,
+    source_ids: Vec<String>,
+) -> Result<(), String> {
     let sources = app.state::<web::Research>().selected(&source_ids)?;
     let text = web::compose(&question, &sources)?;
     let persona = personas::load().active_persona().clone();
     let prompt = active_prompt(&app, &persona);
-    let metadata = sources.iter().map(|source| helix_chat::chat::WebSource { provider: source.provider.clone(), title: source.title.clone(), url: source.url.clone(), kind: source.kind.clone(), fetched: source.fetched }).collect();
+    let metadata = sources
+        .iter()
+        .map(|source| helix_chat::chat::WebSource {
+            provider: source.provider.clone(),
+            title: source.title.clone(),
+            url: source.url.clone(),
+            kind: source.kind.clone(),
+            fetched: source.fetched,
+        })
+        .collect();
     let turn = {
-        let shared = shared(&app); let mut state = shared.lock().expect("state");
-        if state.chat.conversation.id != chat_id { return Err("The chat changed. Open online research again.".into()); }
-        if !state.chat.conversation.analysis_job.is_empty() { return Err("Start a separate chat for online research. Software-analysis conversations keep their evidence local.".into()); }
-        state.chat.send_with_sources(&text, metadata, now(), &prompt).map_err(|e| error_text(&e).to_string())?
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.conversation.id != chat_id {
+            return Err("The chat changed. Open online research again.".into());
+        }
+        if !state.chat.conversation.analysis_job.is_empty() {
+            return Err("Start a separate chat for online research. Software-analysis conversations keep their evidence local.".into());
+        }
+        state
+            .chat
+            .send_with_sources(&text, metadata, now(), &prompt)
+            .map_err(|e| error_text(&e).to_string())?
     };
     record(&app, "web-answer", 0, true);
     dispatch_turn(app, turn).await
@@ -994,7 +1169,9 @@ async fn web_answer(app: AppHandle, chat_id: String, question: String, source_id
 
 #[tauri::command]
 async fn chat_pick_attachments() -> Result<attach::Selection, String> {
-    tauri::async_runtime::spawn_blocking(attach::pick_and_read).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(attach::pick_and_read)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -1005,7 +1182,9 @@ async fn chat_send(
     pictures: Option<Vec<String>>,
 ) -> Result<(), String> {
     if let Some(prompt) = text.trim().strip_prefix("/image ") {
-        if attachments.as_ref().is_some_and(|v| !v.is_empty()) || pictures.as_ref().is_some_and(|v| !v.is_empty()) {
+        if attachments.as_ref().is_some_and(|v| !v.is_empty())
+            || pictures.as_ref().is_some_and(|v| !v.is_empty())
+        {
             return Err("This first image generator accepts a text prompt. Reference-image editing comes later.".into());
         }
         return chat_generate_image(app, prompt.to_string(), None, None, None, None).await;
@@ -1015,7 +1194,9 @@ async fn chat_send(
     let prompt = active_prompt(&app, &persona);
     let attachments = attachments.unwrap_or_default();
     let has_attachments = !attachments.is_empty();
-    let excerpts = attachments.iter().any(|a| a.original_chars > a.content.chars().count());
+    let excerpts = attachments
+        .iter()
+        .any(|a| a.original_chars > a.content.chars().count());
     let composed = if !has_attachments {
         text
     } else {
@@ -1038,7 +1219,9 @@ async fn chat_send(
         }
         let typed = if excerpts {
             format!("{typed}\n\n(Some attached files are excerpts; only the included text is available.)")
-        } else { typed.to_string() };
+        } else {
+            typed.to_string()
+        };
         Conversation::compose_with_attachments(&typed, &pairs).0
     };
     let pictures: Vec<String> = pictures.unwrap_or_default();
@@ -1063,24 +1246,53 @@ async fn chat_send(
         }
     };
     record(&app, "send", 0, true);
-    let using_tools = shared(&app).lock().expect("state").chat.conversation.tools_enabled;
+    let using_tools = shared(&app)
+        .lock()
+        .expect("state")
+        .chat
+        .conversation
+        .tools_enabled;
     if using_tools {
         let private = has_attachments || !turn.images.is_empty();
         emit_view(&app);
         tauri::async_runtime::spawn(agent::run(app, turn, private));
         Ok(())
-    } else { dispatch_turn(app, turn).await }
+    } else {
+        dispatch_turn(app, turn).await
+    }
 }
 
 #[tauri::command]
 async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
-    if shared(&app).lock().expect("state").chat.conversation.messages.last().is_some_and(|m| !m.activities.is_empty()) { return Err("Send a new Tools request to retry. Earlier tool activity is kept in the conversation.".into()); }
+    if shared(&app)
+        .lock()
+        .expect("state")
+        .chat
+        .conversation
+        .messages
+        .last()
+        .is_some_and(|m| !m.activities.is_empty())
+    {
+        return Err(
+            "Send a new Tools request to retry. Earlier tool activity is kept in the conversation."
+                .into(),
+        );
+    }
     let image = {
-        let shared = shared(&app); let state = shared.lock().expect("state");
-        state.chat.conversation.messages.last().and_then(|message| message.images.first()).cloned()
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        state
+            .chat
+            .conversation
+            .messages
+            .last()
+            .and_then(|message| message.images.first())
+            .cloned()
     };
     if let Some(id) = image {
-        if generation::info(&images_dir(), &id)?.is_some() { return image_regenerate(app, id).await; }
+        if generation::info(&images_dir(), &id)?.is_some() {
+            return image_regenerate(app, id).await;
+        }
     }
     let store = personas::load();
     let persona = store.active_persona().clone();
@@ -1097,7 +1309,20 @@ async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn chat_edit(app: AppHandle, index: usize, text: String) -> Result<(), String> {
-    if shared(&app).lock().expect("state").chat.conversation.messages.iter().skip(index).any(|m| !m.activities.is_empty()) { return Err("Send a new request to revise a tools task. Its command history stays saved.".into()); }
+    if shared(&app)
+        .lock()
+        .expect("state")
+        .chat
+        .conversation
+        .messages
+        .iter()
+        .skip(index)
+        .any(|m| !m.activities.is_empty())
+    {
+        return Err(
+            "Send a new request to revise a tools task. Its command history stays saved.".into(),
+        );
+    }
     let store = personas::load();
     let persona = store.active_persona().clone();
     let prompt = active_prompt(&app, &persona);
@@ -1178,7 +1403,10 @@ fn lab_get(app: AppHandle) -> LabView {
     let (style, project) = {
         let shared = shared(&app);
         let state = shared.lock().expect("state");
-        (state.chat.conversation.style.clone(), state.chat.conversation.project.clone())
+        (
+            state.chat.conversation.style.clone(),
+            state.chat.conversation.project.clone(),
+        )
     };
     LabView {
         styles: lab.styles(),
@@ -1209,7 +1437,11 @@ fn lab_set_experiment(app: AppHandle, key: String, on: bool) -> Result<(), Strin
 }
 
 #[tauri::command]
-fn lab_set_project_instructions(app: AppHandle, project: String, text: String) -> Result<(), String> {
+fn lab_set_project_instructions(
+    app: AppHandle,
+    project: String,
+    text: String,
+) -> Result<(), String> {
     let mut lab = mobius_lab::load();
     lab.set_project_instructions(&project, &text)?;
     mobius_lab::save(&lab)?;
@@ -1233,11 +1465,17 @@ fn lab_note(app: AppHandle, text: String) -> Result<String, String> {
     let (style, project) = {
         let shared = shared(&app);
         let state = shared.lock().expect("state");
-        (state.chat.conversation.style.clone(), state.chat.conversation.project.clone())
+        (
+            state.chat.conversation.style.clone(),
+            state.chat.conversation.project.clone(),
+        )
     };
     let persona = personas::load().active_persona().name.clone();
     let path = mobius_lab::wishlist_path();
-    mobius_lab::append_line(&path, &mobius_lab::note_line(now(), &persona, &style, &project, text))?;
+    mobius_lab::append_line(
+        &path,
+        &mobius_lab::note_line(now(), &persona, &style, &project, text),
+    )?;
     record(&app, "note", 0, true);
     Ok(path.display().to_string())
 }
@@ -1247,7 +1485,11 @@ fn lab_note(app: AppHandle, text: String) -> Result<String, String> {
 fn lab_usage(days: u64) -> String {
     let since = now().saturating_sub(days.clamp(1, 365) * 86_400);
     let text = std::fs::read_to_string(mobius_lab::usage_path()).unwrap_or_default();
-    format!("Last {} days — {}", days.clamp(1, 365), mobius_lab::summarize(&text, since))
+    format!(
+        "Last {} days — {}",
+        days.clamp(1, 365),
+        mobius_lab::summarize(&text, since)
+    )
 }
 
 #[tauri::command]
@@ -1397,13 +1639,18 @@ async fn chat_act_on_desktop(app: AppHandle, text: String) -> Result<(), String>
         ));
     }
     let connection = connection().await.map_err(|_| shell_offline())?;
-    let proxy = shell_proxy(&connection).await.map_err(|_| shell_offline())?;
+    let proxy = shell_proxy(&connection)
+        .await
+        .map_err(|_| shell_offline())?;
     // Remembered before the hand-over, so the first state the shell reports is already known to be this task, and so the
     // finished task is written to the chat it was asked in, after the messages it already had.
     let (chat, after) = {
         let shared = shared(&app);
         let state = shared.lock().expect("state");
-        (state.chat.conversation.id.clone(), state.chat.conversation.messages.len())
+        (
+            state.chat.conversation.id.clone(),
+            state.chat.conversation.messages.len(),
+        )
     };
     act::remember(trimmed, &chat, after);
     proxy
@@ -1427,7 +1674,9 @@ async fn chat_open_shell_panel(id: String) -> Result<(), String> {
         return Err("unknown panel".into());
     }
     let connection = connection().await.map_err(|_| shell_offline())?;
-    let proxy = shell_proxy(&connection).await.map_err(|_| shell_offline())?;
+    let proxy = shell_proxy(&connection)
+        .await
+        .map_err(|_| shell_offline())?;
     proxy
         .call_method("OpenPanel", &(id.as_str(),))
         .await
@@ -1537,7 +1786,12 @@ fn chat_reply_draft(app: AppHandle, index: usize) -> Result<ReplyDraftView, Stri
         if state.chat.is_streaming() {
             return Err("Wait for the reply to finish before saving.".into());
         }
-        let message = state.chat.conversation.messages.get(index).ok_or("That message is not in this chat.")?;
+        let message = state
+            .chat
+            .conversation
+            .messages
+            .get(index)
+            .ok_or("That message is not in this chat.")?;
         if message.role != Role::Assistant {
             return Err("Only assistant replies can be saved as a file.".into());
         }
@@ -1553,7 +1807,10 @@ fn chat_reply_draft(app: AppHandle, index: usize) -> Result<ReplyDraftView, Stri
 }
 
 #[tauri::command]
-async fn chat_reply_save(content: String, default_filename: String) -> Result<Option<String>, String> {
+async fn chat_reply_save(
+    content: String,
+    default_filename: String,
+) -> Result<Option<String>, String> {
     tokio::task::spawn_blocking(move || output::save_new_file(&content, &default_filename))
         .await
         .map_err(|e| e.to_string())?
@@ -1646,7 +1903,9 @@ fn chat_search(query: String) -> Vec<SearchHit> {
                 Ok(n) => n,
                 Err(_) => continue,
             };
-            let Some(id) = name.strip_suffix(".json") else { continue };
+            let Some(id) = name.strip_suffix(".json") else {
+                continue;
+            };
             if !seen.insert(id.to_string()) {
                 continue;
             }
@@ -1716,7 +1975,11 @@ fn chat_delete(app: AppHandle, id: String) -> Result<(), String> {
         state.chat = Chat::new(Conversation::new(&new_id(), now()).ok_or("no id")?);
     }
     if let Some(gone) = load(&id) {
-        let ids: Vec<String> = gone.messages.iter().flat_map(|m| m.images.clone()).collect();
+        let ids: Vec<String> = gone
+            .messages
+            .iter()
+            .flat_map(|m| m.images.clone())
+            .collect();
         images::remove(&images_dir(), &ids);
     }
     let _ = std::fs::remove_file(data_dir().join(format!("{id}.json")));
@@ -1859,20 +2122,36 @@ fn routing_ensure_openrouter(app: AppHandle) -> Result<Routing, String> {
 
 /// Model ids the service has in memory now (empty when it is offline).
 fn inference_model_rows(reply: &zbus::Message) -> Result<Vec<serde_json::Value>, zbus::Error> {
-    let rows = reply.body().deserialize::<Vec<zbus::zvariant::OwnedValue>>()?;
+    let rows = reply
+        .body()
+        .deserialize::<Vec<zbus::zvariant::OwnedValue>>()?;
     Ok(rows.iter().map(helix_desktop_api::owned_to_json).collect())
 }
 
 async fn loaded_models() -> Vec<String> {
-    let Ok(connection) = connection().await else { return Vec::new() };
-    let Ok(proxy) = proxy(&connection).await else { return Vec::new() };
-    let Ok(reply) = proxy.call_method("ListModels", &()).await else { return Vec::new() };
+    let Ok(connection) = connection().await else {
+        return Vec::new();
+    };
+    let Ok(proxy) = proxy(&connection).await else {
+        return Vec::new();
+    };
+    let Ok(reply) = proxy.call_method("ListModels", &()).await else {
+        return Vec::new();
+    };
     let Ok(rows) = inference_model_rows(&reply) else {
         return Vec::new();
     };
     rows.iter()
-        .filter(|row| row.get("loaded").and_then(serde_json::Value::as_bool).unwrap_or(false))
-        .filter_map(|row| row.get("id").and_then(serde_json::Value::as_str).map(str::to_string))
+        .filter(|row| {
+            row.get("loaded")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        })
+        .filter_map(|row| {
+            row.get("id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
         .collect()
 }
 
@@ -1909,14 +2188,18 @@ async fn library_cancel(app: AppHandle, id: String) {
 
 #[tauri::command]
 async fn library_remove(app: AppHandle, id: String) -> Result<(), String> {
-    let model = model_catalog::find(&id).ok_or("Only models from the library can be removed here.")?;
+    let model =
+        model_catalog::find(&id).ok_or("Only models from the library can be removed here.")?;
     let routing = inference_routing::load();
     let used: Vec<&str> = ["chat", "act", "code", "summarize", "vision"]
         .into_iter()
         .filter(|task| routing.route(task).model == model.model_file())
         .collect();
     if !used.is_empty() {
-        return Err(format!("It is used for {}. Choose another model for that first.", used.join(", ")));
+        return Err(format!(
+            "It is used for {}. Choose another model for that first.",
+            used.join(", ")
+        ));
     }
     library::remove(&id)?;
     emit_library(&app).await;
@@ -1935,8 +2218,7 @@ async fn routing_list_models() -> Vec<String> {
     let Ok(reply) = proxy.call_method("ListModels", &()).await else {
         return Vec::new();
     };
-    let Ok(rows) = inference_model_rows(&reply)
-    else {
+    let Ok(rows) = inference_model_rows(&reply) else {
         return Vec::new();
     };
     let mut ids = Vec::new();
@@ -2019,7 +2301,9 @@ async fn routing_page_info() -> RoutingPageInfo {
         inference_ready,
         has_cloud_key,
         lan_configured: lan.map(|b| !b.base_url.trim().is_empty()).unwrap_or(false),
-        cloud_configured: cloud.map(|b| !b.base_url.trim().is_empty()).unwrap_or(false),
+        cloud_configured: cloud
+            .map(|b| !b.base_url.trim().is_empty())
+            .unwrap_or(false),
     }
 }
 
@@ -2069,7 +2353,11 @@ async fn open_settings_agents() -> Result<(), String> {
 }
 
 fn receive_generated_image(app: &AppHandle, operation: u64, result: &serde_json::Value) {
-    let seconds = shared(app).lock().expect("state").turn_started.map_or(0.0, |at| at.elapsed().as_secs_f64());
+    let seconds = shared(app)
+        .lock()
+        .expect("state")
+        .turn_started
+        .map_or(0.0, |at| at.elapsed().as_secs_f64());
     let saved = generation::store(&images_dir(), result, seconds);
     let outcome = {
         let shared = shared(app);
@@ -2077,64 +2365,130 @@ fn receive_generated_image(app: &AppHandle, operation: u64, result: &serde_json:
         match saved {
             Ok((id, info)) => {
                 if state.chat.generated_image(operation, &id) {
-                    let label = format!("Created locally · {} × {} · {:.1}s · seed {}", info.width, info.height, info.seconds, info.seed);
+                    let label = format!(
+                        "Created locally · {} × {} · {:.1}s · seed {}",
+                        info.width, info.height, info.seconds, info.seed
+                    );
                     state.chat.delta(operation, &label);
-                } else { images::remove(&images_dir(), &[id]); }
+                } else {
+                    images::remove(&images_dir(), &[id]);
+                }
                 state.chat.complete(operation, true, "{\"ok\":true}")
             }
-            Err(error) => state.chat.complete(operation, false, &serde_json::json!({"error": error}).to_string()),
+            Err(error) => state.chat.complete(
+                operation,
+                false,
+                &serde_json::json!({"error": error}).to_string(),
+            ),
         }
     };
-    if let Some(outcome) = outcome { ended(app, outcome); }
+    if let Some(outcome) = outcome {
+        ended(app, outcome);
+    }
 }
 
 #[tauri::command]
-async fn chat_generate_image(app: AppHandle, prompt: String, model: Option<String>, width: Option<u32>, height: Option<u32>, seed: Option<u32>) -> Result<(), String> {
+async fn chat_generate_image(
+    app: AppHandle,
+    prompt: String,
+    model: Option<String>,
+    width: Option<u32>,
+    height: Option<u32>,
+    seed: Option<u32>,
+) -> Result<(), String> {
     let prompt = prompt.trim().to_string();
-    if prompt.is_empty() || prompt.len() > 4000 || prompt.contains('\0') { return Err("Describe the picture in up to 4000 bytes of text.".into()); }
-    let width = width.unwrap_or(512); let height = height.unwrap_or(512);
-    if !(256..=768).contains(&width) || !(256..=768).contains(&height) || !width.is_multiple_of(64) || !height.is_multiple_of(64) {
+    if prompt.is_empty() || prompt.len() > 4000 || prompt.contains('\0') {
+        return Err("Describe the picture in up to 4000 bytes of text.".into());
+    }
+    let width = width.unwrap_or(512);
+    let height = height.unwrap_or(512);
+    if !(256..=768).contains(&width)
+        || !(256..=768).contains(&height)
+        || !width.is_multiple_of(64)
+        || !height.is_multiple_of(64)
+    {
         return Err("Use image dimensions between 256 and 768, in multiples of 64.".into());
     }
-    let seed = seed.unwrap_or_else(|| u32::from_str_radix(&new_id()[..8], 16).unwrap_or(0) & 0x7fff_ffff);
-    if seed > 0x7fff_ffff { return Err("Seed must be between 0 and 2147483647.".into()); }
-    let model = model.unwrap_or_else(|| model_catalog::find("sd-turbo").expect("image catalog").model_file().to_string());
-    let model = std::path::Path::new(&model).file_name().and_then(|s| s.to_str()).ok_or("Choose an image model.")?.to_string();
-    if !model_catalog::safe_file_name(&model) || !library::models_dir().join("image").join(&model).is_file() {
-        return Err("Download SD-Turbo from Models & routing → My computer before generating pictures.".into());
+    let seed =
+        seed.unwrap_or_else(|| u32::from_str_radix(&new_id()[..8], 16).unwrap_or(0) & 0x7fff_ffff);
+    if seed > 0x7fff_ffff {
+        return Err("Seed must be between 0 and 2147483647.".into());
+    }
+    let model = model.unwrap_or_else(|| {
+        model_catalog::find("sd-turbo")
+            .expect("image catalog")
+            .model_file()
+            .to_string()
+    });
+    let model = std::path::Path::new(&model)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or("Choose an image model.")?
+        .to_string();
+    if !model_catalog::safe_file_name(&model)
+        || !library::models_dir().join("image").join(&model).is_file()
+    {
+        return Err(
+            "Download SD-Turbo from Models & routing → My computer before generating pictures."
+                .into(),
+        );
     }
     let turn = {
         let shared = shared(&app);
         let mut state = shared.lock().expect("state");
-        if !state.chat.conversation.analysis_job.is_empty() { return Err("Start a new chat to create images; this conversation holds software-analysis evidence.".into()); }
-        let turn = state.chat.send_composed(&format!("/image {prompt}"), now(), SYSTEM_PROMPT).map_err(|e| error_text(&e).to_string())?;
+        if !state.chat.conversation.analysis_job.is_empty() {
+            return Err("Start a new chat to create images; this conversation holds software-analysis evidence.".into());
+        }
+        let turn = state
+            .chat
+            .send_composed(&format!("/image {prompt}"), now(), SYSTEM_PROMPT)
+            .map_err(|e| error_text(&e).to_string())?;
         state.turn_started = Some(std::time::Instant::now());
         state.last_backend = "On this computer".into();
         turn
     };
-    let _ = app.emit("image-progress", serde_json::json!({"fraction": 0.0, "stage": "Queued for local image generation"}));
+    let _ = app.emit(
+        "image-progress",
+        serde_json::json!({"fraction": 0.0, "stage": "Queued for local image generation"}),
+    );
     emit_view(&app);
     let result = async {
         let connection = connection().await.map_err(|e| e.to_string())?;
         let proxy = proxy(&connection).await.map_err(|e| e.to_string())?;
         let args: std::collections::HashMap<&str, Value<'static>> = [
-            ("prompt", Value::from(prompt)), ("model", Value::from(model)), ("width", Value::U32(width)),
-            ("height", Value::U32(height)), ("steps", Value::U32(4)), ("seed", Value::U32(seed)),
-        ].into_iter().collect();
-        let operation: u64 = proxy.call("Action", &("image", args)).await.map_err(|e| e.to_string())?;
+            ("prompt", Value::from(prompt)),
+            ("model", Value::from(model)),
+            ("width", Value::U32(width)),
+            ("height", Value::U32(height)),
+            ("steps", Value::U32(4)),
+            ("seed", Value::U32(seed)),
+        ]
+        .into_iter()
+        .collect();
+        let operation: u64 = proxy
+            .call("Action", &("image", args))
+            .await
+            .map_err(|e| e.to_string())?;
         let (outcome, stop) = {
-            let shared = shared(&app); let mut state = shared.lock().expect("state");
+            let shared = shared(&app);
+            let mut state = shared.lock().expect("state");
             let outcome = state.chat.started(turn.generation, operation);
             (outcome, state.chat.stop_requested())
         };
-        if stop && outcome.is_none() { let _ = proxy.call_method("Cancel", &(operation,)).await; }
+        if stop && outcome.is_none() {
+            let _ = proxy.call_method("Cancel", &(operation,)).await;
+        }
         Ok::<_, String>(outcome)
-    }.await;
+    }
+    .await;
     match result {
         Ok(Some(outcome)) => ended(&app, outcome),
-        Ok(None) => {},
+        Ok(None) => {}
         Err(error) => {
-            shared(&app).lock().expect("state").chat.failed_to_start(turn.generation, &format!("Image generation could not start: {error}"));
+            shared(&app).lock().expect("state").chat.failed_to_start(
+                turn.generation,
+                &format!("Image generation could not start: {error}"),
+            );
             emit_view(&app);
         }
     }
@@ -2142,53 +2496,87 @@ async fn chat_generate_image(app: AppHandle, prompt: String, model: Option<Strin
 }
 
 #[tauri::command]
-fn image_info(id: String) -> Result<Option<generation::Info>, String> { generation::info(&images_dir(), &id) }
+fn image_info(id: String) -> Result<Option<generation::Info>, String> {
+    generation::info(&images_dir(), &id)
+}
 
 #[tauri::command]
 async fn image_copy(id: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || generation::copy(&images_dir(), &id)).await.map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(move || generation::copy(&images_dir(), &id))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 async fn image_save(id: String) -> Result<Option<String>, String> {
-    tokio::task::spawn_blocking(move || generation::save(&images_dir(), &id)).await.map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(move || generation::save(&images_dir(), &id))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 async fn image_regenerate(app: AppHandle, id: String) -> Result<(), String> {
-    let info = generation::info(&images_dir(), &id)?.ok_or("That picture has no generation prompt.")?;
-    chat_generate_image(app, info.prompt, Some(info.model), Some(info.width), Some(info.height), None).await
+    let info =
+        generation::info(&images_dir(), &id)?.ok_or("That picture has no generation prompt.")?;
+    chat_generate_image(
+        app,
+        info.prompt,
+        Some(info.model),
+        Some(info.width),
+        Some(info.height),
+        None,
+    )
+    .await
 }
 
 #[tauri::command]
-fn analysis_readiness() -> analysis::Readiness { analysis::readiness() }
+fn analysis_readiness() -> analysis::Readiness {
+    analysis::readiness()
+}
 
 #[tauri::command]
-fn analysis_view(app: AppHandle) -> analysis::Job { analysis::view(&app) }
+fn analysis_view(app: AppHandle) -> analysis::Job {
+    analysis::view(&app)
+}
 
 #[tauri::command]
-fn analysis_load(app: AppHandle, id: String) -> Result<analysis::Job, String> { analysis::load(&app, &id) }
+fn analysis_load(app: AppHandle, id: String) -> Result<analysis::Job, String> {
+    analysis::load(&app, &id)
+}
 
 #[tauri::command]
 async fn analysis_pick() -> Result<Option<String>, String> {
-    tokio::task::spawn_blocking(analysis::pick).await.map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(analysis::pick)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn analysis_start(app: AppHandle, path: String, procedure: Option<String>) -> Result<analysis::Job, String> {
+fn analysis_start(
+    app: AppHandle,
+    path: String,
+    procedure: Option<String>,
+) -> Result<analysis::Job, String> {
     analysis::start(app, path, procedure.unwrap_or_default())
 }
 
 #[tauri::command]
-fn analysis_cancel(app: AppHandle) { analysis::cancel(&app); }
+fn analysis_cancel(app: AppHandle) {
+    analysis::cancel(&app);
+}
 
 #[tauri::command]
 async fn analysis_explain(app: AppHandle, id: String, model: String) -> Result<(), String> {
-    if !routing_list_models().await.contains(&model) { return Err("Choose an installed local text model in the analysis panel.".into()); }
+    if !routing_list_models().await.contains(&model) {
+        return Err("Choose an installed local text model in the analysis panel.".into());
+    }
     let job = analysis::view(&app);
-    if job.id != id { return Err("The analysis changed. Open the evidence you want to explain.".into()); }
+    if job.id != id {
+        return Err("The analysis changed. Open the evidence you want to explain.".into());
+    }
     let prompt = analysis::explanation(&app)?;
-    let mut fresh = Conversation::new(&new_id(), now()).ok_or("Could not create an analysis conversation.")?;
+    let mut fresh =
+        Conversation::new(&new_id(), now()).ok_or("Could not create an analysis conversation.")?;
     fresh.analysis_job = job.id;
     fresh.analysis_model = model;
     switch_to(&app, fresh)?;
@@ -2246,7 +2634,10 @@ fn follow_appearance(app: tauri::AppHandle) {
         let _ = desktop
             .watch_theme_dark(move |dark| {
                 eprintln!("UI theme {}", if dark { "dark" } else { "light" });
-                APP_THEME.store(if dark { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
+                APP_THEME.store(
+                    if dark { 1 } else { 2 },
+                    std::sync::atomic::Ordering::Relaxed,
+                );
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
                         let _ = window.eval(script);
@@ -2377,7 +2768,8 @@ fn main() {
                     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
                         let name = entry.file_name().to_string_lossy().to_string();
                         if let Some(conversation) = name.strip_suffix(".json").and_then(load) {
-                            referenced.extend(conversation.messages.into_iter().flat_map(|m| m.images));
+                            referenced
+                                .extend(conversation.messages.into_iter().flat_map(|m| m.images));
                         }
                     }
                 }
@@ -2421,10 +2813,21 @@ mod snippet_tests {
         let string = Signature::try_from("s").unwrap();
         let variant = Signature::try_from("v").unwrap();
         let mut row = Dict::new(&string, &variant);
-        row.append(Value::from("id"), Value::Value(Box::new(Value::from("fake-model")))).unwrap();
-        row.append(Value::from("loaded"), Value::Value(Box::new(Value::Bool(true)))).unwrap();
+        row.append(
+            Value::from("id"),
+            Value::Value(Box::new(Value::from("fake-model"))),
+        )
+        .unwrap();
+        row.append(
+            Value::from("loaded"),
+            Value::Value(Box::new(Value::Bool(true))),
+        )
+        .unwrap();
         let rows = vec![Value::Dict(row)];
-        let message = zbus::Message::method_call("/org/helix/Inference", "ListModels").unwrap().build(&(rows,)).unwrap();
+        let message = zbus::Message::method_call("/org/helix/Inference", "ListModels")
+            .unwrap()
+            .build(&(rows,))
+            .unwrap();
         assert_eq!(message.body().signature().to_string(), "av");
         let decoded = super::inference_model_rows(&message).unwrap();
         assert_eq!(decoded[0]["id"], "fake-model");
@@ -2438,7 +2841,10 @@ mod snippet_tests {
         // A letter whose lowercase form is longer than the original (İ becomes i + a combining dot) must not shift the cut.
         assert!(snippet_around("İstanbul ké😀 text", "ké").is_some());
         assert!(snippet_around("😀ké", "É").is_some());
-        assert_eq!(snippet_around("hello world", "WORLD").as_deref(), Some("hello world"));
+        assert_eq!(
+            snippet_around("hello world", "WORLD").as_deref(),
+            Some("hello world")
+        );
         assert!(snippet_around("hello", "zzz").is_none());
     }
 }
@@ -2450,7 +2856,10 @@ mod picture_wire_tests {
 
     #[test]
     fn pictures_go_as_parts_plus_a_byte_array_list() {
-        let messages = [("system", "be brief".to_string()), ("user", "what is this?".to_string())];
+        let messages = [
+            ("system", "be brief".to_string()),
+            ("user", "what is this?".to_string()),
+        ];
         let pictures = vec![(1usize, vec![vec![1u8, 2, 3], vec![4u8, 5]])];
         let args = chat_args(&messages, &pictures, "vision", "").unwrap();
         let images = args.get("images").expect("images are sent");
@@ -2459,7 +2868,10 @@ mod picture_wire_tests {
         let ctx = zbus::zvariant::serialized::Context::new_dbus(zbus::zvariant::LE, 0);
         let encoded = zbus::zvariant::to_bytes(ctx, &args).expect("encodes");
         assert!(encoded.len() > 40);
-        assert_eq!(<std::collections::HashMap<&str, Value>>::SIGNATURE.to_string(), "a{sv}");
+        assert_eq!(
+            <std::collections::HashMap<&str, Value>>::SIGNATURE.to_string(),
+            "a{sv}"
+        );
         // Without pictures nothing changes: no images, string content.
         let plain = chat_args(&messages, &[], "chat", "").unwrap();
         assert!(!plain.contains_key("images"));

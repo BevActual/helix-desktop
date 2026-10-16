@@ -29,9 +29,7 @@ pub fn validate_color_config_string(text: &str) -> Result<(), String> {
     if ROLE_TOKENS.contains(&text) {
         return Ok(());
     }
-    if text.len() == 7
-        && text.starts_with('#')
-        && text[1..].chars().all(|c| c.is_ascii_hexdigit())
+    if text.len() == 7 && text.starts_with('#') && text[1..].chars().all(|c| c.is_ascii_hexdigit())
     {
         return Ok(());
     }
@@ -40,9 +38,7 @@ pub fn validate_color_config_string(text: &str) -> Result<(), String> {
 
 /// `#RRGGBB` accent colors for `Appearance1.SetAccent` / `SetRole` (C++ `hex()`).
 pub fn validate_accent_hex(text: &str) -> Result<(), String> {
-    if text.len() == 7
-        && text.starts_with('#')
-        && text[1..].chars().all(|c| c.is_ascii_hexdigit())
+    if text.len() == 7 && text.starts_with('#') && text[1..].chars().all(|c| c.is_ascii_hexdigit())
     {
         Ok(())
     } else {

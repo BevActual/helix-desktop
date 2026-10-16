@@ -48,7 +48,10 @@ pub struct Reply {
 /// A reply never prints what was typed.
 impl std::fmt::Debug for Reply {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Reply").field("response", &"<hidden>").field("cancel", &self.cancel).finish()
+        f.debug_struct("Reply")
+            .field("response", &"<hidden>")
+            .field("cancel", &self.cancel)
+            .finish()
     }
 }
 
@@ -108,12 +111,22 @@ impl Pairing {
         if prompt.get("device").and_then(Value::as_str) != Some(device.as_str()) {
             return;
         }
-        let Some(kind) = prompt.get("kind").and_then(Value::as_i64).and_then(kind_of) else { return };
+        let Some(kind) = prompt.get("kind").and_then(Value::as_i64).and_then(kind_of) else {
+            return;
+        };
         self.prompt = Some(Prompt {
             kind,
-            passkey: prompt.get("passkey").and_then(Value::as_u64).unwrap_or(0).min(999_999) as u32,
+            passkey: prompt
+                .get("passkey")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(999_999) as u32,
             pin: sanitize_for_display(prompt.get("pin").and_then(Value::as_str).unwrap_or(""), 16),
-            entered: prompt.get("entered").and_then(Value::as_u64).unwrap_or(0).min(6) as u16,
+            entered: prompt
+                .get("entered")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(6) as u16,
         });
     }
 
@@ -161,7 +174,13 @@ impl Pairing {
 
     pub fn view(&self, bluetooth: &Bluetooth) -> PairingView {
         let Some(path) = &self.device else {
-            return PairingView { active: false, device: String::new(), stage: "waiting", code: String::new(), entered: 0 };
+            return PairingView {
+                active: false,
+                device: String::new(),
+                stage: "waiting",
+                code: String::new(),
+                entered: 0,
+            };
         };
         let device = bluetooth.name_of(path).unwrap_or_default();
         let (stage, code, entered) = match &self.prompt {
@@ -175,7 +194,13 @@ impl Pairing {
                 Kind::Authorize | Kind::AuthorizeService => ("authorize", String::new(), 0),
             },
         };
-        PairingView { active: true, device, stage, code, entered }
+        PairingView {
+            active: true,
+            device,
+            stage,
+            code,
+            entered,
+        }
     }
 
     fn question(&self) -> Result<&Prompt, PairingError> {
@@ -186,15 +211,22 @@ impl Pairing {
     pub fn answer_text(&self, text: &str) -> Result<Reply, PairingError> {
         match self.question()?.kind {
             Kind::Pin => {
-                if (1..=16).contains(&text.len()) && text.chars().all(|c| (' '..='~').contains(&c)) {
-                    Ok(Reply { response: text.to_string(), cancel: false })
+                if (1..=16).contains(&text.len()) && text.chars().all(|c| (' '..='~').contains(&c))
+                {
+                    Ok(Reply {
+                        response: text.to_string(),
+                        cancel: false,
+                    })
                 } else {
                     Err(PairingError::BadPin)
                 }
             }
             Kind::Passkey => {
                 if (1..=6).contains(&text.len()) && text.chars().all(|c| c.is_ascii_digit()) {
-                    Ok(Reply { response: text.to_string(), cancel: false })
+                    Ok(Reply {
+                        response: text.to_string(),
+                        cancel: false,
+                    })
                 } else {
                     Err(PairingError::BadPasskey)
                 }
@@ -206,7 +238,10 @@ impl Pairing {
     /// "Yes" to a comparison or an authorisation.
     pub fn accept(&self) -> Result<Reply, PairingError> {
         match self.question()?.kind {
-            Kind::Confirm | Kind::Authorize | Kind::AuthorizeService => Ok(Reply { response: String::new(), cancel: false }),
+            Kind::Confirm | Kind::Authorize | Kind::AuthorizeService => Ok(Reply {
+                response: String::new(),
+                cancel: false,
+            }),
             _ => Err(PairingError::WrongKind),
         }
     }
@@ -215,7 +250,10 @@ impl Pairing {
     pub fn cancel(&mut self) -> Result<Request, PairingError> {
         let path = self.device.clone().ok_or(PairingError::NoQuestion)?;
         self.finish();
-        Ok(Request { action: "cancel-pair", args: serde_json::json!({"path": path}) })
+        Ok(Request {
+            action: "cancel-pair",
+            args: serde_json::json!({"path": path}),
+        })
     }
 }
 
@@ -248,13 +286,32 @@ mod tests {
     fn only_an_unpaired_listed_device_can_be_paired_and_only_one_at_a_time() {
         let bt = bluetooth();
         let mut pairing = Pairing::default();
-        assert_eq!(pairing.begin(&bt, "/d/old").unwrap_err(), PairingError::Request(RequestError::AlreadyPaired));
-        assert_eq!(pairing.begin(&bt, "/d/none").unwrap_err(), PairingError::Request(RequestError::UnknownDevice));
-        assert!(!pairing.is_active(), "a refused start leaves nothing under way");
+        assert_eq!(
+            pairing.begin(&bt, "/d/old").unwrap_err(),
+            PairingError::Request(RequestError::AlreadyPaired)
+        );
+        assert_eq!(
+            pairing.begin(&bt, "/d/none").unwrap_err(),
+            PairingError::Request(RequestError::UnknownDevice)
+        );
+        assert!(
+            !pairing.is_active(),
+            "a refused start leaves nothing under way"
+        );
         let request = pairing.begin(&bt, "/d/new").unwrap();
-        assert_eq!(request, Request { action: "pair", args: json!({"path": "/d/new"}) });
-        assert_eq!(pairing.begin(&bt, "/d/new").unwrap_err(), PairingError::Request(RequestError::Busy));
-        let off = Bluetooth::from_snapshot(&json!({"available": true, "enabled": false, "devices": []}));
+        assert_eq!(
+            request,
+            Request {
+                action: "pair",
+                args: json!({"path": "/d/new"})
+            }
+        );
+        assert_eq!(
+            pairing.begin(&bt, "/d/new").unwrap_err(),
+            PairingError::Request(RequestError::Busy)
+        );
+        let off =
+            Bluetooth::from_snapshot(&json!({"available": true, "enabled": false, "devices": []}));
         assert!(Pairing::default().begin(&off, "/d/new").is_err());
     }
 
@@ -263,7 +320,10 @@ mod tests {
         let mut p = started();
         p.set_operation(7);
         p.operation_done(3);
-        assert!(p.is_active(), "a scan finishing is not the pairing finishing");
+        assert!(
+            p.is_active(),
+            "a scan finishing is not the pairing finishing"
+        );
         p.operation_done(7);
         assert!(!p.is_active());
         let mut early = started();
@@ -271,7 +331,10 @@ mod tests {
         early.operation_done(4);
         assert!(early.is_active());
         early.set_operation(9);
-        assert!(!early.is_active(), "the pair operation finished before its id arrived");
+        assert!(
+            !early.is_active(),
+            "the pair operation finished before its id arrived"
+        );
         let mut other = started();
         other.operation_done(4);
         other.set_operation(5);
@@ -286,10 +349,17 @@ mod tests {
         assert_eq!(p.view(&bt).device, "Speaker");
         p.on_prompt(&prompt(5, 42, "", 0));
         let v = p.view(&bt);
-        assert_eq!((v.stage, v.code.as_str()), ("confirm", "000042"), "a code is padded to six digits");
+        assert_eq!(
+            (v.stage, v.code.as_str()),
+            ("confirm", "000042"),
+            "a code is padded to six digits"
+        );
         p.on_prompt(&prompt(4, 123456, "", 3));
         let v = p.view(&bt);
-        assert_eq!((v.stage, v.code.as_str(), v.entered), ("display", "123456", 3));
+        assert_eq!(
+            (v.stage, v.code.as_str(), v.entered),
+            ("display", "123456", 3)
+        );
         p.on_prompt(&prompt(3, 0, "0000", 0));
         assert_eq!(p.view(&bt).code, "0000");
         p.on_prompt(&prompt(1, 0, "", 0));
@@ -321,9 +391,19 @@ mod tests {
     #[test]
     fn a_pin_is_one_to_sixteen_printable_characters() {
         let mut p = started();
-        assert_eq!(p.answer_text("1234"), Err(PairingError::NoQuestion), "nothing was asked yet");
+        assert_eq!(
+            p.answer_text("1234"),
+            Err(PairingError::NoQuestion),
+            "nothing was asked yet"
+        );
         p.on_prompt(&prompt(1, 0, "", 0));
-        assert_eq!(p.answer_text("1234"), Ok(Reply { response: "1234".into(), cancel: false }));
+        assert_eq!(
+            p.answer_text("1234"),
+            Ok(Reply {
+                response: "1234".into(),
+                cancel: false
+            })
+        );
         assert!(p.answer_text(&"a".repeat(16)).is_ok());
         for bad in ["", &"a".repeat(17), "tab\t", "né", "line\n"] {
             assert_eq!(p.answer_text(bad), Err(PairingError::BadPin), "{bad:?}");
@@ -346,14 +426,28 @@ mod tests {
         let mut p = started();
         p.on_prompt(&prompt(5, 7, "", 0));
         assert!(p.accept().is_ok());
-        assert_eq!(p.answer_text("123456"), Err(PairingError::WrongKind), "text for a yes/no");
+        assert_eq!(
+            p.answer_text("123456"),
+            Err(PairingError::WrongKind),
+            "text for a yes/no"
+        );
         p.on_prompt(&prompt(1, 0, "", 0));
         assert_eq!(p.accept(), Err(PairingError::WrongKind), "a yes for a PIN");
         p.on_prompt(&prompt(4, 5, "", 0));
-        assert_eq!(p.accept(), Err(PairingError::WrongKind), "nothing to answer for a displayed code");
+        assert_eq!(
+            p.accept(),
+            Err(PairingError::WrongKind),
+            "nothing to answer for a displayed code"
+        );
         assert_eq!(p.answer_text("5"), Err(PairingError::WrongKind));
         p.on_prompt(&prompt(6, 0, "", 0));
-        assert_eq!(p.accept(), Ok(Reply { response: String::new(), cancel: false }));
+        assert_eq!(
+            p.accept(),
+            Ok(Reply {
+                response: String::new(),
+                cancel: false
+            })
+        );
     }
 
     #[test]
@@ -362,16 +456,31 @@ mod tests {
         let mut p = started();
         p.on_prompt(&prompt(5, 7, "", 0));
         let cancel = p.cancel().unwrap();
-        assert_eq!(cancel, Request { action: "cancel-pair", args: json!({"path": "/d/new"}) });
+        assert_eq!(
+            cancel,
+            Request {
+                action: "cancel-pair",
+                args: json!({"path": "/d/new"})
+            }
+        );
         assert!(!p.is_active() && p.accept() == Err(PairingError::NoQuestion));
-        assert_eq!(p.cancel(), Err(PairingError::NoQuestion), "nothing left to cancel");
+        assert_eq!(
+            p.cancel(),
+            Err(PairingError::NoQuestion),
+            "nothing left to cancel"
+        );
         let mut p = started();
         p.on_prompt(&prompt(5, 7, "", 0));
         p.follow(&bt);
         assert!(p.is_active(), "still unpaired: still going");
-        let paired = Bluetooth::from_snapshot(&json!({"available": true, "enabled": true, "devices": [{"path": "/d/new", "name": "Speaker", "paired": true}]}));
+        let paired = Bluetooth::from_snapshot(
+            &json!({"available": true, "enabled": true, "devices": [{"path": "/d/new", "name": "Speaker", "paired": true}]}),
+        );
         p.follow(&paired);
-        assert!(!p.is_active() && p.accept() == Err(PairingError::NoQuestion), "paired: done");
+        assert!(
+            !p.is_active() && p.accept() == Err(PairingError::NoQuestion),
+            "paired: done"
+        );
     }
 
     #[test]
@@ -389,6 +498,9 @@ mod tests {
         let mut p = started();
         p.on_prompt(&json!({"kind": 3, "device": "/d/new", "pin": "12\u{202e}34\n"}));
         let code = p.view(&bt).code;
-        assert!(!code.contains('\u{202e}') && !code.contains('\n'), "{code:?}");
+        assert!(
+            !code.contains('\u{202e}') && !code.contains('\n'),
+            "{code:?}"
+        );
     }
 }

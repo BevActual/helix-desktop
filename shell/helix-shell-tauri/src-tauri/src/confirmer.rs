@@ -9,9 +9,9 @@ use std::time::{Duration, Instant};
 
 use gtk::prelude::*;
 use gtk_layer_shell::LayerShell;
-use helix_desktop_api::Desktop;
 use helix_agent::confirmer::Confirmer;
 use helix_agent::confirmer::ConfirmerView;
+use helix_desktop_api::Desktop;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::mpsc;
@@ -56,10 +56,7 @@ impl ConfirmerHost {
         }));
         let mut panel = panel;
         panel.require_protection();
-        Self {
-            panel,
-            started,
-        }
+        Self { panel, started }
     }
 
     pub fn needs_protection_check(&self) -> bool {
@@ -209,7 +206,10 @@ pub fn probe_protection(app: AppHandle, host: Arc<Mutex<ConfirmerHost>>) {
                 None => std::thread::sleep(Duration::from_millis(100)),
             }
         }
-        eprintln!("CONFIRMER protection={}", if trusted { "protected" } else { "unprotected" });
+        eprintln!(
+            "CONFIRMER protection={}",
+            if trusted { "protected" } else { "unprotected" }
+        );
         let runner = app.clone();
         let _ = app.run_on_main_thread(move || {
             let keep = crate::confirmer_keep(&runner);
@@ -250,11 +250,19 @@ fn gloss_for(app: &AppHandle, details: &Value) -> Option<String> {
     if details.get("tool").and_then(Value::as_str) != Some("window-close") {
         return None;
     }
-    let id = match details.get("args").and_then(Value::as_array).and_then(|a| a.first()) {
+    let id = match details
+        .get("args")
+        .and_then(Value::as_array)
+        .and_then(|a| a.first())
+    {
         Some(arg) => Some(arg.as_str()?.parse::<u64>().ok()?),
         None => None,
     };
-    let facts = crate::shell_state(app).lock().expect("shell state").dock.window_facts();
+    let facts = crate::shell_state(app)
+        .lock()
+        .expect("shell state")
+        .dock
+        .window_facts();
     Some(helix_agent::agent_status::describe_window_close(&facts, id))
 }
 

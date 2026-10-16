@@ -2,7 +2,8 @@
 //! Regenerate with `tools/gen_golden_palette.cpp`.
 
 use helix_theme::palette::{
-    expand_fixed_palette_mode, map_generated_palette_mode, synthesize_terminal_palette_tokens, Palette,
+    expand_fixed_palette_mode, map_generated_palette_mode, synthesize_terminal_palette_tokens,
+    Palette,
 };
 use helix_theme::Color;
 
@@ -29,8 +30,22 @@ fn palette_from(colors: &[Color]) -> Palette {
 
 fn hex_list(p: &Palette) -> String {
     [
-        p.primary, p.on_primary, p.secondary, p.on_secondary, p.tertiary, p.on_tertiary, p.error, p.on_error,
-        p.surface, p.on_surface, p.surface_variant, p.on_surface_variant, p.outline, p.shadow, p.hover, p.on_hover,
+        p.primary,
+        p.on_primary,
+        p.secondary,
+        p.on_secondary,
+        p.tertiary,
+        p.on_tertiary,
+        p.error,
+        p.on_error,
+        p.surface,
+        p.on_surface,
+        p.surface_variant,
+        p.on_surface_variant,
+        p.outline,
+        p.shadow,
+        p.hover,
+        p.on_hover,
     ]
     .iter()
     .map(|c| c.to_hex())
@@ -44,7 +59,10 @@ fn matches_cpp_reference() {
     let mut rows = 0;
     for line in golden.lines() {
         let f: Vec<&str> = line.split('\t').collect();
-        let colors: Vec<Color> = f[0].split(',').map(|h| Color::from_hex(h).unwrap()).collect();
+        let colors: Vec<Color> = f[0]
+            .split(',')
+            .map(|h| Color::from_hex(h).unwrap())
+            .collect();
         let dark = f[1] == "1";
         let palette = palette_from(&colors);
 
@@ -54,7 +72,9 @@ fn matches_cpp_reference() {
         let mut want_tokens = 0;
         for field in &f[2..f.len() - 1] {
             let (key, value) = field.split_once('=').unwrap();
-            let got = tokens.get(key).unwrap_or_else(|| panic!("missing token {key}"));
+            let got = tokens
+                .get(key)
+                .unwrap_or_else(|| panic!("missing token {key}"));
             assert_eq!(
                 format!("#{:06x}", got & 0xff_ffff),
                 value,

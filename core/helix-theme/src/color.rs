@@ -41,7 +41,12 @@ impl Color {
 
     /// `#rrggbb`
     pub fn to_hex(self) -> String {
-        format!("#{:02x}{:02x}{:02x}", self.r & 0xff, self.g & 0xff, self.b & 0xff)
+        format!(
+            "#{:02x}{:02x}{:02x}",
+            self.r & 0xff,
+            self.g & 0xff,
+            self.b & 0xff
+        )
     }
 
     /// `(h°, s, l)` with h in `[0, 360)`.
@@ -81,7 +86,11 @@ impl Color {
             let v = round_clamp_255(l);
             return Self::new(v, v, v);
         }
-        let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
+        let q = if l < 0.5 {
+            l * (1.0 + s)
+        } else {
+            l + s - l * s
+        };
         let p = 2.0 * l - q;
         let hn = h / 360.0;
 
@@ -150,7 +159,9 @@ mod tests {
 
     #[test]
     fn hsl_round_trip_is_stable_for_primaries() {
-        for hex in ["#ff0000", "#00ff00", "#0000ff", "#808080", "#000000", "#ffffff"] {
+        for hex in [
+            "#ff0000", "#00ff00", "#0000ff", "#808080", "#000000", "#ffffff",
+        ] {
             let c = Color::from_hex(hex).unwrap();
             let (h, s, l) = c.to_hsl();
             assert_eq!(Color::from_hsl(h, s, l), c, "{hex}");

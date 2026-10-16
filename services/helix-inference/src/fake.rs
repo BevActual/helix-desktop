@@ -115,10 +115,19 @@ impl Backend for FakeBackend {
 pub struct FakeTranscriber;
 
 impl Transcriber for FakeTranscriber {
-    fn transcribe(&self, samples: &[i16], language: &str, _cancelled: &dyn Fn() -> bool) -> Outcome {
+    fn transcribe(
+        &self,
+        samples: &[i16],
+        language: &str,
+        _cancelled: &dyn Fn() -> bool,
+    ) -> Outcome {
         Outcome {
             ok: true,
-            language: if language == "auto" { "en".into() } else { language.into() },
+            language: if language == "auto" {
+                "en".into()
+            } else {
+                language.into()
+            },
             text: format!("heard {} samples", samples.len()),
             ..Outcome::default()
         }
@@ -151,7 +160,8 @@ impl ImageGenerator for FakeImageGenerator {
         }
         let pixels = [80u8, 140, 200].repeat((request.image_width * request.image_height) as usize);
         outcome.ok = true;
-        outcome.image_png = pictures::encode_png(&pixels, request.image_width, request.image_height);
+        outcome.image_png =
+            pictures::encode_png(&pixels, request.image_width, request.image_height);
         outcome.image_model = if request.model.is_empty() {
             "fake-image-model.gguf".into()
         } else {

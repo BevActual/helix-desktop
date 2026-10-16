@@ -71,7 +71,6 @@ struct App {
     surfaces: Vec<Option<Surface>>,
 }
 
-
 /// BGRX bytes (what `wl_shm` calls XRGB8888 on a little-endian machine) of `source` fitted to `w` x `h`.
 fn render(source: &Source, w: u32, h: u32) -> Vec<u8> {
     let fill =
@@ -461,7 +460,8 @@ fn main() {
             },
         ];
         // SAFETY: two valid pollfd structures; the call only reads and writes them.
-        let ready = unsafe { libc::poll(fds.as_mut_ptr(), if watcher.fd >= 0 { 2 } else { 1 }, -1) };
+        let ready =
+            unsafe { libc::poll(fds.as_mut_ptr(), if watcher.fd >= 0 { 2 } else { 1 }, -1) };
         if ready < 0 {
             continue;
         }

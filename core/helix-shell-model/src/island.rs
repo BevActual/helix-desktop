@@ -150,9 +150,15 @@ mod tests {
     #[test]
     fn what_waits_on_the_person_wins_over_everything() {
         let m = playing("Song");
-        assert_eq!(choose(1, true, "thinking", None, Some(&m)).kind, Kind::Approval);
+        assert_eq!(
+            choose(1, true, "thinking", None, Some(&m)).kind,
+            Kind::Approval
+        );
         assert_eq!(choose(1, true, "idle", None, None).text, "Waiting for you");
-        assert_eq!(choose(3, true, "idle", None, None).text, "3 waiting for you");
+        assert_eq!(
+            choose(3, true, "idle", None, None).text,
+            "3 waiting for you"
+        );
     }
 
     #[test]
@@ -166,7 +172,10 @@ mod tests {
         let v = choose(0, true, "thinking", None, Some(&m));
         assert_eq!((v.kind, v.text.as_str()), (Kind::Assistant, "Thinking…"));
         assert_eq!(choose(0, true, "acting", None, Some(&m)).text, "Working…");
-        assert_eq!(choose(0, true, "confirm", None, None).text, "Your answer needed");
+        assert_eq!(
+            choose(0, true, "confirm", None, None).text,
+            "Your answer needed"
+        );
     }
 
     #[test]
@@ -176,8 +185,14 @@ mod tests {
             label: "Helix Agent".into(),
         };
         let m = playing("Song");
-        assert_eq!(choose(0, true, "idle", Some(&desk), Some(&m)).kind, Kind::AgentDesk);
-        assert_eq!(choose(0, true, "thinking", Some(&desk), None).kind, Kind::Assistant);
+        assert_eq!(
+            choose(0, true, "idle", Some(&desk), Some(&m)).kind,
+            Kind::AgentDesk
+        );
+        assert_eq!(
+            choose(0, true, "thinking", Some(&desk), None).kind,
+            Kind::Assistant
+        );
     }
 
     #[test]
@@ -191,8 +206,14 @@ mod tests {
             playing: false,
             ..playing("Song")
         };
-        assert_eq!(choose(0, true, "idle", None, Some(&paused)).kind, Kind::None);
-        assert_eq!(choose(0, true, "idle", None, Some(&playing(""))).kind, Kind::None);
+        assert_eq!(
+            choose(0, true, "idle", None, Some(&paused)).kind,
+            Kind::None
+        );
+        assert_eq!(
+            choose(0, true, "idle", None, Some(&playing(""))).kind,
+            Kind::None
+        );
     }
 
     #[test]

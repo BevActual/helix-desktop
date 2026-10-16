@@ -50,7 +50,10 @@ pub fn normalized_clock(value: &str) -> Option<&str> {
 
 fn time_to_minutes(hhmm: &str) -> i32 {
     let b = hhmm.as_bytes();
-    i32::from(b[0] - b'0') * 600 + i32::from(b[1] - b'0') * 60 + i32::from(b[3] - b'0') * 10 + i32::from(b[4] - b'0')
+    i32::from(b[0] - b'0') * 600
+        + i32::from(b[1] - b'0') * 60
+        + i32::from(b[3] - b'0') * 10
+        + i32::from(b[4] - b'0')
 }
 
 fn is_manual_mode(config: &LocationConfig) -> bool {
@@ -72,10 +75,12 @@ fn compute_solar_times(latitude: f64, longitude: f64, now: LocalTime) -> (i32, i
     use std::f64::consts::PI;
     let fractional_year = 2.0 * PI / 365.0 * (f64::from(now.day_of_year) - 1.0);
     let equation_of_time = 229.18
-        * (0.000075 + 0.001868 * fractional_year.cos() - 0.032077 * fractional_year.sin()
+        * (0.000075 + 0.001868 * fractional_year.cos()
+            - 0.032077 * fractional_year.sin()
             - 0.014615 * (2.0 * fractional_year).cos()
             - 0.040849 * (2.0 * fractional_year).sin());
-    let declination = 0.006918 - 0.399912 * fractional_year.cos() + 0.070257 * fractional_year.sin()
+    let declination = 0.006918 - 0.399912 * fractional_year.cos()
+        + 0.070257 * fractional_year.sin()
         - 0.006758 * (2.0 * fractional_year).cos()
         + 0.000907 * (2.0 * fractional_year).sin()
         - 0.002697 * (3.0 * fractional_year).cos()
@@ -83,8 +88,8 @@ fn compute_solar_times(latitude: f64, longitude: f64, now: LocalTime) -> (i32, i
 
     let sunrise_zenith = 90.833 * PI / 180.0;
     let lat_rad = latitude * PI / 180.0;
-    let hour_angle_arg =
-        sunrise_zenith.cos() / (lat_rad.cos() * declination.cos()) - lat_rad.tan() * declination.tan();
+    let hour_angle_arg = sunrise_zenith.cos() / (lat_rad.cos() * declination.cos())
+        - lat_rad.tan() * declination.tan();
     if hour_angle_arg > 1.0 {
         return (0, 0);
     }
@@ -102,7 +107,10 @@ fn compute_solar_times(latitude: f64, longitude: f64, now: LocalTime) -> (i32, i
         }
         r
     };
-    (normalize(solar_noon_min - hour_angle_deg * 4.0), normalize(solar_noon_min + hour_angle_deg * 4.0))
+    (
+        normalize(solar_noon_min - hour_angle_deg * 4.0),
+        normalize(solar_noon_min + hour_angle_deg * 4.0),
+    )
 }
 
 /// `day_night_schedule::evaluate` with no resolved (IP/address) coordinates.
@@ -126,20 +134,36 @@ pub fn evaluate(config: &LocationConfig, now: LocalTime) -> Evaluation {
         return Evaluation {
             night,
             until_boundary_ms: ms.max(1000),
-            since_boundary_ms: since_boundary_ms(now_min, now_sec, if night { sunset } else { sunrise }),
+            since_boundary_ms: since_boundary_ms(
+                now_min,
+                now_sec,
+                if night { sunset } else { sunrise },
+            ),
         };
     }
 
     let (Some(lat), Some(lon)) = (config.latitude, config.longitude) else {
-        return Evaluation { night: false, until_boundary_ms: HOUR_MS, since_boundary_ms: HOUR_MS };
+        return Evaluation {
+            night: false,
+            until_boundary_ms: HOUR_MS,
+            since_boundary_ms: HOUR_MS,
+        };
     };
 
     let (sunrise, sunset) = compute_solar_times(lat, lon, now);
     if sunrise == 0 && sunset == 0 {
-        return Evaluation { night: true, until_boundary_ms: HOUR_MS, since_boundary_ms: HOUR_MS };
+        return Evaluation {
+            night: true,
+            until_boundary_ms: HOUR_MS,
+            since_boundary_ms: HOUR_MS,
+        };
     }
     if sunrise == 0 && sunset == 1440 {
-        return Evaluation { night: false, until_boundary_ms: HOUR_MS, since_boundary_ms: HOUR_MS };
+        return Evaluation {
+            night: false,
+            until_boundary_ms: HOUR_MS,
+            since_boundary_ms: HOUR_MS,
+        };
     }
     let night = if sunset > sunrise {
         now_min >= sunset || now_min < sunrise
@@ -155,6 +179,10 @@ pub fn evaluate(config: &LocationConfig, now: LocalTime) -> Evaluation {
     Evaluation {
         night,
         until_boundary_ms: ms.max(1000),
-        since_boundary_ms: since_boundary_ms(now_min, now_sec, if night { sunset } else { sunrise }),
+        since_boundary_ms: since_boundary_ms(
+            now_min,
+            now_sec,
+            if night { sunset } else { sunrise },
+        ),
     }
 }

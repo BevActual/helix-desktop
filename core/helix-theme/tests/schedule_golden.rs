@@ -23,7 +23,11 @@ fn matches_cpp_schedule() {
         match f[0] {
             "coords" => {
                 let (lat, lon, offset) = place(f[1]);
-                config = LocationConfig { latitude: Some(lat), longitude: Some(lon), ..Default::default() };
+                config = LocationConfig {
+                    latitude: Some(lat),
+                    longitude: Some(lon),
+                    ..Default::default()
+                };
                 let minute: i32 = f[3].parse().unwrap();
                 now = LocalTime {
                     minute_of_day: minute,

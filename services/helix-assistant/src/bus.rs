@@ -6,8 +6,8 @@ use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
 use serde_json::{json, Value as Json};
-use zbus::zvariant::{OwnedValue, Value};
 use zbus::proxy::SignalStream;
+use zbus::zvariant::{OwnedValue, Value};
 
 pub fn to_variant(value: &Json) -> Option<OwnedValue> {
     let wrapped = match value {
@@ -90,7 +90,10 @@ pub struct Waiter {
 
 impl Waiter {
     pub fn new(stream: SignalStream<'static>) -> Self {
-        Self { stream, seen: BTreeMap::new() }
+        Self {
+            stream,
+            seen: BTreeMap::new(),
+        }
     }
 
     fn take(&mut self, message: &zbus::Message) {
@@ -110,7 +113,12 @@ impl Waiter {
             let left = end.saturating_duration_since(Instant::now());
             match tokio::time::timeout(left, self.stream.next()).await {
                 Ok(Some(message)) => self.take(&message),
-                _ => return Done { ok: false, result: json!({"error": "timed out"}) },
+                _ => {
+                    return Done {
+                        ok: false,
+                        result: json!({"error": "timed out"}),
+                    }
+                }
             }
         }
     }
