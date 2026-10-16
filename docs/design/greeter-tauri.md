@@ -16,7 +16,7 @@ The page shows a plain message if the bundle is missing, so a build without node
 | greetd protocol | `src-tauri/src/greetd.rs` | Length-prefixed JSON over `$GREETD_SOCK`; messages over 64 KiB refused; PAM text stripped of control characters and bounded. Unit-tested against a fake greetd. |
 | Accounts and sessions | `src-tauri/src/system.rs` | Accounts from passwd (uid 1000–59999, real shell); sessions from `/usr/share/wayland-sessions/*.desktop`. |
 | Commands | `main.rs` | `greeter_begin(username)` only for a listed account; `greeter_start(session_id)` only for a listed session id, command split on spaces (no shell) and sent with an empty environment. The page never names a command. |
-| Appearance | `greeter_offer` | Reads `dark` from `/var/lib/helix-greeter/appearance.json` if present; defaults to dark. |
+| Appearance | `greeter_offer` | Reads `/var/lib/helix-greeter/appearance.json` (`HELIX_GREETER_STATE` in tests). Carries dark/light, palette colors, wallpaper file name, font, UI scale, corner radius, glass (`transparency_mode`), refraction, high contrast, and reduced motion. Missing file stays dark. The wallpaper URL is an asset-protocol path inside that directory. |
 
 The page shows one of four steps (prompt, info, ready, failed) and sends back typed text. Wrong passwords read as one generic retry message.
 
@@ -43,9 +43,9 @@ Not covered: a real DRM seat as the `greetd` user and real PAM; the first real l
 
 ## Not yet
 
-1. Wallpaper behind the card and the full appearance sync (palette, glass, font, scale) from the shell's greeter state; the privileged sync helper does not exist in this tree.
+1. ~~Wallpaper behind the card and the full appearance sync~~ — Settings **Appearance** has **Sync login screen** and **Sync greeter theme automatically**. `helix-greeter-apply-appearance` (`cargo build -p helix-desktop --bin helix-greeter-apply-appearance`) stages the payload and, when the state directory is not writable, installs it through `pkexec` (or `shell.greeter_sync.privilege_command`). Passwordless Polkit rules are still packaging.
 2. Power actions (restart, shut down) from the greeter.
 3. Remembering the last account and session.
-4. Packaging (distro packages and Nix) for the session script and compositor config; today `tools/install-greeter.sh` does it.
+4. Packaging (distro packages and Nix) for the session script, the apply helper, and compositor config; today `tools/install-greeter.sh` does the session script.
 
 Do not merge the greeter into the session shell binary.

@@ -3,7 +3,8 @@
 use std::path::Path;
 use std::time::Instant;
 
-use helix_shell_core::{AuditRecord, RiskTier};
+use helix_agent::audit_log::AuditRecord;
+use helix_agent::risk::Tier as RiskTier;
 use serde_json::json;
 use zbus::names::{BusName, UniqueName};
 use zbus::Connection;
@@ -123,16 +124,13 @@ pub fn audit_record(
     }
 }
 
-pub async fn finish_pending_denied(state: &mut State, pending: PendingConfirm, operation: u64, reason: &str) {
-    complete_pending_denial(
-        state,
-        pending,
-        operation,
-        reason,
-        "cancelled",
-        "stopped",
-    )
-    .await;
+pub async fn finish_pending_denied(
+    state: &mut State,
+    pending: PendingConfirm,
+    operation: u64,
+    reason: &str,
+) {
+    complete_pending_denial(state, pending, operation, reason, "cancelled", "stopped").await;
 }
 
 async fn complete_pending_denial(
@@ -201,7 +199,12 @@ pub async fn confirmer_disconnected(state: &mut State) {
     let conn = state.bus.clone();
     let desktop = state.desktop.clone();
     for (operation, pending) in waiting {
-        let record = audit_record(&pending, RiskTier::Confirm, "denied", "confirmer disconnected");
+        let record = audit_record(
+            &pending,
+            RiskTier::Confirm,
+            "denied",
+            "confirmer disconnected",
+        );
         if let Some(conn) = &conn {
             if let Err(error) = state.audit.append(&record) {
                 tracing::warn!(%error, "audit append failed");

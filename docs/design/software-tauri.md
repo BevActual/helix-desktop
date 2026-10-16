@@ -4,7 +4,7 @@ Frontend: React + TypeScript + Vite (`apps/helix-software/web`, workspace `helix
 
 The React page adds: package icons, Installed / Update available chips, the update count on the sidebar, a named confirmation ("Install Demo App?"), a working state and an error banner, per-page empty states, library filtering, `/` to focus search, and a highlighted row for `--app=`.
 
-Standalone package store as a Tauri toplevel. Pure package models live in `helix-shell-core::software`; the host runs Flatpak / PackageKit / fwupd and draws text-only UI from `core/shared-ui`.
+Standalone package store as a Tauri toplevel. Pure package models live in `helix-software-model::software`; the host runs Flatpak / PackageKit / fwupd and draws text-only UI from `core/shared-ui`.
 
 ## Threat model
 

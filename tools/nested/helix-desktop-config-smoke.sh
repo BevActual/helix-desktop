@@ -338,7 +338,12 @@ import json
 appearance_call("SetAccent", GLib.Variant("(s)", ("#336699",)))
 palette_file = os.path.join(os.environ["XDG_CONFIG_HOME"], "helix", "palettes", "custom.json")
 saved = json.load(open(palette_file))
-assert saved["dark"]["mPrimary"] == "#336699", saved["dark"]["mPrimary"]
+# mode = "auto" with a location: SetAccent edits the palette the shell is showing right now (light by day, dark by night),
+# so exactly one side takes the colour, whatever time this runs.
+def primary(side):
+    return saved[side].get("mPrimary") or saved[side].get("primary")
+edited = [side for side in ("dark", "light") if primary(side) == "#336699"]
+assert len(edited) == 1, (primary("dark"), primary("light"))
 overrides = open(os.path.join(os.environ["XDG_STATE_HOME"], "helix", "settings.toml")).read()
 assert 'source = "custom"' in overrides and 'custom_palette = "custom"' in overrides, overrides
 print("theme_palette=OK")

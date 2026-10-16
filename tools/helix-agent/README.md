@@ -33,8 +33,7 @@ python3 -m venv .venv
 Requires a running Helix Shell and, for window tools, `niri` on `PATH` with
 `NIRI_SOCKET` set in the session.
 
-Optional: `HELIX_SHELL=/path/to/helix-shell` to prefer a specific binary (defaults to
-`build-debug/helix` in this repo when present).
+Optional: `HELIX_SHELL=/path/to/helix-shell` to prefer a specific binary (defaults to `helix-shell` on `PATH`).
 
 ### Example: Cursor
 

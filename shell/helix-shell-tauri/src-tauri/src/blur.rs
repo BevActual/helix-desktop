@@ -1,6 +1,6 @@
 //! Glass: asks the compositor to blur what is behind the parts of the shell surface that are drawn as glass, through
 //! `ext-background-effect-v1`. The shell is one surface covering the whole output, so the blur region has to follow whatever is open
-//! (the bar, a panel, toasts); the page reports those rectangles and `helix_shell_core::glass` turns them into the region.
+//! (the bar, a panel, toasts); the page reports those rectangles and `helix_shell_model::glass` turns them into the region.
 //! GTK owns the surface and its connection. This module makes its own event queue on that same connection, so nothing here reads
 //! or dispatches GTK's events, and it only ever adds the blur region (never attaches buffers or touches the surface otherwise).
 
@@ -8,7 +8,7 @@ use std::cell::RefCell;
 
 use gtk::glib::translate::ToGlibPtr;
 use gtk::prelude::*;
-use helix_shell_core::glass::Rect;
+use helix_shell_model::glass::Rect;
 use wayland_backend::client::{Backend, ObjectId};
 use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::{

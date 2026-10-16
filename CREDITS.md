@@ -1,67 +1,62 @@
 # Credits
 
-Helix Shell builds on the open-source projects below.
+Helix builds on the open-source projects below. `Cargo.lock` and `package-lock.json` are the authoritative list of every crate and package;
+each dependency is governed by its own license.
 
 ## Design & Branding
 
-- **[Tabler Icons](https://tabler.io/icons)** — Icon set used throughout the shell
-- **[Riyan Resdian on Noun Project](https://thenounproject.com/creator/yaicon/)** — Plug icon
+- **[Tabler Icons](https://tabler.io/icons)**: Icon set used throughout the shell and apps (MIT; license in `assets/fonts/tabler-icons-license.txt`)
+- **[Riyan Resdian on Noun Project](https://thenounproject.com/creator/yaicon/)**: Plug icon
 
-## System Libraries
+## Compositor and session
 
-Provided by system packages at build time and linked dynamically where applicable:
+- **[niri](https://github.com/YaLTeR/niri)**: The scrolling Wayland compositor that `compositor/` forks (GPL-3.0-or-later)
+- **[greetd](https://sr.ht/~kennylevinsen/greetd/)**: Login manager the greeter speaks to
+- **[Wayland](https://wayland.freedesktop.org/)**, **[wlroots protocols](https://gitlab.freedesktop.org/wlroots/wlr-protocols)**: Display protocol and the layer-shell, gamma-control, screencopy and output-management extensions the shell uses
+- **[PipeWire](https://pipewire.org/)** and **[WirePlumber](https://pipewire.pages.freedesktop.org/wireplumber/)**: Audio
+- **[NetworkManager](https://networkmanager.dev/)**, **[BlueZ](https://www.bluez.org/)**, **[polkit](https://gitlab.freedesktop.org/polkit/polkit)**, **[systemd](https://systemd.io/)**: System services Helix talks to over D-Bus
 
-- **[Wayland](https://wayland.freedesktop.org/)** (`wayland-client`, `wayland-protocols`, `wayland-egl`) — Display protocol
-- **[Mesa / EGL / GLES2](https://www.mesa3d.org/)** (or **[libepoxy](https://github.com/anholt/libepoxy)** as fallback) — OpenGL ES context and dispatch
-- **[Cairo](https://www.cairographics.org/)** — 2D graphics surface used for text and SVG rasterization
-- **[Pango](https://pango.gnome.org/)** / **PangoCairo** — Text layout and shaping
-- **[HarfBuzz](https://harfbuzz.github.io/)** — OpenType font metrics used for stable text alignment
-- **[FreeType](https://freetype.org/)** — Font rasterization
-- **[Fontconfig](https://www.fontconfig.org/)** — Font discovery
-- **[librsvg](https://wiki.gnome.org/Projects/LibRsvg)** — SVG rendering (filters, clipPaths, masks)
-- **[GLib / GObject / GIO](https://gitlab.gnome.org/GNOME/glib)** — Core utilities used by Pango/Cairo/librsvg
-- **[libxkbcommon](https://xkbcommon.org/)** — Keyboard handling
-- **[sdbus-c++](https://github.com/Kistler-Group/sdbus-cpp)** — D-Bus client bindings
-- **[libsecret](https://gnome.pages.gitlab.gnome.org/libsecret/)** — Secret Service client for credential and encrypted-state persistence
-- **[libsodium](https://doc.libsodium.org/)** — Cryptography for credential and encrypted-state persistence
-- **[PipeWire](https://pipewire.org/)** — Audio capture and playback
-- **[WirePlumber](https://pipewire.pages.freedesktop.org/wireplumber/)** — PipeWire mixer and default-node integration
-- **[libsndfile](https://libsndfile.github.io/libsndfile/)** — UI sound effect decoding
-- **[libcurl](https://curl.se/libcurl/)** — HTTP client
-- **[libwebp](https://developers.google.com/speed/webp)** — WebP decoding and thumbnail/notification image encoding
-- **[libjxl](https://github.com/libjxl/libjxl)** — JPEG XL decoding
-- **[libqalculate](https://qalculate.github.io/)** — Calculator engine for the launcher (arithmetic, unit and currency conversion) (GPL-2.0-or-later)
-- **[libxml2](https://gitlab.gnome.org/GNOME/libxml2)** — XML parser used to read CalDAV responses (MIT)
-- **[libical](https://libical.github.io/libical/)** — iCalendar parsing for calendar events (MPL-2.0)
-- **[nlohmann/json](https://github.com/nlohmann/json)** — JSON for Modern C++ (MIT)
-- **[stb](https://github.com/nothings/stb)** — Header-only image resizing and writing utilities (MIT / public domain)
-- **[toml++](https://github.com/marzer/tomlplusplus)** — TOML parser (MIT)
-- **[polkit](https://gitlab.freedesktop.org/polkit/polkit)** (`polkit-agent`, `polkit-gobject`) — Authentication agent
-- **[Linux-PAM](https://github.com/linux-pam/linux-pam)** — Lockscreen authentication
-- **[jemalloc](https://jemalloc.net/)** — Optional memory allocator used on glibc builds when detected
+## Application framework
 
-## Vendored Libraries
+- **[Tauri](https://tauri.app/)**: Desktop application host for the shell, greeter and apps (MIT / Apache-2.0)
+- **[WebKitGTK](https://webkitgtk.org/)** and **[GTK](https://www.gtk.org/)**: Web view and toolkit under Tauri; **[gtk-layer-shell](https://github.com/wmww/gtk-layer-shell)**: layer surfaces for the bar and panels
+- **[React](https://react.dev/)**, **[Vite](https://vite.dev/)**, **[TypeScript](https://www.typescriptlang.org/)**: App frontends (MIT)
+- **[ts-rs](https://github.com/Aleph-Alpha/ts-rs)**: TypeScript types generated from Rust view structs
 
-Bundled in `third_party/` and built from source:
+## Rust libraries
 
-- **[fzy](https://github.com/jhawthorn/fzy)** — Fuzzy matching algorithm used by the launcher, search pickers, and other shell ranking (MIT)
-- **[Material Color Utilities](https://github.com/material-foundation/material-color-utilities)** — Material 3 palette generation (Apache-2.0)
-- **[Wuffs](https://github.com/google/wuffs)** — Memory-safe image decoders (Apache-2.0)
+The main ones; see `Cargo.lock` for the rest.
 
-## System Integration
+- **[zbus](https://github.com/dbus2/zbus)**: D-Bus client and server
+- **[tokio](https://tokio.rs/)**, **[serde](https://serde.rs/)**, **[toml](https://github.com/toml-rs/toml)**, **[reqwest](https://github.com/seanmonstar/reqwest)**, **[tracing](https://github.com/tokio-rs/tracing)**
+- **[image](https://github.com/image-rs/image)**: Image decoding and encoding
+- **[pipewire-rs](https://gitlab.freedesktop.org/pipewire/pipewire-rs)**: Microphone level metering
+- **[keyring](https://github.com/hwchen/keyring-rs)**: Secret Service access for stored credentials
+- **[scraper](https://github.com/causal-agent/scraper)**, **[roxmltree](https://github.com/RazrFalcon/roxmltree)**: Reading web pages and appstream data
 
-External tools Helix integrates with at runtime when present:
+## Colour and theming
 
-- **[ddcutil](https://www.ddcutil.com/)** — External display brightness control
+- **[Material Color Utilities](https://github.com/material-foundation/material-color-utilities)**: Material 3 palette generation (Apache-2.0). `third_party/material_color_utilities` is the C++ reference the HCT golden tests were generated from; `third_party/material-colors` is the Rust port the theme engine uses.
+
+## Local models
+
+Optional engines Helix runs on this computer when you install them:
+
+- **[llama.cpp](https://github.com/ggml-org/llama.cpp)**: Text and vision models (MIT)
+- **[whisper.cpp](https://github.com/ggml-org/whisper.cpp)**: Speech recognition (MIT)
+- **[stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp)**: Image generation (MIT)
+- **[Ghidra](https://ghidra-sre.org/)**: Software analysis for Mobius, when you set it up (Apache-2.0)
+
+## Vendored in `third_party/`
+
+- **[Wuffs](https://github.com/google/wuffs)**: Memory-safe image decoders (Apache-2.0); not built yet, reserved for the image-decode plan in `docs/design/inference-capabilities.md`
 
 ## Special Thanks
 
 - The **Wayland** community for building the future of Linux desktop graphics
-- The **Niri**, **Hyprland**, **Sway**, **Labwc**, and **MangoWC** teams for their excellent Wayland compositors
+- The **niri** team for the compositor Helix is built on
 - All the contributors and users who have helped make Helix better
 
 ## License
 
-Helix is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
-Each dependency listed above is governed by its own respective license. Please refer to their individual projects for licensing information.
+Helix is licensed under the MIT License. See [LICENSE](LICENSE) for details. The compositor in `compositor/` is a fork of niri and keeps its GPL-3.0-or-later license.

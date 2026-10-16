@@ -92,7 +92,7 @@ wait_for "CONFIRMER destroyed" 2 40 || exit 1
 expect_denied && echo "ok: pointer Deny"
 
 echo "--- 3. Pointer Allow after arming (grant, confirm stays unchecked)"
-# Arming before 700 ms is covered in helix-shell-core unit tests; Enter-never is step 1.
+# Arming before 700 ms is covered in helix-agent unit tests; Enter-never is step 1.
 # Here: wait until armed, Allow with the pointer, confirm tier stays opt-in.
 ARMED_BEFORE=$(grep -c "CONFIRMER armed" "$LOG" 2>/dev/null || true)
 rm -f "$LAYOUT"

@@ -8,13 +8,7 @@ const CONFIG_INTERFACE: &str = "org.helix.Desktop.Configuration1";
 
 pub async fn emit_audio_changed(conn: &Connection) {
     let _ = conn
-        .emit_signal(
-            None::<&str>,
-            OBJECT_PATH,
-            AUDIO_INTERFACE,
-            "Changed",
-            &(),
-        )
+        .emit_signal(None::<&str>, OBJECT_PATH, AUDIO_INTERFACE, "Changed", &())
         .await;
 }
 
@@ -38,12 +32,6 @@ pub async fn emit_input_level(
 
 pub async fn emit_configuration_changed(conn: &Connection) {
     let _ = conn
-        .emit_signal(
-            None::<&str>,
-            OBJECT_PATH,
-            CONFIG_INTERFACE,
-            "Changed",
-            &(),
-        )
+        .emit_signal(None::<&str>, OBJECT_PATH, CONFIG_INTERFACE, "Changed", &())
         .await;
 }

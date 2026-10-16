@@ -123,7 +123,10 @@ impl AgentHub {
     }
 
     pub fn bluetooth_owner(&self) -> Option<String> {
-        self.bluetooth_owner.lock().expect("bluetooth_owner").clone()
+        self.bluetooth_owner
+            .lock()
+            .expect("bluetooth_owner")
+            .clone()
     }
 
     pub fn set_bluetooth_owner(&self, owner: String) {
@@ -150,10 +153,7 @@ impl AgentHub {
     }
 
     pub fn bt_has_pending(&self) -> bool {
-        self.bt_pending
-            .lock()
-            .expect("bt_pending")
-            .is_some()
+        self.bt_pending.lock().expect("bt_pending").is_some()
     }
 
     pub fn bt_pending_kind(&self) -> BluetoothPairingKind {
@@ -305,7 +305,9 @@ impl AgentHub {
         setting_name: String,
     ) -> Result<String, NmSecretOutcome> {
         if self.nm_pending.lock().expect("nm_pending").is_some() {
-            return Err(NmSecretOutcome::NoSecrets("another secret request is already pending"));
+            return Err(NmSecretOutcome::NoSecrets(
+                "another secret request is already pending",
+            ));
         }
         let destination = self
             .network_owner()
@@ -335,8 +337,7 @@ impl AgentHub {
         let mut inner = HashMap::new();
         inner.insert(
             Self::nm_secret_key(setting_name).to_string(),
-            OwnedValue::try_from(zbus::zvariant::Value::from(secret))
-                .expect("secret value"),
+            OwnedValue::try_from(zbus::zvariant::Value::from(secret)).expect("secret value"),
         );
         let mut outer = HashMap::new();
         outer.insert(setting_name.to_string(), inner);
@@ -367,7 +368,11 @@ impl AgentHub {
         Ok(())
     }
 
-    async fn emit_bluetooth_prompt(&self, destination: &str, prompt: &BtPrompt) -> zbus::Result<()> {
+    async fn emit_bluetooth_prompt(
+        &self,
+        destination: &str,
+        prompt: &BtPrompt,
+    ) -> zbus::Result<()> {
         let session = self.session.lock().await;
         let conn = session
             .as_ref()
@@ -389,11 +394,7 @@ impl AgentHub {
         Ok(())
     }
 
-    fn begin_bt(
-        &self,
-        prompt: BtPrompt,
-        wait: BtWait,
-    ) -> Result<(), BtAgentOutcome> {
+    fn begin_bt(&self, prompt: BtPrompt, wait: BtWait) -> Result<(), BtAgentOutcome> {
         if self.bt_pending.lock().expect("bt_pending").is_some() {
             return Err(BtAgentOutcome::Rejected);
         }

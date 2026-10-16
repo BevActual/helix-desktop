@@ -1,29 +1,34 @@
 [package]
 name = "helix-mobius"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Mobius: Helix’s desktop AI — conversations, personas, and model routing. Talks via org.helix.Inference; Act hands off to the bar."
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { workspace = true }
 
 [dependencies]
-helix-shell-core = { path = "../../../core/helix-shell-core" }
-helix-desktop-api = { path = "../../../core/helix-desktop-api" }
-gtk = "0.18"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tauri = { version = "2", features = [] }
-zbus = { version = "5", default-features = false, features = ["tokio"] }
-tokio = { version = "1", features = ["time", "sync", "macros", "fs", "io-util", "process", "rt-multi-thread", "net"] }
-futures-util = { version = "0.3", default-features = false }
-toml = "0.8"
+helix-agent = { workspace = true }
+helix-base = { workspace = true }
+helix-chat = { workspace = true }
+helix-compositor = { workspace = true }
+helix-config = { workspace = true }
+helix-desktop-api = { workspace = true }
+gtk = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true }
+zbus = { workspace = true, features = ["tokio"] }
+tokio = { workspace = true, features = ["time", "sync", "macros", "fs", "io-util", "process", "rt-multi-thread", "net"] }
+futures-util = { workspace = true }
+toml = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 keyring = "3"
 sha2 = "0.10"
-libc = "0.2"
-base64 = "0.22"
+libc = { workspace = true }
+base64 = { workspace = true }
 scraper = "0.27"
 roxmltree = "0.21"
 url = "2"
@@ -31,3 +36,6 @@ url = "2"
 [[bin]]
 name = "helix-mobius"
 path = "src/main.rs"
+
+[lints]
+workspace = true

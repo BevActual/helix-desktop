@@ -11,8 +11,8 @@ use std::time::Duration;
 
 use gtk::prelude::*;
 use gtk_layer_shell::{Edge, LayerShell};
-use helix_shell_core::bar_visibility::read as read_top_strut;
-use helix_shell_core::dock_prefs::DockPrefs;
+use helix_shell_model::bar_visibility::read as read_top_strut;
+use helix_config::dock_prefs::DockPrefs;
 
 fn dock_prefs_path() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
@@ -161,11 +161,11 @@ fn main() {
     eprintln!("STRUT helix-shell-reserve (survives bar restart)");
 
     let top_watch = top.clone();
-    let mut top_seen = helix_shell_core::bar_visibility::state_path()
+    let mut top_seen = helix_shell_model::bar_visibility::state_path()
         .and_then(|p| std::fs::metadata(p).ok())
         .and_then(|m| m.modified().ok());
     gtk::glib::timeout_add_local(Duration::from_millis(400), move || {
-        let now = helix_shell_core::bar_visibility::state_path()
+        let now = helix_shell_model::bar_visibility::state_path()
             .and_then(|p| std::fs::metadata(p).ok())
             .and_then(|m| m.modified().ok());
         if now != top_seen {

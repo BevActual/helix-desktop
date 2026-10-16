@@ -40,10 +40,10 @@ entry point and the fallbacks are deleted.
 ## Rules
 
 1. **Rust owns state and authority.** React holds only what the person is typing and what is on screen. Every mutation is a typed Tauri
-   command; the model in `helix-shell-core` decides whether it is legal.
+   command; the model in the matching core crate (`helix-models`, `helix-config`, ...) decides whether it is legal.
 2. **Text is a text node.** Text from a model, an app, a notification or the system is only ever a React child. Never
    `dangerouslySetInnerHTML`, never `innerHTML`. `react/no-danger` and a ban on `innerHTML` assignment are lint errors. Markdown reaches the
-   page as blocks Rust has already parsed (`helix_shell_core::markdown`).
+   page as blocks Rust has already parsed (`helix_chat::markdown`).
 3. **Strict CSP, no remote content, no `eval`.** Each Tauri window's capability lists only the commands and window actions it needs.
 4. **Types come from Rust.** A view the page receives derives `ts_rs::TS` (behind the `ts` feature); a command's arguments are named in
    the page by the types the view listed. Hand-mirrored types live in `apps/<app>/web/src/types.ts` with a comment naming the Rust struct.

@@ -1,6 +1,6 @@
 //! The system tray: this shell is the StatusNotifierWatcher and the host. Applications register an item (a bus name and object path); the
 //! shell reads what the item publishes, draws it in the bar, and forwards a click as `Activate`, `ContextMenu` or `SecondaryActivate`. What
-//! is acceptable to register, and everything an application says, is decided by `helix_shell_core::tray`; the page can only name an item by
+//! is acceptable to register, and everything an application says, is decided by `helix_shell_model::tray`; the page can only name an item by
 //! a key that model made. A name that is already owned by another watcher is never taken from it.
 
 use std::collections::HashMap;
@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use base64::Engine;
 use futures_util::StreamExt;
-use helix_shell_core::dbusmenu::{Menu, MenuItem};
-use helix_shell_core::tray::{parse_service, Props, Registered, Status};
+use helix_shell_model::dbusmenu::{Menu, MenuItem};
+use helix_shell_model::tray::{parse_service, Props, Registered, Status};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};

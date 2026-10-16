@@ -5,8 +5,8 @@ Status: living design + implementation notes. Wire contracts for Agent Surface /
 sections below mark what ships versus what is still open.
 Product homes: `services/helix-assistant` and `services/helix-inference` (Rust).
 Speech worker is Cargo (`helix-transcribe`). Interim llama lives under
-`services/helix-inference/native/`; Meson still builds optional `helix-image`
-(`cpp/inference/image_*`) until that worker is Rust (`cpp-to-rust.md`).
+`services/helix-inference/native/`; `helix-image` is a Cargo crate over a C engine shim
+under `services/helix-image/native/` (`cpp-to-rust.md`).
 
 ## Why a second design
 
@@ -146,7 +146,7 @@ default to least privilege and closing the panel denies what is pending. It was 
 session with isolated state: a real access request opened the dialog and closing it denied the request. Not yet
 checked: the disabled look of Allow during the arming window, clicking Allow/Deny with a pointer, and the
 confirm-tier action layout. The same queue and panel rules are ported in Rust as
-`helix-shell-core::{ConfirmationQueue, Confirmer}` (mutation-checked) and `helix-desktop-api::ConfirmerClient`
+`helix-agent::{ConfirmationQueue, Confirmer}` (mutation-checked) and `helix-desktop-api::ConfirmerClient`
 (RegisterConfirmer / Confirm / ConfirmationRequested / ConfirmationEnded only). The Tauri Overlay confirmer surface is wired behind `HELIX_SHELL_CONFIRMER=1` (nested
 `tauri-shell.sh` sets it; the live trial must not). It is a separate full-output Overlay window
 (not a panel in the shell page), created on demand and destroyed when the queue is empty, with
@@ -179,7 +179,7 @@ pressing Remove with a pointer, and the unavailable state.
 
 Until now an approved action was carried out by sending `helix-panel` commands to the **native** shell's socket, so under the Tauri shell
 every action failed with "helix is not running". The Tauri shell now serves that socket (`helix-<WAYLAND_DISPLAY>.sock`, mode 0600,
-`shell/helix-shell-tauri/src-tauri/src/agent_ipc.rs`) and understands exactly the commands in `helix_shell_core::agent_msg::SUPPORTED`
+`shell/helix-shell-tauri/src-tauri/src/agent_ipc.rs`) and understands exactly the commands in `helix_agent::agent_msg::SUPPORTED`
 (volume, brightness, theme mode, night light, do not disturb, open and close its own panels). Every other command gets
 `error: unknown command (this shell does not support it)`. The line is parsed by a pure, mutation-tested model (whole numbers in range,
 listed words only, no extra arguments, no control characters, 1 KiB limit) and executes through the code the sliders and key bindings use.
@@ -247,7 +247,7 @@ cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a re
 
 ## Implementation status: helix-assistant
 
-`helix-assistant "<request>"` (`services/helix-assistant`, Rust; the logic is `helix-shell-core::agent::assistant_core`). Plain English in, one desktop action out.
+`helix-assistant "<request>"` (`services/helix-assistant`, Rust; the logic is `helix_agent::assistant_core`). Plain English in, one desktop action out.
 
 1. `Hello` to Agent Surface to learn this client's grants. With none, it asks once (`RequestAccess observe, act`); the shell
    shows the usual approval dialog. With no shell running it stops: a headless session cannot grant itself access.
@@ -274,7 +274,7 @@ measurements). `helix-assistant --warm` loads it and primes its prompt cache wit
 request takes about 0.7 s instead of 25 s (measured live). `assets/services/helix-assistant-warm.service.in` runs it at
 login; it is not installed or enabled by default, and the model is freed again after the idle timeout (300 s).
 
-Packaging: `meson install` puts the engine's runtime libraries in a private `<prefix>/lib64/helix` (`tools/scripts/install_engine.py`)
+Packaging: `tools/install.sh` puts the engine's runtime libraries in a private `<prefix>/lib64/helix` (`tools/scripts/install_engine.py`)
 and gives `helix-inference` an install rpath to it, so nothing system-wide changes and the repo's `third_party/` is
 not needed at run time. `tools/install-assistant.sh <staged tree>` installs only the model runtime, the assistant and
 `helix-service` (backing up the old one), restarts nothing, and has `--uninstall`. Installed on the development machine
@@ -293,7 +293,7 @@ It is a thin face over `helix-assistant --json`, which prints one JSON object pe
 - Enter never confirms (focus stays in the input, and a submit while a change is waiting is ignored), Do it is disabled
   for 700 ms after it appears, Escape backs out of a pending request before it closes the panel, and opening the panel
   always starts fresh.
-- The state machine (`core/helix-shell-core/src/apps/assistant.rs`) has no UI in it and is unit tested, including late answers
+- The state machine (`core/helix-agent/src/assistant.rs`) has no UI in it and is unit tested, including late answers
   after cancel, a second yes, malformed output, and display-safety of model text. Mutation-checked.
 - Tried in a nested niri session on a private bus with the real 7B model: typing, "Thinking...", the confirmation, two
   stray Enter presses (nothing ran, audit empty), keyboard-driven Do it (ran through Agent Surface, audited as allowed), the
@@ -417,7 +417,7 @@ show every state-changing call before running it and rely on the Agent Surface t
 ### The Agents panel in the Tauri shell (workstream 2)
 
 `helix-desktop-api::ActivityClient` wraps `AgentSurfaceActivity1` (a contract test pins the method list to the XML, and a second test
-keeps `SetGrant`, `RegisterManager` and every client verb out of it). `helix-shell-core::activity` is the pure model: every field an
+keeps `SetGrant`, `RegisterManager` and every client verb out of it). `helix-agent::activity` is the pure model: every field an
 agent can influence is sanitized, a tier that is not exactly one of the five names is shown as `unknown` (sanitizing could otherwise
 turn `ob<bidi>serve` into a real tier name), `stop` is refused unless the last snapshot listed that operation, `revoke` unless it
 listed that client, and `stop_all` is never refused. The panel (`agents`, also `org.helix.Shell1.OpenPanel("agents")`) shows what is

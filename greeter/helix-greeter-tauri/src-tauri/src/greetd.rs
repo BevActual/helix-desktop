@@ -10,9 +10,16 @@ const MAX_MESSAGE: usize = 64 * 1024;
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Request<'a> {
-    CreateSession { username: &'a str },
-    PostAuthMessageResponse { response: Option<&'a str> },
-    StartSession { cmd: &'a [String], env: &'a [String] },
+    CreateSession {
+        username: &'a str,
+    },
+    PostAuthMessageResponse {
+        response: Option<&'a str>,
+    },
+    StartSession {
+        cmd: &'a [String],
+        env: &'a [String],
+    },
     CancelSession,
 }
 
@@ -20,8 +27,14 @@ pub enum Request<'a> {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Response {
     Success,
-    Error { error_type: String, description: String },
-    AuthMessage { auth_message_type: String, auth_message: String },
+    Error {
+        error_type: String,
+        description: String,
+    },
+    AuthMessage {
+        auth_message_type: String,
+        auth_message: String,
+    },
 }
 
 /// What the person sees next. Only these four shapes ever reach the page, so a hostile or odd greetd cannot make it draw anything else.
@@ -68,20 +81,38 @@ impl Response {
     pub fn into_step(self) -> Step {
         match self {
             Response::Success => Step::Ready,
-            Response::Error { error_type, description } => Step::Failed {
+            Response::Error {
+                error_type,
+                description,
+            } => Step::Failed {
                 message: if error_type == "auth_error" {
                     "That didn’t work. Try again.".into()
                 } else {
                     display_text(&description)
                 },
             },
-            Response::AuthMessage { auth_message_type, auth_message } => {
+            Response::AuthMessage {
+                auth_message_type,
+                auth_message,
+            } => {
                 let message = display_text(&auth_message);
                 match auth_message_type.as_str() {
-                    "secret" => Step::Prompt { secret: true, message },
-                    "visible" => Step::Prompt { secret: false, message },
-                    "error" => Step::Info { message, error: true },
-                    _ => Step::Info { message, error: false },
+                    "secret" => Step::Prompt {
+                        secret: true,
+                        message,
+                    },
+                    "visible" => Step::Prompt {
+                        secret: false,
+                        message,
+                    },
+                    "error" => Step::Info {
+                        message,
+                        error: true,
+                    },
+                    _ => Step::Info {
+                        message,
+                        error: false,
+                    },
                 }
             }
         }
@@ -104,11 +135,15 @@ impl<S: Read + Write> Conversation<S> {
     }
 
     pub fn begin(&mut self, username: &str) -> io::Result<Step> {
-        Ok(self.exchange(&Request::CreateSession { username })?.into_step())
+        Ok(self
+            .exchange(&Request::CreateSession { username })?
+            .into_step())
     }
 
     pub fn respond(&mut self, response: Option<&str>) -> io::Result<Step> {
-        Ok(self.exchange(&Request::PostAuthMessageResponse { response })?.into_step())
+        Ok(self
+            .exchange(&Request::PostAuthMessageResponse { response })?
+            .into_step())
     }
 
     pub fn cancel(&mut self) -> io::Result<()> {
@@ -117,11 +152,15 @@ impl<S: Read + Write> Conversation<S> {
 
     /// Success means greetd will end this greeter and start the session.
     pub fn start(&mut self, cmd: &[String]) -> io::Result<Result<(), String>> {
-        Ok(match self.exchange(&Request::StartSession { cmd, env: &[] })? {
-            Response::Success => Ok(()),
-            Response::Error { description, .. } => Err(display_text(&description)),
-            Response::AuthMessage { .. } => Err("unexpected request from the login service".into()),
-        })
+        Ok(
+            match self.exchange(&Request::StartSession { cmd, env: &[] })? {
+                Response::Success => Ok(()),
+                Response::Error { description, .. } => Err(display_text(&description)),
+                Response::AuthMessage { .. } => {
+                    Err("unexpected request from the login service".into())
+                }
+            },
+        )
     }
 }
 
@@ -143,22 +182,55 @@ mod tests {
         write_request(&mut out, &Request::CreateSession { username: "ada" }).unwrap();
         assert_eq!(&out[4..], br#"{"type":"create_session","username":"ada"}"#);
         let mut out = Vec::new();
-        write_request(&mut out, &Request::PostAuthMessageResponse { response: None }).unwrap();
-        assert_eq!(&out[4..], br#"{"type":"post_auth_message_response","response":null}"#);
+        write_request(
+            &mut out,
+            &Request::PostAuthMessageResponse { response: None },
+        )
+        .unwrap();
+        assert_eq!(
+            &out[4..],
+            br#"{"type":"post_auth_message_response","response":null}"#
+        );
     }
 
     #[test]
     fn auth_messages_become_prompts_and_info() {
-        let secret = Response::AuthMessage { auth_message_type: "secret".into(), auth_message: "Password: ".into() };
-        assert_eq!(secret.into_step(), Step::Prompt { secret: true, message: "Password: ".into() });
-        let error = Response::AuthMessage { auth_message_type: "error".into(), auth_message: "Locked\u{7}".into() };
-        assert_eq!(error.into_step(), Step::Info { message: "Locked".into(), error: true });
+        let secret = Response::AuthMessage {
+            auth_message_type: "secret".into(),
+            auth_message: "Password: ".into(),
+        };
+        assert_eq!(
+            secret.into_step(),
+            Step::Prompt {
+                secret: true,
+                message: "Password: ".into()
+            }
+        );
+        let error = Response::AuthMessage {
+            auth_message_type: "error".into(),
+            auth_message: "Locked\u{7}".into(),
+        };
+        assert_eq!(
+            error.into_step(),
+            Step::Info {
+                message: "Locked".into(),
+                error: true
+            }
+        );
     }
 
     #[test]
     fn a_wrong_password_reads_as_a_plain_retry() {
-        let failed = Response::Error { error_type: "auth_error".into(), description: "pam says no\nat /etc/pam.d".into() };
-        assert_eq!(failed.into_step(), Step::Failed { message: "That didn’t work. Try again.".into() });
+        let failed = Response::Error {
+            error_type: "auth_error".into(),
+            description: "pam says no\nat /etc/pam.d".into(),
+        };
+        assert_eq!(
+            failed.into_step(),
+            Step::Failed {
+                message: "That didn’t work. Try again.".into()
+            }
+        );
     }
 
     #[test]
@@ -189,7 +261,13 @@ mod tests {
             seen
         });
         let mut talk = Conversation::new(client);
-        assert_eq!(talk.begin("ada").unwrap(), Step::Prompt { secret: true, message: "Password:".into() });
+        assert_eq!(
+            talk.begin("ada").unwrap(),
+            Step::Prompt {
+                secret: true,
+                message: "Password:".into()
+            }
+        );
         assert_eq!(talk.respond(Some("hunter2")).unwrap(), Step::Ready);
         assert_eq!(talk.start(&["niri-session".to_string()]).unwrap(), Ok(()));
         let seen = fake.join().unwrap();

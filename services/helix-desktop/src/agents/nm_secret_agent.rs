@@ -47,11 +47,7 @@ impl NmSecretAgent {
         }
         let ssid = AgentHub::extract_ssid(&connection);
         tracing::info!(ssid, setting = setting_name, "GetSecrets prompt");
-        match self
-            .hub
-            .begin_nm_secret(&ssid, setting_name.clone())
-            .await
-        {
+        match self.hub.begin_nm_secret(&ssid, setting_name.clone()).await {
             Ok(secret) => Ok(AgentHub::build_nm_secrets(&setting_name, &secret)),
             Err(NmSecretOutcome::NoSecrets(reason)) => {
                 tracing::debug!(reason, "GetSecrets -> NoSecrets");

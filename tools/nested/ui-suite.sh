@@ -39,6 +39,8 @@ pick idle           && run idle idle-test.sh idle-nested.sh
 pick island         && run island island-test.sh tauri-shell.sh
 pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-net   && run settings-net settings-net-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-sound && run settings-sound settings-sound-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
 pick mobius         && run mobius mobius-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

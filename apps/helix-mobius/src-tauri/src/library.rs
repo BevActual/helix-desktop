@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use helix_shell_core::model_catalog::{self, CatalogModel};
+use helix_chat::model_catalog::{self, CatalogModel};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 

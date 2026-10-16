@@ -1,242 +1,54 @@
-# Packaging Helix Shell
+# Packaging Helix
 
-Notes for distribution packagers. End-user install docs live in the
-[README](README.md) and [docs/user/getting-started/installation.mdx](docs/user/getting-started/installation.mdx).
+Notes for packagers. The supported target is Fedora with helix-niri; other distributions are not a product surface.
 
 ## Package description
 
-Use this exact short description for package metadata (`pkgdesc`, `Summary`,
-AppStream, etc.):
+> Helix: a Wayland desktop built on the niri compositor, with a shell, login screen and apps that people and AI agents share.
 
-> Helix Shell — a niri-first Wayland desktop shell (command: helix).
+## Source layout and build
 
-Do not substitute shorter or alternate blurbs (“lightweight Wayland bar”,
-“status bar”, ...). Helix Shell is a full desktop shell (bars, dock, launcher,
-notifications, lock screen, wallpaper, settings, Control Center services), not a bar-only tool.
+One Git tree builds everything:
 
-## Packaged distributions
+- Cargo workspace at the root (services, session shell, greeter, apps); `compositor/` is a second, separate workspace.
+- npm workspace at the root for the React frontends. Each app's `build.rs` runs its build when `node_modules` exists, so a package
+  build runs `npm ci` first (offline against a vendored cache, or with network access allowed for that step).
+- Vendor Cargo and npm dependencies for an offline build (`cargo vendor`, an npm cache); both lock files are committed.
 
-Upstream Helix v5 is already packaged as `helix-shell` for:
+Build and install commands are in [BUILDING.md](BUILDING.md). The packager's usual sequence:
 
-- Arch Linux
-- NixOS
-- Fedora
-- openSUSE
-- KaOS
-- Gentoo
-- Void Linux
-- GNU Guix
-- Debian (including Ubuntu)
+```sh
+npm ci
+cargo build --release --workspace --locked
+DESTDIR="$RPM_BUILD_ROOT" tools/install.sh --no-build --prefix /usr --profile release
+```
 
-Helix currently builds from this tree. Keep the `helix-shell` command and config paths until a rename is an explicit release.
+`tools/install.sh` installs the services and their units, D-Bus activation files, polkit policy, icon and agent policy tables. It does
+not yet install the session shell, greeter and apps; a package must also install those binaries (`helix-shell-tauri`, `helix-greeter`,
+`helix-settings`, `helix-mobius`, `helix-software`, `helix-system-monitor`), the `assets/*.desktop` entries and the `tools/systemd/*.in`
+units (their `@SHELL_BIN@`, `@STRUT_BIN@`, `@IDLE_BIN@`, `@WALLPAPER_BIN@` and `@POLKIT_AGENT@` placeholders are filled in by
+`tools/switch-shell.sh`). Moving that into `tools/install.sh` is the next step toward an RPM spec.
 
 ## Identity
 
 | | |
 |---|---|
-| Product | Helix Shell |
-| Command | `helix-shell` |
+| Product | Helix |
 | Homepage | https://github.com/BevActual/helix-desktop |
-| Docs | [`docs/user/`](docs/user/) |
-| License | MIT ([LICENSE](LICENSE)); also see vendored licenses under `third_party/` for SPDX completeness |
-| Version | Meson `project(... version: ...)` in [`meson.build`](meson.build) |
-| Session shell (live) | `helix-shell-tauri` via `tools/switch-shell.sh install` |
-| Legacy C++ session binary | Removed (Tauri only) |
-| Desktop entry | `org.helix.Shell.desktop` |
-| Icon | `org.helix.Shell` / `helix.svg` |
+| License | MIT; the compositor in `compositor/` is GPL-3.0-or-later (niri fork) |
+| D-Bus names | `org.helix.Desktop`, `org.helix.Inference`, `org.helix.Shell`, `org.helix.Shell.Act` |
+| Config and state | `~/.config/helix`, `~/.local/state/helix`, `~/.local/share/helix` |
 
-## Maintenance Policy
+## Runtime dependencies
 
-Releases strive to follow [semantic versioning](https://semver.org).
-The latest version is the only actively maintained version.
-No attempts are made to achieve overlapping lifecycles of major or minor versions.
-Bug reports are required to be reproducible on the latest version.
+Required by the session: WebKitGTK 4.1, GTK 3, libsoup 3, gtk-layer-shell, PipeWire and WirePlumber.
 
-## Architectures / libc
+Used when present (a missing one is an empty or unavailable page): NetworkManager, BlueZ, polkit, greetd, Flatpak, PackageKit, fwupd and
+the systemd user manager.
 
-First-class targets:
+Optional model engines (llama.cpp, whisper.cpp, stable-diffusion.cpp) are not packaged with Helix. They are built by hand into
+`third_party/*-install` and installed with `tools/install-inference.sh`; the service runs without them using only its scripted backend.
 
-- `x86_64` (amd64)
-- `aarch64` (arm64)
+## Files a package must not ship
 
-Linux only. There is no intentional arch-specific code path; other little-endian
-Linux arches may build if dependencies are available, but they are not
-first-class supported.
-
-**musl**: known to build (e.g. Alpine / Void musl). Not first-class tested.
-`jemalloc` is glibc-only, on musl leave `-Djemalloc=disabled` (or `auto`, which
-skips it).
-
-## Compilers / linkers
-
-C++23 is required.
-
-| Toolchain | Minimum | Notes |
-|---|---|---|
-| GCC + libstdc++ | **GCC 13+** | Default on most distros |
-| Clang + libstdc++ or libc++ | **Clang 16+** | libc++ needs Meson’s experimental-library flags (already wired in `meson.build`) |
-
-Debian 12 “bookworm” needs a newer toolchain than the default `g++` (e.g.
-`g++-13` with `CXX=g++-13`).
-
-No special linker is required. The default linker from the compiler driver is
-fine (**GNU ld** / gold, **lld**, **mold** via `-fuse-ld=` all work). Release
-builds pass `-Wl,--gc-sections` and `-Wl,--as-needed`, which those linkers
-support.
-
-## Build
-
-- Build system: [Meson](https://mesonbuild.com/) + Ninja. The repo’s
-  [`justfile`](justfile) is convenience only; packaging can call Meson
-  directly.
-- Language / toolchain: see [Compilers / linkers](#compilers--linkers).
-- Recommended: `meson setup build --buildtype=release`, then compile/install.
-- Do **not** enable `-Dnative_optimizations=true` for distro packages (CPU-local
-  codegen; not portable).
-- Tests: `-Dtests=disabled` (or leave `auto`, which skips tests for release).
-- `jemalloc`: recommended on glibc; Meson feature option `-Djemalloc=auto|enabled|disabled`.
-  Only used on glibc builds.
-
-Prefix/datadir are baked into the binary via `HELIX_INSTALL_PREFIX` /
-`HELIX_INSTALL_DATADIR`. Install with the same prefix you configured.
-
-### Installed layout
-
-```text
-<prefix>/bin/helix
-<prefix>/share/helix/assets/...
-<prefix>/share/applications/org.helix.Helix.desktop
-<prefix>/share/icons/hicolor/scalable/apps/helix.svg
-```
-
-The shipped `assets/` tree is **required at runtime**. Shipping only the binary
-breaks fonts, translations, templates, glyphs, and sounds. See
-[CONTRIBUTING.md](CONTRIBUTING.md#runtime-assets) for lookup order (including
-`HELIX_ASSETS_DIR` overrides for unusual layouts).
-
-Not shipped (don’t look for them in the install): AppStream / metainfo XML, man
-pages, systemd units.
-
-### Shell completions
-
-Static completion files are not shipped. Generate them from the freshly built
-binary and install them in the distribution's completion directories:
-
-```text
-./build-<mode>/helix completions bash  → share/bash-completion/completions/helix
-./build-<mode>/helix completions zsh   → share/zsh/site-functions/_helix
-./build-<mode>/helix completions fish  → share/fish/vendor_completions.d/helix.fish
-```
-
-This is intentionally a packaging step rather than a Meson install rule:
-executing the target binary during installation would break cross-compilation.
-
-## Dependencies
-
-The **session shell and apps** are Rust/Tauri (`shell/`, `apps/`); see
-[docs/design/rust-workspace.md](docs/design/rust-workspace.md). Shared app controls
-follow GTK4/libadwaita grammar ([docs/design/helix-hig.md](docs/design/helix-hig.md)).
-
-The section below is for the C++ helpers and Meson targets that remain next to the
-Rust `helix-desktop` authority. GLES/EGL appear where C++ helpers still
-need them — not as the session UI stack.
-
-### Build-time (required)
-
-Canonical list is the `dependency(...)` / header checks in
-[`meson.build`](meson.build). Distro package names differ; [BUILDING.md](BUILDING.md)
-has copy-paste install lines for common distros.
-
-Notes packagers hit often:
-
-- **stb** must provide `stb/stb_image_resize2.h` (and `stb/stb_image_write.h`).
-  Older packages that only ship `stb_image_resize` are not enough. Meson fails
-  the configure check if `stb_image_resize2` is missing.
-- Meson requires **WirePlumber 0.5** (`wireplumber-0.5` pkg-config). 0.4 is not
-  enough.
-
-### Vendored (no system package)
-
-Shipped under `third_party/`: Wuffs, fzy, Material Color Utilities.
-Each carries its own license file beside the code.
-
-### Runtime
-
-| Dependency | Role |
-|---|---|
-| PipeWire **daemon** (+ WirePlumber 0.5) | Audio, volume OSD, privacy indicators, spectrum. Libraries alone are not enough; without a running daemon those features stay off. |
-| PAM (`login` service by default) | Lock screen authentication |
-| Fontconfig / fonts | Text rendering (users still need usable fonts installed) |
-| `upower` | Optional: battery / power devices |
-| `ddcutil` | Optional: external monitor brightness |
-| Secret Service provider | Optional but recommended for credential / encrypted-state persistence (GNOME Keyring, KWallet, KeePassXC, ...). `libsecret` is only the client library; without a session provider those features cannot persist secrets. |
-| `sound-theme-freedesktop` | Shell sounds |
-
-## Startup and IPC
-
-No systemd user unit is shipped. Typical startup is compositor autostart or the
-desktop entry (`helix --daemon`). Control a running instance with
-`helix-panel ...` (Unix socket under `XDG_RUNTIME_DIR`).
-
-Keep the `.desktop` daemon Exec unless you intentionally package a different
-session integration. Prefer the canonical description above for `Comment=` /
-AppStream summary as well.
-
-## Session conflicts
-
-On non-Plasma sessions Helix provides and registers:
-
-- `org.freedesktop.Notifications`
-- `org.kde.StatusNotifierWatcher` (system tray host)
-
-Do not run it alongside another notification daemon or StatusNotifier host
-(mako, dunst, swaync, waybar-as-host, ...) unless those are disabled. On Plasma,
-Helix integrates with Plasma's notification / tray paths instead of claiming
-the freedesktop Notifications name.
-
-## User data paths
-
-| Kind | Default |
-|---|---|
-| Config | `$XDG_CONFIG_HOME/helix` (`~/.config/helix`), e.g. `config.toml` |
-| State | `$XDG_STATE_HOME/helix` (`~/.local/state/helix`), e.g. `settings.toml`, caches |
-| Data | `$XDG_DATA_HOME/helix` (`~/.local/share/helix`) |
-| Logs | `$XDG_CACHE_HOME/helix` (`~/.cache/helix`) |
-
-Override bases with `HELIX_CONFIG_HOME`, `HELIX_STATE_HOME`,
-`HELIX_DATA_HOME` (each still appends `/helix`).
-
-## What Helix is not
-
-- Not a display manager. Login is in-tree `greeter/` (`helix-greeter`).
-- Not a replacement for file managers, screen casting, or drive mounting.
-- The supported compositor is in-tree helix-niri (`compositor/`). Other
-  compositor guides under [`docs/user/compositor-settings/`](docs/user/compositor-settings/)
-  are unsupported historical notes. Product shape:
-  [`docs/design/product-structure.md`](docs/design/product-structure.md).
-
-## Versioning
-
-Prefer packaging **tagged releases** rather than random `main` snapshots unless
-you maintain a `-git` / nightly package on purpose.
-
-## Contact
-
-Report Helix Shell issues at https://github.com/BevActual/helix-desktop/issues.
-
-## Helix desktop service and Settings
-
-Install the Rust `helix-desktop` binary,
-`org.helix.Desktop.service` D-Bus activation file and matching systemd user unit together with
-the shell. They must share the same prefix. The service is activated on demand; no globally
-enabled user unit is required. See [`docs/design/cpp-to-rust.md`](docs/design/cpp-to-rust.md).
-
-`helix-settings` is the Tauri Settings app (`apps/helix-settings`). It has its own application
-entry and requires the matching desktop service for live state and edits. Helix Desktop & Dock
-settings are omitted outside a Helix session. Install the Settings desktop entry only when the
-application target is built.
-
-`helix-system-monitor` is the Tauri System Monitor app. Install
-`org.helix.SystemMonitor.desktop` with its binary. It needs Linux procfs for resource
-metrics and runs independently of the shell, compositor and desktop service. Appearance
-integration is optional and does not activate a service.
+`target/`, `node_modules/`, `third_party/*-install`, and `compositor/target/` are build output and can be many gigabytes.

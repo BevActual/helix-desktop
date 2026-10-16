@@ -6,7 +6,7 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 
 | Dir | Role |
 |---|---|
-| `core/` | `helix-shell-core` (pure models), `helix-desktop-api`, `shared-ui` |
+| `core/` | ten pure model crates (`helix-base`, `helix-agent`, `helix-config`, ...), `helix-theme`, `helix-desktop-api`, `shared-ui` |
 | `shell/` | `helix-shell-tauri` — live session shell |
 | `greeter/` | `helix-greeter` — greetd login (Tauri) |
 | `apps/` | Settings, Software, System Monitor, Chat (Tauri toplevels) |
@@ -16,7 +16,7 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 
 **Apps have a React frontend** built by the npm workspace at the repo root (`apps/<app>/web`, `core/shared-ui/react`; see `frontend-stack.md`). A Rust-only checkout still builds: without `node_modules` the hand-written pages are used.
 
-**The session shell is Tauri** (`tools/switch-shell.sh install`). C++ session UI and GTK apps are deleted; `org.helix.Desktop` is Rust (`services/helix-desktop`). Remaining C++ under `cpp/` is config validation, inference glue, and agent policy units (`desktop-contract-tests.md` for bus behaviour).
+**The session shell is Tauri** (`tools/switch-shell.sh install`). C++ session UI, GTK apps and the `cpp/` tree are deleted; `org.helix.Desktop` is Rust (`services/helix-desktop`). The only C/C++ left is the llama, whisper and image engine shims under `services/*/native/` (`desktop-contract-tests.md` for bus behaviour).
 
 ## Build
 

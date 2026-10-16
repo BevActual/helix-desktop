@@ -1,18 +1,22 @@
 [package]
 name = "helix-greeter"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Helix login greeter (greetd). Tauri face; appearance sync matches the session shell."
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { workspace = true }
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tauri = { version = "2", features = [] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true, features = ["protocol-asset"] }
 
 [[bin]]
 name = "helix-greeter"
 path = "src/main.rs"
+
+[lints]
+workspace = true

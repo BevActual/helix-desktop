@@ -80,7 +80,9 @@ impl FakeObjectManager {
 async fn main() -> zbus::Result<()> {
     let conn = zbus::Connection::session().await?;
     conn.object_server().at("/", FakeObjectManager).await?;
-    conn.object_server().at("/org/bluez", FakeAgentManager).await?;
+    conn.object_server()
+        .at("/org/bluez", FakeAgentManager)
+        .await?;
     conn.object_server()
         .at("/org/bluez/hci0/dev_FAKE", FakeDevice)
         .await?;

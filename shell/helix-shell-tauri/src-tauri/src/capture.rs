@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use helix_shell_core::capture::{pick_agent_desk_window, resolve_scope, CaptureScope};
+use helix_compositor::capture::{pick_agent_desk_window, resolve_scope, CaptureScope};
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
@@ -157,13 +157,13 @@ fn shoot_screen(path: &Path) -> Result<(), String> {
 
 /// `desktop-capture` for Agent Surface. Returns `ok <absolute-path>\n`.
 pub fn desktop_capture(app: &AppHandle, target: Option<String>) -> Result<String, String> {
-    let caps = helix_shell_core::compositor_ipc::helix_capabilities();
-    let placement = helix_shell_core::compositor_config::agent_desk_placement_enabled();
+    let caps = helix_compositor::compositor_ipc::helix_capabilities();
+    let placement = helix_compositor::compositor_config::agent_desk_placement_enabled();
     let scope = resolve_scope(target.as_deref(), caps.agent_desk, placement);
     let path = capture_file()?;
     match scope {
         CaptureScope::AgentDesk => {
-            let desk = helix_shell_core::compositor_ipc::agent_desk_status();
+            let desk = helix_compositor::compositor_ipc::agent_desk_status();
             if !desk.available {
                 return Err("agent desk is not available on this compositor".into());
             }
@@ -176,7 +176,7 @@ pub fn desktop_capture(app: &AppHandle, target: Option<String>) -> Result<String
             shoot_window(window, &path)?;
         }
         CaptureScope::AllOutputs => {
-            if !helix_shell_core::compositor_ipc::is_helix_compositor() {
+            if !helix_compositor::compositor_ipc::is_helix_compositor() {
                 return Err(
                     "capturing every output requires helix-niri; use focused or agent-desk on stock niri"
                         .into(),
@@ -185,7 +185,7 @@ pub fn desktop_capture(app: &AppHandle, target: Option<String>) -> Result<String
             shoot_all_outputs(&path)?;
         }
         CaptureScope::Output(name) => {
-            if !helix_shell_core::compositor_ipc::is_helix_compositor() {
+            if !helix_compositor::compositor_ipc::is_helix_compositor() {
                 return Err(format!(
                     "capturing output {name} requires helix-niri; use focused or agent-desk on stock niri"
                 ));

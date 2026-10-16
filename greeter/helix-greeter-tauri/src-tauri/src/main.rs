@@ -1,16 +1,18 @@
 //! Helix Greeter — the greetd login UI. Rust talks to greetd and decides what may be offered; the page (React) draws the login card
 //! and sends back only a typed answer, a login name and a session id it was given. See `greeter/HELIX.md`.
 
+mod appearance;
 mod greetd;
 mod system;
 
+use appearance::Appearance;
 use greetd::{Conversation, Step};
 use serde::Serialize;
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::sync::Mutex;
 use system::{Session, User};
-use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 const WINDOW: &str = "greeter";
 const SESSIONS: &str = "/usr/share/wayland-sessions";
@@ -23,34 +25,87 @@ struct Login {
 }
 
 #[derive(Serialize)]
+struct OfferColors {
+    background: String,
+    on_background: String,
+    surface: String,
+    on_surface: String,
+    primary: String,
+    on_primary: String,
+}
+
+#[derive(Serialize)]
 struct Offer {
     users: Vec<User>,
     sessions: Vec<Session>,
-    /// Appearance the greeter was given by the shell (dark or light); defaults to dark.
+    /// Appearance the shell synced for the login screen. Defaults to a dark card when nothing was synced.
     dark: bool,
+    font: String,
+    ui_scale: f64,
+    corner_radius_scale: f64,
+    transparency_mode: String,
+    refraction: bool,
+    high_contrast: bool,
+    reduced_motion: bool,
+    colors: Option<OfferColors>,
+    /// Asset URL of the synced wallpaper, empty when there is no image the page may load.
+    wallpaper_url: String,
 }
 
 fn known_users() -> Vec<User> {
-    std::fs::read_to_string("/etc/passwd").map(|text| system::users_from_passwd(&text)).unwrap_or_default()
+    std::fs::read_to_string("/etc/passwd")
+        .map(|text| system::users_from_passwd(&text))
+        .unwrap_or_default()
+}
+
+fn offer_from(app: &AppHandle, appearance: &Appearance) -> Offer {
+    let wallpaper_url = appearance
+        .wallpaper
+        .as_ref()
+        .and_then(|path| {
+            let _ = app
+                .asset_protocol_scope()
+                .allow_directory(path.parent().unwrap_or(path), true);
+            app.get_webview_window(WINDOW)
+                .and_then(|window| window.convert_file_src(path, None).ok())
+        })
+        .unwrap_or_default();
+    Offer {
+        users: known_users(),
+        sessions: system::sessions_in(Path::new(SESSIONS))
+            .into_iter()
+            .map(|(session, _)| session)
+            .collect(),
+        dark: appearance.dark,
+        font: appearance.font.clone(),
+        ui_scale: appearance.ui_scale,
+        corner_radius_scale: appearance.corner_radius_scale,
+        transparency_mode: appearance.transparency_mode.clone(),
+        refraction: appearance.refraction && !appearance.high_contrast,
+        high_contrast: appearance.high_contrast,
+        reduced_motion: appearance.reduced_motion,
+        colors: appearance.colors.as_ref().map(|colors| OfferColors {
+            background: colors.background.clone(),
+            on_background: colors.on_background.clone(),
+            surface: colors.surface.clone(),
+            on_surface: colors.on_surface.clone(),
+            primary: colors.primary.clone(),
+            on_primary: colors.on_primary.clone(),
+        }),
+        wallpaper_url,
+    }
 }
 
 #[tauri::command]
-fn greeter_offer() -> Offer {
-    let dark = std::fs::read_to_string("/var/lib/helix-greeter/appearance.json")
-        .ok()
-        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-        .and_then(|value| value.get("dark").and_then(serde_json::Value::as_bool))
-        .unwrap_or(true);
-    Offer {
-        users: known_users(),
-        sessions: system::sessions_in(Path::new(SESSIONS)).into_iter().map(|(session, _)| session).collect(),
-        dark,
-    }
+fn greeter_offer(app: AppHandle) -> Offer {
+    offer_from(&app, &appearance::load(&appearance::state_dir()))
 }
 
 fn connect() -> Result<Conversation<UnixStream>, String> {
     let path = std::env::var_os("GREETD_SOCK").ok_or("The login service is not running.")?;
-    UnixStream::connect(path).map(Conversation::new).map_err(|error| format!("Cannot reach the login service: {error}"))
+    UnixStream::connect(path)
+        .map(Conversation::new)
+        .map_err(|error| format!("Cannot reach the login service: {error}"))
 }
 
 fn finish(login: &Login, step: Result<Step, std::io::Error>) -> Result<Step, String> {
@@ -95,7 +150,11 @@ fn greeter_cancel(login: State<Login>) {
 }
 
 #[tauri::command]
-fn greeter_start(app: tauri::AppHandle, login: State<Login>, session: String) -> Result<(), String> {
+fn greeter_start(
+    app: tauri::AppHandle,
+    login: State<Login>,
+    session: String,
+) -> Result<(), String> {
     let (_, cmd) = system::sessions_in(Path::new(SESSIONS))
         .into_iter()
         .find(|(offered, _)| offered.id == session)
@@ -115,7 +174,13 @@ fn greeter_start(app: tauri::AppHandle, login: State<Login>, session: String) ->
 fn main() {
     tauri::Builder::default()
         .manage(Login::default())
-        .invoke_handler(tauri::generate_handler![greeter_offer, greeter_begin, greeter_respond, greeter_cancel, greeter_start])
+        .invoke_handler(tauri::generate_handler![
+            greeter_offer,
+            greeter_begin,
+            greeter_respond,
+            greeter_cancel,
+            greeter_start
+        ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
                 .title("Helix")

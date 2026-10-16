@@ -112,7 +112,7 @@ pub fn view(app: &AppHandle) -> Job {
 }
 
 pub fn load(app: &AppHandle, id: &str) -> Result<Job, String> {
-    if !helix_shell_core::chat::valid_id(id) {
+    if !helix_chat::chat::valid_id(id) {
         return Err("Invalid analysis job.".into());
     }
     let hub = app.state::<Arc<Hub>>();

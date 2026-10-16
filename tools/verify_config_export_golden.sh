@@ -2,20 +2,19 @@
 # Fail if Rust default export or frozen parity fixtures drift.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GOLDEN="$ROOT/core/helix-shell-core/tests/golden/config_export_minimal.toml"
+GOLDEN="$ROOT/core/helix-config-export/tests/golden/config_export_minimal.toml"
 
-cargo build -p helix-shell-core --bin helix-rust-config-export --quiet
+cargo build -p helix-config-export --bin helix-rust-config-export --quiet
 
-cargo test -p helix-shell-core desktop::config_export_defaults::tests::ported_schema_sections_match_golden_export --quiet
-cargo test -p helix-shell-core --test config_export_golden rust_export_matches_minimal_golden --quiet
-cargo test -p helix-shell-core --test config_export_golden --quiet
+cargo test -p helix-config-export config_export_defaults::tests::ported_schema_sections_match_golden_export --quiet
+cargo test -p helix-config-export --test config_export_golden rust_export_matches_minimal_golden --quiet
+cargo test -p helix-config-export --test config_export_golden --quiet
 
 BIN="${HELIX_RUST_CONFIG_EXPORT_BIN:-${HELIX_CONFIG_EXPORT_BIN:-}}"
 if [[ -z "$BIN" ]]; then
   for candidate in \
     "$ROOT/target/debug/helix-rust-config-export" \
-    "$ROOT/target/fast/helix-rust-config-export" \
-    "$ROOT/build-debug/helix-rust-config-export"; do
+    "$ROOT/target/fast/helix-rust-config-export"; do
     if [[ -x "$candidate" ]]; then
       BIN="$candidate"
       break

@@ -1,52 +1,52 @@
 //! Rust desktop authority for `org.helix.Desktop` (installed as `helix-desktop`, unit `helix-service.service`).
 //! Nested harness: `HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop`.
 
-mod agents;
-mod desktop_operations;
 mod agent;
 mod agent_activity;
 mod agent_support;
+mod agents;
 mod appearance;
+mod assets_path;
 mod audio;
 mod audio_backend;
 mod audio_meter;
 mod audio_support;
+mod blocking;
 mod bluetooth;
 mod bluetooth_backend;
 mod bluetooth_support;
 mod community_template_catalog;
+mod config_export;
 mod configuration;
+mod day_night;
 mod dbus_value;
+mod desktop_operations;
 mod displays;
 mod displays_backend;
 mod displays_support;
+mod msg_ipc;
 mod network;
 mod network_backend;
 mod network_support;
 mod palette_catalog;
-mod assets_path;
-mod config_export;
-mod template_apply;
-mod blocking;
-mod day_night;
-mod theme_palette;
-mod wallhaven;
-mod wallpaper_source;
-mod msg_ipc;
 mod palette_previews;
 mod peer;
 mod runtime_state;
 mod state;
+mod template_apply;
 #[cfg(test)]
 mod testing;
+mod theme_palette;
+mod wallhaven;
+mod wallpaper_source;
 
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::connection;
 use zbus::message::Type as MessageType;
-use zbus::MessageStream;
 use zbus::MatchRule;
+use zbus::MessageStream;
 
 use crate::agent::Agent;
 use crate::agent_activity::AgentActivity;
@@ -354,8 +354,7 @@ async fn main() -> zbus::Result<()> {
                 locked.audio_meters.poll()
             };
             for (owner, source, peak, available) in samples {
-                audio_support::emit_input_level(&meter_conn, &owner, source, peak, available)
-                    .await;
+                audio_support::emit_input_level(&meter_conn, &owner, source, peak, available).await;
             }
         }
     });

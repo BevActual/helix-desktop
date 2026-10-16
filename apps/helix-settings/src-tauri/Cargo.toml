@@ -1,27 +1,35 @@
 [package]
 name = "helix-settings"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Helix Settings: its own Tauri application. The Agent Surface manager (who may do what), and the pages that grow around it."
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { workspace = true }
 
 [dependencies]
-helix-desktop-api = { path = "../../../core/helix-desktop-api" }
-helix-shell-core = { path = "../../../core/helix-shell-core" }
-helix-wallpaper = { path = "../../../services/helix-wallpaper" }
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
-base64 = "0.22"
-gtk = "0.18"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tauri = { version = "2", features = [] }
-zbus = { version = "5", default-features = false, features = ["tokio"] }
-tokio = { version = "1", features = ["time", "sync"] }
-ureq = "3"
+helix-desktop-api = { workspace = true }
+helix-agent = { workspace = true }
+helix-base = { workspace = true }
+helix-compositor = { workspace = true }
+helix-config = { workspace = true }
+helix-models = { workspace = true }
+helix-wallpaper = { workspace = true }
+image = { workspace = true, features = ["jpeg", "png", "webp"] }
+base64 = { workspace = true }
+gtk = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true }
+zbus = { workspace = true, features = ["tokio"] }
+tokio = { workspace = true, features = ["time", "sync"] }
+ureq = { workspace = true }
 
 [[bin]]
 name = "helix-settings"
 path = "src/main.rs"
+
+[lints]
+workspace = true

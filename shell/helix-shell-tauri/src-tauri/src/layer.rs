@@ -9,9 +9,9 @@ use std::sync::Mutex;
 
 use gtk::prelude::*;
 use gtk_layer_shell::{Edge, LayerShell};
-use helix_shell_core::shell_surface::{InputRegion, BAR_HEIGHT};
-use helix_shell_core::surfaces::{KeyboardMode, Layer};
-use helix_shell_core::Plan;
+use helix_shell_model::shell_surface::{InputRegion, BAR_HEIGHT};
+use helix_shell_model::surfaces::{KeyboardMode, Layer};
+use helix_shell_model::shell_surface::Plan;
 use tauri::{AppHandle, Manager, WebviewWindow};
 
 pub const WINDOW: &str = "shell";
@@ -248,7 +248,7 @@ pub fn apply(app: &AppHandle, plan: Plan) {
 }
 
 /// Replaces the extra pointer-taking rectangles and re-applies the region. Must run on the main thread.
-pub fn set_extra_input(app: &AppHandle, rects: &[helix_shell_core::glass::Rect]) {
+pub fn set_extra_input(app: &AppHandle, rects: &[helix_shell_model::glass::Rect]) {
     *EXTRA.lock().expect("extra input") = rects.iter().map(|r| (r.x, r.y, r.w, r.h)).collect();
     let Some(window) = app.get_webview_window(WINDOW) else {
         return;

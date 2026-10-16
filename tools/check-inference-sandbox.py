@@ -61,7 +61,7 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 UNIT = "helix-inference-sandbox-check"
-binary = next(p for p in (root / "build-debug/helix-inference", root / "build/helix-inference") if p.exists())
+binary = next(p for p in (root / "target/fast/helix-inference", root / "target/release/helix-inference", root / "target/debug/helix-inference") if p.exists())
 command = ["systemd-run", "--user", f"--unit={UNIT}", "--collect", "--quiet", "-p", "Type=dbus", "-p", "BusName=org.helix.Inference"]
 for item in properties:
     command += ["-p", item]

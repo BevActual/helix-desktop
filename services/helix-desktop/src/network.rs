@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::fdo;
+use zbus::interface;
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{OwnedValue, Value};
-use zbus::interface;
 
 use crate::dbus_value::{json_to_owned, owned_bool, owned_str};
 use crate::desktop_operations::{
@@ -58,7 +58,9 @@ fn arg_u8(args: &HashMap<String, OwnedValue>, key: &str) -> fdo::Result<u8> {
         .ok_or_else(|| fdo::Error::InvalidArgs(format!("missing {key}")))?;
     match &**value {
         Value::U8(number) => Ok(*number),
-        Value::U32(number) => u8::try_from(*number).map_err(|_| fdo::Error::InvalidArgs(format!("bad {key}"))),
+        Value::U32(number) => {
+            u8::try_from(*number).map_err(|_| fdo::Error::InvalidArgs(format!("bad {key}")))
+        }
         Value::I32(number) if *number >= 0 => Ok(*number as u8),
         _ => Err(fdo::Error::InvalidArgs(format!("bad {key}"))),
     }
@@ -81,7 +83,8 @@ fn ssid_for_path(snapshot: &serde_json::Value, path: &str) -> Option<String> {
         .get("access-points")
         .and_then(|value| value.as_array())
         .and_then(|list| {
-            list.iter().find(|entry| entry.get("path").and_then(|v| v.as_str()) == Some(path))
+            list.iter()
+                .find(|entry| entry.get("path").and_then(|v| v.as_str()) == Some(path))
         })
         .and_then(|entry| entry.get("ssid").and_then(|v| v.as_str()))
         .map(str::to_string)
@@ -168,8 +171,9 @@ impl Network {
                 }
                 "connect" => {
                     let path = arg_str(&args, "path")?;
-                    let ssid = ssid_for_path(&snapshot, &path)
-                        .ok_or_else(|| fdo::Error::Failed("Network is no longer available".into()))?;
+                    let ssid = ssid_for_path(&snapshot, &path).ok_or_else(|| {
+                        fdo::Error::Failed("Network is no longer available".into())
+                    })?;
                     let secret = match args.get("secret") {
                         Some(_) => Some(arg_str(&args, "secret")?),
                         None => None,
@@ -186,8 +190,9 @@ impl Network {
                 }
                 "enterprise" => {
                     let path = arg_str(&args, "path")?;
-                    let ssid = ssid_for_path(&snapshot, &path)
-                        .ok_or_else(|| fdo::Error::Failed("Network is no longer available".into()))?;
+                    let ssid = ssid_for_path(&snapshot, &path).ok_or_else(|| {
+                        fdo::Error::Failed("Network is no longer available".into())
+                    })?;
                     let credentials = parse_enterprise(&args)?;
                     state
                         .network
@@ -201,10 +206,7 @@ impl Network {
                 }
                 "disconnect" => {
                     state.agents.cancel_nm_secret("disconnect");
-                    state
-                        .network
-                        .disconnect()
-                        .map_err(fdo::Error::Failed)?;
+                    state.network.disconnect().map_err(fdo::Error::Failed)?;
                     state.agents.clear_network_owner();
                     Ok(ActionPlan {
                         operation,
@@ -231,10 +233,7 @@ impl Network {
                         .map_err(fdo::Error::Failed)?;
                     Ok(ActionPlan {
                         operation,
-                        wait: OperationWait::NetworkVpn {
-                            path,
-                            active: true,
-                        },
+                        wait: OperationWait::NetworkVpn { path, active: true },
                         cancel: None,
                     })
                 }
@@ -254,10 +253,7 @@ impl Network {
                     })
                 }
                 "wired" => {
-                    state
-                        .network
-                        .activate_wired()
-                        .map_err(fdo::Error::Failed)?;
+                    state.network.activate_wired().map_err(fdo::Error::Failed)?;
                     Ok(ActionPlan {
                         operation,
                         wait: OperationWait::NetworkWired,
@@ -286,7 +282,9 @@ impl Network {
                         cancel: None,
                     })
                 }
-                other => Err(fdo::Error::Failed(format!("Unknown network action {other}"))),
+                other => Err(fdo::Error::Failed(format!(
+                    "Unknown network action {other}"
+                ))),
             };
             if result.is_err() && claim_connect {
                 state.agents.cancel_nm_secret("connect failed");
@@ -327,7 +325,9 @@ impl Network {
         };
         Self::changed(&emitter).await.ok();
         if finished_now {
-            Self::completed(&emitter, plan.operation, true, "").await.ok();
+            Self::completed(&emitter, plan.operation, true, "")
+                .await
+                .ok();
         }
         Ok(plan.operation)
     }
@@ -422,11 +422,7 @@ impl Network {
         Ok(())
     }
 
-    async fn cancel(
-        &self,
-        #[zbus(header)] header: Header<'_>,
-        operation: u64,
-    ) -> fdo::Result<()> {
+    async fn cancel(&self, #[zbus(header)] header: Header<'_>, operation: u64) -> fdo::Result<()> {
         let sender = sender_name(&header)?;
         let mut state = self.state.lock().await;
         state

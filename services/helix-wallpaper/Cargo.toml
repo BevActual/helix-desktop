@@ -1,16 +1,20 @@
 [package]
 name = "helix-wallpaper"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Paints the desktop background on a Wayland layer surface. A separate small process, so its memory is not the shell's."
 
 [dependencies]
-wayland-client = "0.31"
-wayland-protocols = { version = "0.32", features = ["client", "staging"] }
-wayland-protocols-wlr = { version = "0.3", features = ["client"] }
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
-memmap2 = "0.9"
-libc = "0.2"
-toml = "0.8"
-serde = { version = "1", features = ["derive"] }
+wayland-client = { workspace = true }
+wayland-protocols = { workspace = true, features = ["client", "staging"] }
+wayland-protocols-wlr = { workspace = true, features = ["client"] }
+image = { workspace = true, features = ["jpeg", "png", "webp"] }
+memmap2 = { workspace = true }
+libc = { workspace = true }
+toml = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

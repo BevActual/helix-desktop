@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::fdo;
+use zbus::interface;
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{OwnedValue, Value};
-use zbus::interface;
 
 use crate::dbus_value::json_to_owned;
 use crate::state::State;
@@ -21,11 +21,13 @@ fn arg_u32(args: &HashMap<String, OwnedValue>, key: &str) -> fdo::Result<u32> {
         .ok_or_else(|| fdo::Error::InvalidArgs(format!("missing {key}")))?;
     match &**value {
         Value::U32(number) => Ok(*number),
-        Value::U64(number) => u32::try_from(*number)
-            .map_err(|_| fdo::Error::InvalidArgs(format!("bad {key}"))),
+        Value::U64(number) => {
+            u32::try_from(*number).map_err(|_| fdo::Error::InvalidArgs(format!("bad {key}")))
+        }
         Value::I32(number) if *number >= 0 => Ok(*number as u32),
-        Value::I64(number) if *number >= 0 => u32::try_from(*number)
-            .map_err(|_| fdo::Error::InvalidArgs(format!("bad {key}"))),
+        Value::I64(number) if *number >= 0 => {
+            u32::try_from(*number).map_err(|_| fdo::Error::InvalidArgs(format!("bad {key}")))
+        }
         _ => Err(fdo::Error::InvalidArgs(format!("bad {key}"))),
     }
 }
@@ -87,9 +89,10 @@ impl Audio {
                     .set_volume(id, volume)
                     .map_err(fdo::Error::Failed)?;
                 if state.audio.sinks().iter().any(|node| node.id == id) {
-                    let _ = state
-                        .config
-                        .set("audio.sound_volume", serde_json::json!(volume.clamp(0.0, 1.0)));
+                    let _ = state.config.set(
+                        "audio.sound_volume",
+                        serde_json::json!(volume.clamp(0.0, 1.0)),
+                    );
                 }
             }
             "mute" => {

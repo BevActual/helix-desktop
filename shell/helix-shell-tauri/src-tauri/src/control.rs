@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use helix_shell_core::apps::assistant::MAX_REQUEST_CHARS;
+use helix_agent::assistant::MAX_REQUEST_CHARS;
 use tauri::AppHandle;
 use zbus::zvariant::{OwnedValue, Value};
 
@@ -73,7 +73,7 @@ pub(crate) fn on_main(
 
 /// An id the surface does not know is an error to the caller instead of a silent no-op.
 fn known(id: &str) -> zbus::fdo::Result<()> {
-    helix_shell_core::shell_surface::PANELS
+    helix_shell_model::shell_surface::PANELS
         .contains(&id)
         .then_some(())
         .ok_or_else(|| zbus::fdo::Error::InvalidArgs(format!("unknown panel {id:?}")))

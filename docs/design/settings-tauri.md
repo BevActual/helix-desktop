@@ -1,6 +1,6 @@
 # Settings, rebuilt as a Rust + Tauri application
 
-Status: live on the Tauri session path; **every page is a React page** (`apps/helix-settings/web`, `docs/design/frontend-stack.md`) over the same Rust commands. Pages include Appearance, Accessibility, Displays, Network, Bluetooth, Keyboard (compositor binds + Helix navigation chords via UpdateOrderedList), Wallpaper, Dock, Power & lock, Privacy & agents (manager), About. Install: `tools/switch-shell.sh install` → `~/.local/bin/helix-settings`.
+Status: live on the Tauri session path; **every page is a React page** (`apps/helix-settings/web`, `docs/design/frontend-stack.md`) over the same Rust commands. Pages include Appearance, Accessibility, Displays, Network, Bluetooth, Sound, Keyboard (compositor binds + Helix navigation chords via UpdateOrderedList), Wallpaper, Dock, Power & lock, Privacy & agents (manager), About. Install: `tools/switch-shell.sh install` → `~/.local/bin/helix-settings`.
 
 ## Why rebuild it, and what not to carry over
 
@@ -19,7 +19,7 @@ service still owns the setting (theme mode, night light, key chords, …).
 - Started by `helix-panel settings` (and the shell's Settings entries); a second start asks the running one to show a page
   (`org.helix.Settings1.ShowPage(page)` on the session bus) instead of opening another window.
 - Shares, not copies: the design tokens and icons (`shell/helix-shell-tauri/dist/style.css`, `icons.js` move to a shared directory both apps
-  take at build time), the pure models in `helix-shell-core` (audio, network, bluetooth, brightness, quick settings, dock, notifications) and the
+  take at build time), the pure models in the core crates (`helix-models`, `helix-shell-model`: audio, network, bluetooth, brightness, quick settings, dock, notifications) and the
   D-Bus client `helix-desktop-api`. A page is a larger view of a model the shell already tests.
 
 ## Pages (first release, in the order they are built)
@@ -39,7 +39,7 @@ service still owns the setting (theme mode, night light, key chords, …).
 
 ## How a page is built (same rules as the shell)
 
-1. A pure, mutation-tested model in `helix-shell-core` (or a new `helix-settings-core`) turns what the service says into a view and is the
+1. A pure, mutation-tested model in a core crate (`helix-models`, `helix-config`, `helix-shell-model`) turns what the service says into a view and is the
    *only* producer of write requests (ranges, ids that must come from the last read, what is refused and why).
 2. A thin Tauri command sends the request; a watcher follows `Changed` signals; never poll.
 3. The page draws what Rust sends, text only through `textContent`, strict CSP, named controls (`data-test`).

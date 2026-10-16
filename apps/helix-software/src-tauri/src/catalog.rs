@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use helix_shell_core::software::{valid_id, Kind, Meta, Package};
+use helix_software_model::software::{valid_id, Kind, Meta, Package};
 use std::io::BufRead;
 
 /// Flatpak prints sizes like `88.2 MB`, `1.0 GB`, `512 bytes` (decimal units).

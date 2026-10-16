@@ -1,12 +1,32 @@
-# Layering rules for cpp/, checked by tools/check-layers.py (meson test `layering`).
+# Dependency-direction rules for the Cargo workspace, checked by tools/check-layers.py
+# (`tools/test-integration.sh layering`). Keys are top-level directories; values are the directories a crate
+# there may depend on (path dependencies inside this workspace). A crate may always depend on
+# its own directory's siblings only where its own directory is listed.
 #
-# After retiring the C++ session UI, only base + platform + independent processes remain.
+# Mirrors the "Tree roles" table in docs/design/product-structure.md: pure models in core/, each
+# process on its own, nothing reaching up into shell chrome, and the greeter on its own.
 
-[layers]
-base = ["util", "core", "i18n", "time"]
-platform = ["config", "net", "security", "dbus", "system", "notification", "hooks", "auth", "debug", "idle", "wayland", "compositors"]
+[rules]
+core = ["core", "third_party"]
+third_party = ["third_party"]
+services = ["core", "third_party"]
+shell = ["core", "third_party"]
+apps = ["core", "third_party"]
+greeter = ["third_party"]
+dev = ["core", "services", "shell", "apps", "greeter", "third_party"]
 
-[independent]
-# `desktop` C++ tree deleted (agent lives in Rust). Remaining independent: inference workers (+ apps/assistant stubs).
-modules = ["apps", "assistant"]
-may_include = ["base", "platform", "independent"]
+# Inside core/, which core crates each crate may depend on. A new core crate must be listed here (docs/design/shell-core-split.md):
+# the lists are what keeps helix-base at the bottom and policy from reaching up into shell models.
+[crates]
+helix-base = []
+helix-agent = ["helix-base"]
+helix-config = ["helix-base"]
+helix-config-export = ["helix-config"]
+helix-models = ["helix-base"]
+helix-compositor = ["helix-base"]
+helix-shell-model = ["helix-base", "helix-compositor"]
+helix-chat = ["helix-base", "helix-config"]
+helix-software-model = ["helix-base"]
+helix-monitor-model = ["helix-base"]
+helix-theme = []
+helix-desktop-api = []

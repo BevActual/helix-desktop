@@ -44,9 +44,7 @@ pub fn string_list(row: &serde_json::Value) -> Vec<String> {
 }
 
 pub fn json_array_value(row: &serde_json::Value) -> serde_json::Value {
-    row.get("value")
-        .cloned()
-        .unwrap_or_else(|| json!([]))
+    row.get("value").cloned().unwrap_or_else(|| json!([]))
 }
 
 pub struct Session {
@@ -270,7 +268,10 @@ pub async fn boot() -> (Session, Desktop) {
     wait_for_bus_name().await;
     let desktop = Desktop::session().await.expect("connect");
     wait_ready(&desktop).await;
-    let snap = desktop.snapshot(Domain::Configuration).await.expect("snapshot");
+    let snap = desktop
+        .snapshot(Domain::Configuration)
+        .await
+        .expect("snapshot");
     assert_eq!(
         snap.get("implementation").and_then(|v| v.as_str()),
         Some("rust"),

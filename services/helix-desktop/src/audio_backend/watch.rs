@@ -42,7 +42,10 @@ impl std::fmt::Debug for Watch {
 
 impl Watch {
     pub fn start() -> Self {
-        let shared = Arc::new(Shared { dirty: AtomicBool::new(true), stop: AtomicBool::new(false) });
+        let shared = Arc::new(Shared {
+            dirty: AtomicBool::new(true),
+            stop: AtomicBool::new(false),
+        });
         let thread_shared = Arc::clone(&shared);
         let thread = std::thread::Builder::new()
             .name("pw-audio-watch".into())
@@ -112,7 +115,9 @@ fn watch_once(shared: &Arc<Shared>) -> Result<(), pw::Error> {
     let _registry_listener = registry
         .add_listener_local()
         .global(move |global| {
-            let Some(registry) = registry_weak.upgrade() else { return };
+            let Some(registry) = registry_weak.upgrade() else {
+                return;
+            };
             let dirty = Arc::clone(&global_shared);
             let entry: Option<(Box<dyn ProxyT>, Box<dyn Listener>)> = match global.type_ {
                 ObjectType::Node => {
@@ -120,7 +125,9 @@ fn watch_once(shared: &Arc<Shared>) -> Result<(), pw::Error> {
                         .props
                         .as_ref()
                         .and_then(|p| p.get("media.class"))
-                        .is_some_and(|class| class.starts_with("Audio/") || class.starts_with("Stream/"));
+                        .is_some_and(|class| {
+                            class.starts_with("Audio/") || class.starts_with("Stream/")
+                        });
                     if !is_audio {
                         None
                     } else {
@@ -135,7 +142,10 @@ fn watch_once(shared: &Arc<Shared>) -> Result<(), pw::Error> {
                                     }
                                 })
                                 .register();
-                            (Box::new(node) as Box<dyn ProxyT>, Box::new(listener) as Box<dyn Listener>)
+                            (
+                                Box::new(node) as Box<dyn ProxyT>,
+                                Box::new(listener) as Box<dyn Listener>,
+                            )
                         })
                     }
                 }
@@ -147,7 +157,10 @@ fn watch_once(shared: &Arc<Shared>) -> Result<(), pw::Error> {
                             0
                         })
                         .register();
-                    (Box::new(metadata) as Box<dyn ProxyT>, Box::new(listener) as Box<dyn Listener>)
+                    (
+                        Box::new(metadata) as Box<dyn ProxyT>,
+                        Box::new(listener) as Box<dyn Listener>,
+                    )
                 }),
                 _ => None,
             };
@@ -155,7 +168,9 @@ fn watch_once(shared: &Arc<Shared>) -> Result<(), pw::Error> {
             // device list; counting them would make each refresh trigger the next.
             if let Some((proxy, listener)) = entry {
                 let id = proxy.upcast_ref().id();
-                global_proxies.borrow_mut().insert(id, (proxy, vec![listener]));
+                global_proxies
+                    .borrow_mut()
+                    .insert(id, (proxy, vec![listener]));
                 global_shared.dirty.store(true, Ordering::Release);
             }
         })

@@ -17,8 +17,7 @@ const ADAPTER_IFACE: &str = "org.bluez.Adapter1";
 const DEVICE_IFACE: &str = "org.bluez.Device1";
 const BATTERY_IFACE: &str = "org.bluez.Battery1";
 
-type ManagedObjects =
-    HashMap<OwnedObjectPath, HashMap<String, HashMap<String, OwnedValue>>>;
+type ManagedObjects = HashMap<OwnedObjectPath, HashMap<String, HashMap<String, OwnedValue>>>;
 
 static SYSTEM_BUS: Mutex<Option<Connection>> = Mutex::new(None);
 
@@ -362,12 +361,17 @@ pub fn bus_owner() -> Option<String> {
                 &(BLUEZ_SERVICE,),
             )
             .map_err(|error| error.to_string())?;
-        reply.body().deserialize::<String>().map_err(|error| error.to_string())
+        reply
+            .body()
+            .deserialize::<String>()
+            .map_err(|error| error.to_string())
     })
     .ok()
 }
 
-fn with_connection<R>(operation: impl FnOnce(&Connection) -> Result<R, String>) -> Result<R, String> {
+fn with_connection<R>(
+    operation: impl FnOnce(&Connection) -> Result<R, String>,
+) -> Result<R, String> {
     crate::blocking::run(|| {
         let mut guard = SYSTEM_BUS
             .lock()
@@ -397,7 +401,13 @@ where
 }
 
 fn managed_objects(conn: &Connection) -> Result<ManagedObjects, String> {
-    let reply = bz_call(conn, ROOT_PATH, OBJECT_MANAGER_IFACE, "GetManagedObjects", &())?;
+    let reply = bz_call(
+        conn,
+        ROOT_PATH,
+        OBJECT_MANAGER_IFACE,
+        "GetManagedObjects",
+        &(),
+    )?;
     reply
         .body()
         .deserialize()

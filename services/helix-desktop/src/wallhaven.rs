@@ -15,8 +15,8 @@ use serde_json::{json, Value};
 
 const API_SEARCH_URL: &str = "https://wallhaven.cc/api/v1/search";
 const ASPECT_RATIOS: [&str; 15] = [
-    "", "wide", "portrait", "16x9", "16x10", "21x9", "32x9", "48x9", "9x16", "10x16", "9x18", "1x1", "3x2", "4x3",
-    "5x4",
+    "", "wide", "portrait", "16x9", "16x10", "21x9", "32x9", "48x9", "9x16", "10x16", "9x18",
+    "1x1", "3x2", "4x3", "5x4",
 ];
 const MAX_ITEMS: usize = 24;
 const SEARCH_LIMIT: usize = 2 * 1024 * 1024;
@@ -72,13 +72,22 @@ pub struct Query {
 // ---- validation and URL building -------------------------------------------------------
 
 pub fn is_wallhaven_id(value: &str) -> bool {
-    value.len() == 6 && value.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    value.len() == 6
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
 }
 
 /// `https://{th|w}.wallhaven.cc/...` with no credentials, query, fragment or odd port.
 pub fn is_image_url(url: &str, thumbnail: bool) -> bool {
-    let Some(rest) = url.strip_prefix("https://") else { return false };
-    let host = if thumbnail { "th.wallhaven.cc" } else { "w.wallhaven.cc" };
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let host = if thumbnail {
+        "th.wallhaven.cc"
+    } else {
+        "w.wallhaven.cc"
+    };
     let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
     let authority = &rest[..authority_end];
     let tail = &rest[authority_end..];
@@ -98,7 +107,9 @@ fn whole_number(value: &Value) -> Option<f64> {
 
 /// C++ `wallhavenQuery`.
 pub fn query_from_args(args: &Value, authenticated: bool) -> Result<Query, WhError> {
-    let object = args.as_object().ok_or_else(|| invalid("Invalid Wallhaven search options"))?;
+    let object = args
+        .as_object()
+        .ok_or_else(|| invalid("Invalid Wallhaven search options"))?;
     for field in ["page", "sort", "ratio", "width", "height"] {
         if let Some(value) = object.get(field) {
             match whole_number(value) {
@@ -107,9 +118,15 @@ pub fn query_from_args(args: &Value, authenticated: bool) -> Result<Query, WhErr
             }
         }
     }
-    let number = |key: &str, default: f64| object.get(key).and_then(whole_number).unwrap_or(default);
-    let flag = |key: &str, default: bool| object.get(key).and_then(Value::as_bool).unwrap_or(default);
-    let tags = object.get("query").and_then(Value::as_str).unwrap_or("").to_string();
+    let number =
+        |key: &str, default: f64| object.get(key).and_then(whole_number).unwrap_or(default);
+    let flag =
+        |key: &str, default: bool| object.get(key).and_then(Value::as_bool).unwrap_or(default);
+    let tags = object
+        .get("query")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     let page = number("page", 1.0);
     let sort = number("sort", 2.0);
     let ratio = number("ratio", 0.0);
@@ -124,14 +141,19 @@ pub fn query_from_args(args: &Value, authenticated: bool) -> Result<Query, WhErr
     }
     let purity_nsfw = flag("nsfw", false);
     if purity_nsfw && !authenticated {
-        return Err(invalid("A saved Wallhaven API key is required for this filter"));
+        return Err(invalid(
+            "A saved Wallhaven API key is required for this filter",
+        ));
     }
     let (width, height) = (number("width", 0.0), number("height", 0.0));
     if (width == 0.0) != (height == 0.0) {
         return Err(invalid("Specify both resolution dimensions"));
     }
-    let (resolution_width, resolution_height) =
-        if width != 0.0 { (format!("{}", width as i64), format!("{}", height as i64)) } else { Default::default() };
+    let (resolution_width, resolution_height) = if width != 0.0 {
+        (format!("{}", width as i64), format!("{}", height as i64))
+    } else {
+        Default::default()
+    };
     Ok(Query {
         tags,
         category_general: flag("general", true),
@@ -185,7 +207,10 @@ fn wallpaper_id_from_text(text: &str) -> Option<String> {
     for marker in ["wallhaven.cc/w/", "wallhaven-"] {
         if let Some(pos) = text.find(marker) {
             let rest = &text[pos + marker.len()..];
-            let id: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric()).collect();
+            let id: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric())
+                .collect();
             if id.len() >= 4 {
                 return Some(id);
             }
@@ -195,9 +220,13 @@ fn wallpaper_id_from_text(text: &str) -> Option<String> {
 }
 
 fn query_param(text: &str, key: &str) -> Option<String> {
-    let pos = text.find(&format!("?{key}=")).or_else(|| text.find(&format!("&{key}=")))?;
+    let pos = text
+        .find(&format!("?{key}="))
+        .or_else(|| text.find(&format!("&{key}=")))?;
     let start = pos + key.len() + 2;
-    let end = text[start..].find(['&', '#']).map_or(text.len(), |i| start + i);
+    let end = text[start..]
+        .find(['&', '#'])
+        .map_or(text.len(), |i| start + i);
     Some(url_decode(&text[start..end].replace('+', " ")))
 }
 
@@ -220,7 +249,10 @@ pub fn normalize_search_query(raw: &str) -> String {
             return format!("id:{id}");
         }
     }
-    text.replace(',', " ").split_whitespace().collect::<Vec<_>>().join(" ")
+    text.replace(',', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn relevance_without_query(query: &Query) -> bool {
@@ -228,8 +260,15 @@ fn relevance_without_query(query: &Query) -> bool {
 }
 
 fn tri_flag(a: bool, b: bool, c: bool) -> String {
-    let value: String = [a, b, c].iter().map(|f| if *f { '1' } else { '0' }).collect();
-    if value == "000" { "100".into() } else { value }
+    let value: String = [a, b, c]
+        .iter()
+        .map(|f| if *f { '1' } else { '0' })
+        .collect();
+    if value == "000" {
+        "100".into()
+    } else {
+        value
+    }
 }
 
 fn parse_positive_int(text: &str) -> Option<u32> {
@@ -237,7 +276,9 @@ fn parse_positive_int(text: &str) -> Option<u32> {
     if t.is_empty() || !t.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    t.parse::<u32>().ok().filter(|v| *v >= 1 && *v <= i32::MAX as u32)
+    t.parse::<u32>()
+        .ok()
+        .filter(|v| *v >= 1 && *v <= i32::MAX as u32)
 }
 
 fn parse_resolution(text: &str) -> Option<(u32, u32)> {
@@ -247,23 +288,50 @@ fn parse_resolution(text: &str) -> Option<(u32, u32)> {
 
 pub fn api_page(query: &Query) -> u32 {
     let page = query.page.max(1);
-    if relevance_without_query(query) { page + 1 } else { page }
+    if relevance_without_query(query) {
+        page + 1
+    } else {
+        page
+    }
 }
 
 pub fn normalize_total_pages(query: &Query, last_page: i64) -> i64 {
     let pages = last_page.max(1);
-    if relevance_without_query(query) { (pages - 1).max(1) } else { pages }
+    if relevance_without_query(query) {
+        (pages - 1).max(1)
+    } else {
+        pages
+    }
 }
 
 /// C++ `buildSearchUrl`.
 pub fn build_search_url(query: &Query, nsfw_allowed: bool) -> String {
-    const SORTS: [&str; 7] = ["relevance", "random", "date_added", "views", "favorites", "toplist", "hot"];
+    const SORTS: [&str; 7] = [
+        "relevance",
+        "random",
+        "date_added",
+        "views",
+        "favorites",
+        "toplist",
+        "hot",
+    ];
     let mut url = format!(
         "{API_SEARCH_URL}?categories={}&purity={}&page={}&sorting={}&order={}",
-        tri_flag(query.category_general, query.category_anime, query.category_people),
-        tri_flag(query.purity_sfw, query.purity_sketchy, query.purity_nsfw && nsfw_allowed),
+        tri_flag(
+            query.category_general,
+            query.category_anime,
+            query.category_people
+        ),
+        tri_flag(
+            query.purity_sfw,
+            query.purity_sketchy,
+            query.purity_nsfw && nsfw_allowed
+        ),
         api_page(query),
-        SORTS.get(query.sort as usize).copied().unwrap_or("date_added"),
+        SORTS
+            .get(query.sort as usize)
+            .copied()
+            .unwrap_or("date_added"),
         if query.ascending { "asc" } else { "desc" },
     );
     let tags = normalize_search_query(&query.tags);
@@ -271,10 +339,15 @@ pub fn build_search_url(query: &Query, nsfw_allowed: bool) -> String {
         url.push_str("&q=");
         url.push_str(&url_encode(&tags));
     }
-    if let (Some(w), Some(h)) =
-        (parse_positive_int(&query.resolution_width), parse_positive_int(&query.resolution_height))
-    {
-        let key = if query.exact_resolution { "resolutions" } else { "atleast" };
+    if let (Some(w), Some(h)) = (
+        parse_positive_int(&query.resolution_width),
+        parse_positive_int(&query.resolution_height),
+    ) {
+        let key = if query.exact_resolution {
+            "resolutions"
+        } else {
+            "atleast"
+        };
         url.push_str(&format!("&{key}={w}x{h}"));
     }
     match ASPECT_RATIOS.get(query.aspect_ratio_index).copied() {
@@ -304,7 +377,13 @@ pub fn parse_search_body(body: &[u8]) -> Option<SearchResponse> {
         .and_then(|m| m.get("last_page"))
         .and_then(Value::as_f64)
         .map_or(1, |n| (n as i64).max(1));
-    let text = |entry: &Value, key: &str| entry.get(key).and_then(Value::as_str).unwrap_or("").to_string();
+    let text = |entry: &Value, key: &str| {
+        entry
+            .get(key)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
     let items = data
         .iter()
         .filter(|entry| entry.is_object())
@@ -336,7 +415,9 @@ pub fn filter_by_aspect_ratio(items: Vec<Item>, index: usize) -> Vec<Item> {
     items
         .into_iter()
         .filter(|item| {
-            let Some((w, h)) = parse_resolution(&item.resolution) else { return false };
+            let Some((w, h)) = parse_resolution(&item.resolution) else {
+                return false;
+            };
             let ratio = f64::from(w) / f64::from(h);
             match selected {
                 "wide" => ratio > 1.0,
@@ -362,18 +443,27 @@ fn thumb_urls(item: &Item) -> Vec<&str> {
 }
 
 pub fn thumb_cache_path(state_dir: &Path, id: &str) -> PathBuf {
-    state_dir.join("wallhaven").join("thumbs").join(format!("{id}.jpg"))
+    state_dir
+        .join("wallhaven")
+        .join("thumbs")
+        .join(format!("{id}.jpg"))
 }
 
 pub fn download_path(dir: &Path, item: &Item) -> PathBuf {
-    let extension = if item.file_type == "image/png" { ".png" } else { ".jpg" };
+    let extension = if item.file_type == "image/png" {
+        ".png"
+    } else {
+        ".jpg"
+    };
     dir.join(format!("wallhaven-{}{extension}", item.id))
 }
 
 fn expand_user_path(path: &str) -> PathBuf {
     match (path.strip_prefix("~/"), std::env::var("HOME")) {
         (Some(rest), Ok(home)) if !home.is_empty() => PathBuf::from(home).join(rest),
-        _ if path == "~" => std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(path)),
+        _ if path == "~" => std::env::var("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from(path)),
         _ => PathBuf::from(path),
     }
 }
@@ -429,8 +519,12 @@ fn default_pictures_dir() -> PathBuf {
     if let Ok(text) = std::fs::read_to_string(config_home.join("user-dirs.dirs")) {
         for line in text.lines() {
             let line = line.trim_start();
-            let Some(rest) = line.strip_prefix("XDG_PICTURES_DIR=") else { continue };
-            let Some(quoted) = rest.trim_start().strip_prefix('"') else { continue };
+            let Some(rest) = line.strip_prefix("XDG_PICTURES_DIR=") else {
+                continue;
+            };
+            let Some(quoted) = rest.trim_start().strip_prefix('"') else {
+                continue;
+            };
             let mut value = String::new();
             let mut chars = quoted.chars();
             let mut terminated = false;
@@ -473,20 +567,35 @@ pub fn resolve_download_dir(configured: &str, wallpaper_directory: &str) -> Path
 
 /// Fetches `url` (headers as `(name, value)`) with a hard size limit; `None` on any failure.
 pub trait Fetch: Send + Sync {
-    fn get(&self, url: &str, headers: &[(String, String)], limit: usize, cancelled: &AtomicBool) -> Option<Vec<u8>>;
+    fn get(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+        limit: usize,
+        cancelled: &AtomicBool,
+    ) -> Option<Vec<u8>>;
 }
 
 pub struct UreqFetch;
 
 impl Fetch for UreqFetch {
-    fn get(&self, url: &str, headers: &[(String, String)], limit: usize, cancelled: &AtomicBool) -> Option<Vec<u8>> {
-        let agent = ureq::AgentBuilder::new().timeout(REQUEST_TIMEOUT).build();
+    fn get(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+        limit: usize,
+        cancelled: &AtomicBool,
+    ) -> Option<Vec<u8>> {
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .timeout_global(Some(REQUEST_TIMEOUT))
+            .build()
+            .into();
         let mut request = agent.get(url);
         for (name, value) in headers {
-            request = request.set(name, value);
+            request = request.header(name, value);
         }
         let response = request.call().ok()?;
-        let mut reader = response.into_reader();
+        let mut reader = response.into_body().into_reader();
         let mut bytes = Vec::new();
         let mut chunk = [0u8; 16 * 1024];
         loop {
@@ -552,7 +661,10 @@ impl Wallhaven {
 
     pub fn with_fetch(fetch: Arc<dyn Fetch>) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Inner { next: 1, ..Default::default() })),
+            inner: Arc::new(Mutex::new(Inner {
+                next: 1,
+                ..Default::default()
+            })),
             fetch,
             counter: Arc::new(AtomicU64::new(1)),
         }
@@ -568,7 +680,9 @@ impl Wallhaven {
         let stale: Vec<u64> = inner
             .jobs
             .iter()
-            .filter(|(_, job)| !desktop || offline || job.touched.lock().unwrap().elapsed() > JOB_IDLE_LIMIT)
+            .filter(|(_, job)| {
+                !desktop || offline || job.touched.lock().unwrap().elapsed() > JOB_IDLE_LIMIT
+            })
             .map(|(id, _)| *id)
             .collect();
         for id in stale {
@@ -581,7 +695,12 @@ impl Wallhaven {
     /// A client went away: cancel everything it owned.
     pub fn disconnect(&self, owner: &str) {
         let mut inner = self.inner.lock().unwrap();
-        let ids: Vec<u64> = inner.jobs.iter().filter(|(_, j)| j.owner == owner).map(|(id, _)| *id).collect();
+        let ids: Vec<u64> = inner
+            .jobs
+            .iter()
+            .filter(|(_, j)| j.owner == owner)
+            .map(|(id, _)| *id)
+            .collect();
         for id in ids {
             if let Some(job) = inner.jobs.remove(&id) {
                 Self::cancel_job(&job);
@@ -623,7 +742,9 @@ impl Wallhaven {
         let mut inner = self.inner.lock().unwrap();
         let own = inner.jobs.values().filter(|j| j.owner == owner).count();
         if own >= 4 || inner.jobs.len() >= 16 {
-            return Err(WhError::Failed("Finish or cancel an existing Wallhaven request first".into()));
+            return Err(WhError::Failed(
+                "Finish or cancel an existing Wallhaven request first".into(),
+            ));
         }
         let job = Arc::new(Job {
             owner: owner.to_string(),
@@ -695,11 +816,16 @@ impl Wallhaven {
             {
                 let mut state = job.state.lock().unwrap();
                 state["items"] = Value::Array(rows);
-                state["pages"] = json!(normalize_total_pages(&query, parsed.last_page).clamp(1, 10000));
+                state["pages"] =
+                    json!(normalize_total_pages(&query, parsed.last_page).clamp(1, 10000));
             }
             for start in 0..THUMB_CHAINS {
-                let (job, fetch, state_dir, counter) =
-                    (Arc::clone(&job), Arc::clone(&fetch), state_dir.clone(), Arc::clone(&counter));
+                let (job, fetch, state_dir, counter) = (
+                    Arc::clone(&job),
+                    Arc::clone(&fetch),
+                    state_dir.clone(),
+                    Arc::clone(&counter),
+                );
                 std::thread::spawn(move || {
                     let mut index = start;
                     loop {
@@ -713,11 +839,16 @@ impl Wallhaven {
                         if job.cancelled.load(Ordering::Relaxed) {
                             return;
                         }
-                        if let Some(url) = thumb_urls(&item).into_iter().find(|u| is_image_url(u, true)) {
+                        if let Some(url) = thumb_urls(&item)
+                            .into_iter()
+                            .find(|u| is_image_url(u, true))
+                        {
                             let path = thumb_cache_path(&state_dir, &item.id);
                             let bytes = fetch.get(url, &[], THUMB_LIMIT, &job.cancelled);
                             if let Some(bytes) = bytes {
-                                if save_image(&path, &bytes, id, &counter) && !job.cancelled.load(Ordering::Relaxed) {
+                                if save_image(&path, &bytes, id, &counter)
+                                    && !job.cancelled.load(Ordering::Relaxed)
+                                {
                                     job.state.lock().unwrap()["items"][index]["thumbnail"] =
                                         json!(path.to_string_lossy());
                                 }
@@ -731,7 +862,13 @@ impl Wallhaven {
         Ok(id)
     }
 
-    pub fn download(&self, ctx: &Context, search_id: u64, image_id: &str, owner: &str) -> Result<u64, WhError> {
+    pub fn download(
+        &self,
+        ctx: &Context,
+        search_id: u64,
+        image_id: &str,
+        owner: &str,
+    ) -> Result<u64, WhError> {
         if !ctx.desktop || ctx.offline {
             return Err(invalid("Wallpaper download is unavailable"));
         }
@@ -757,7 +894,9 @@ impl Wallhaven {
             }
             job.set("busy", json!(false));
             let saved = !(!desktop || offline)
-                && bytes.as_deref().is_some_and(|bytes| save_image(&path, bytes, id, &counter));
+                && bytes
+                    .as_deref()
+                    .is_some_and(|bytes| save_image(&path, bytes, id, &counter));
             if !saved {
                 job.set(
                     "error",
@@ -777,12 +916,18 @@ fn save_image(path: &Path, bytes: &[u8], job_id: u64, counter: &AtomicU64) -> bo
     if !(bytes.starts_with(&[0xff, 0xd8, 0xff]) || bytes.starts_with(b"\x89PNG\r\n\x1a\n")) {
         return false;
     }
-    let Some(parent) = path.parent() else { return false };
+    let Some(parent) = path.parent() else {
+        return false;
+    };
     if std::fs::create_dir_all(parent).is_err() {
         return false;
     }
     let unique = counter.fetch_add(1, Ordering::Relaxed);
-    let temporary = PathBuf::from(format!("{}.helix-{job_id}-{}-{unique}", path.display(), std::process::id()));
+    let temporary = PathBuf::from(format!(
+        "{}.helix-{job_id}-{}-{unique}",
+        path.display(),
+        std::process::id()
+    ));
     if std::fs::write(&temporary, bytes).is_err() {
         let _ = std::fs::remove_file(&temporary);
         return false;
@@ -802,8 +947,19 @@ mod tests {
     struct FakeFetch(Mutex<HashMap<String, Vec<u8>>>);
 
     impl Fetch for FakeFetch {
-        fn get(&self, url: &str, _h: &[(String, String)], limit: usize, _c: &AtomicBool) -> Option<Vec<u8>> {
-            self.0.lock().unwrap().get(url).filter(|b| b.len() <= limit).cloned()
+        fn get(
+            &self,
+            url: &str,
+            _h: &[(String, String)],
+            limit: usize,
+            _c: &AtomicBool,
+        ) -> Option<Vec<u8>> {
+            self.0
+                .lock()
+                .unwrap()
+                .get(url)
+                .filter(|b| b.len() <= limit)
+                .cloned()
         }
     }
 
@@ -866,8 +1022,14 @@ mod tests {
             "https://wallhaven.cc/api/v1/search?categories=111&purity=100&page=1&sorting=toplist&order=desc\
              &q=forest%20night&atleast=1920x1080&ratios=16x9"
         );
-        assert_eq!(normalize_search_query("https://wallhaven.cc/w/abc123"), "id:abc123");
-        assert_eq!(normalize_search_query("https://wallhaven.cc/search?q=cats+dogs&page=2"), "cats dogs");
+        assert_eq!(
+            normalize_search_query("https://wallhaven.cc/w/abc123"),
+            "id:abc123"
+        );
+        assert_eq!(
+            normalize_search_query("https://wallhaven.cc/search?q=cats+dogs&page=2"),
+            "cats dogs"
+        );
         let relevance = query_from_args(&json!({"sort": 0, "page": 2}), false).unwrap();
         assert!(build_search_url(&relevance, false).contains("&page=3&"));
         assert_eq!(normalize_total_pages(&relevance, 5), 4);
@@ -875,9 +1037,18 @@ mod tests {
 
     #[test]
     fn trusted_image_hosts_only() {
-        assert!(is_image_url("https://w.wallhaven.cc/full/ab/wallhaven-abc123.jpg", false));
-        assert!(is_image_url("https://th.wallhaven.cc/small/ab/abc123.jpg", true));
-        assert!(!is_image_url("https://th.wallhaven.cc/small/ab/abc123.jpg", false));
+        assert!(is_image_url(
+            "https://w.wallhaven.cc/full/ab/wallhaven-abc123.jpg",
+            false
+        ));
+        assert!(is_image_url(
+            "https://th.wallhaven.cc/small/ab/abc123.jpg",
+            true
+        ));
+        assert!(!is_image_url(
+            "https://th.wallhaven.cc/small/ab/abc123.jpg",
+            false
+        ));
         for bad in [
             "http://w.wallhaven.cc/a.jpg",
             "https://w.wallhaven.cc.evil.example/a.jpg",
@@ -902,8 +1073,14 @@ mod tests {
         let mut responses = HashMap::new();
         let mut url_query = query_from_args(&json!({}), false).unwrap();
         url_query.page = 1;
-        responses.insert(build_search_url(&url_query, false), serde_json::to_vec(&body).unwrap());
-        responses.insert("https://th.wallhaven.cc/lg/ab/abc123.jpg".to_string(), b"\xff\xd8\xffthumb".to_vec());
+        responses.insert(
+            build_search_url(&url_query, false),
+            serde_json::to_vec(&body).unwrap(),
+        );
+        responses.insert(
+            "https://th.wallhaven.cc/lg/ab/abc123.jpg".to_string(),
+            b"\xff\xd8\xffthumb".to_vec(),
+        );
         responses.insert(
             "https://w.wallhaven.cc/full/ab/wallhaven-abc123.jpg".to_string(),
             b"\xff\xd8\xffpicture".to_vec(),
@@ -917,8 +1094,14 @@ mod tests {
         assert_eq!(state["pages"], 3);
         let items = state["items"].as_array().unwrap();
         assert_eq!(items.len(), 2, "untrusted host dropped");
-        assert!(items[0]["thumbnail"].as_str().unwrap().ends_with("abc123.jpg"));
-        assert!(wh.result(id, ":1.9").is_err(), "other clients cannot read the job");
+        assert!(items[0]["thumbnail"]
+            .as_str()
+            .unwrap()
+            .ends_with("abc123.jpg"));
+        assert!(
+            wh.result(id, ":1.9").is_err(),
+            "other clients cannot read the job"
+        );
 
         assert!(wh.download(&context, id, "zzzzzz", ":1.5").is_err());
         let download = wh.download(&context, id, "abc123", ":1.5").unwrap();
@@ -938,14 +1121,20 @@ mod tests {
             build_search_url(&query_from_args(&json!({}), false).unwrap(), false),
             serde_json::to_vec(&body).unwrap(),
         );
-        responses.insert("https://w.wallhaven.cc/a.jpg".to_string(), b"<html>nope</html>".to_vec());
+        responses.insert(
+            "https://w.wallhaven.cc/a.jpg".to_string(),
+            b"<html>nope</html>".to_vec(),
+        );
         let wh = Wallhaven::with_fetch(Arc::new(FakeFetch(Mutex::new(responses))));
         let context = ctx(&dir);
         let id = wh.search(&context, &json!({}), ":1.1").unwrap();
         wait_idle(&wh, id, ":1.1");
         let download = wh.download(&context, id, "abc123", ":1.1").unwrap();
         let state = wait_idle(&wh, download, ":1.1");
-        assert!(state["error"].as_str().unwrap().contains("could not be downloaded"));
+        assert!(state["error"]
+            .as_str()
+            .unwrap()
+            .contains("could not be downloaded"));
 
         // Four jobs per client.
         let mut ids = vec![id, download];
@@ -962,10 +1151,24 @@ mod tests {
     #[test]
     fn matches_cpp_client() {
         let golden = include_str!("../tests/golden/wallhaven.tsv");
-        let items: Vec<Item> = ["1920x1080", "1080x1920", "3440x1440", "1000x1000", "2560x1600", "1600x1200", "bogus", "0x5"]
-            .iter()
-            .map(|r| Item { id: (*r).into(), path: "p".into(), resolution: (*r).into(), ..Default::default() })
-            .collect();
+        let items: Vec<Item> = [
+            "1920x1080",
+            "1080x1920",
+            "3440x1440",
+            "1000x1000",
+            "2560x1600",
+            "1600x1200",
+            "bogus",
+            "0x5",
+        ]
+        .iter()
+        .map(|r| Item {
+            id: (*r).into(),
+            path: "p".into(),
+            resolution: (*r).into(),
+            ..Default::default()
+        })
+        .collect();
         let mut rows = 0;
         for line in golden.lines() {
             let f: Vec<&str> = line.split('\t').collect();
@@ -998,14 +1201,23 @@ mod tests {
                         ..query_from_args(&json!({}), false).unwrap()
                     };
                     let last: i64 = f[3].parse().unwrap();
-                    assert_eq!(normalize_total_pages(&query, last), f[4].parse::<i64>().unwrap(), "{line}");
+                    assert_eq!(
+                        normalize_total_pages(&query, last),
+                        f[4].parse::<i64>().unwrap(),
+                        "{line}"
+                    );
                 }
                 "ratio" => {
-                    let kept: Vec<String> = filter_by_aspect_ratio(items.clone(), f[1].parse().unwrap())
-                        .into_iter()
-                        .map(|i| i.id)
-                        .collect();
-                    assert_eq!(kept, f[2..].iter().map(|s| s.to_string()).collect::<Vec<_>>(), "{line}");
+                    let kept: Vec<String> =
+                        filter_by_aspect_ratio(items.clone(), f[1].parse().unwrap())
+                            .into_iter()
+                            .map(|i| i.id)
+                            .collect();
+                    assert_eq!(
+                        kept,
+                        f[2..].iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                        "{line}"
+                    );
                 }
                 other => panic!("unknown row {other}"),
             }

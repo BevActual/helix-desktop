@@ -3,7 +3,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use helix_shell_core::{AuditLog, ConfigStore, GrantStore, RiskPolicy, TaintTracker};
+use helix_agent::audit_log::AuditLog;
+use helix_config::settings::ConfigStore;
+use helix_agent::grant_store::GrantStore;
+use helix_agent::risk::RiskPolicy;
+use helix_agent::grant_store::TaintTracker;
 use serde_json::Value;
 use zbus::Connection;
 
@@ -11,10 +15,10 @@ use crate::agents::AgentHub;
 use crate::audio_backend::AudioBackend;
 use crate::audio_meter::AudioMeterManager;
 use crate::bluetooth_backend::BluetoothBackend;
+use crate::desktop_operations::DesktopOperation;
 use crate::displays_backend::DisplaysBackend;
 use crate::network_backend::NetworkBackend;
 use crate::palette_catalog::load_palette_previews;
-use crate::desktop_operations::DesktopOperation;
 use crate::runtime_state::RuntimeState;
 
 /// Same window as C++ `AgentBroker::kConfirmationDeadline`.
@@ -97,11 +101,8 @@ impl State {
     }
 
     pub fn new(agents: Arc<AgentHub>) -> Self {
-        let config = ConfigStore::load(helix_shell_core::ConfigPaths::from_env());
-        let initial_volume = config
-            .get("audio.sound_volume")
-            .as_f64()
-            .unwrap_or(0.5);
+        let config = ConfigStore::load(helix_config::settings::ConfigPaths::from_env());
+        let initial_volume = config.get("audio.sound_volume").as_f64().unwrap_or(0.5);
         let state_dir = config
             .paths()
             .settings_toml
@@ -164,7 +165,11 @@ impl State {
             .to_path_buf();
         crate::wallhaven::Context {
             desktop: self.desktop.is_some(),
-            offline: self.config.get("shell.offline_mode").as_bool().unwrap_or(false),
+            offline: self
+                .config
+                .get("shell.offline_mode")
+                .as_bool()
+                .unwrap_or(false),
             api_key,
             download_dir: crate::wallhaven::resolve_download_dir(
                 &text("wallpaper.wallhaven.download_dir"),

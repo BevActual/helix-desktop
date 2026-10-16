@@ -761,6 +761,20 @@ body.chat .model-option:hover { background: var(--fill-2); }
 body.chat .model-option.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 650; }
 #banner { margin: 0 auto 8px; max-width: 720px; width: calc(100% - 48px); padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--warn, #ff9f0a) 18%, transparent); color: var(--label); font-size: 13px; animation: sheet-rise var(--dur) var(--ease); }
 #banner[hidden] { display: none; }
+/* The task the desktop assistant is working on for a request Mobius handed over (Mobius thread, above the composer). */
+.act-task { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: var(--r-card); background: var(--glass-solid, var(--fill-1)); box-shadow: inset 0 0 0 1px var(--fill-1); animation: sheet-rise var(--dur) var(--ease); }
+.act-task.ask { --tone: var(--warn, #ff9f0a); }
+.act-task.done { --tone: var(--ok, #30d158); }
+.act-task.fail { --tone: var(--danger, #ff453a); }
+.act-task-mark { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--tone, var(--accent)) 16%, transparent); color: var(--tone, var(--accent)); }
+.act-task-mark svg { width: 18px; height: 18px; }
+.act-task-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--tone, var(--accent)) 28%, transparent); border-top-color: var(--tone, var(--accent)); animation: act-spin .9s linear infinite; }
+@keyframes act-spin { to { transform: rotate(360deg); } }
+.act-task-text { flex: 1; min-width: 0; }
+.act-task-title { font-size: 14px; font-weight: 600; }
+.act-task-detail { color: var(--label-2); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act-task-actions { flex: none; display: flex; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .act-task { animation: none; } .act-task-spin { animation-duration: 3s; } }
 #scroller { flex: 1; min-height: 0; overflow-y: auto; padding: 0 24px; scroll-behavior: auto; }
 #scroller::-webkit-scrollbar { width: 0; }
 #messages { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding: 8px 0 28px; }
@@ -1161,6 +1175,8 @@ img.hx-shot { object-fit: cover; }
 
 /* ===== Mobius on the app visual language: solid content, material sidebar, unified titlebar, compact personas, dated sections. ===== */
 body.chat #app { background: var(--content); border-radius: var(--r-window); grid-template-columns: 260px 1fr; }
+/* The narrow-window rule above (single column, sidebar as a drawer) is overridden by the line before it; without this the chat sits in a 260px column and the composer has no room. */
+@media (max-width: 719px) { body.chat #app { grid-template-columns: 1fr; } }
 body.chat #side { background: var(--sidebar-solid); padding: 0 10px 10px; gap: 8px; }
 :root[data-blur="1"] body.chat #side { background: var(--sidebar); backdrop-filter: blur(30px) saturate(1.4); }
 body.chat #titlebar { height: 52px; padding: 0 2px; gap: 8px; }

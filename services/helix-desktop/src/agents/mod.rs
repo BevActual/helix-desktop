@@ -37,9 +37,12 @@ pub async fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
                 if !nm_exported {
                     match system
                         .object_server()
-                        .at(nm_secret_agent::OBJECT_PATH, nm_secret_agent::NmSecretAgent {
-                            hub: Arc::clone(&hub_task),
-                        })
+                        .at(
+                            nm_secret_agent::OBJECT_PATH,
+                            nm_secret_agent::NmSecretAgent {
+                                hub: Arc::clone(&hub_task),
+                            },
+                        )
                         .await
                     {
                         Ok(_) => nm_exported = true,
@@ -52,7 +55,9 @@ pub async fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
                 if nm_exported {
                     match nm_secret_agent::register(&system).await {
                         Ok(_) => nm_pending = false,
-                        Err(error) => tracing::debug!(%error, "NM secret agent registration pending"),
+                        Err(error) => {
+                            tracing::debug!(%error, "NM secret agent registration pending")
+                        }
                     }
                 }
             }
@@ -60,9 +65,12 @@ pub async fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
                 if !bluez_exported {
                     match system
                         .object_server()
-                        .at(bluez_agent::OBJECT_PATH, bluez_agent::BluezAgent {
-                            hub: Arc::clone(&hub_task),
-                        })
+                        .at(
+                            bluez_agent::OBJECT_PATH,
+                            bluez_agent::BluezAgent {
+                                hub: Arc::clone(&hub_task),
+                            },
+                        )
                         .await
                     {
                         Ok(_) => bluez_exported = true,

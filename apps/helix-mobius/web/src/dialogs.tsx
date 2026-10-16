@@ -17,7 +17,7 @@ export interface LabView {
   project: string;
   project_instructions: string;
 }
-/** The symbols a persona may pick from (must match `ICONS` in helix-shell-core). */
+/** The symbols a persona may pick from (must match `ICONS` in helix-chat). */
 const ICONS = ["sparkle", "music", "palette", "fork", "clipboard", "eye", "shield", "sun", "moon", "bolt", "pin", "image", "folder", "lock"];
 interface PersonaStore { active: string; personas: Persona[]; }
 interface Route { backend?: string; model?: string; label?: string; }

@@ -1,11 +1,16 @@
 [package]
 name = "helix-shell-strut"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Long-lived exclusive-zone holder for the Helix bar strip. Survives bar restarts so niri does not resize every window."
 
 [dependencies]
-helix-shell-core = { path = "../../core/helix-shell-core" }
-gtk = "0.18"
-gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+helix-config = { workspace = true }
+helix-shell-model = { workspace = true }
+gtk = { workspace = true }
+gtk-layer-shell = { workspace = true, features = ["v0_6"] }
+
+[lints]
+workspace = true

@@ -24,7 +24,7 @@ impl Default for RemoteOptions {
 /// so a key is never put on the open internet in clear text (a typo of `http://` for a cloud service would do that).
 pub fn key_allowed(base: &str) -> bool {
     let base = base.trim();
-    base.starts_with("https://") || (base.starts_with("http://") && helix_shell_core::inference_routing::is_local_network_url(base))
+    base.starts_with("https://") || (base.starts_with("http://") && helix_config::inference_routing::is_local_network_url(base))
 }
 
 /// POST `{base}/chat/completions`. `base` is e.g. `http://host:11434/v1` (no trailing slash required).

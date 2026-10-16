@@ -1,5 +1,5 @@
 //! The dock's bridge: niri's event stream in, the dock model's view out, and what a click does (focus a window through niri, start an
-//! application through the launcher). What the dock shows and which ids may be acted on is decided by `helix_shell_core::dock`; this
+//! application through the launcher). What the dock shows and which ids may be acted on is decided by `helix_shell_model::dock`; this
 //! file only moves values. niri is spoken to with its documented JSON IPC over `$NIRI_SOCKET`: a long-lived connection for the event
 //! stream (a blocked read, no polling) and a short one per action.
 
@@ -8,7 +8,7 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use helix_shell_core::dock::{Action, ItemView};
+use helix_shell_model::dock::{Action, ItemView};
 use serde::Serialize;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter};
@@ -30,22 +30,22 @@ fn config_path() -> Option<PathBuf> {
 }
 
 /// The dock's look and behaviour as the person set it in Settings (`dock-settings.json`), re-read when the file changes.
-static PREFS: std::sync::Mutex<Option<helix_shell_core::dock_prefs::DockPrefs>> = std::sync::Mutex::new(None);
+static PREFS: std::sync::Mutex<Option<helix_config::dock_prefs::DockPrefs>> = std::sync::Mutex::new(None);
 
 pub fn prefs_path() -> Option<PathBuf> {
     config_path().map(|p| p.with_file_name("dock-settings.json"))
 }
 
-fn read_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+fn read_prefs() -> helix_config::dock_prefs::DockPrefs {
     prefs_path()
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .map(|text| helix_shell_core::dock_prefs::DockPrefs::parse(&text))
+        .map(|text| helix_config::dock_prefs::DockPrefs::parse(&text))
         .unwrap_or_default()
 }
 
 /// Applies what is not the page's business: the strip the compositor keeps free for the dock.
 /// When `helix-shell-strut` is running it owns the dock exclusive zone so bar restart does not flap it.
-fn apply_reserve(app: &AppHandle, prefs: &helix_shell_core::dock_prefs::DockPrefs) {
+fn apply_reserve(app: &AppHandle, prefs: &helix_config::dock_prefs::DockPrefs) {
     if crate::strut::strut_unit_active() {
         return;
     }
@@ -53,12 +53,12 @@ fn apply_reserve(app: &AppHandle, prefs: &helix_shell_core::dock_prefs::DockPref
     let _ = app.run_on_main_thread(move || crate::layer::set_dock_strut(height));
 }
 
-pub fn prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+pub fn prefs() -> helix_config::dock_prefs::DockPrefs {
     PREFS.lock().expect("dock prefs").get_or_insert_with(read_prefs).clone()
 }
 
 #[tauri::command]
-pub fn dock_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+pub fn dock_prefs() -> helix_config::dock_prefs::DockPrefs {
     prefs()
 }
 
@@ -151,7 +151,7 @@ fn request(json: &str) -> Result<String, String> {
 
 /// Queue the next opened window(s) on the Helix agent desk without stealing focus.
 pub(crate) fn place_on_agent_desk(count: u8) -> Result<(), String> {
-    helix_shell_core::compositor_ipc::place_on_agent_desk(count)
+    helix_compositor::compositor_ipc::place_on_agent_desk(count)
 }
 
 /// One niri action (`{"CloseWindow": {"id": 3}}`); `Ok` only when niri said so.
@@ -213,7 +213,7 @@ fn items(app: &AppHandle) -> Vec<DockItem> {
 
 /// What each window's process really is, read from `/proc` (the pid is the compositor's, taken from the connection). A process that cannot
 /// be read (it has gone) is simply left out: the dock then keeps the application its window names.
-fn read_processes(niri: &helix_shell_core::niri::Niri) -> std::collections::HashMap<u32, helix_shell_core::identity::Process> {
+fn read_processes(niri: &helix_compositor::niri::Niri) -> std::collections::HashMap<u32, helix_shell_model::identity::Process> {
     let mut found = std::collections::HashMap::new();
     for pid in niri.windows().filter_map(|w| w.pid) {
         if found.contains_key(&pid) {
@@ -241,7 +241,7 @@ fn read_processes(niri: &helix_shell_core::niri::Niri) -> std::collections::Hash
             .filter(|name| !name.is_empty());
         found.insert(
             pid,
-            helix_shell_core::identity::Process {
+            helix_shell_model::identity::Process {
                 exe: exe.to_string_lossy().into_owned(),
                 cmdline,
                 flatpak,
@@ -276,7 +276,7 @@ pub fn refresh(app: &AppHandle) {
 
 /// Tells the page the workspace strip, but only when it differs from what it was last told (the event stream is chatty).
 fn publish_workspaces(app: &AppHandle) {
-    static LAST: std::sync::Mutex<Vec<helix_shell_core::niri::WorkspaceView>> =
+    static LAST: std::sync::Mutex<Vec<helix_compositor::niri::WorkspaceView>> =
         std::sync::Mutex::new(Vec::new());
     let strip = shell_state(app)
         .lock()
@@ -303,8 +303,8 @@ pub fn start(app: AppHandle) {
         let mut guard = state.lock().expect("shell state");
         guard.dock_apps = apps::scan();
         let pins = load_pins()
-            .unwrap_or_else(|| helix_shell_core::dock::Dock::default_pins(&guard.dock_apps));
-        guard.dock = helix_shell_core::dock::Dock::new(pins);
+            .unwrap_or_else(|| helix_shell_model::dock::Dock::default_pins(&guard.dock_apps));
+        guard.dock = helix_shell_model::dock::Dock::new(pins);
     }
     refresh(&app);
     apply_reserve(&app, &prefs());
@@ -345,7 +345,7 @@ fn follow(app: &AppHandle, stream: UnixStream) {
 
 fn run(
     app: &AppHandle,
-    action: Result<Action, helix_shell_core::dock::RequestError>,
+    action: Result<Action, helix_shell_model::dock::RequestError>,
 ) -> Result<(), String> {
     match action.map_err(|e| format!("{e:?}"))? {
         Action::Focus(id) => focus_window(id),
@@ -396,8 +396,8 @@ pub fn dock_new_window(app: AppHandle, id: String) -> Result<(), String> {
 fn edit(
     app: &AppHandle,
     change: impl FnOnce(
-        &mut helix_shell_core::dock::Dock,
-    ) -> Result<(), helix_shell_core::dock::RequestError>,
+        &mut helix_shell_model::dock::Dock,
+    ) -> Result<(), helix_shell_model::dock::RequestError>,
 ) -> Result<(), String> {
     let pins = {
         let state = shell_state(app);
@@ -426,7 +426,7 @@ pub fn dock_move(app: AppHandle, id: String, to: usize) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn workspaces_view(app: AppHandle) -> Vec<helix_shell_core::niri::WorkspaceView> {
+pub fn workspaces_view(app: AppHandle) -> Vec<helix_compositor::niri::WorkspaceView> {
     shell_state(&app)
         .lock()
         .expect("shell state")
@@ -437,7 +437,7 @@ pub fn workspaces_view(app: AppHandle) -> Vec<helix_shell_core::niri::WorkspaceV
 /// Focus the Helix agent desk workspace (helix-niri).
 #[tauri::command]
 pub fn agent_desk_focus() -> Result<(), String> {
-    helix_shell_core::compositor_ipc::focus_agent_desk()
+    helix_compositor::compositor_ipc::focus_agent_desk()
 }
 
 /// Switches to a workspace of the strip the bar shows; any other id is refused here and never sent to niri.

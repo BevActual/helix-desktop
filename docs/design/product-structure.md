@@ -52,7 +52,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | Path | Owns | Must not own |
 |---|---|---|
 | `protocols/` | D-Bus XML + IPC schemas (source of truth) | Implementation |
-| `core/helix-shell-core` | Pure models, risk policy, config catalog helpers | D-Bus servers, UI |
+| `core/helix-base`, `helix-agent`, `helix-config`, `helix-config-export`, `helix-models`, `helix-compositor`, `helix-shell-model`, `helix-chat`, `helix-software-model`, `helix-monitor-model` | Pure models, risk policy, config catalog (`shell-core-split.md`) | D-Bus servers, UI |
 | `core/helix-desktop-api` | Typed client for `org.helix.Desktop` | Service logic |
 | `core/shared-ui` | Shared CSS tokens, icons, and `react/` (`@helix/ui` components, generated TS bindings) | Session policy |
 | `shell/` | Live session UI (layer-shell) | Device backends |
@@ -71,11 +71,14 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 
 | System | Builds | Install / run |
 |---|---|---|
-| **Cargo** (workspace root) | Session services, Tauri apps/shell, `helix-inference` + `helix-transcribe` + `helix-image`, theme, config export | `just install-rust-desktop`, `just build-inference`, `tools/install-inference.sh` |
-| **Meson** | Units, polkit policy, assets, llama engine install tag. No compiled platform C++ | `meson install` |
-| **compositor/** | Own Cargo workspace (niri fork) | Separate |
+| **Cargo** (workspace root) | Everything Helix: session services, Tauri apps and shell, greeter, `helix-inference` + `helix-transcribe` + `helix-image`, theme, config export | `just build`, `just install`, `tools/switch-shell.sh install`, `tools/install-inference.sh` |
+| **npm** (workspace root) | The React frontends, run by each app's `build.rs` | with Cargo |
+| **compositor/** | Own Cargo workspace (niri fork) | `tools/install-trusted-niri.sh` |
 
-Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Shrink `cpp/` until it is gone (`cpp-to-rust.md`).
+There is no Meson or CMake step. `tools/install.sh` installs the services, units, policy and assets (with `PREFIX` and `DESTDIR`);
+`tools/test-integration.sh` runs the integration tests against `target/fast` or `target/debug`.
+
+Rule: new binaries and tests land in Cargo. Dependency direction between crates is checked by `tools/check-layers.py` (`layering.md`).
 
 ## How it should function
 
@@ -83,8 +86,8 @@ Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Shrin
 2. **Shell is presentation.** It registers as desktop (`RegisterDesktop`), shows state from snapshots, and writes through Configuration / domain Actions. It does not own PipeWire/NM/BlueZ long-term—the service does.
 3. **Apps are peers.** Settings is an app on the same bus, not a second shell. Manager/agent roles are explicit (see Agent Surface design).
 4. **Backends are replaceable behind snapshots.** Unavailable backends return readable empty/unavailable snapshots; pages still navigate.
-5. **Migration is domain cutover, not a big bang.** Parity on nested/unit tests, then delete the C++ domain in the same change (`cpp-to-rust.md`).
-6. **Visual language is one HIG.** GTK4/libadwaita for shared controls; glass only on floating chrome (`helix-hig.md`).
+5. **Change a domain with its contract.** Behavior changes land with the `protocols/` entry and the contract test in `services/helix-desktop/tests/contract/` (`desktop-contract-tests.md`). The C++ → Rust cutover that set this rule is finished (`cpp-to-rust.md`).
+6. **Visual language is one HIG.** Shared tokens and `@helix/ui` components; glass only on floating chrome (`helix-hig.md`).
 7. **Apps and the shell are Tauri + React + TypeScript + Vite** over typed commands (the shell moves in slices); only the trust surfaces
    (approval dialog, greeter) stay hand-written (`frontend-stack.md`).
 
@@ -100,7 +103,7 @@ Rule: new binaries and tests land in Cargo. Do not add Meson C++ products. Shrin
 | **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-mobius/` |
 | `helix-wallpaper`, `helix-idle` | helpers | `services/` |
 | `helix-assistant` | Agent Surface client; never in the shell | `services/helix-assistant` |
-| `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (+ `helix-transcribe` bin; interim native/ llama; Meson `helix-image` until ported) |
+| `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (+ `helix-transcribe` bin; llama glue under `native/`) |
 | `helix-system-upgrade` | polkit-gated `dnf` plan helper | `services/helix-system-upgrade` |
 | Helix MCP server | MCP → Agent Surface for MCP-capable apps/agents | `tools/helix-agent/` |
 
@@ -118,9 +121,10 @@ Rules that stay true after cutover:
 |---|---|---|
 | Theme | `core/helix-theme`, `services/helix-desktop` | Legacy C++ theme tree removed |
 | Inference workers | Rust `helix-transcribe` and `helix-image` crates; llama and image engine shims under `services/*/native/` | Replace those shims with Rust |
-| Agent policy C++ | **Deleted** | `helix-shell-core::agent` |
-| Greeter | Tauri scaffold | Full greetd product surface |
-| Doc drift | Soak + entry docs still mention C++ desktop | This file is the structure SoT; others link here |
+| Agent policy C++ | **Deleted** | `helix-desktop-api::agent` |
+| Greeter | Tauri greeter with appearance sync | Power actions, last account/session, packaging (`greeter-tauri.md`) |
+| Shell frontend | React islands over the hand-written `shell.js` page, with fallbacks | Every slice React; fallbacks deleted (`frontend-stack.md`) |
+| Doc drift | Soak + a few entry docs may still mention the C++ desktop | This file is the structure SoT; others link here |
 
 ## Reading order
 
@@ -128,7 +132,7 @@ See `docs/design/README.md` for the full index. Short path:
 
 1. This file — product shape and ownership  
 2. `session-shell.md` — live install / restart rules  
-3. `cpp-to-rust.md` — cutover checklist  
+3. `cpp-to-rust.md` — how the cutover was done (history)  
 4. `protocols/` — wire contracts  
 5. `helix-hig.md` — UI rules  
 6. `inference-fabric.md` — Mobius + routing + MCP layer  

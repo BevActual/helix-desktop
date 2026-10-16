@@ -1,4 +1,4 @@
-//! `org.freedesktop.Notifications` for the shell: the bus face of `helix_shell_core::notifications`. Everything the model needs to
+//! `org.freedesktop.Notifications` for the shell: the bus face of `helix_shell_model::notifications`. Everything the model needs to
 //! decide (what to keep, how long, what to show) lives there; this file only moves values between the bus, the model and the page.
 //! The shell never starts anything because of a notification: a button press sends the key the application itself offered back
 //! to that application as `ActionInvoked`, nothing more.
@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
-use helix_shell_core::notifications::{Event, Incoming, NotificationsView, RequestError, Urgency};
+use helix_shell_model::notifications::{Event, Incoming, NotificationsView, RequestError, Urgency};
 use tauri::{AppHandle, Emitter};
 use zbus::zvariant::OwnedValue;
 

@@ -17,7 +17,7 @@ pub struct Info {
 }
 
 fn metadata_path(dir: &Path, id: &str) -> Result<PathBuf, String> {
-    if !helix_shell_core::chat::valid_id(id) {
+    if !helix_chat::chat::valid_id(id) {
         return Err("Invalid image id.".into());
     }
     Ok(dir.join(format!("{id}.json")))

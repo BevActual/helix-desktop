@@ -53,17 +53,17 @@ Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite
 
 ```sh
 npm install                     # once: the React app workspace (Node 22+)
-tools/check-all.sh              # typecheck + lint, clippy -D warnings, cargo test, meson test, then the nested UI suite
+tools/check-all.sh              # typecheck + lint, clippy -D warnings, cargo test, integration tests, then the nested UI suite
 tools/check-all.sh --no-nested  # skip the nested compositor runs
 tools/nested/ui-suite.sh dock mobius   # just some of the nested tests
 tools/migrate-state.sh --dry-run       # what would be copied from the old noctalia folders (additive, never overwrites)
 ```
 
 Nested tests run a private compositor and bus. They share the real user's systemd and login manager, so code that would touch those
-(start a unit, suspend, power off) checks `helix_shell_core::nested_test_session()` and does nothing there.
+(start a unit, suspend, power off) checks `helix_base::nested_test_session()` and does nothing there.
 
 ## Design
 
-GTK4/libadwaita defines shared controls and application styling; glass remains floating shell chrome. Full language: `docs/design/helix-hig.md`.
+Shared design tokens and `@helix/ui` components define controls and application styling; glass remains floating shell chrome. Full language: `docs/design/helix-hig.md`.
 
 Helix is an **agentic OS** (Mobius hub + bar Assistant + MCP layer). Fabric: `docs/design/inference-fabric.md`. Surface: `docs/design/agentic-os.md`.

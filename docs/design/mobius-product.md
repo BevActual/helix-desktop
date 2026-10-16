@@ -13,7 +13,7 @@ Priorities are based on current gaps in the code and everyday workflows. Each de
 | Make a picture | Local SD-Turbo generation, size/seed, progress, Stop, save/copy/reuse | Reference-image editing and measured quality improvements |
 | Dictate a prompt | Local microphone recording and Whisper transcription | Read-aloud replies, with playback and cancellation |
 | Inspect a compiled program | Local REA/Ghidra evidence jobs and explanation | Better evidence navigation and comparison between binaries |
-| Change the desktop | Explicit Act handoff and approval controls | Show task progress and the resulting state alongside the conversation |
+| Change the desktop | Act hands the request to the desktop assistant; a card above the composer shows it working, waiting for approval (Review), done, or why it could not, with Stop | Keep the finished task in the conversation, and show the resulting state (and undo where it can) |
 | Reuse an answer | Copy text/code/table, export Markdown, **Save as file** on replies and on individual code blocks (preview + zenity save) | Table export shortcuts; richer export formats |
 
 ## Delivered: context and a chat brief

@@ -4,14 +4,13 @@
 # Usage: tools/gen_config_export_golden.sh [output.toml]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="${1:-$ROOT/core/helix-shell-core/tests/golden/config_export_minimal.toml}"
+OUT="${1:-$ROOT/core/helix-config-export/tests/golden/config_export_minimal.toml}"
 BIN="${HELIX_RUST_CONFIG_EXPORT_BIN:-${HELIX_CONFIG_EXPORT_BIN:-}}"
 
 if [[ -z "$BIN" ]]; then
   for candidate in \
     "$ROOT/target/debug/helix-rust-config-export" \
-    "$ROOT/target/fast/helix-rust-config-export" \
-    "$ROOT/build-debug/helix-rust-config-export"; do
+    "$ROOT/target/fast/helix-rust-config-export"; do
     if [[ -x "$candidate" ]]; then
       BIN="$candidate"
       break
@@ -20,7 +19,7 @@ if [[ -z "$BIN" ]]; then
 fi
 
 if [[ -z "$BIN" || ! -x "$BIN" ]]; then
-  echo "error: build helix-rust-config-export (cargo build -p helix-shell-core --bin helix-rust-config-export) or set HELIX_RUST_CONFIG_EXPORT_BIN" >&2
+  echo "error: build helix-rust-config-export (cargo build -p helix-config-export --bin helix-rust-config-export) or set HELIX_RUST_CONFIG_EXPORT_BIN" >&2
   exit 1
 fi
 

@@ -700,13 +700,37 @@ $("edit-form").addEventListener("submit", (event) => {
     .catch(report);
 });
 
-function actOnDesktop(text) {
-  invoke("chat_act_on_desktop", { text })
+// The task the desktop assistant is doing for a request handed over from this window: working, waiting for approval, done, or why not.
+// Approval itself is only ever given in the shell; the card can bring that back (Review) or cancel (Stop).
+let dismissedTask = 0;
+const reactAct = window.HelixMobiusReact?.acttask
+  ? window.HelixMobiusReact.acttask($("act-task-host"), {
+      stop: () => invoke("chat_act_stop").catch(report),
+      review: () => invoke("chat_open_shell_panel", { id: "assistant" }).catch(report),
+      dismiss: () => { dismissedTask = lastActTask; reactAct.set(null); },
+    })
+  : null;
+let lastActTask = 0;
+function showAct(state) {
+  if (!reactAct || !state || !state.mine) return;
+  // Stopped (or finished and cleared) in the shell: the card goes with it.
+  if (state.phase === "idle") { reactAct.set(null); return; }
+  lastActTask = state.task;
+  if (state.task <= dismissedTask) return;
+  reactAct.set(state);
+}
+if (reactAct) {
+  listen("act-state", (event) => showAct(event.payload));
+}
+function actOnDesktop(text, handedOver) {
+  return invoke("chat_act_on_desktop", { text })
     .then(() => {
+      if (handedOver) handedOver();
+      if (reactAct) return;   // the card above the composer takes it from here
       const banner = $("banner");
-      banner.textContent = "Sent to Mobius Act. Confirm in the bar if it asks.";
+      banner.textContent = "Sent to the desktop assistant. Approve it in the bar if it asks.";
       banner.hidden = false;
-      setTimeout(() => { if (banner.textContent.startsWith("Sent to Mobius Act")) banner.hidden = true; }, 4000);
+      setTimeout(() => { if (banner.textContent.startsWith("Sent to the desktop assistant")) banner.hidden = true; }, 4000);
     })
     .catch(report);
 }
@@ -1408,9 +1432,13 @@ input.addEventListener("paste", (event) => {
   if (files && files.length && addPictureFiles(files)) event.preventDefault();
 });
 $("act").onclick = () => {
-  const text = input.value.trim() || (view.messages.slice().reverse().find((m) => m.role === "user") || {}).text || "";
+  const typed = input.value.trim();
+  const text = typed || (view.messages.slice().reverse().find((m) => m.role === "user") || {}).text || "";
   if (!text.trim()) { report("Write something to act on."); return; }
-  actOnDesktop(text);
+  // Handed over like a sent message: the draft goes, unless it was changed meanwhile or the hand-over failed.
+  actOnDesktop(text, typed ? () => {
+    if (input.value.trim() === typed) { input.value = ""; grow(); syncSendEnabled(); }
+  } : null);
 };
 $("new-chat").onclick = () => {
   invoke("chat_new").then(() => { clearAttachments(); input.focus(); closeSideDrawer(); }).catch(report);

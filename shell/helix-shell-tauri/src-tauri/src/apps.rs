@@ -1,4 +1,4 @@
-//! Finds the installed applications (desktop entries) and starts one. Parsing and ranking live in helix_shell_core::launcher.
+//! Finds the installed applications (desktop entries) and starts one. Parsing and ranking live in helix_shell_model::launcher.
 //! The page never sees or sends a command: it names an application by id and the argument list comes from the entry found here.
 
 use std::collections::BTreeSet;
@@ -6,7 +6,7 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use helix_shell_core::launcher::{parse_desktop_entry, App};
+use helix_shell_model::launcher::{parse_desktop_entry, App};
 
 const MAX_ENTRIES: usize = 5000;
 const MAX_FILE_BYTES: u64 = 64 * 1024;
@@ -193,13 +193,13 @@ fn history_path() -> Option<PathBuf> {
 }
 
 /// The launch history saved by an earlier session. A missing or damaged file is an empty history, never an error.
-pub fn load_history() -> helix_shell_core::launcher::History {
+pub fn load_history() -> helix_shell_model::launcher::History {
     let entries = history_path()
         .and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
         .and_then(|value| value.get("entries").and_then(|e| e.as_array()).cloned())
         .unwrap_or_default();
-    helix_shell_core::launcher::History::from_entries(entries.iter().filter_map(|entry| {
+    helix_shell_model::launcher::History::from_entries(entries.iter().filter_map(|entry| {
         Some((
             entry.get("id")?.as_str()?.to_string(),
             u32::try_from(entry.get("count")?.as_u64()?).ok()?,
@@ -209,7 +209,7 @@ pub fn load_history() -> helix_shell_core::launcher::History {
 }
 
 /// Saves the history privately (directory 0700, file 0600), by writing a new file and renaming it so a crash cannot leave half a file.
-pub fn save_history(history: &helix_shell_core::launcher::History) {
+pub fn save_history(history: &helix_shell_model::launcher::History) {
     use std::io::Write;
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     let Some(path) = history_path() else { return };

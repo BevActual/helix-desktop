@@ -1,5 +1,5 @@
 // Views whose structs live in the shell's own crate or are not exported to TypeScript yet. Keep in step with
-// core/helix-shell-core/src/desktop/{audio,brightness,power,quick}.rs and shell/helix-shell-tauri/src-tauri/src/island.rs.
+// core/helix-models/src/{audio,brightness,power,quick}.rs and shell/helix-shell-tauri/src-tauri/src/island.rs.
 export interface OutputView {
   id: number;
   name: string;
@@ -45,7 +45,7 @@ export interface MediaView {
 }
 
 /** One row of the Caps Lock palette: display text only; the choice is sent back as a position in the list Rust drew it from. Mirrors the
- * rows of `quick_insert_query` in the shell's main.rs and `core/helix-shell-core/src/shell/quick_insert.rs`. */
+ * rows of `quick_insert_query` in the shell's main.rs and `core/helix-shell-model/src/quick_insert.rs`. */
 export interface QuickInsertRow {
   glyph: string | null;
   label: string;

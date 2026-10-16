@@ -1,7 +1,7 @@
-//! Theme `config.*` table for template apply (see `helix-shell-core::desktop::config_export`).
+//! Theme `config.*` table for template apply (see `helix-config-export::config_export`).
 
-use helix_shell_core::desktop::config_export::template_config_for_apply;
-use helix_shell_core::ConfigStore;
+use helix_config_export::config_export::template_config_for_apply;
+use helix_config::settings::ConfigStore;
 use serde_json::Value;
 
 /// Effective config JSON for `ApplyInputs::config_table`.

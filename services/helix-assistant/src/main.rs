@@ -10,12 +10,12 @@ use std::collections::BTreeSet;
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::PathBuf;
 
-use helix_shell_core::agent::assistant_core::{
+use helix_agent::assistant_core::{
     build_messages, choose_model, describe, parse_reply, step_for, Reply, ReplyKind, Step,
 };
-use helix_shell_core::agent::risk::{RiskPolicy, Tier};
-use helix_shell_core::agent::shell_ipc::shell_supported_tools;
-use helix_shell_core::agent::tool_schema::{
+use helix_agent::risk::{RiskPolicy, Tier};
+use helix_agent::shell_ipc::shell_supported_tools;
+use helix_agent::tool_schema::{
     msg_commands, tool_call_schema, tool_catalog, ToolHints, DECLINE_TOOL,
 };
 use serde_json::{json, Value as Json};

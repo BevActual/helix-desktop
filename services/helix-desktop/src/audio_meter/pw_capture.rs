@@ -6,13 +6,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use pipewire as pw;
+use pw::loop_::Timeout;
 use pw::properties::properties;
 use pw::spa::param::audio::{AudioFormat, AudioInfoRaw};
 use pw::spa::param::ParamType;
 use pw::spa::pod::serialize::PodSerializer;
 use pw::spa::pod::{Object, Pod, Value};
 use pw::spa::utils::{Direction, SpaTypes};
-use pw::loop_::Timeout;
 use pw::stream::{StreamBox, StreamFlags, StreamState};
 
 pub fn input_peak_from_bytes(bytes: &[u8]) -> f64 {
@@ -101,7 +101,9 @@ fn run_capture(source_id: u32, shared: Arc<CaptureShared>) -> Result<(), pw::Err
         .add_local_listener_with_user_data(())
         .state_changed(move |_, (), _old, new| {
             let streaming = new == StreamState::Streaming;
-            streaming_state.streaming.store(streaming, Ordering::Relaxed);
+            streaming_state
+                .streaming
+                .store(streaming, Ordering::Relaxed);
             if !streaming {
                 if let Ok(mut peak) = peak_state.peak.lock() {
                     *peak = 0.0;
@@ -149,13 +151,11 @@ fn run_capture(source_id: u32, shared: Arc<CaptureShared>) -> Result<(), pw::Err
         id: ParamType::EnumFormat.as_raw(),
         properties: audio_info.into(),
     };
-    let values: Vec<u8> = PodSerializer::serialize(
-        std::io::Cursor::new(Vec::new()),
-        &Value::Object(obj),
-    )
-    .unwrap()
-    .0
-    .into_inner();
+    let values: Vec<u8> =
+        PodSerializer::serialize(std::io::Cursor::new(Vec::new()), &Value::Object(obj))
+            .unwrap()
+            .0
+            .into_inner();
 
     let mut params = [Pod::from_bytes(&values).unwrap()];
 

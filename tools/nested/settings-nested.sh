@@ -2,7 +2,6 @@
 # Started by run.sh: the real helix-service (told that the Settings binary under test is the one that may manage agents), two applications
 # that already hold grants, a little audit history, then Helix Settings itself.
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-BUILD=${HELIX_BUILD_DIR:-$(ls -d "$ROOT/build-debug" "$ROOT/build-native-clean" 2>/dev/null | head -1)}   # the meson build that has the C++ service
 BIN=${HELIX_SETTINGS_BIN:-$(ls -t "$ROOT/target/fast/helix-settings" "$ROOT/target/release/helix-settings" 2>/dev/null | head -1)}
 export PIPEWIRE_REMOTE=helix-nested-no-audio HELIX_RISK_POLICY="$ROOT/protocols/ipc/msg-risk.toml" HELIX_MANAGER_EXE="$BIN"
 mkdir -p "$XDG_STATE_HOME/helix/agent" "$XDG_CONFIG_HOME/niri"

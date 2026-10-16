@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use helix_shell_core::desktop::settings::ConfigStore;
+use helix_config::settings::ConfigStore;
 use helix_theme::custom::{GeneratedPalette, WallpaperPalette};
 use helix_theme::wallpaper::{generate, load_and_resize, Scheme};
 
@@ -55,7 +55,10 @@ fn has_configured_wallpaper(config: &ConfigStore, wallpaper: Option<&toml::Table
         }
         if w.get("monitors")
             .and_then(|m| m.as_table())
-            .is_some_and(|t| t.values().any(|v| v.as_str().is_some_and(|s| !s.is_empty())))
+            .is_some_and(|t| {
+                t.values()
+                    .any(|v| v.as_str().is_some_and(|s| !s.is_empty()))
+            })
         {
             return true;
         }
@@ -122,7 +125,10 @@ fn mtime_ns(path: &Path) -> i128 {
         .unwrap_or(0)
 }
 
-pub fn wallpaper_palette(config: &ConfigStore, session_wallpaper: &str) -> Option<WallpaperPalette> {
+pub fn wallpaper_palette(
+    config: &ConfigStore,
+    session_wallpaper: &str,
+) -> Option<WallpaperPalette> {
     let path = palette_wallpaper_path(config, session_wallpaper);
     if path.is_empty() {
         return None;
@@ -138,7 +144,8 @@ pub fn wallpaper_palette(config: &ConfigStore, session_wallpaper: &str) -> Optio
     {
         let cache = CACHE.lock().ok()?;
         if let Some(hit) = cache.as_ref() {
-            if mtime != 0 && hit.path == path && hit.scheme == scheme_name && hit.mtime_ns == mtime {
+            if mtime != 0 && hit.path == path && hit.scheme == scheme_name && hit.mtime_ns == mtime
+            {
                 return Some(WallpaperPalette {
                     generated: hit.generated.clone(),
                     path,
@@ -171,17 +178,31 @@ pub fn wallpaper_palette(config: &ConfigStore, session_wallpaper: &str) -> Optio
             });
         }
     }
-    Some(WallpaperPalette { generated, path, scheme: scheme_name })
+    Some(WallpaperPalette {
+        generated,
+        path,
+        scheme: scheme_name,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use helix_shell_core::desktop::settings::ConfigPaths;
+    use helix_config::settings::ConfigPaths;
     use std::fs;
 
     #[test]
     fn first_run_uses_bundled_wallpaper_when_setup_incomplete() {
+        // Other tests rewrite HELIX_ASSETS_DIR under this lock; without it the lookup races them.
+        let _guard = crate::testing::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        unsafe {
+            std::env::set_var(
+                "HELIX_ASSETS_DIR",
+                crate::testing::fixtures::repo_root().join("assets"),
+            );
+        }
         let root = std::env::temp_dir().join(format!("helix-wp-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();

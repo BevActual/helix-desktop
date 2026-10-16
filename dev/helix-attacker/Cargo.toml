@@ -1,16 +1,20 @@
 [package]
 name = "helix-attacker"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 description = "Test tool, never installed: behaves like a hostile program on the person's session (reads the screen through the screencopy protocol) so nested tests can show what the compositor does and does not stop."
 
 [dependencies]
-wayland-client = "0.31"
-wayland-protocols-wlr = { version = "0.3", features = ["client"] }
-memmap2 = "0.9"
-libc = "0.2"
+wayland-client = { workspace = true }
+wayland-protocols-wlr = { workspace = true, features = ["client"] }
+memmap2 = { workspace = true }
+libc = { workspace = true }
 
 [[bin]]
 name = "wl-capture"
 path = "src/main.rs"
+
+[lints]
+workspace = true

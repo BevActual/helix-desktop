@@ -12,6 +12,8 @@ The compositor lives in-tree at [`compositor/`](compositor/) (helix-niri fork; o
 
 It gives you a polished, configurable desktop without stitching together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, settings UI, and a pile of service panels. Control Center also owns first-party services (packages, Tailscale, Firewall, Printers, Privacy, and similar tools).
 
+Helix is also being built as an **agentic OS**: the Agent Surface exposes the session to approved agents (observe and semantic act), **Mobius** is the local AI hub, and every desktop action by an agent goes through grants and a confirmation dialog. See [docs/design/agentic-os.md](docs/design/agentic-os.md) and [docs/design/inference-fabric.md](docs/design/inference-fabric.md).
+
 The product name, install paths, and IPC are **Helix** (see `docs/design/helix-identity.md`).
 
 <p><br/></p>
@@ -70,7 +72,8 @@ return as first-party features or as a new extension mechanism.
 
 **Session shell and apps (live path):** see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
 
-**Desktop authority:** The Rust `helix-desktop` (`cargo build -p helix-desktop`) owns `org.helix.Desktop`; Meson builds the assistant/inference/helpers. Details: [BUILDING.md](BUILDING.md), [docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md).
+**Everything else:** Cargo builds the whole workspace (`just build`), `just test` runs the tests, and `just install` installs the services.
+Dependencies, profiles and install options are in [BUILDING.md](BUILDING.md). The Rust `helix-desktop` owns `org.helix.Desktop`.
 
 ## Configuration
 
@@ -89,8 +92,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Packaging
 
-Distro packaging notes (description, deps, install layout, Meson options) live in
-[PACKAGING.md](PACKAGING.md).
+Packaging notes (description, runtime dependencies, install layout) live in [PACKAGING.md](PACKAGING.md).
 
 ### Native desktop applications
 

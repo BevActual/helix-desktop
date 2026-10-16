@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use futures_util::StreamExt;
-use helix_shell_core::apps::chat::SYSTEM_PROMPT;
-use helix_shell_core::apps::inference_routing;
-use helix_shell_core::display::sanitize_for_display;
+use helix_chat::chat::SYSTEM_PROMPT;
+use helix_config::inference_routing;
+use helix_base::display::sanitize_for_display;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use zbus::zvariant::{Array, Dict, Signature, Value};

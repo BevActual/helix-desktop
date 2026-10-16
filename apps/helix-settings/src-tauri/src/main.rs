@@ -1,7 +1,7 @@
 //! Helix Settings. A separate Tauri application with one window and a page per area; this file is the thin layer between the pages and
-//! `helix-shell-core` / `helix-desktop-api`. It holds the Agent Surface *manager* role (and nothing else of Agent Surface): it can read who has which
+//! the core crates / `helix-desktop-api`. It holds the Agent Surface *manager* role (and nothing else of Agent Surface): it can read who has which
 //! tiers and the audit, change tiers and revoke, but it is not an agent, cannot approve anything, and never talks to the model. What a
-//! change may be is decided by the pure models in `helix-shell-core`; the page only sends names those models listed.
+//! change may be is decided by the pure models in the core crates; the page only sends names those models listed.
 
 mod wallhaven;
 
@@ -9,34 +9,47 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use helix_desktop_api::{Desktop, Domain};
-use helix_shell_core::pairing::{Pairing, PairingView};
-use helix_shell_core::bluetooth::{Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError};
-use helix_shell_core::network::{EnterpriseInput, Network, NetworkView, Request as NetRequest, RequestError as NetError};
+use helix_models::audio::{
+    Audio, AudioView, Request as AudioRequest, RequestError as AudioError,
+};
+use helix_models::bluetooth::{
+    Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError,
+};
+use helix_config::catalog::{Catalog, Change, RowView};
+use helix_agent::grants::{Grants, GrantsView, Request, RequestError};
+use helix_config::keybinds::{self, KeybindRow};
+use helix_models::network::{
+    EnterpriseInput, Network, NetworkView, Request as NetRequest, RequestError as NetError,
+};
+use helix_models::pairing::{Pairing, PairingView};
+use helix_compositor::shortcuts::{self, ShortcutGroup};
 use helix_wallpaper::picker::{Picker, PickerView};
 use helix_wallpaper::{choice_path, choice_to_toml, load_config, Source};
-use helix_shell_core::keybinds::{self, KeybindRow};
-use helix_shell_core::shortcuts::{self, ShortcutGroup};
-use helix_shell_core::catalog::{Catalog, Change, RowView};
-use helix_shell_core::grants::{Grants, GrantsView, Request, RequestError};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const WINDOW: &str = "settings";
 
 /// The service settings the Appearance page shows, in order. A change to any other id is refused before it is sent.
-const APPEARANCE: &[&str] = &["theme.mode", "theme.pure_black_dark"];
+const APPEARANCE: &[&str] = &[
+    "theme.mode",
+    "theme.pure_black_dark",
+    "shell.greeter_sync.auto_sync",
+    "shell.greeter_sync.privilege_command",
+];
 
 /// Only what something on this desktop acts on (the service applies high contrast to GTK applications).
 const ACCESSIBILITY: &[&str] = &["accessibility.high_contrast"];
 
 /// Every page that is only rows of service settings: its name (the page's id in the window) and the ids it shows.
-const ROW_PAGES: [(&str, &[&str]); 2] = [
-    ("appearance", APPEARANCE),
-    ("accessibility", ACCESSIBILITY),
-];
+const ROW_PAGES: [(&str, &[&str]); 2] =
+    [("appearance", APPEARANCE), ("accessibility", ACCESSIBILITY)];
 
 fn page_ids(page: &str) -> Option<&'static [&'static str]> {
-    ROW_PAGES.iter().find(|(name, _)| *name == page).map(|(_, ids)| *ids)
+    ROW_PAGES
+        .iter()
+        .find(|(name, _)| *name == page)
+        .map(|(_, ids)| *ids)
 }
 
 struct State {
@@ -44,6 +57,7 @@ struct State {
     catalog: Catalog,
     network: Network,
     bluetooth: Bluetooth,
+    audio: Audio,
     picker: Picker,
     pairing: Pairing,
     status: &'static str,
@@ -113,7 +127,6 @@ struct RowsView {
     rows: Vec<RowView>,
 }
 
-
 fn rows_of(state: &State) -> Vec<RowsView> {
     ROW_PAGES
         .iter()
@@ -147,7 +160,10 @@ async fn refresh_settings(app: &AppHandle) {
 /// Network and Bluetooth: the control center's models, with the same request rules, shown as pages. Each follows its own `Changed` signal.
 async fn refresh_network(app: &AppHandle) {
     let Some(desktop) = current() else { return };
-    let snapshot = desktop.snapshot(Domain::Network).await.unwrap_or(serde_json::Value::Null);
+    let snapshot = desktop
+        .snapshot(Domain::Network)
+        .await
+        .unwrap_or(serde_json::Value::Null);
     let network = Network::from_snapshot(&snapshot);
     let view = network.view();
     shared(app).lock().expect("state").network = network;
@@ -155,9 +171,29 @@ async fn refresh_network(app: &AppHandle) {
     let _ = app.emit("network-view", view);
 }
 
+async fn refresh_audio(app: &AppHandle) {
+    let Some(desktop) = current() else { return };
+    let snapshot = desktop
+        .snapshot(Domain::Audio)
+        .await
+        .unwrap_or(serde_json::Value::Null);
+    let audio = Audio::from_snapshot(&snapshot);
+    let view = audio.view();
+    shared(app).lock().expect("state").audio = audio;
+    eprintln!(
+        "SETTINGS audio outputs={} inputs={}",
+        view.outputs.len(),
+        view.inputs.len()
+    );
+    let _ = app.emit("audio-view", view);
+}
+
 async fn refresh_bluetooth(app: &AppHandle) {
     let Some(desktop) = current() else { return };
-    let snapshot = desktop.snapshot(Domain::Bluetooth).await.unwrap_or(serde_json::Value::Null);
+    let snapshot = desktop
+        .snapshot(Domain::Bluetooth)
+        .await
+        .unwrap_or(serde_json::Value::Null);
     let bluetooth = Bluetooth::from_snapshot(&snapshot);
     let view = bluetooth.view();
     {
@@ -177,7 +213,10 @@ fn pairing_view_of(state: &State) -> PairingView {
 
 fn publish_pairing(app: &AppHandle) {
     let view = pairing_view_of(&shared(app).lock().expect("state"));
-    eprintln!("SETTINGS pairing active={} stage={}", view.active, view.stage);
+    eprintln!(
+        "SETTINGS pairing active={} stage={}",
+        view.active, view.stage
+    );
     let _ = app.emit("pairing-view", view);
 }
 
@@ -192,13 +231,21 @@ async fn bluetooth_pair(app: AppHandle, path: String) -> Result<(), String> {
     let request = {
         let shared = shared(&app);
         let mut state = shared.lock().expect("state");
-        let State { pairing, bluetooth, .. } = &mut *state;
-        pairing.begin(bluetooth, &path).map_err(|error| format!("{error:?}"))?
+        let State {
+            pairing, bluetooth, ..
+        } = &mut *state;
+        pairing
+            .begin(bluetooth, &path)
+            .map_err(|error| format!("{error:?}"))?
     };
     publish_pairing(&app);
     match send_bluetooth_operation(Ok(request)).await {
         Ok(operation) => {
-            shared(&app).lock().expect("state").pairing.set_operation(operation);
+            shared(&app)
+                .lock()
+                .expect("state")
+                .pairing
+                .set_operation(operation);
             publish_pairing(&app);
             Ok(())
         }
@@ -210,7 +257,10 @@ async fn bluetooth_pair(app: AppHandle, path: String) -> Result<(), String> {
     }
 }
 
-async fn send_reply(app: &AppHandle, reply: Result<helix_shell_core::pairing::Reply, helix_shell_core::pairing::PairingError>) -> Result<(), String> {
+async fn send_reply(
+    app: &AppHandle,
+    reply: Result<helix_models::pairing::Reply, helix_models::pairing::PairingError>,
+) -> Result<(), String> {
     let reply = reply.map_err(|error| format!("{error:?}"))?;
     let desktop = current().ok_or("not connected to the desktop service")?;
     desktop
@@ -225,7 +275,11 @@ async fn send_reply(app: &AppHandle, reply: Result<helix_shell_core::pairing::Re
 /// A PIN or passkey the person typed. Used for this one answer and kept nowhere.
 #[tauri::command]
 async fn bluetooth_pair_answer(app: AppHandle, text: String) -> Result<(), String> {
-    let reply = shared(&app).lock().expect("state").pairing.answer_text(&text);
+    let reply = shared(&app)
+        .lock()
+        .expect("state")
+        .pairing
+        .answer_text(&text);
     send_reply(&app, reply).await
 }
 
@@ -261,6 +315,7 @@ fn follow(
                     match domain {
                         Domain::Network => refresh_network(&app).await,
                         Domain::Bluetooth => refresh_bluetooth(&app).await,
+                        Domain::Audio => refresh_audio(&app).await,
                         Domain::Configuration => refresh_settings(&app).await,
                         _ => {}
                     }
@@ -278,6 +333,17 @@ async fn send_network(request: Result<NetRequest, NetError>) -> Result<(), Strin
         .await
         .map_err(|error| error.to_string())?;
     eprintln!("SETTINGS network {} sent", request.action);
+    Ok(())
+}
+
+async fn send_audio(request: Result<AudioRequest, AudioError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    desktop
+        .action(Domain::Audio, request.action, &request.args)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS audio {} sent", request.action);
     Ok(())
 }
 
@@ -299,6 +365,10 @@ async fn send_bluetooth_operation(request: Result<BtRequest, BtError>) -> Result
 
 fn network_with<T>(app: &AppHandle, build: impl FnOnce(&Network) -> T) -> T {
     build(&shared(app).lock().expect("state").network)
+}
+
+fn audio_with<T>(app: &AppHandle, build: impl FnOnce(&Audio) -> T) -> T {
+    build(&shared(app).lock().expect("state").audio)
 }
 
 fn bluetooth_with<T>(app: &AppHandle, build: impl FnOnce(&Bluetooth) -> T) -> T {
@@ -379,6 +449,35 @@ async fn network_vpn(app: AppHandle, path: String, active: bool) -> Result<(), S
 }
 
 #[tauri::command]
+fn audio_view(app: AppHandle) -> AudioView {
+    audio_with(&app, Audio::view)
+}
+#[tauri::command]
+async fn audio_set_volume(app: AppHandle, percent: f64) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_volume(percent))).await
+}
+#[tauri::command]
+async fn audio_set_muted(app: AppHandle, muted: bool) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_muted(muted))).await
+}
+#[tauri::command]
+async fn audio_set_default(app: AppHandle, id: u32) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_default(id))).await
+}
+#[tauri::command]
+async fn audio_set_input_volume(app: AppHandle, percent: f64) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_input_volume(percent))).await
+}
+#[tauri::command]
+async fn audio_set_input_muted(app: AppHandle, muted: bool) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_input_muted(muted))).await
+}
+#[tauri::command]
+async fn audio_set_default_input(app: AppHandle, id: u32) -> Result<(), String> {
+    send_audio(audio_with(&app, |a| a.set_default_input(id))).await
+}
+
+#[tauri::command]
 fn bluetooth_view(app: AppHandle) -> BluetoothView {
     bluetooth_with(&app, Bluetooth::view)
 }
@@ -426,10 +525,12 @@ fn connect(app: AppHandle) {
                     refresh_settings(&app).await;
                     refresh_network(&app).await;
                     refresh_bluetooth(&app).await;
+                    refresh_audio(&app).await;
                     let tasks = [
                         follow(&app, &desktop, Domain::Configuration),
                         follow(&app, &desktop, Domain::Network),
                         follow(&app, &desktop, Domain::Bluetooth),
+                        follow(&app, &desktop, Domain::Audio),
                     ];
                     let prompt_app = app.clone();
                     let prompt_desktop = desktop.clone();
@@ -437,7 +538,11 @@ fn connect(app: AppHandle) {
                         let watcher = prompt_app.clone();
                         let _ = prompt_desktop
                             .watch_bluetooth_prompt(move |prompt| {
-                                shared(&watcher).lock().expect("state").pairing.on_prompt(&prompt);
+                                shared(&watcher)
+                                    .lock()
+                                    .expect("state")
+                                    .pairing
+                                    .on_prompt(&prompt);
                                 publish_pairing(&watcher);
                             })
                             .await;
@@ -449,7 +554,11 @@ fn connect(app: AppHandle) {
                         let _ = done_desktop
                             .watch_completed(Domain::Bluetooth, move |operation, _, _| {
                                 // The pairing operation ended, however it ended: the question is over. Other operations (a scan) do not count.
-                                shared(&watcher).lock().expect("state").pairing.operation_done(operation);
+                                shared(&watcher)
+                                    .lock()
+                                    .expect("state")
+                                    .pairing
+                                    .operation_done(operation);
                                 publish_pairing(&watcher);
                             })
                             .await;
@@ -543,43 +652,43 @@ async fn agents_revoke(app: AppHandle, client: String) -> Result<(), String> {
 
 #[derive(Serialize)]
 struct CompositorSettingsView {
-    config: helix_shell_core::compositor_config::CompositorConfigView,
-    caps: helix_shell_core::compositor_ipc::HelixCaps,
-    desk: helix_shell_core::compositor_ipc::AgentDeskStatus,
+    config: helix_compositor::compositor_config::CompositorConfigView,
+    caps: helix_compositor::compositor_ipc::HelixCaps,
+    desk: helix_compositor::compositor_ipc::AgentDeskStatus,
 }
 
 #[tauri::command]
 fn compositor_view() -> CompositorSettingsView {
     CompositorSettingsView {
-        config: helix_shell_core::compositor_config::read_view(),
-        caps: helix_shell_core::compositor_ipc::helix_capabilities(),
-        desk: helix_shell_core::compositor_ipc::agent_desk_status(),
+        config: helix_compositor::compositor_config::read_view(),
+        caps: helix_compositor::compositor_ipc::helix_capabilities(),
+        desk: helix_compositor::compositor_ipc::agent_desk_status(),
     }
 }
 
 #[tauri::command]
 fn compositor_set_agent_desk_name(name: String) -> Result<(), String> {
-    helix_shell_core::compositor_config::save_snippet(
-        &helix_shell_core::compositor_config::HelixSnippet {
+    helix_compositor::compositor_config::save_snippet(
+        &helix_compositor::compositor_config::HelixSnippet {
             agent_desk_name: name,
         },
     )?;
-    helix_shell_core::compositor_ipc::reload_config();
+    helix_compositor::compositor_ipc::reload_config();
     Ok(())
 }
 
 #[tauri::command]
 fn compositor_set_placement(on: bool) -> Result<(), String> {
-    let prefs = helix_shell_core::compositor_config::CompositorPrefs {
+    let prefs = helix_compositor::compositor_config::CompositorPrefs {
         agent_desk_placement: on,
     };
-    helix_shell_core::compositor_config::save_prefs(&prefs)
+    helix_compositor::compositor_config::save_prefs(&prefs)
 }
 
 #[tauri::command]
 fn compositor_focus_agent_desk() -> Result<(), String> {
     let line = serde_json::json!({"Action": {"HelixFocusAgentDesk": {}}}).to_string();
-    helix_shell_core::compositor_ipc::request_json(&line)
+    helix_compositor::compositor_ipc::request_json(&line)
         .ok_or_else(|| "the compositor did not accept focus agent desk".to_string())?;
     Ok(())
 }
@@ -675,8 +784,8 @@ fn inference_restart_service() -> Result<(), String> {
 
 #[tauri::command]
 fn compositor_open_config(which: String) -> Result<(), String> {
-    let dir = helix_shell_core::compositor_config::niri_config_dir().ok_or("no config home")?;
-    let path = helix_shell_core::compositor_config::resolve_include_path(&dir, &which)
+    let dir = helix_compositor::compositor_config::niri_config_dir().ok_or("no config home")?;
+    let path = helix_compositor::compositor_config::resolve_include_path(&dir, &which)
         .ok_or_else(|| {
             if which == "main" {
                 "niri config.kdl is not present yet".into()
@@ -728,13 +837,20 @@ fn about(app: AppHandle) -> AboutView {
     let state = shared.lock().expect("state");
     AboutView {
         version: env!("CARGO_PKG_VERSION"),
-        service: if current().is_some() { "Running" } else { "Not running" },
+        service: if current().is_some() {
+            "Running"
+        } else {
+            "Not running"
+        },
         agent_access: match state.status {
             "connected" => "Managing",
             "denied" => "Not permitted: this is not the installed Settings",
             _ => "Unavailable",
         },
-        settings: ROW_PAGES.iter().map(|(_, ids)| state.catalog.rows(ids).len()).sum(),
+        settings: ROW_PAGES
+            .iter()
+            .map(|(_, ids)| state.catalog.rows(ids).len())
+            .sum(),
         network: state.network.view().available,
         bluetooth: state.bluetooth.view().available,
     }
@@ -745,8 +861,12 @@ fn about(app: AppHandle) -> AboutView {
 fn shortcuts_view() -> Vec<ShortcutGroup> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config")));
-    let Some(dir) = base.map(|base| base.join("niri")) else { return Vec::new() };
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config"))
+        });
+    let Some(dir) = base.map(|base| base.join("niri")) else {
+        return Vec::new();
+    };
     let mut files: Vec<_> = std::fs::read_dir(&dir)
         .into_iter()
         .flatten()
@@ -758,7 +878,10 @@ fn shortcuts_view() -> Vec<ShortcutGroup> {
     let mut binds = Vec::new();
     for path in files.into_iter().take(40) {
         // A config file is small; anything bigger is not one.
-        if std::fs::metadata(&path).map(|m| m.len() > 512 * 1024).unwrap_or(true) {
+        if std::fs::metadata(&path)
+            .map(|m| m.len() > 512 * 1024)
+            .unwrap_or(true)
+        {
             continue;
         }
         if let (Ok(text), Some(name)) = (std::fs::read_to_string(&path), path.file_name()) {
@@ -789,7 +912,8 @@ async fn keybinds_set(app: AppHandle, id: String, chords: String) -> Result<(), 
         let shared = shared(&app);
         let state = shared.lock().expect("state");
         let baseline = keybinds::baseline(state.catalog.entries(), &id).ok_or("unknown keybind")?;
-        let next = keybinds::update(state.catalog.entries(), &id, &candidate).map_err(|error| format!("{error:?}"))?;
+        let next = keybinds::update(state.catalog.entries(), &id, &candidate)
+            .map_err(|error| format!("{error:?}"))?;
         (baseline, next)
     };
     let desktop = current().ok_or("not connected to the desktop service")?;
@@ -846,7 +970,12 @@ fn wallpaper_view(app: AppHandle) -> PickerView {
 /// A small picture of listed image number `index`, as a data URL. Only listed images can be asked for.
 #[tauri::command]
 async fn wallpaper_thumb(app: AppHandle, index: usize) -> Option<String> {
-    let path = shared(&app).lock().expect("state").picker.file(index)?.to_path_buf();
+    let path = shared(&app)
+        .lock()
+        .expect("state")
+        .picker
+        .file(index)?
+        .to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
         use base64::Engine;
         let image = image::open(&path).ok()?.thumbnail(360, 225).to_rgb8();
@@ -887,6 +1016,7 @@ pub(crate) fn write_choice(app: &AppHandle, source: Source) -> Result<(), String
     eprintln!("SETTINGS wallpaper chosen");
     let view = scan_wallpapers(app);
     let _ = app.emit("wallpaper-view", view);
+    greeter_auto_sync(app, "wallpaper");
     Ok(())
 }
 
@@ -916,7 +1046,9 @@ fn wallpaper_choose_swatch(app: AppHandle, index: usize) -> Result<(), String> {
 fn approvals_path() -> Option<std::path::PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
     Some(base.join("helix/approvals.json"))
 }
 
@@ -924,7 +1056,7 @@ fn approvals_path() -> Option<std::path::PathBuf> {
 fn approvals_view() -> bool {
     approvals_path()
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .is_some_and(|text| helix_shell_core::approvals::allow_unprotected(&text))
+        .is_some_and(|text| helix_agent::approvals::allow_unprotected(&text))
 }
 
 #[tauri::command]
@@ -941,7 +1073,7 @@ fn approvals_set(allow: bool) -> Result<bool, String> {
         .mode(0o600)
         .open(&temporary)
         .map_err(|e| e.to_string())?;
-    file.write_all(helix_shell_core::approvals::render(allow).as_bytes())
+    file.write_all(helix_agent::approvals::render(allow).as_bytes())
         .map_err(|e| e.to_string())?;
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     eprintln!("SETTINGS approvals allow_unprotected={allow}");
@@ -951,7 +1083,10 @@ fn approvals_set(allow: bool) -> Result<bool, String> {
 /// A page reports something that went wrong (only the start of it, and never anything a person typed).
 #[tauri::command]
 fn ui_error(text: String) {
-    eprintln!("SETTINGS ui error: {}", text.chars().take(200).collect::<String>());
+    eprintln!(
+        "SETTINGS ui error: {}",
+        text.chars().take(200).collect::<String>()
+    );
 }
 
 #[tauri::command]
@@ -963,14 +1098,16 @@ fn dock_prefs_file() -> Option<std::path::PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .filter(|v| !v.is_empty())
         .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config"))
+        })?;
     Some(base.join("helix/dock-settings.json"))
 }
 
-fn read_dock_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+fn read_dock_prefs() -> helix_config::dock_prefs::DockPrefs {
     dock_prefs_file()
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .map(|text| helix_shell_core::dock_prefs::DockPrefs::parse(&text))
+        .map(|text| helix_config::dock_prefs::DockPrefs::parse(&text))
         .unwrap_or_default()
 }
 
@@ -984,18 +1121,30 @@ fn dock_rows() -> Vec<RowView> {
 fn dock_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
-    let change = match (change.get("kind").and_then(|k| k.as_str()), change.get("value")) {
+    let change = match (
+        change.get("kind").and_then(|k| k.as_str()),
+        change.get("value"),
+    ) {
         (Some("switch"), Some(v)) => Change::Switch(v.as_bool().ok_or("not a boolean")?),
         (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
         _ => return Err("unknown change".into()),
     };
-    let next = read_dock_prefs().apply(&id, &change).map_err(|error| format!("{error:?}"))?;
+    let next = read_dock_prefs()
+        .apply(&id, &change)
+        .map_err(|error| format!("{error:?}"))?;
     let path = dock_prefs_file().ok_or("no folder for the settings")?;
     std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
     let temporary = path.with_extension("tmp");
     {
-        let mut file = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&temporary).map_err(|e| e.to_string())?;
-        file.write_all(next.to_json().as_bytes()).map_err(|e| e.to_string())?;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        file.write_all(next.to_json().as_bytes())
+            .map_err(|e| e.to_string())?;
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     eprintln!("SETTINGS dock {id} changed");
@@ -1006,9 +1155,11 @@ fn idle_prefs_file() -> Option<std::path::PathBuf> {
     dock_prefs_file().map(|p| p.with_file_name("idle.toml"))
 }
 
-fn read_idle_prefs() -> (helix_shell_core::idle_prefs::IdlePrefs, String) {
-    let text = idle_prefs_file().and_then(|path| std::fs::read_to_string(path).ok()).unwrap_or_default();
-    (helix_shell_core::idle_prefs::IdlePrefs::parse(&text), text)
+fn read_idle_prefs() -> (helix_config::idle_prefs::IdlePrefs, String) {
+    let text = idle_prefs_file()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .unwrap_or_default();
+    (helix_config::idle_prefs::IdlePrefs::parse(&text), text)
 }
 
 /// The Power & lock page: when the session locks and the screen goes off (`idle.toml`, read by helix-idle).
@@ -1021,24 +1172,41 @@ fn power_rows() -> Vec<RowView> {
 fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
-    let change = match (change.get("kind").and_then(|k| k.as_str()), change.get("value")) {
+    let change = match (
+        change.get("kind").and_then(|k| k.as_str()),
+        change.get("value"),
+    ) {
         (Some("switch"), Some(v)) => Change::Switch(v.as_bool().ok_or("not a boolean")?),
         (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
         _ => return Err("unknown change".into()),
     };
     let (current, text) = read_idle_prefs();
-    let next = current.apply(&id, &change).map_err(|error| format!("{error:?}"))?;
+    let next = current
+        .apply(&id, &change)
+        .map_err(|error| format!("{error:?}"))?;
     let path = idle_prefs_file().ok_or("no folder for the settings")?;
     std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
     let temporary = path.with_extension("tmp");
     {
-        let mut file = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&temporary).map_err(|e| e.to_string())?;
-        file.write_all(next.write_into(&text).as_bytes()).map_err(|e| e.to_string())?;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        file.write_all(next.write_into(&text).as_bytes())
+            .map_err(|e| e.to_string())?;
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     // helix-idle reads the file when it starts, so it is started again (a fixed command; nothing typed reaches it).
-    if !helix_shell_core::nested_test_session() {
-        let _ = std::process::Command::new("systemctl").args(["--user", "restart", "helix-idle.service"]).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status();
+    if !helix_base::nested_test_session() {
+        let _ = std::process::Command::new("systemctl")
+            .args(["--user", "restart", "helix-idle.service"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
     }
     eprintln!("SETTINGS power {id} changed");
     Ok(next.rows())
@@ -1049,8 +1217,12 @@ fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, S
 fn displays_rows() -> Vec<RowView> {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
-    let Some(path) = std::env::var_os("NIRI_SOCKET") else { return Vec::new() };
-    let Ok(mut stream) = UnixStream::connect(path) else { return Vec::new() };
+    let Some(path) = std::env::var_os("NIRI_SOCKET") else {
+        return Vec::new();
+    };
+    let Ok(mut stream) = UnixStream::connect(path) else {
+        return Vec::new();
+    };
     let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
     if stream.write_all(b"\"Outputs\"\n").is_err() {
         return Vec::new();
@@ -1059,13 +1231,19 @@ fn displays_rows() -> Vec<RowView> {
     if BufReader::new(stream).read_line(&mut line).is_err() {
         return Vec::new();
     }
-    let Ok(reply) = serde_json::from_str::<serde_json::Value>(&line) else { return Vec::new() };
-    let Some(outputs) = reply.pointer("/Ok/Outputs").and_then(|o| o.as_object()) else { return Vec::new() };
+    let Ok(reply) = serde_json::from_str::<serde_json::Value>(&line) else {
+        return Vec::new();
+    };
+    let Some(outputs) = reply.pointer("/Ok/Outputs").and_then(|o| o.as_object()) else {
+        return Vec::new();
+    };
     let mut rows: Vec<RowView> = outputs
         .iter()
         .map(|(name, output)| {
             let text = |key: &str| output.get(key).and_then(|v| v.as_str()).unwrap_or("");
-            let make = format!("{} {}", text("make"), text("model")).trim().to_string();
+            let make = format!("{} {}", text("make"), text("model"))
+                .trim()
+                .to_string();
             let mode = output
                 .get("current_mode")
                 .and_then(|i| i.as_u64())
@@ -1073,23 +1251,223 @@ fn displays_rows() -> Vec<RowView> {
                 .map(|m| {
                     let w = m.get("width").and_then(|v| v.as_u64()).unwrap_or(0);
                     let h = m.get("height").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let hz = m.get("refresh_rate").and_then(|v| v.as_u64()).unwrap_or(0) as f64 / 1000.0;
+                    let hz =
+                        m.get("refresh_rate").and_then(|v| v.as_u64()).unwrap_or(0) as f64 / 1000.0;
                     format!("{w} × {h} at {hz:.0} Hz")
                 })
                 .unwrap_or_default();
-            let scale = output.pointer("/logical/scale").and_then(|v| v.as_f64()).map(|s| format!(", scale {s}")).unwrap_or_default();
+            let scale = output
+                .pointer("/logical/scale")
+                .and_then(|v| v.as_f64())
+                .map(|s| format!(", scale {s}"))
+                .unwrap_or_default();
             RowView {
                 id: name.chars().take(40).collect(),
-                title: helix_shell_core::sanitize_for_display(name, 40),
+                title: helix_base::display::sanitize_for_display(name, 40),
                 group: "Connected".into(),
-                description: helix_shell_core::sanitize_for_display(&make, 80),
+                description: helix_base::display::sanitize_for_display(&make, 80),
                 overridden: false,
-                control: helix_shell_core::catalog::Control::Text { value: helix_shell_core::sanitize_for_display(&format!("{mode}{scale}"), 80) },
+                control: helix_config::catalog::Control::Text {
+                    value: helix_base::display::sanitize_for_display(&format!("{mode}{scale}"), 80),
+                },
             }
         })
         .collect();
     rows.sort_by(|a, b| a.id.cmp(&b.id));
     rows
+}
+
+fn catalog_bool(state: &State, id: &str) -> bool {
+    state
+        .catalog
+        .entries()
+        .iter()
+        .find(|entry| entry.get("id").and_then(|value| value.as_str()) == Some(id))
+        .and_then(|entry| entry.get("value").and_then(|value| value.as_bool()))
+        .unwrap_or(false)
+}
+
+fn catalog_text(state: &State, id: &str) -> String {
+    state
+        .catalog
+        .entries()
+        .iter()
+        .find(|entry| entry.get("id").and_then(|value| value.as_str()) == Some(id))
+        .and_then(|entry| entry.get("value").and_then(|value| value.as_str()))
+        .unwrap_or("")
+        .to_string()
+}
+
+fn apply_bin() -> Result<std::path::PathBuf, String> {
+    if let Some(path) = std::env::var_os("HELIX_GREETER_APPLY_BIN") {
+        return Ok(std::path::PathBuf::from(path));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let sibling = dir.join("helix-greeter-apply-appearance");
+            if sibling.is_file() {
+                return Ok(sibling);
+            }
+        }
+    }
+    Err("helix-greeter-apply-appearance is not installed.".into())
+}
+
+fn greeter_dest() -> std::path::PathBuf {
+    std::env::var_os("HELIX_GREETER_STATE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("/var/lib/helix-greeter"))
+}
+
+fn staging_dir() -> Result<std::path::PathBuf, String> {
+    let base = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    let dir = base.join(format!("helix-greeter-sync-{}", std::process::id()));
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).map_err(|error| error.to_string())?;
+    }
+    std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+        .map_err(|error| error.to_string())?;
+    Ok(dir)
+}
+
+struct ApplyExit {
+    code: i32,
+    message: String,
+}
+
+fn command_output(cmd: &std::ffi::OsStr, args: &[std::ffi::OsString]) -> Result<ApplyExit, String> {
+    let output = std::process::Command::new(cmd)
+        .args(args)
+        .output()
+        .map_err(|error| format!("could not run {}: {error}", cmd.to_string_lossy()))?;
+    if output.status.success() {
+        return Ok(ApplyExit {
+            code: 0,
+            message: String::new(),
+        });
+    }
+    let message = String::from_utf8_lossy(&output.stderr);
+    let message = message.trim();
+    let message = if message.is_empty() {
+        format!("greeter sync failed ({})", output.status)
+    } else {
+        message.to_string()
+    };
+    Ok(ApplyExit {
+        code: output.status.code().unwrap_or(1),
+        message,
+    })
+}
+
+fn privilege_argv(
+    command: &str,
+    bin: &std::path::Path,
+    staging: &std::path::Path,
+    dest: &std::path::Path,
+) -> Result<Vec<std::ffi::OsString>, String> {
+    let mut args: Vec<std::ffi::OsString> = if command.trim().is_empty() {
+        vec!["pkexec".into()]
+    } else {
+        command
+            .split_whitespace()
+            .map(std::ffi::OsString::from)
+            .collect()
+    };
+    if args.is_empty() || args.len() > 8 {
+        return Err("Greeter sync privilege command is too long.".into());
+    }
+    args.push(bin.as_os_str().to_os_string());
+    args.push("--sync".into());
+    args.push(staging.as_os_str().to_os_string());
+    args.push("--dest".into());
+    args.push(dest.as_os_str().to_os_string());
+    Ok(args)
+}
+
+/// One sync at a time: the staging directory is shared, and a second password prompt on top of the first helps nobody.
+static GREETER_SYNC: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Copy the current theme and wallpaper into the greeter state directory.
+fn greeter_sync_blocking(app: &AppHandle) -> Result<(), String> {
+    let _one_at_a_time = GREETER_SYNC.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let bin = apply_bin()?;
+    let staging = staging_dir()?;
+    let result = greeter_sync_from(app, &bin, &staging);
+    let _ = std::fs::remove_dir_all(&staging);
+    result
+}
+
+fn greeter_sync_from(app: &AppHandle, bin: &std::path::Path, staging: &std::path::Path) -> Result<(), String> {
+    let staged = command_output(
+        bin.as_os_str(),
+        &["--stage".into(), staging.as_os_str().to_os_string()],
+    )?;
+    if staged.code != 0 {
+        return Err(staged.message);
+    }
+    let dest = greeter_dest();
+    let direct = command_output(
+        bin.as_os_str(),
+        &[
+            "--sync".into(),
+            staging.as_os_str().to_os_string(),
+            "--dest".into(),
+            dest.as_os_str().to_os_string(),
+        ],
+    )?;
+    // Exit 2 means the state directory is not writable. Anything else is a bad payload, and a nested
+    // test must not ask for a password.
+    if direct.code == 0 {
+        return Ok(());
+    }
+    if direct.code != 2 || helix_base::nested_test_session() {
+        return Err(direct.message);
+    }
+    let privilege = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        catalog_text(&state, "shell.greeter_sync.privilege_command")
+    };
+    let argv = privilege_argv(&privilege, bin, staging, &dest)?;
+    let (cmd, rest) = argv.split_first().ok_or("empty privilege command")?;
+    let installed = command_output(cmd, rest)?;
+    if installed.code == 0 {
+        Ok(())
+    } else {
+        Err(installed.message)
+    }
+}
+
+fn greeter_auto_sync(app: &AppHandle, id: &str) {
+    if id == "shell.greeter_sync.privilege_command" {
+        return;
+    }
+    let enabled = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        catalog_bool(&state, "shell.greeter_sync.auto_sync")
+    };
+    if !enabled {
+        return;
+    }
+    // The sync can wait on an administrator password; keep it off the command that changed the setting.
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Err(error) = greeter_sync_blocking(&app) {
+            eprintln!("SETTINGS greeter sync: {error}");
+        }
+    });
+}
+
+#[tauri::command]
+async fn greeter_sync(app: AppHandle) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || greeter_sync_blocking(&app))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 /// A change to one row. The page names the row and what it wants; the catalog model decides whether that is a legal write.
@@ -1124,6 +1502,9 @@ async fn setting_change(
     }
     eprintln!("SETTINGS set {} {}", update.id, update.value);
     refresh_settings(&app).await;
+    if page == "appearance" {
+        greeter_auto_sync(&app, &id);
+    }
     Ok(())
 }
 
@@ -1160,12 +1541,18 @@ fn startup_page() -> Option<String> {
     while let Some(arg) = args.next() {
         if arg == "--page" {
             return args.next().filter(|p| {
-                p.len() <= 40 && p.bytes().all(|b| b.is_ascii_lowercase() || b == b'-' || b == b'_')
+                p.len() <= 40
+                    && p.bytes()
+                        .all(|b| b.is_ascii_lowercase() || b == b'-' || b == b'_')
             });
         }
         if let Some(page) = arg.strip_prefix("--page=") {
             let page = page.to_string();
-            if page.len() <= 40 && page.bytes().all(|b| b.is_ascii_lowercase() || b == b'-' || b == b'_') {
+            if page.len() <= 40
+                && page
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b == b'-' || b == b'_')
+            {
                 return Some(page);
             }
         }
@@ -1225,6 +1612,13 @@ fn main() {
             network_disconnect,
             network_forget,
             network_vpn,
+            audio_view,
+            audio_set_volume,
+            audio_set_muted,
+            audio_set_default,
+            audio_set_input_volume,
+            audio_set_input_muted,
+            audio_set_default_input,
             bluetooth_view,
             bluetooth_set_power,
             bluetooth_scan,
@@ -1237,6 +1631,7 @@ fn main() {
             bluetooth_pair_cancel,
             pairing_view,
             setting_change,
+            greeter_sync,
             layout_reporting,
             report_layout
         ])
@@ -1248,6 +1643,7 @@ fn main() {
                 pairing: Pairing::default(),
                 network: Network::from_snapshot(&serde_json::Value::Null),
                 bluetooth: Bluetooth::from_snapshot(&serde_json::Value::Null),
+                audio: Audio::from_snapshot(&serde_json::Value::Null),
                 status: "unavailable",
             })));
             let url = match &open_page {

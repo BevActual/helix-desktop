@@ -1,30 +1,40 @@
 [package]
 name = "helix-shell-tauri"
-version = "0.1.0"
-edition = "2021"
-publish = false
-description = "Helix shell surfaces on Tauri. A thin face over helix-shell-core and helix-desktop-api."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Helix shell surfaces on Tauri. A thin face over the helix core crates and helix-desktop-api."
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { workspace = true }
 
 [dependencies]
-helix-desktop-api = { path = "../../../core/helix-desktop-api" }
-helix-shell-core = { path = "../../../core/helix-shell-core" }
-gtk = "0.18"
-gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
-libc = "0.2"
+helix-desktop-api = { workspace = true }
+helix-agent = { workspace = true }
+helix-base = { workspace = true }
+helix-chat = { workspace = true }
+helix-compositor = { workspace = true }
+helix-config = { workspace = true }
+helix-models = { workspace = true }
+helix-shell-model = { workspace = true }
+gtk = { workspace = true }
+gtk-layer-shell = { workspace = true, features = ["v0_6"] }
+libc = { workspace = true }
 # Tells the compositor which rectangles of the shell surface to blur (ext-background-effect-v1); see src/blur.rs.
-wayland-client = "0.31"
+wayland-client = { workspace = true }
 wayland-backend = { version = "0.3", features = ["client_system"] }
-wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols = { workspace = true, features = ["client", "staging"] }
 gdkwayland-sys = "0.18"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-base64 = "0.22"
-tauri = { version = "2", features = [] }
-zbus = { version = "5", default-features = false, features = ["tokio"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+base64 = { workspace = true }
+tauri = { workspace = true }
+zbus = { workspace = true, features = ["tokio"] }
 zbus_polkit = "5.1"
 nix = { version = "0.29", features = ["user"] }
-tokio = { version = "1", features = ["macros", "time", "sync", "net", "io-util"] }
-futures-util = { version = "0.3", default-features = false }
+tokio = { workspace = true, features = ["macros", "time", "sync", "net", "io-util"] }
+futures-util = { workspace = true }
+
+[lints]
+workspace = true

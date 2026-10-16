@@ -2,7 +2,16 @@
 [workspace]
 resolver = "2"
 members = [
-    "core/helix-shell-core",
+    "core/helix-agent",
+    "core/helix-base",
+    "core/helix-chat",
+    "core/helix-compositor",
+    "core/helix-config",
+    "core/helix-config-export",
+    "core/helix-models",
+    "core/helix-monitor-model",
+    "core/helix-shell-model",
+    "core/helix-software-model",
     "core/helix-desktop-api",
     "core/helix-theme",
     "services/helix-wallpaper",
@@ -22,7 +31,62 @@ members = [
     "dev/helix-attacker",
 ]
 # compositor/ is its own Cargo workspace (GPL niri fork); keep it out of this one.
-exclude = ["compositor"]
+# material-colors is vendored upstream code used as a path dependency. Excluded so that its dev-dependencies (examples:
+# reqwest 0.13, a second image and tokio) are not resolved into our lockfile.
+exclude = ["compositor", "third_party/material-colors"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+repository = "https://github.com/BevActual/helix-desktop"
+
+# One place for the versions every crate shares. A member adds its own features: `tokio = { workspace = true, features = [...] }`.
+# Crates that differ on purpose say why next to their own line.
+[workspace.dependencies]
+helix-agent = { path = "core/helix-agent" }
+helix-base = { path = "core/helix-base" }
+helix-chat = { path = "core/helix-chat" }
+helix-compositor = { path = "core/helix-compositor" }
+helix-config = { path = "core/helix-config" }
+helix-config-export = { path = "core/helix-config-export" }
+helix-models = { path = "core/helix-models" }
+helix-monitor-model = { path = "core/helix-monitor-model" }
+helix-shell-model = { path = "core/helix-shell-model" }
+helix-software-model = { path = "core/helix-software-model" }
+helix-desktop-api = { path = "core/helix-desktop-api" }
+helix-theme = { path = "core/helix-theme" }
+helix-wallpaper = { path = "services/helix-wallpaper" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+regex = "1"
+libc = "0.2"
+base64 = "0.22"
+futures-util = "0.3"
+tokio = "1"
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+image = { version = "0.25", default-features = false }
+tauri = "2"
+tauri-build = "2"
+gtk = "0.18"
+gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+memmap2 = "0.9"
+cc = "1"
+ureq = "3"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
 
 [profile.release]
 opt-level = "s"

@@ -1,11 +1,11 @@
 #!/bin/bash
-# The whole baseline in one command: lints, Rust tests, the C++ tests, and the nested UI suite. Stops at the first red step.
-#   tools/check-all.sh [--no-nested] [--no-meson]
+# The whole baseline in one command: lints, Rust tests, the integration tests, and the nested UI suite. Stops at the first red step.
+#   tools/check-all.sh [--no-nested] [--no-integration]
 # Leftovers of earlier nested runs are stopped first (only processes whose command line is a /tmp/helix-nested one).
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
-nested=1; meson_tests=1
-for arg in "$@"; do case "$arg" in --no-nested) nested=0;; --no-meson) meson_tests=0;; esac; done
+nested=1; integration=1
+for arg in "$@"; do case "$arg" in --no-nested) nested=0;; --no-integration|--no-meson) integration=0;; esac; done
 step() { printf '\n== %s\n' "$*"; }
 step "stop leftovers of earlier nested runs"
 for p in $(pgrep -x niri 2>/dev/null); do
@@ -20,11 +20,11 @@ step "cargo clippy (warnings are errors)"
 cargo clippy --release --workspace --all-targets -- -D warnings
 step "cargo test"
 cargo test --release --workspace
-if [ $meson_tests = 1 ]; then
-  BUILD=$(ls -d "$ROOT/build-debug" "$ROOT/build-native-clean" 2>/dev/null | head -1)
-  [ -n "$BUILD" ] || { echo "no meson build directory (build-debug or build-native-clean)"; exit 1; }
-  step "meson test ($BUILD)"
-  nice -n 10 meson test -C "$BUILD" --print-errorlogs
+if [ $integration = 1 ]; then
+  step "build what the integration tests run"
+  cargo build --profile fast -p helix-desktop -p helix-assistant -p helix-inference -p helix-system-upgrade
+  step "integration tests"
+  nice -n 10 tools/test-integration.sh
 fi
 if [ $nested = 1 ]; then
   step "build what the nested tests run"
