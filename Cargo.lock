@@ -2555,7 +2555,10 @@ name = "helix-desktop-api"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "helix-theme",
+ "libc",
  "serde_json",
+ "tokio",
  "zbus",
 ]
 
