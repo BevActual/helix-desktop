@@ -1,7 +1,7 @@
 # One-line descriptions of desktop tools for the model's tool list, in the words a person uses. They replace the
 # command's own summary (written for `helix-shell msg --help`) wherever a hint exists. They exist to tell near-neighbours
 # apart: sound from screen brightness, the desktop's state from the AI assistant's state, a panel from a list of past items.
-# Hints are descriptions, not policy: what a tool may do is decided by msg-risk.toml. tests/msg_risk_policy_test.py checks
+# Hints are descriptions, not policy: what a tool may do is decided by msg-risk.toml. the tests in core/helix-agent/src/tool_schema.rs check
 # that every key is a real command.
 
 [hints]

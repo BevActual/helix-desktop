@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A scripted shell for Mobius's task card. It owns org.helix.Shell (AssistantSubmit, OpenPanel) and org.helix.Shell.Act
-(GetState, Stop, Changed) the way the shell's assistant session does, and walks a handed-over request through
+(GetState, Stop, Undo, Changed) the way the shell's assistant session does, and walks a handed-over request through
 thinking -> confirm -> acting -> result. Approving is something only the real shell does, so the test stands in for the person by
 creating <state>/approve; a request containing "fail" ends as a failure. Every call is appended to <state>/fake-shell-act.log.
 
@@ -16,7 +16,8 @@ state_dir = sys.argv[1]
 log_path = os.path.join(state_dir, "fake-shell-act.log")
 approve_path = os.path.join(state_dir, "approve")
 PATH_SHELL, PATH_ACT = "/org/helix/Shell", "/org/helix/Shell/Act"
-state = {"task": 0, "phase": "idle", "request": "", "text": "", "description": "", "reason": "", "failed": False}
+state = {"task": 0, "phase": "idle", "request": "", "text": "", "description": "", "reason": "", "failed": False,
+         "before": "", "after": "", "undoable": False, "restored": False}
 timers = []
 connection = None
 
@@ -56,7 +57,7 @@ def finish():
     if "fail" in state["request"].lower():
         move(phase="result", failed=True, text="The desktop service did not answer.")
     else:
-        move(phase="result", failed=False, text="Done. The screen is dimmer.")
+        move(phase="result", failed=False, text="Done. The screen is dimmer.", before="80%", after="40%", undoable=True, restored=False)
     return False
 
 def begin_confirm():
@@ -72,7 +73,8 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             log(f"SUBMIT {json.dumps(request)}")
             cancel_timers()
             if os.path.exists(approve_path): os.remove(approve_path)
-            state.update(task=state["task"] + 1, phase="thinking", request=request, text="", description="", reason="", failed=False)
+            state.update(task=state["task"] + 1, phase="thinking", request=request, text="", description="", reason="", failed=False,
+                         before="", after="", undoable=False, restored=False)
             changed()
             later(900, begin_confirm)
             invocation.return_value(None)
@@ -87,6 +89,14 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             cancel_timers()
             if state["phase"] in ("thinking", "confirm", "acting"):
                 move(phase="idle", text="", description="")
+            invocation.return_value(None)
+        elif short == "Act1" and method == "Undo":
+            (task,) = params.unpack()
+            log(f"UNDO {task}")
+            if task != state["task"] or not state["undoable"]:
+                invocation.return_dbus_error("org.helix.Desktop.Error.Failed", "The desktop has changed since then.")
+                return
+            move(undoable=False, restored=True, text="Put it back to 80%.")
             invocation.return_value(None)
         else:
             invocation.return_dbus_error("org.helix.Desktop.Error.Failed", f"fake shell: {short}.{method} is not implemented")

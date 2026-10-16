@@ -1,15 +1,20 @@
 <node>
 <!-- Served by the shell process that holds the desktop assistant's session (the monolith, or `panels` in the split shell) at
      org.helix.Shell.Act, /org/helix/Shell/Act, on the session bus. It says what the assistant is doing right now so an app that handed
-     a request over (Mobius) can show progress and the result where the person asked. Read-only apart from Stop, which only cancels:
-     approving an action is never possible here, it stays in the shell's own approval surface (docs/design/trusted-surface.md). -->
+     a request over (Mobius) can show progress and the result where the person asked. Stop only cancels. Undo only writes back a value
+     this shell recorded for that task. Approving an action is never possible here; it stays in the shell's own approval surface
+     (docs/design/trusted-surface.md). -->
 <interface name="org.helix.Shell.Act1">
  <!-- {task: t (counts requests, so a client can tell tasks apart), phase: s (idle | thinking | confirm | acting | result),
       request: s (what was asked), text: s (the answer or result), description: s (what will be done, in the confirm phase),
-      reason: s, failed: b} -->
- <method name="GetState"><arg type="a{sv}" direction="out"/></method>
+      reason: s, failed: b, before: s (display form of the previous value, or empty), after: s (display form after the write, or empty),
+      undoable: b (this task is still in the shell's ledger and the live value still matches),
+      restored: b (Undo already wrote the previous value back)} -->
+    <method name="GetState"><arg type="a{sv}" direction="out"/></method>
  <!-- Cancels what is thinking, waiting for approval or running. Does nothing when idle. -->
  <method name="Stop"/>
+ <!-- Writes the previous value back for this task id. It takes no command and no value. An unknown task, or a desktop that has moved on, is an error and nothing is written. -->
+ <method name="Undo"><arg name="task" type="t" direction="in"/></method>
  <!-- The state changed; call GetState. -->
  <signal name="Changed"/>
 </interface>

@@ -11,6 +11,10 @@ use std::time::Duration;
 
 use helix_agent::agent_msg::{parse, Command, Direction, Theme, MAX_LINE, SUPPORTED};
 use helix_agent::agent_status::{status_json, StatusInput};
+use helix_agent::assistant::Phase;
+use helix_agent::change_ledger::{
+    sentence, volume_machine, volume_text, ChangeLedger, ChangeRecord, SettingKey,
+};
 use tauri::AppHandle;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
@@ -28,14 +32,18 @@ fn runtime_dir() -> Option<PathBuf> {
 
 /// `helix-<WAYLAND_DISPLAY>.sock`: the name the service looks for first.
 fn socket_path() -> Option<PathBuf> {
-    let display = std::env::var("WAYLAND_DISPLAY").ok().filter(|d| !d.is_empty() && !d.contains('/'))?;
+    let display = std::env::var("WAYLAND_DISPLAY")
+        .ok()
+        .filter(|d| !d.is_empty() && !d.contains('/'))?;
     Some(runtime_dir()?.join(format!("helix-{display}.sock")))
 }
 
 /// Where the shell says which commands it carries out, so the service lists only those (first line: this shell's pid, so a stale file from
 /// a shell that has gone is ignored).
 fn tools_path() -> Option<PathBuf> {
-    let display = std::env::var("WAYLAND_DISPLAY").ok().filter(|d| !d.is_empty() && !d.contains('/'))?;
+    let display = std::env::var("WAYLAND_DISPLAY")
+        .ok()
+        .filter(|d| !d.is_empty() && !d.contains('/'))?;
     Some(runtime_dir()?.join(format!("helix-shell-tools-{display}")))
 }
 
@@ -43,44 +51,81 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
     let ok = || Ok("ok\n".to_string());
     match command {
         Command::VolumeStep(delta) => {
+            let before = audio_level(app);
             crate::adjust_volume(app, delta).await;
-            ok()
+            crate::refresh_audio(app).await;
+            noted_volume(app, before, audio_level(app))
         }
         Command::VolumeToggleMute => {
+            let before = audio_level(app);
             crate::toggle_mute(app).await;
-            ok()
+            crate::refresh_audio(app).await;
+            noted_volume(app, before, audio_level(app))
         }
         Command::VolumeSet(percent) => {
+            let before = audio_level(app);
             crate::audio_set_volume(app.clone(), percent).await?;
-            ok()
+            crate::refresh_audio(app).await;
+            noted_volume(app, before, audio_level(app))
         }
         Command::BrightnessStep(delta) => {
+            let before = brightness_level(app);
             crate::adjust_brightness(app, delta).await;
-            ok()
+            noted_level(
+                app,
+                SettingKey::Brightness,
+                "Brightness",
+                before,
+                brightness_level(app),
+            )
         }
         Command::BrightnessSet(percent) => {
+            let before = brightness_level(app);
             crate::brightness_set(app.clone(), percent).await?;
-            ok()
+            noted_level(
+                app,
+                SettingKey::Brightness,
+                "Brightness",
+                before,
+                brightness_level(app),
+            )
         }
         Command::ThemeSet(Theme::Dark) => {
+            let before = theme_mode(app);
             crate::quick_set_dark(app.clone(), true).await?;
-            ok()
+            crate::refresh_quick(app).await;
+            noted_text(app, SettingKey::Theme, "Theme", before, theme_mode(app))
         }
         Command::ThemeSet(Theme::Light) => {
+            let before = theme_mode(app);
             crate::quick_set_dark(app.clone(), false).await?;
-            ok()
+            crate::refresh_quick(app).await;
+            noted_text(app, SettingKey::Theme, "Theme", before, theme_mode(app))
         }
         Command::ThemeSet(Theme::Auto) => {
-            let update = shell_state(app).lock().expect("shell state").quick.set_auto();
+            let before = theme_mode(app);
+            let update = shell_state(app)
+                .lock()
+                .expect("shell state")
+                .quick
+                .set_auto();
             crate::send_setting(update).await?;
-            ok()
+            crate::refresh_quick(app).await;
+            noted_text(app, SettingKey::Theme, "Theme", before, theme_mode(app))
         }
         Command::ThemeToggle => {
+            let before = theme_mode(app);
             crate::toggle_dark_theme(app).await;
-            ok()
+            crate::refresh_quick(app).await;
+            noted_text(app, SettingKey::Theme, "Theme", before, theme_mode(app))
         }
         Command::ThemeGet => {
-            let dark = shell_state(app).lock().expect("shell state").quick.view().dark;
+            let dark = shell_state(app)
+                .lock()
+                .expect("shell state")
+                .quick
+                .view()
+                .dark;
             match dark {
                 Some(true) => Ok("dark\n".into()),
                 Some(false) => Ok("light\n".into()),
@@ -88,20 +133,50 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             }
         }
         Command::NightLight(Some(on)) => {
+            let before = night_light(app);
             crate::quick_set_night_light(app.clone(), on).await?;
-            ok()
+            crate::refresh_quick(app).await;
+            noted_text(
+                app,
+                SettingKey::NightLight,
+                "Night light",
+                before,
+                night_light(app),
+            )
         }
         Command::NightLight(None) => {
+            let before = night_light(app);
             crate::toggle_night_light(app).await;
-            ok()
+            crate::refresh_quick(app).await;
+            noted_text(
+                app,
+                SettingKey::NightLight,
+                "Night light",
+                before,
+                night_light(app),
+            )
         }
         Command::DndSet(on) => {
+            let before = dnd(app);
             crate::notify::notification_set_dnd(app.clone(), on).await;
-            ok()
+            noted_text(
+                app,
+                SettingKey::DoNotDisturb,
+                "Do not disturb",
+                before,
+                dnd(app),
+            )
         }
         Command::DndToggle => {
+            let before = dnd(app);
             crate::notify::toggle_dnd(app).await;
-            ok()
+            noted_text(
+                app,
+                SettingKey::DoNotDisturb,
+                "Do not disturb",
+                before,
+                dnd(app),
+            )
         }
         Command::DndStatus => {
             let on = crate::notify::dnd_is_on(app);
@@ -137,7 +212,9 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
                 do_not_disturb: shell.notifications.view(now).dnd,
                 volume: audio.available.then_some(audio.percent),
                 muted: audio.available.then_some(audio.muted),
-                brightness: shell.brightness.map(|b| b.percent().round().clamp(0., 100.) as u8),
+                brightness: shell
+                    .brightness
+                    .map(|b| b.percent().round().clamp(0., 100.) as u8),
                 workspaces: shell
                     .niri
                     .workspace_strip()
@@ -154,7 +231,12 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             let Some(id) = id else {
                 return Err("name the window: window-close <id> (ids are in status)".into());
             };
-            let known = shell_state(app).lock().expect("shell state").niri.window(id).is_some();
+            let known = shell_state(app)
+                .lock()
+                .expect("shell state")
+                .niri
+                .window(id)
+                .is_some();
             if !known {
                 return Err("no such window".into());
             }
@@ -162,12 +244,14 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             ok()
         }
         Command::WorkspaceSwitch(direction) => {
+            let before = active_workspace(app);
+            let after = workspace_neighbor(app, direction);
             let action = match direction {
                 Direction::Next => "FocusWorkspaceDown",
                 Direction::Prev => "FocusWorkspaceUp",
             };
             crate::dock::niri_action(&serde_json::json!({ action: {} }))?;
-            ok()
+            noted_workspace(app, before, after)
         }
         Command::PanelClose(which) => {
             let open = current_panel(app).await;
@@ -194,7 +278,8 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             if shell.apps.is_empty() {
                 shell.apps = crate::apps::scan();
             }
-            let Some(entry) = helix_shell_model::launcher::resolve_launch(&shell.apps, &query).cloned()
+            let Some(entry) =
+                helix_shell_model::launcher::resolve_launch(&shell.apps, &query).cloned()
             else {
                 return Err("no matching application".into());
             };
@@ -235,22 +320,374 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
                 .map_err(|_| "desktop capture failed".to_string())?
         }
         Command::AgentDeskFocus => {
+            let before = active_workspace(app);
+            let after = agent_desk(app);
             crate::dock::agent_desk_focus()?;
-            ok()
+            noted_workspace(app, before, after)
         }
         Command::BarShow => {
+            let before = bar_text();
             crate::bar::set_visible(app, true)?;
-            ok()
+            noted_text(app, SettingKey::Bar, "Bar", before, bar_text())
         }
         Command::BarHide => {
+            let before = bar_text();
             crate::bar::set_visible(app, false)?;
-            ok()
+            noted_text(app, SettingKey::Bar, "Bar", before, bar_text())
         }
         Command::BarToggle => {
+            let before = bar_text();
             crate::bar::toggle(app)?;
-            ok()
+            noted_text(app, SettingKey::Bar, "Bar", before, bar_text())
         }
     }
+}
+
+fn changes() -> std::sync::MutexGuard<'static, ChangeLedger> {
+    static LEDGER: std::sync::Mutex<ChangeLedger> = std::sync::Mutex::new(ChangeLedger::new());
+    LEDGER.lock().expect("act change ledger")
+}
+
+fn assistant_running(app: &AppHandle) -> bool {
+    let phase = shell_state(app)
+        .lock()
+        .expect("shell state")
+        .session
+        .view()
+        .phase;
+    matches!(phase, Phase::Thinking | Phase::Acting)
+}
+
+/// Returns the display sentence when both sides were read. Records an undo only for the assistant task
+/// that is actually running, and only when the value moved.
+fn noted(
+    app: &AppHandle,
+    key: SettingKey,
+    label: &str,
+    before: Option<String>,
+    after: Option<String>,
+    before_machine: Option<String>,
+    after_machine: Option<String>,
+) -> Result<String, String> {
+    let (Some(before), Some(after)) = (before, after) else {
+        return Ok("ok\n".into());
+    };
+    let line = sentence(label, &before, &after);
+    if line.is_empty() {
+        return Ok("ok\n".into());
+    }
+    if assistant_running(app) {
+        if let (Some(before_machine), Some(after_machine)) = (before_machine, after_machine) {
+            let recorded = changes().record(
+                crate::act_feed::current_task(),
+                key,
+                &before_machine,
+                &after_machine,
+                &before,
+                &after,
+            );
+            if recorded {
+                crate::act_feed::note_change(&before, &after);
+            }
+        }
+    }
+    Ok(format!("{line}\n"))
+}
+
+/// The ledger entry for this task, if the shell still holds one.
+pub(crate) fn remembered(task: u64) -> Option<ChangeRecord> {
+    changes().get(task).cloned()
+}
+
+/// Whether the live setting is still the value this task wrote.
+pub(crate) fn still_current(app: &AppHandle, record: &ChangeRecord) -> bool {
+    live_machine(app, record.key).as_deref() == Some(record.after_machine.as_str())
+}
+
+/// Writes the previous value back. The ledger entry is removed only after that write succeeds.
+pub(crate) async fn undo(app: &AppHandle, task: u64) -> Result<(), String> {
+    let record = changes()
+        .get(task)
+        .cloned()
+        .ok_or_else(|| "Nothing to undo.".to_string())?;
+    let live = live_machine(app, record.key)
+        .ok_or_else(|| "That setting is not available.".to_string())?;
+    if live != record.after_machine {
+        let _ = changes().take_if_current(task, &live);
+        crate::act_feed::clear_undoable(task);
+        return Err("The desktop has changed since then.".into());
+    }
+    restore(app, &record).await?;
+    let _ = changes().take_if_current(task, &record.after_machine);
+    crate::act_feed::note_restored(task, &format!("Restored to {}.", record.before));
+    Ok(())
+}
+
+fn live_machine(app: &AppHandle, key: SettingKey) -> Option<String> {
+    match key {
+        SettingKey::Volume => audio_level(app).map(|(percent, muted)| volume_machine(percent, muted)),
+        SettingKey::Brightness => brightness_level(app).map(|percent| format!("{percent}%")),
+        SettingKey::Theme => theme_mode(app),
+        SettingKey::NightLight => night_light(app),
+        SettingKey::DoNotDisturb => dnd(app),
+        SettingKey::Bar => bar_text(),
+        SettingKey::Workspace => active_workspace(app).map(|(id, _)| id.to_string()),
+    }
+}
+
+fn parse_volume(machine: &str) -> Option<(u8, bool)> {
+    let (percent, flag) = machine.split_once(' ')?;
+    let percent: u8 = percent.parse().ok()?;
+    if percent > 100 {
+        return None;
+    }
+    let muted = match flag {
+        "1" => true,
+        "0" => false,
+        _ => return None,
+    };
+    Some((percent, muted))
+}
+
+fn on_off(machine: &str) -> Result<bool, String> {
+    match machine {
+        "on" => Ok(true),
+        "off" => Ok(false),
+        _ => Err("That setting is not available.".into()),
+    }
+}
+
+async fn restore(app: &AppHandle, record: &ChangeRecord) -> Result<(), String> {
+    match record.key {
+        SettingKey::Volume => {
+            let (percent, muted) =
+                parse_volume(&record.before_machine).ok_or("That setting is not available.")?;
+            crate::send_audio(crate::audio_request(app, |audio| {
+                audio.set_volume(f64::from(percent))
+            }))
+            .await?;
+            crate::send_audio(crate::audio_request(app, |audio| audio.set_muted(muted))).await?;
+            crate::refresh_audio(app).await;
+        }
+        SettingKey::Brightness => {
+            let percent: f64 = record
+                .before_machine
+                .trim_end_matches('%')
+                .parse()
+                .map_err(|_| "That setting is not available.".to_string())?;
+            crate::brightness_set(app.clone(), percent).await?;
+        }
+        SettingKey::Theme => {
+            match record.before_machine.as_str() {
+                "dark" => crate::quick_set_dark(app.clone(), true).await?,
+                "light" => crate::quick_set_dark(app.clone(), false).await?,
+                "auto" => {
+                    let update = shell_state(app).lock().expect("shell state").quick.set_auto();
+                    crate::send_setting(update).await?;
+                }
+                _ => return Err("That setting is not available.".into()),
+            }
+            crate::refresh_quick(app).await;
+        }
+        SettingKey::NightLight => {
+            let on = on_off(&record.before_machine)?;
+            crate::quick_set_night_light(app.clone(), on).await?;
+            crate::refresh_quick(app).await;
+        }
+        SettingKey::DoNotDisturb => {
+            let on = on_off(&record.before_machine)?;
+            crate::notify::notification_set_dnd(app.clone(), on).await;
+        }
+        SettingKey::Bar => {
+            let shown = match record.before_machine.as_str() {
+                "shown" => true,
+                "hidden" => false,
+                _ => return Err("That setting is not available.".into()),
+            };
+            crate::bar::set_visible(app, shown)?;
+        }
+        SettingKey::Workspace => {
+            let id: u64 = record
+                .before_machine
+                .parse()
+                .map_err(|_| "That setting is not available.".to_string())?;
+            crate::dock::workspace_focus(app.clone(), id)?;
+        }
+    }
+    Ok(())
+}
+
+fn noted_text(
+    app: &AppHandle,
+    key: SettingKey,
+    label: &str,
+    before: Option<String>,
+    after: Option<String>,
+) -> Result<String, String> {
+    noted(
+        app,
+        key,
+        label,
+        before.clone(),
+        after.clone(),
+        before,
+        after,
+    )
+}
+
+fn noted_level(
+    app: &AppHandle,
+    key: SettingKey,
+    label: &str,
+    before: Option<u8>,
+    after: Option<u8>,
+) -> Result<String, String> {
+    let text = |value: Option<u8>| value.map(|value| format!("{value}%"));
+    noted_text(app, key, label, text(before), text(after))
+}
+
+fn noted_volume(
+    app: &AppHandle,
+    before: Option<(u8, bool)>,
+    after: Option<(u8, bool)>,
+) -> Result<String, String> {
+    let text =
+        |level: Option<(u8, bool)>| level.map(|(percent, muted)| volume_text(percent, muted));
+    let machine =
+        |level: Option<(u8, bool)>| level.map(|(percent, muted)| volume_machine(percent, muted));
+    noted(
+        app,
+        SettingKey::Volume,
+        "Volume",
+        text(before),
+        text(after),
+        machine(before),
+        machine(after),
+    )
+}
+
+fn noted_workspace(
+    app: &AppHandle,
+    before: Option<(u64, String)>,
+    after: Option<(u64, String)>,
+) -> Result<String, String> {
+    let text = |place: &Option<(u64, String)>| place.as_ref().map(|(_, name)| name.clone());
+    let machine = |place: &Option<(u64, String)>| place.as_ref().map(|(id, _)| id.to_string());
+    noted(
+        app,
+        SettingKey::Workspace,
+        "Workspace",
+        text(&before),
+        text(&after),
+        machine(&before),
+        machine(&after),
+    )
+}
+
+fn audio_level(app: &AppHandle) -> Option<(u8, bool)> {
+    let view = shell_state(app).lock().expect("shell state").audio.view();
+    view.available.then_some((view.percent, view.muted))
+}
+
+fn brightness_level(app: &AppHandle) -> Option<u8> {
+    shell_state(app)
+        .lock()
+        .expect("shell state")
+        .brightness
+        .map(|brightness| brightness.percent().round().clamp(0.0, 100.0) as u8)
+}
+
+fn theme_mode(app: &AppHandle) -> Option<String> {
+    shell_state(app)
+        .lock()
+        .expect("shell state")
+        .quick
+        .mode()
+        .map(str::to_string)
+}
+
+fn night_light(app: &AppHandle) -> Option<String> {
+    shell_state(app)
+        .lock()
+        .expect("shell state")
+        .quick
+        .view()
+        .night_light
+        .map(|on| if on { "on" } else { "off" }.to_string())
+}
+
+fn dnd(app: &AppHandle) -> Option<String> {
+    Some(
+        if crate::notify::dnd_is_on(app) {
+            "on"
+        } else {
+            "off"
+        }
+        .to_string(),
+    )
+}
+
+fn bar_text() -> Option<String> {
+    Some(
+        if crate::bar::is_visible() {
+            "shown"
+        } else {
+            "hidden"
+        }
+        .to_string(),
+    )
+}
+
+fn workspace_label(name: &str, idx: u64) -> String {
+    let name = helix_agent::display::sanitize_for_display(name, 40);
+    if name.is_empty() {
+        format!("workspace {idx}")
+    } else {
+        name
+    }
+}
+
+fn workspaces(app: &AppHandle) -> Vec<helix_compositor::niri::WorkspaceView> {
+    shell_state(app)
+        .lock()
+        .expect("shell state")
+        .niri
+        .workspace_strip()
+}
+
+fn active_workspace(app: &AppHandle) -> Option<(u64, String)> {
+    workspaces(app)
+        .into_iter()
+        .find(|workspace| workspace.active)
+        .map(|workspace| {
+            (
+                workspace.id,
+                workspace_label(&workspace.name, workspace.idx),
+            )
+        })
+}
+
+/// The workspace `next` or `prev` will land on, in strip order (the same order as niri's up and down).
+fn workspace_neighbor(app: &AppHandle, direction: Direction) -> Option<(u64, String)> {
+    let strip = workspaces(app);
+    let position = strip.iter().position(|workspace| workspace.active)?;
+    let next = match direction {
+        Direction::Next => strip.get(position + 1),
+        Direction::Prev => position.checked_sub(1).and_then(|index| strip.get(index)),
+    }?;
+    Some((next.id, workspace_label(&next.name, next.idx)))
+}
+
+fn agent_desk(app: &AppHandle) -> Option<(u64, String)> {
+    workspaces(app)
+        .into_iter()
+        .find(|workspace| workspace.agent_desk)
+        .map(|workspace| {
+            (
+                workspace.id,
+                workspace_label(&workspace.name, workspace.idx),
+            )
+        })
 }
 
 /// What the log may say about a command: never clipboard contents.
@@ -266,7 +703,9 @@ async fn serve_one(app: AppHandle, mut stream: UnixStream) {
     let mut buffer = Vec::new();
     let read = tokio::time::timeout(
         Duration::from_secs(2),
-        (&mut stream).take(MAX_LINE as u64 + 1).read_to_end(&mut buffer),
+        (&mut stream)
+            .take(MAX_LINE as u64 + 1)
+            .read_to_end(&mut buffer),
     )
     .await;
     if read.is_err() {
@@ -329,7 +768,10 @@ pub fn serve(app: AppHandle) {
             Probe::Gone => {}
             Probe::Service => {
                 // The desktop service binds this path when it starts before the shell; the shell is the real owner.
-                eprintln!("AGENT-IPC taking {} over from the desktop service", path.display());
+                eprintln!(
+                    "AGENT-IPC taking {} over from the desktop service",
+                    path.display()
+                );
             }
             Probe::Shell => {
                 eprintln!("AGENT-IPC another shell already serves {}", path.display());
@@ -358,7 +800,11 @@ pub fn serve(app: AppHandle) {
             use std::os::unix::fs::PermissionsExt;
             let _ = std::fs::set_permissions(&tools, std::fs::Permissions::from_mode(0o600));
         }
-        eprintln!("AGENT-IPC serving {} ({} commands)", path.display(), SUPPORTED.len());
+        eprintln!(
+            "AGENT-IPC serving {} ({} commands)",
+            path.display(),
+            SUPPORTED.len()
+        );
         loop {
             match listener.accept().await {
                 Ok((stream, _)) => {
@@ -377,7 +823,9 @@ pub fn serve(app: AppHandle) {
 mod probe_tests {
     #[test]
     fn recognises_the_service_help_text() {
-        assert!(super::is_service_help("Usage: helix-panel <command> [args]\n"));
+        assert!(super::is_service_help(
+            "Usage: helix-panel <command> [args]\n"
+        ));
         assert!(!super::is_service_help("error: unknown command\n"));
     }
 }

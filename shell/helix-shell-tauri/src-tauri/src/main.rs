@@ -146,6 +146,14 @@ struct AssistantView {
     failed: bool,
     unverified: bool,
     armed: bool,
+    /// The feed's task. 0 before the first request.
+    task: u64,
+    /// Display form of the previous value, or empty.
+    before: String,
+    /// Display form after the write, or empty.
+    after: String,
+    /// This task is still in the ledger and the live value still matches.
+    undoable: bool,
 }
 
 fn now_ms(started: Instant) -> u64 {
@@ -172,6 +180,10 @@ fn assistant_view(shell: &ShellState) -> AssistantView {
         failed: view.failed,
         unverified: view.unverified,
         armed: view.phase == Phase::Confirm && shell.confirmation.armed(now_ms(shell.started)),
+        task: 0,
+        before: String::new(),
+        after: String::new(),
+        undoable: false,
     }
 }
 
@@ -193,7 +205,7 @@ fn shell_state(app: &AppHandle) -> Arc<Mutex<ShellState>> {
 fn emit_view(app: &AppHandle, view: &AssistantView) {
     eprintln!("ASSISTANT {}", view.phase);
     act_feed::publish(view);
-    let _ = app.emit("assistant-view", view);
+    let _ = app.emit("assistant-view", &act_feed::with_change(app, view));
     island::publish(app);
 }
 
@@ -1828,6 +1840,19 @@ fn assistant_cancel(app: AppHandle) -> AssistantView {
     view
 }
 
+/// Writes the previous value back for the task the Act door is showing. The id has to be the one that view carried.
+#[tauri::command]
+async fn assistant_undo(app: AppHandle, task: u64) -> Result<AssistantView, String> {
+    crate::agent_ipc::undo(&app, task).await?;
+    let view = {
+        let shell = shell_state(&app);
+        let guard = shell.lock().expect("shell state");
+        assistant_view(&guard)
+    };
+    emit_view(&app, &view);
+    Ok(act_feed::with_change(&app, &view))
+}
+
 #[tauri::command]
 fn panel_escape(app: AppHandle) {
     dismiss_escape(&app);
@@ -1965,6 +1990,7 @@ fn main() {
             panel_outside,
             assistant_submit,
             assistant_confirm,
+            assistant_undo,
             assistant_cancel,
             panel_escape,
             launcher_query,
