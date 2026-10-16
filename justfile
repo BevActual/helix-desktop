@@ -62,6 +62,10 @@ install prefix="/usr/local" profile="release":
 uninstall prefix="/usr/local":
     tools/install.sh --uninstall --prefix {{prefix}}
 
+# Formats the Rust the project owns (CI checks it); the compositor fork and third_party are left alone.
+fmt:
+    tools/rustfmt.sh
+
 # Formats the C++ engine shims under services/*/native (the only C++ left). Rust is formatted with `cargo fmt`.
 format:
     #!/usr/bin/env bash

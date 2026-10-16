@@ -20,7 +20,6 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 | Item | Size | Evidence / where |
 |---|---|---|
 | Merge the `land-greeter-sync-and-doc-reset` branch | S | Greeter appearance sync, Sound page, Act task card, build and docs reset |
-| Decide Rust formatting: one repo-wide `cargo fmt` commit plus a CI check, or no policy | S | The tree outside touched files is not rustfmt-clean (hundreds of diffs in `core/`, Mobius) |
 | Pin the toolchain (`rust-toolchain.toml`) | S | Fedora `rustc` with a rustup `clippy-driver` on one `PATH` fails with "incompatible version of rustc" |
 | Write the RPM spec over `tools/install.sh --require-session`, with a systemd user preset and a decision on how the compositor is packaged | M | `PACKAGING.md`; the installer now covers the whole session |
 | Move CI to a Fedora container and install the real dependency list from `BUILDING.md` | M | CI builds on Arch with a list trimmed from the C++ one, so it is not the platform we ship on |
