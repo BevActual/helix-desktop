@@ -13,6 +13,7 @@ services = ["core", "third_party"]
 shell = ["core", "third_party"]
 apps = ["core", "third_party"]
 greeter = ["third_party"]
+compositor = ["compositor", "third_party"]
 dev = ["core", "services", "shell", "apps", "greeter", "third_party"]
 
 # Inside core/, which core crates each crate may depend on. A new core crate must be listed here (docs/design/shell-core-split.md):

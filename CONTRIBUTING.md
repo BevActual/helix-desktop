@@ -187,7 +187,7 @@ services/           One process each
 shell/              Live session shell (Tauri + React islands)
 apps/               Settings, Mobius, Software, System Monitor (Tauri + React)
 greeter/            Login greeter (Tauri + React, greetd client)
-compositor/         helix-niri fork (own Cargo workspace)
+compositor/         helix-niri, the niri fork (crates: niri, niri-config, niri-ipc, niri-visual-tests)
 protocols/          D-Bus + IPC contracts (source of truth); also vendored Wayland XML
 assets/             Icons, fonts, sounds, templates, translations, unit files
 tests/              Python integration tests, fixtures, eval

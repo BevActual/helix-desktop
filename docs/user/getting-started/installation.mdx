@@ -19,10 +19,10 @@ cd helix-desktop
 just build release
 ```
 
-The compositor is a separate workspace:
+The compositor is built from the same workspace:
 
 ```bash
-cd compositor && cargo build --release
+cargo build --release -p niri
 ```
 
 ## Install

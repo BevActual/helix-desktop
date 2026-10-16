@@ -5,10 +5,10 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-NIRI_DEBUG="$ROOT/compositor/target/debug/niri"
+NIRI_DEBUG="${CARGO_TARGET_DIR:-$ROOT/target}/debug/niri"
 if [ ! -x "$NIRI_DEBUG" ]; then
   echo "== compositor debug niri (for nested runs)"
-  (cd "$ROOT/compositor" && cargo build --bin niri)
+  cargo build -p niri --bin niri
 fi
 export HELIX_NIRI_BIN="${HELIX_NIRI_BIN:-$NIRI_DEBUG}"
 

@@ -49,8 +49,14 @@ KDL
 if [ -z "${HELIX_NESTED_WINIT:-}" ]; then
   export HELIX_NESTED_HEADLESS=1
 fi
-NIRI_BIN="${HELIX_NIRI_BIN:-$ROOT/compositor/target/debug/niri}"
-[ -x "$NIRI_BIN" ] || NIRI_BIN=niri
+# The compositor is part of the workspace: target/{debug,fast,release}/niri (CARGO_TARGET_DIR when set), else niri on PATH.
+NIRI_BIN="${HELIX_NIRI_BIN:-}"
+if [ -z "$NIRI_BIN" ]; then
+  for profile in debug fast release; do
+    [ -x "${CARGO_TARGET_DIR:-$ROOT/target}/$profile/niri" ] && { NIRI_BIN="${CARGO_TARGET_DIR:-$ROOT/target}/$profile/niri"; break; }
+  done
+fi
+[ -x "${NIRI_BIN:-}" ] || NIRI_BIN=niri
 "$NIRI_BIN" -c "$SCRATCH/niri.kdl" > "$SCRATCH/niri.log" 2>&1 &
 NIRI=$!
 for _ in $(seq 1 60); do grep -q "IPC listening" "$SCRATCH/niri.log" && break; sleep 0.3; done

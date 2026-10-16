@@ -32,6 +32,8 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 | Run `mobius-test.sh` again (it now starts the Rust inference service) and fix what has rotted | S | `tools/nested/mobius-nested.sh` |
 | Decide on `third_party/wuffs` and `third_party/material_color_utilities`: build the image-decode plan on Wuffs or remove it; keep the C++ reference only while the HCT goldens need regenerating | S | Neither is built today |
 | Find out why `inference_service_integration` is SIGKILLed after about 85 s (it also happened here and took the calling shell with it), then make it a CI gate | S | `tools/test-integration.sh inference_service_integration`; the note in `ci.yml` |
+| Compositor in the workspace: decide the release profile for the rest of the dependency tree. `niri`, `niri-config`, `niri-ipc` and `smithay` are set to opt-level 3 with overflow checks, but crates like `calloop` and the Wayland libraries follow the workspace's opt-level "s" | S | Measure frame times in a nested run before and after; `Cargo.toml` `[profile.release.package.*]` |
+| Compositor clippy: about 7 findings in upstream and Helix code (collapsible `if`, too many arguments, an indexed loop) keep the compositor out of the `-D warnings` gate in `tools/check-all.sh` | S | Fix them in `compositor/src` and drop the `--exclude` flags |
 | Local disk: `target/` is 100 GB and `build-native-clean/` 2 GB of stale artifacts | S | `cargo clean`, or `cargo sweep` to keep the current toolchain's output |
 
 ## 2. Settings (missing pages and ghost settings)

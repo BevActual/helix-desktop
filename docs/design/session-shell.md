@@ -42,7 +42,7 @@ See `product-structure.md` and `cpp-to-rust.md`.
 ```
 Cargo.toml            Rust workspace (repo root; excludes compositor)
 greeter/              Tauri login greeter (helix-greeter)
-compositor/           helix-niri fork (own Cargo workspace)
+compositor/           helix-niri fork (members of the root Cargo workspace)
 core/                 pure models + desktop-api + shared-ui
 shell/                live session shell (Tauri)
 apps/                 Settings / Software / Monitor / Chat

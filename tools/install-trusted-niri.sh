@@ -7,8 +7,7 @@
 # Applies to the user only (~/.local/bin, ~/.config/niri): no root, nothing under /usr.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-NIRI_SRC=${HELIX_NIRI_SRC:-$ROOT/compositor}
-NEW=$NIRI_SRC/target/release/niri
+NEW=${HELIX_NIRI_BIN:-${CARGO_TARGET_DIR:-$ROOT/target}/release/niri}
 BIN=$HOME/.local/bin/niri
 CONF_DIR=$HOME/.config/niri
 CONFIG=$CONF_DIR/config.kdl
@@ -34,7 +33,7 @@ write_snippet() {
 
 case "${1:-status}" in
   apply)
-    [ -x "$NEW" ] || { echo "no compositor build at $NEW (build it: cargo build --release --bin niri in $NIRI_SRC)"; exit 1; }
+    [ -x "$NEW" ] || { echo "no compositor build at $NEW (build it: cargo build --release -p niri --bin niri)"; exit 1; }
     "$NEW" --version | grep -q helix || { echo "$NEW is not the Helix build"; exit 1; }
     # The new build must accept the person's whole config, with the new block, before anything is installed.
     TMP=$(mktemp -d); cp -r "$CONF_DIR/." "$TMP/"

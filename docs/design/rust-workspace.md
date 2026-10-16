@@ -12,7 +12,7 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 | `apps/` | Settings, Software, System Monitor, Chat (Tauri toplevels) |
 | `services/` | `helix-wallpaper`, `helix-idle`, `helix-desktop` (Rust `org.helix.Desktop` scaffold) |
 | `dev/` | Nested probes only (`helix-attacker`, `experiments/`) |
-| `compositor/` | helix-niri fork (own Cargo workspace; excluded from this one) |
+| `compositor/` | helix-niri fork: `niri`, `niri-config`, `niri-ipc`, `niri-visual-tests` (GTK 4, built only on request) |
 
 **Apps have a React frontend** built by the npm workspace at the repo root (`apps/<app>/web`, `core/shared-ui/react`; see `frontend-stack.md`). A Rust-only checkout still builds: without `node_modules` the hand-written pages are used.
 

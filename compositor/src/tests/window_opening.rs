@@ -224,8 +224,14 @@ fn check_target_output_and_workspace(
     let mut snapshot_desc = Vec::new();
     let mut snapshot_suffix = Vec::new();
 
+    // These snapshots describe upstream placement across two outputs and two named workspaces. Helix adds a default
+    // agent desk workspace, which would shift every workspace index, so it is turned off here.
     let mut config = String::from(
         r##"
+helix {
+    agent-desk-name ""
+}
+
 output "headless-2" {
     layout {
         border {

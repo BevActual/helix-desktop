@@ -21,6 +21,7 @@ A crate may depend (by path) only on the directories listed for its own top-leve
 | `shell/` | `core/`, `third_party/` | Presentation; backends belong to the service |
 | `apps/` | `core/`, `third_party/` | Peers on the bus, never linked to another process's crate |
 | `greeter/` | `third_party/` | Login is a trust surface; it links nothing from the session |
+| `compositor/` | `compositor/`, `third_party/` | The niri fork: its crates use each other and nothing else of ours |
 | `dev/` | anything | Test tooling |
 
 Inside `core/` the order of crates is checked too, from the `[crates]` table in `tools/layers.toml`:
@@ -36,7 +37,7 @@ Inside `core/` the order of crates is checked too, from the `[crates]` table in 
 A new crate in `core/` fails the check until it has a row there, so every new edge between core crates is a deliberate edit to that
 file. See `shell-core-split.md` for what each crate holds.
 
-`compositor/` is its own workspace and is not checked here.
+The compositor is in the same workspace and the same lockfile as everything else.
 
 ## Known exceptions
 

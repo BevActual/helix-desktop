@@ -1579,6 +1579,9 @@ mod tests {
                 },
                 allow_virtual_input: false,
             },
+            helix: Helix {
+                agent_desk_name: "Helix Agent",
+            },
             config_notification: ConfigNotification {
                 disable_failed: false,
             },

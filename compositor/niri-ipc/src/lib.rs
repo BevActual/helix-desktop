@@ -203,10 +203,15 @@ pub struct HelixCapabilities {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct HelixAgentDesk {
+    /// The configured name of the agent desk workspace; empty when none is configured.
     pub name: String,
+    /// The workspace's id, or `None` when no workspace has that name yet.
     pub workspace_id: Option<u64>,
+    /// How many windows are on the agent desk now.
     pub window_count: u32,
+    /// Whether the agent desk is the active workspace.
     pub is_focused: bool,
+    /// How many windows opened next are still to be placed on the agent desk (set by `helix-place-on-agent-desk`).
     pub placements_pending: u32,
 }
 
@@ -1014,6 +1019,7 @@ pub enum Action {
     },
     /// Helix: queue the next opened toplevel(s) to land on the agent desk without stealing focus.
     HelixPlaceOnAgentDesk {
+        /// How many of the next opened windows to place on the agent desk (at least 1).
         #[serde(default = "helix_default_place_count")]
         count: u8,
     },

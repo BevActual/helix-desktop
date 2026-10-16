@@ -10,7 +10,7 @@ Notes for packagers. The supported target is Fedora with helix-niri; other distr
 
 One Git tree builds everything:
 
-- Cargo workspace at the root (services, session shell, greeter, apps); `compositor/` is a second, separate workspace.
+- One Cargo workspace at the root: services, session shell, greeter, apps, and the compositor crates under `compositor/`.
 - npm workspace at the root for the React frontends. Each app's `build.rs` runs its build when `node_modules` exists, so a package
   build runs `npm ci` first (offline against a vendored cache, or with network access allowed for that step).
 - Vendor Cargo and npm dependencies for an offline build (`cargo vendor`, an npm cache); both lock files are committed.
