@@ -59,7 +59,8 @@ has_id "keybind-edit:keybinds.copy" || fail "copy keybind missing"
 click_id "keybind-edit:keybinds.copy"; sleep 0.6
 has_id "keybind-input:keybinds.copy" && has_id "keybind-save:keybinds.copy" || fail "edit form missing"
 click_id "keybind-input:keybinds.copy"; sleep 0.2
-wtype -M ctrl -k a -m ctrl; wtype -k BackSpace; wtype "Alt+F9; Ctrl+F8"; sleep 0.3
+# Opening the field selects the whole chord list, so typing replaces it.
+wtype "Alt+F9; Ctrl+F8"; sleep 0.5
 click_id "keybind-save:keybinds.copy"; sleep 1.2
 copy_keys=$(python3 - <<'PY'
 import json, re, subprocess
