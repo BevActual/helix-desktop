@@ -54,12 +54,12 @@ v1 ships Flatpak Explore / Library / Updates first; PackageKit + firmware + Sour
 
 ## Budgets
 
-Own process, not shell USS. Record app USS/RSS after the first nested run below.
+Own process, not shell USS. Memory is PSS of the app and its WebKit processes (a headless nested run, so a floor for what a real session holds).
 
 | Measurement | Value | Notes |
 |-------------|-------|-------|
-| Nested first paint (fake catalog) | _pending_ | `tools/nested/software-test.sh` |
-| USS after first nested run | _pending_ | |
+| Nested first paint (fake catalog) | not measured | The nested compositor's start-up (about 14 s) dominates; it says nothing about the app |
+| Memory after first nested run (PSS, app and its WebKit processes) | about 315 MB | `tools/nested/measure-app.sh` with `MEASURE_READY=page-discover MEASURE_BIN=helix-software`; unchanged 15 s later (314.7 MB). Measured 2026-10-16 on a `fast` build |
 
 ## Nested tests
 
