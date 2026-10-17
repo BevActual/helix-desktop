@@ -30,7 +30,8 @@ cd "$WORK/$NAME"
 mkdir -p "$WORK/v"
 # cargo empties the directory it vendors into, so the config goes beside it, not in it.
 cargo vendor ${OFFLINE:+--offline} --locked "$WORK/v/vendor" > "$WORK/v/cargo-vendor-config.toml"
-# The config refers to the directory as "vendor"; the archive unpacks both at the top of the source tree.
+# cargo writes the absolute path it vendored into; the build unpacks the archive at the top of the source tree, so make it relative to that.
+sed -i 's|^directory = .*|directory = "vendor"|' "$WORK/v/cargo-vendor-config.toml"
 tar -C "$WORK/v" --zstd -cf "$OUT/$NAME-vendor.tar.zst" vendor cargo-vendor-config.toml
 echo "wrote $OUT/$NAME-vendor.tar.zst ($(du -h "$OUT/$NAME-vendor.tar.zst" | cut -f1))"
 
