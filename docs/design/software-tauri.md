@@ -32,7 +32,7 @@ Standalone package store as a Tauri toplevel. Pure package models live in `helix
 Tests: `cargo test -p helix-software` (parsers), `tools/nested/ui-suite.sh software` (fake catalog, windowed list, search, detail, install
 with progress, Update All) and `software-real` (this machine's real catalog and library, read-only; skipped without Flatpak apps).
 
-Not done: adding or removing sources, screenshots for Fedora applications, ratings, and Fedora repositories on the Sources page.
+Not done: adding or removing sources (Flatpak or Fedora), screenshots for Fedora applications, and ratings.
 
 ## Fedora applications (PackageKit)
 
@@ -47,6 +47,7 @@ by its source. Where PackageKit is not on the system bus (another distribution) 
 | Authentication | PackageKit asks polkit, and the shell's polkit agent shows the dialog, as for a system Flatpak. The app never handles a password. |
 | Open | `gtk-launch <desktop id>` for the entry the catalog names. |
 | Detail | The description, licence and categories come from the same catalog (read on demand). Fedora applications show no screenshots (the catalog's hosts are not on the allowed list). |
+| Sources | The enabled repositories from `GetRepoList` (a Fedora install lists about 30, half of them debug and source repositories that are off), shown as "Fedora repository" under their description, beside the Flatpak remotes. Read only. |
 | Check for Updates | `RefreshCache` on a PackageKit transaction, after the Flatpak appstream refresh. |
 
 Tests: `rpm.rs` unit tests (catalog parsing, package ids, the merge, icon paths); `tools/nested/software-rpm-test.sh` runs the real client against `tools/nested/fake-packagekit.py` on a

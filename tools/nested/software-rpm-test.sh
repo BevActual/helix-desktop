@@ -72,4 +72,8 @@ for _ in $(seq 1 60); do grep -q '^UPDATE ' "$PK" && break; sleep 0.5; done
 grep -q '^UPDATE glibc helix-calc kernel$' "$PK" && echo "ok: one PackageKit update for everything that had one" || fail "update call: $(grep UPDATE "$PK")"
 for _ in $(seq 1 80); do has_id "pkg:helix-calc" || break; sleep 0.25; done
 has_id "pkg:helix-calc" && fail "the updated app is still listed" || echo "ok: nothing is left to update"
+echo "--- 7. sources: the enabled repositories PackageKit lists"
+click_id page-sources; sleep 1.5
+wait_id "source:rpm-fixture" && wait_id "source:rpm-fixture-extra" && echo "ok: enabled repositories are listed" || fail "repositories missing"
+has_id "source:rpm-fixture-source" && fail "a disabled repository is listed" || echo "ok: disabled repositories are left out"
 [ "$FAILED" = 0 ] && echo "PASS: software rpm" || exit 1

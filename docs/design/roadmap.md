@@ -51,7 +51,7 @@ acts on it, and a nested test asserts the exact requests sent.
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
-| Software: Fedora repositories on the Sources page, and a real install, remove and update tested with authentication on a throwaway machine | M | A Fedora VM or container with PackageKit | `software-tauri.md` "Fedora applications" |
+| Software: a real install, remove and update tested with authentication on a throwaway machine; adding and removing sources | M | A Fedora VM or container with PackageKit | `software-tauri.md` "Fedora applications" |
 | Software: add and remove sources | M | Confirmation and auth for system remotes | `software-tauri.md` |
 | System Monitor: kill and renice, behind a confirmation | M | Own-process-only rule, confirm dialog | `system-monitor-tauri.md` "v1 omissions" |
 | System Monitor: cut the bar and Control Center `sysmon` widgets over | M | Monitor model shared with the shell | `system-monitor-tauri.md` |
@@ -84,6 +84,6 @@ acts on it, and a nested test asserts the exact requests sent.
 1. Foundations, all of section 1 (a few days, unlocks everything).
 2. Sound page: biggest visible hole, no dependencies, and it exercises the page pattern the others reuse.
 3. Act loop end to end: the product bet, and it decides what the agent-facing UI work looks like.
-4. Software: Fedora repositories as sources, and a real install tested on a throwaway machine (the PackageKit backend itself is done).
+4. Software: a real install tested on a throwaway machine, then adding and removing sources.
 5. Notifications page together with its consumer, then night light, then UI scale.
 6. Greeter power actions and packaging, then shell slices and the extension design.

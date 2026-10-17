@@ -318,6 +318,14 @@ pub fn parse_package_id(id: &str, summary: &str) -> Option<PkPackage> {
     })
 }
 
+/// A repository as PackageKit lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PkRepo {
+    pub id: String,
+    pub description: String,
+    pub enabled: bool,
+}
+
 /// What a person asked for, resolved by the caller to package names.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Op {
@@ -325,6 +333,12 @@ pub enum Op {
     Remove(String),
     /// One package, or every update that is not an application (`None`).
     Update(Option<Vec<String>>),
+}
+
+/// What one transaction reported.
+struct Collected {
+    packages: Vec<PkPackage>,
+    repos: Vec<PkRepo>,
 }
 
 pub struct PackageKit {
@@ -353,7 +367,7 @@ impl PackageKit {
         start: impl FnOnce(&Proxy<'_>) -> zbus::Result<()>,
         cancel: Option<&Arc<AtomicBool>>,
         mut progress: impl FnMut(u8),
-    ) -> Result<Vec<PkPackage>, String> {
+    ) -> Result<Collected, String> {
         let root = Proxy::new(&self.connection, PK, PK_PATH, "org.freedesktop.PackageKit")
             .map_err(|e| e.to_string())?;
         let path: OwnedObjectPath = root
@@ -396,7 +410,8 @@ impl PackageKit {
             done.store(true, Ordering::SeqCst);
             return Err(clean_error(&error.to_string()));
         }
-        let (mut packages, mut error, mut exit) = (Vec::new(), String::new(), None);
+        let (mut packages, mut repos, mut error, mut exit) =
+            (Vec::new(), Vec::new(), String::new(), None);
         for message in signals.flatten() {
             let header = message.header();
             let member = header
@@ -410,6 +425,17 @@ impl PackageKit {
                         if let Some(package) = parse_package_id(&id, &summary) {
                             packages.push(package);
                         }
+                    }
+                }
+                "RepoDetail" => {
+                    if let Ok((id, description, enabled)) =
+                        body.deserialize::<(String, String, bool)>()
+                    {
+                        repos.push(PkRepo {
+                            id,
+                            description,
+                            enabled,
+                        });
                     }
                 }
                 "ItemProgress" => {
@@ -450,7 +476,7 @@ impl PackageKit {
         }
         done.store(true, Ordering::SeqCst);
         match exit {
-            Some(EXIT_SUCCESS) => Ok(packages),
+            Some(EXIT_SUCCESS) => Ok(Collected { packages, repos }),
             Some(EXIT_CANCELLED) => Err("Cancelled.".into()),
             Some(_) if !error.is_empty() => Err(clean_error(&error)),
             Some(_) => Err("PackageKit could not do that.".into()),
@@ -464,10 +490,18 @@ impl PackageKit {
             None,
             |_| {},
         )
+        .map(|c| c.packages)
+    }
+
+    /// The repositories PackageKit knows, enabled or not.
+    pub fn repos(&self) -> Result<Vec<PkRepo>, String> {
+        self.transact(|p| p.call("GetRepoList", &(0u64,)), None, |_| {})
+            .map(|c| c.repos)
     }
 
     pub fn updates(&self) -> Result<Vec<PkPackage>, String> {
         self.transact(|p| p.call("GetUpdates", &(0u64,)), None, |_| {})
+            .map(|c| c.packages)
     }
 
     /// Asks the package manager to fetch fresh repository metadata (needs the network).
@@ -479,7 +513,11 @@ impl PackageKit {
     fn resolve(&self, filter: u64, name: &str) -> Result<Vec<PkPackage>, String> {
         let names = vec![name.to_string()];
         let found = self.transact(|p| p.call("Resolve", &(filter, names)), None, |_| {})?;
-        Ok(found.into_iter().filter(|p| arch_fits(&p.arch)).collect())
+        Ok(found
+            .packages
+            .into_iter()
+            .filter(|p| arch_fits(&p.arch))
+            .collect())
     }
 
     /// Runs a change and reports its progress. Returns when PackageKit has finished.
@@ -553,12 +591,35 @@ fn clean_error(text: &str) -> String {
     text.lines().next().unwrap_or("").trim().to_string()
 }
 
+/// The repositories the Sources page lists: the enabled ones (a Fedora install has a couple of dozen more for debug and source packages, off).
+pub fn sources(repos: &[PkRepo]) -> Vec<crate::catalog::Remote> {
+    repos
+        .iter()
+        .filter(|r| r.enabled && !r.id.is_empty() && !r.id.contains('/'))
+        .map(|r| crate::catalog::Remote {
+            // Prefixed, so a Flatpak remote of the same name (Fedora has a `fedora` one too) is a different row.
+            name: format!("rpm-{}", r.id),
+            title: if r.description.is_empty() {
+                r.id.clone()
+            } else {
+                r.description.clone()
+            },
+            url: String::new(),
+            installation: "system".into(),
+            enabled: true,
+            kind: "rpm".into(),
+        })
+        .collect()
+}
+
 // ---- the catalog's state ----
 
 /// What the catalog shows: every application with whether it is installed and has an update, plus one row for the other package updates.
 pub struct RpmCatalog {
     pub packages: Vec<Package>,
     pub apps: HashMap<String, RpmApp>,
+    /// The enabled repositories, for the Sources page (filled by the caller that asked PackageKit).
+    pub sources: Vec<crate::catalog::Remote>,
 }
 
 pub fn build(apps: Vec<RpmApp>, installed: &[PkPackage], updates: &[PkPackage]) -> RpmCatalog {
@@ -616,6 +677,7 @@ pub fn build(apps: Vec<RpmApp>, installed: &[PkPackage], updates: &[PkPackage]) 
     RpmCatalog {
         packages,
         apps: by_id,
+        sources: Vec::new(),
     }
 }
 
@@ -786,6 +848,28 @@ mod tests {
     }
 
     #[test]
+    fn sources_are_the_enabled_repositories_under_their_own_names() {
+        let repo = |id: &str, description: &str, enabled: bool| PkRepo {
+            id: id.into(),
+            description: description.into(),
+            enabled,
+        };
+        let rows = sources(&[
+            repo("fedora", "Fedora 44 - x86_64", true),
+            repo("fedora-source", "Fedora 44 - Source", false),
+            repo("odd/id", "x", true),
+            repo("bare", "", true),
+        ]);
+        let names: Vec<&str> = rows.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, ["rpm-fedora", "rpm-bare"], "disabled and malformed ones are left out; the prefix keeps `fedora` apart from the Flatpak remote");
+        assert_eq!(rows[0].title, "Fedora 44 - x86_64");
+        assert_eq!(rows[1].title, "bare", "no description: the id");
+        assert!(rows
+            .iter()
+            .all(|r| r.kind == "rpm" && r.installation == "system"));
+    }
+
+    #[test]
     fn errors_lose_the_transport_prefix() {
         assert_eq!(
             clean_error("org.freedesktop.DBus.Error.Failed: Package is needed by gimp\nmore"),
@@ -814,6 +898,16 @@ mod tests {
             installed.len(),
             catalog.packages.iter().filter(|p| p.update && !p.update_only).count(),
             updates.len()
+        );
+        let repos = packagekit.repos().expect("repositories");
+        println!(
+            "{} repositories, {} enabled",
+            repos.len(),
+            sources(&repos).len()
+        );
+        assert!(
+            sources(&repos).iter().any(|r| r.name == "rpm-fedora"),
+            "the Fedora repository is listed"
         );
         assert!(!installed.is_empty(), "PackageKit lists installed packages");
         assert!(installed.iter().any(|p| p.name == "bash"));
