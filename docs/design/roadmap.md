@@ -76,7 +76,7 @@ acts on it, and a nested test asserts the exact requests sent.
 | Tier 3 (synthetic input): decide the three open questions in `synthetic-input-threat-model.md`, then build in its order (semantic AT-SPI on agent-desk windows first) | M | The person's decisions; the keyboard path in `trusted-surface.md` proven first | `synthetic-input-threat-model.md` |
 | Project knowledge: explicit notes and selected files reused across chats, with visible sources | L | Retrieval measured first | `mobius-product.md` priority 4 |
 | Read-aloud replies with playback and cancel | M | TTS engine choice | `mobius-product.md` |
-| Act: act on the eval's findings (`agent-and-inference.md`, re-measured 2026-10-16): constrain argument types in the tool grammar, and make declining reliable (the 7B acts on 6 of 10 impossible requests); re-measure with `tools/run-assistant-eval.sh`. Still unmeasured: Tools-mode planning and retrieval | M | The harness exists; a schema change | `agent-and-inference.md` |
+| Act: the eval's remaining findings (`agent-and-inference.md`): the 7B still answers a status tool for "turn off Wi-Fi" and similar; refresh the stale decline cases; then measure Tools-mode planning and retrieval, which have no evaluation yet | M | The harness exists (`tools/run-assistant-eval.sh`) | `agent-and-inference.md` |
 | Replace the llama, whisper and image C/C++ shims with Rust, or fix the boundary as permanent | L | Decision | `cpp-to-rust.md` "Next" |
 
 ## Suggested order

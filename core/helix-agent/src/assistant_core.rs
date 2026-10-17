@@ -80,7 +80,7 @@ pub fn parse_reply(text: &str) -> Reply {
 }
 
 /// Measured in the evaluation (`tests/eval/desktop_requests.json`), plus the format of a call.
-const EXAMPLES: [(&str, &str); 5] = [
+const EXAMPLES: [(&str, &str); 8] = [
     (
         "Set the log level to debug.",
         r#"{"tool":"log-level-set","args":["debug"]}"#,
@@ -101,6 +101,18 @@ const EXAMPLES: [(&str, &str); 5] = [
         "Set the output audio profile to Music.",
         r#"{"tool":"effects-profile-set","args":["output","Music"]}"#,
     ),
+    (
+        "Order me a pizza.",
+        r#"{"tool":"decline","args":[],"reason":"I can only control this desktop; I cannot order food."}"#,
+    ),
+    (
+        "Pair my phone over Bluetooth.",
+        r#"{"tool":"decline","args":[],"reason":"I can only read Bluetooth status here; I cannot pair devices."}"#,
+    ),
+    (
+        "Turn the heating up.",
+        r#"{"tool":"decline","args":[],"reason":"I can only control this desktop, not the house."}"#,
+    ),
 ];
 
 /// The conversation sent to the model: instructions and tool list, the few-shot examples, then the request.
@@ -109,7 +121,8 @@ pub fn build_messages(catalog: &str, request: &str) -> Value {
         "role": "system",
         "content": format!(
             "You control a Linux desktop. Answer with exactly one JSON tool call for the user's request, \
-             choosing the single most suitable tool. Use only these tools:\n{catalog}"
+             choosing the single most suitable tool. If no tool does what was asked, answer with decline and say why: \
+             never pick a status or read-only tool, or a different action, as a stand-in. Use only these tools:\n{catalog}"
         ),
     })];
     for (ask, answer) in EXAMPLES {
@@ -311,11 +324,39 @@ mod tests {
     fn the_prompt_carries_tools_examples_and_the_request_last() {
         let messages = build_messages("- status\n", "Turn it up.");
         let list = messages.as_array().unwrap();
-        assert_eq!(list.len(), 2 + 2 * 5);
+        assert_eq!(list.len(), 2 + 2 * EXAMPLES.len());
         assert_eq!(list[0]["role"], "system");
         assert!(list[0]["content"].as_str().unwrap().contains("- status"));
         assert_eq!(list.last().unwrap()["role"], "user");
         assert_eq!(list.last().unwrap()["content"], "Turn it up.");
+    }
+
+    #[test]
+    fn the_examples_are_valid_replies_and_none_is_an_evaluation_case() {
+        let declines = EXAMPLES
+            .iter()
+            .filter(|(_, answer)| parse_reply(answer).kind == ReplyKind::Decline)
+            .count();
+        assert!(
+            declines >= 3,
+            "the examples teach declining, not only acting"
+        );
+        for (ask, answer) in EXAMPLES {
+            assert_ne!(parse_reply(answer).kind, ReplyKind::Invalid, "{ask}");
+        }
+        // An example that is also a test case would make the measurement meaningless.
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+        for file in ["desktop_requests.json", "desktop_requests_heldout.json"] {
+            let text = std::fs::read_to_string(format!("{root}/tests/eval/{file}")).unwrap();
+            let doc: Value = serde_json::from_str(&text).unwrap();
+            for case in doc["cases"].as_array().unwrap() {
+                let request = case["request"].as_str().unwrap();
+                assert!(
+                    EXAMPLES.iter().all(|(ask, _)| *ask != request),
+                    "'{request}' is both a prompt example and a case in {file}"
+                );
+            }
+        }
     }
 
     #[test]

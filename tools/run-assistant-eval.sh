@@ -16,7 +16,7 @@ for a in "$@"; do
   if [[ "$prev" == "--json" ]]; then opts+=("$a"); prev=""; continue; fi
   case "$a" in
     --json) opts+=("$a"); prev="--json" ;;
-    --model|--limit|--min-exact) opts+=("$a"); prev="value" ;;
+    --model|--limit|--category|--min-exact) opts+=("$a"); prev="value" ;;
     --raw) opts+=("$a") ;;
     *) if [[ "$prev" == "value" ]]; then opts+=("$a"); prev=""; else files+=("$a"); fi ;;
   esac
