@@ -1,0 +1,6 @@
+# Enabled for every user when the package is installed (systemd_user_post runs `systemctl --global preset`). The panels unit is pulled in by
+# the bar, the desktop and inference services start by D-Bus activation, and the dev units are not packaged.
+enable helix-shell-strut.service
+enable helix-shell-bar.service
+enable helix-wallpaper.service
+enable helix-idle.service

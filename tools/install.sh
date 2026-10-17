@@ -10,16 +10,18 @@
 # Not touched: the compositor (tools/install-trusted-niri.sh), greetd's configuration (tools/install-greeter.sh) and the user's niri
 # configuration. For a single user from a source checkout, tools/switch-shell.sh install links the build tree instead.
 #
-#   tools/install.sh [--prefix DIR] [--destdir DIR] [--profile release|fast] [--no-build] [--services-only] [--require-session]
+#   tools/install.sh [--prefix DIR] [--destdir DIR] [--profile release|fast] [--no-build|--build-only] [--services-only] [--require-session]
 #   tools/install.sh --uninstall [--prefix DIR] [--destdir DIR]
 #
 # Defaults: prefix /usr/local, profile release. DESTDIR stages the tree instead of touching the system (packagers, tests).
+# CARGO_FLAGS adds arguments to the cargo build (a package build passes `--locked --offline`). --build-only builds and stops.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PREFIX=${PREFIX:-/usr/local}
 DESTDIR=${DESTDIR:-}
 PROFILE=release
 BUILD=1
+BUILD_ONLY=0
 UNINSTALL=0
 SESSION=1
 REQUIRE=0
@@ -29,10 +31,11 @@ while [ $# -gt 0 ]; do
     --destdir)  DESTDIR=${2:?--destdir needs a directory}; shift 2 ;;
     --profile)  PROFILE=${2:?--profile needs release or fast}; shift 2 ;;
     --no-build) BUILD=0; shift ;;
+    --build-only) BUILD_ONLY=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     --services-only) SESSION=0; shift ;;
     --require-session) REQUIRE=1; shift ;;
-    -h|--help)  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)  sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "install.sh: unknown argument $1" >&2; exit 2 ;;
   esac
 done
@@ -72,7 +75,13 @@ if [ "$BUILD" = 1 ]; then
   command -v cargo >/dev/null || { echo "install.sh: cargo not found" >&2; exit 1; }
   packages="-p helix-desktop -p helix-assistant -p helix-inference -p helix-system-upgrade"
   if [ "$SESSION" = 1 ]; then for pkg in $SESSION_PKGS; do packages="$packages -p $pkg"; done; fi
-  (cd "$ROOT" && cargo build --profile "$PROFILE" $packages)
+  # shellcheck disable=SC2086
+  (cd "$ROOT" && cargo build --profile "$PROFILE" ${CARGO_FLAGS:-} $packages)
+fi
+if [ "$BUILD_ONLY" = 1 ]; then
+  [ "$BUILD" = 1 ] || { echo "install.sh: --build-only and --no-build contradict each other" >&2; exit 2; }
+  echo "built into $OUT"
+  exit 0
 fi
 for bin in helix-desktop helix-assistant helix-inference helix-system-upgrade; do
   [ -x "$OUT/$bin" ] || { echo "install.sh: $OUT/$bin is missing (build it, or drop --no-build)" >&2; exit 1; }
