@@ -1,4 +1,5 @@
 import { Chart, parseChart } from "./chart";
+import { ArtifactCard } from "./workpanel";
 import { FlowDiagram, parseDiagram } from "./diagram";
 import { Ephemeral, parseUi } from "./ephemeral";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -71,6 +72,8 @@ export interface ThreadHooks {
   quote: (text: string) => void;
   fork: (index: number) => void;
   report: (error: unknown) => void;
+  /** Puts a document the reply wrote on the stage. */
+  stage: (title: string, body: string) => void;
   /** Sends this text as the next message (what the person chose or filled in on a piece of ephemeral UI). */
   send: (text: string) => void;
   /** Asks the shell to write this task's previous value back. */
@@ -156,7 +159,7 @@ function ChangesCard({ activity, streaming, hooks }: { activity: { id: string; i
   </section>;
 }
 
-function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void }) {
+function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, onStage, writing }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void; onStage?: (title: string, body: string) => void; writing?: boolean }) {
   return (
     <>
       {blocks.map((block, index) => {
@@ -220,6 +223,8 @@ function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend }: { block
           case "code": {
             const chart = block.language === "chart" ? parseChart(block.text) : null;
             if (chart) return <Chart key={index} spec={chart} />;
+            const artifactTitle = /^artifact:/i.test(block.language) ? block.language.replace(/^artifact:\s*/i, "").trim() : "";
+            if (artifactTitle) return <ArtifactCard key={index} title={artifactTitle} body={block.text} writing={!!writing} onOpen={() => onStage?.(artifactTitle, block.text)} />;
             const flow = block.language === "diagram" ? parseDiagram(block.text) : null;
             if (flow) return <FlowDiagram key={index} diagram={flow} />;
             const ui = block.language === "ui" ? parseUi(block.text) : null;
@@ -350,7 +355,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
                 <div className="tool-heading"><strong>{({ planning: "Choosing next step", web_search: "Search the web", web_read: "Read a page", terminal: "Project command", answer: "Write answer", edit_file: "Edit a file" } as Record<string, string>)[activity.tool] || activity.tool}</strong><span>{activity.state === "waiting" ? "Needs your review" : activity.state}</span></div>
                 {activity.state === "waiting" ? <>{activity.tool === "edit_file" ? <Diff text={activity.input} testId="tool-command" /> : <pre data-test="tool-command">{activity.input}</pre>}<p className="sheet-note">{activity.output}</p><div className="tool-review"><button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : "Allow lookup"}</button><button data-test="tool-decline" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: false }).catch(hooks.report)}>Skip</button></div></> : (activity.input || activity.output) && <><details open={activity.tool === "edit_file" || (activity.state === "running" && activity.tool === "terminal")}><summary>Details</summary>{activity.input && (activity.tool === "edit_file" ? <Diff text={activity.input} /> : <pre>{activity.input}</pre>)}{activity.output && <pre>{activity.output}</pre>}</details>{activity.tool === "edit_file" && activity.state === "completed" && <button type="button" className="mini" data-test="tool-undo-edit" disabled={streaming} onClick={() => invoke("tools_undo_edit", { activityId: activity.id }).catch(hooks.report)}>Undo edit</button>}</>}
               </div>)}</section>}
-              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} />
+              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} onStage={hooks.stage} writing={last && streaming} />
               {!!message.sources?.length && <section className="answer-web-sources" data-test="answer-web-sources" aria-label="Online sources provided to the model"><strong>Online sources</strong>{message.sources.map((source, i) => <div key={`${i}:${source.url}`}><button type="button" className="web-citation" data-test={`answer-source-${index}-${i}`} title={source.url} onClick={() => invoke("web_open_source", { url: source.url }).catch(hooks.report)}>[{i + 1}] {source.title || source.url}</button><span>{source.kind === "page" ? "Page excerpt" : `Search snippet${source.provider ? ` · ${source.provider}` : ""}`} · retrieved {new Date(source.fetched * 1000).toLocaleDateString()}</span></div>)}</section>}
               {last && streaming && messages[index - 1]?.text.startsWith("/image ") && !messages[index - 1]?.sources?.length && <div className="image-progress" data-test="image-generation-progress"><p>{progress.stage}</p><progress value={Number.isFinite(progress.fraction) ? Math.max(0, Math.min(1, progress.fraction)) : 0} max={1} /><p className="sheet-note">On this computer · use Stop to cancel</p></div>}
               {!blocks.length && !message.activities?.some((activity) => activity.state === "waiting" || activity.state === "running") ? (

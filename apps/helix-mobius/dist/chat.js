@@ -372,7 +372,12 @@ function clearAttachments() {
 }
 
 function attachmentPayload() {
-  return pendingAttachments.map((a) => ({ name: a.name, content: a.content, original_chars: a.original_chars }));
+  const files = pendingAttachments.map((a) => ({ name: a.name, content: a.content, original_chars: a.original_chars }));
+  if (stageOpen && stageAttach && stageOpen.text.trim()) {
+    const text = stageOpen.text;
+    files.unshift({ name: `${stageOpen.title} (the open document)`, content: Array.from(text).slice(0, 6000).join(""), original_chars: Array.from(text).length });
+  }
+  return files;
 }
 
 function openFindBar() {
@@ -1090,7 +1095,7 @@ listen("chat-view", (event) => {
   const key = `${view.id}|${view.route_backend || ""}|${view.route_model || ""}`;
   if (key !== routeKey) { routeKey = key; refreshRoute(); }
   drawChat();
-  if (wasStreaming && !view.streaming) flushQueue();
+  if (wasStreaming && !view.streaming) { recordArtifacts(); flushQueue(); }
 });
 listen("chat-stream", (event) => {
   if (reactThread) {
@@ -1161,6 +1166,7 @@ const reactThread = window.HelixMobiusReact
   ? window.HelixMobiusReact.thread($("messages"), {
     edit: (index, text) => editUserMessage(index, text),
     act: (text) => actOnDesktop(text),
+    stage: (title, body) => reactStage?.open(title, body),
     quote: (text) => {
       const prefix = input.value && !input.value.endsWith("\n") ? "\n\n" : "";
       input.value = input.value + prefix + text;
@@ -2588,6 +2594,32 @@ function paletteItems(query) {
   act("fork", "Fork this chat", "Continue from here in a new chat", "Ctrl+Shift+F", () => forkChat());
   SLASH_COMMANDS.filter((c) => ["/image", "/web", "/attach", "/tools"].includes(c.cmd)).forEach((c) => act("slash" + c.cmd, c.cmd.slice(1)[0].toUpperCase() + c.cmd.slice(2) + "…", c.desc, c.cmd, () => { input.focus(); input.value = c.cmd + " "; grow(); syncSendEnabled(); }));
   return rows;
+}
+
+// The stage (docs/design/mobius-workspaces.md): the open document goes to the model with the next message, as a chip that can be dropped.
+let stageOpen = null;      // { title, text } while a document is open
+let stageAttach = true;    // whether it is sent with the next message
+function drawStageChip() {
+  const chip = $("stage-chip");
+  chip.hidden = !stageOpen;
+  document.body.classList.toggle("stage-open", !!stageOpen);
+  if (!stageOpen) return;
+  chip.textContent = stageAttach ? `${stageOpen.title} · sent with your message ×` : `${stageOpen.title} · not sent (click to send)`;
+  chip.classList.toggle("off", !stageAttach);
+}
+$("stage-chip").onclick = () => { stageAttach = !stageAttach; drawStageChip(); };
+const reactStage = window.HelixMobiusReact?.stage($("stage-host"), {
+  chatId: () => view.id,
+  report: (error) => report(error),
+  changed: (open) => { if (!stageOpen && open) stageAttach = true; stageOpen = open; drawStageChip(); },
+});
+// A reply that wrote documents: keep each as a version, then show the newest text if that document is open.
+async function recordArtifacts() {
+  const last = view.messages[view.messages.length - 1];
+  if (!last || last.role !== "assistant" || !view.id) return;
+  const found = [...last.text.matchAll(/```artifact:([^\n]+)\n([\s\S]*?)```/g)];
+  for (const m of found) await invoke("stage_record", { chatId: view.id, title: m[1].trim(), body: m[2].replace(/\n$/, ""), by: "model" }).catch(() => undefined);
+  if (found.length) reactStage?.refresh();
 }
 const reactPalette = window.HelixMobiusReact?.palette($("palette-host"), {
   items: (query) => paletteItems(query),
