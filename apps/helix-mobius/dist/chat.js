@@ -1802,9 +1802,8 @@ document.addEventListener("keydown", (event) => {
   }
   if (meta && event.key.toLowerCase() === "k") {
     event.preventDefault();
-    openSideDrawer();
-    $("chat-search").focus();
-    $("chat-search").select();
+    if (reactPalette) reactPalette.open();
+    else { openSideDrawer(); $("chat-search").focus(); $("chat-search").select(); }
   }
   if (meta && event.shiftKey && event.key.toLowerCase() === "c") {
     event.preventDefault();
@@ -2567,5 +2566,34 @@ window.addEventListener("focus", refreshAgentDeskGlance);
 
 const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
 const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
+// The command palette (Ctrl+K): chats, commands, modes and models in one box.
+function paletteItems(query) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const match = (text) => words.every((w) => text.toLowerCase().includes(w));
+  const rows = [];
+  chatItems.filter((c) => match(c.title + " " + (c.project || ""))).slice(0, words.length ? 6 : 5).forEach((c) => rows.push({
+    id: "chat:" + c.id, section: "Chats", title: c.title, sub: c.project || (c.pinned ? "Pinned" : ""), run: () => invoke("chat_open", { id: c.id }).then(() => { clearAttachments(); input.focus(); }).catch(report),
+  }));
+  const act = (id, title, sub, hint, run) => { if (match(title + " " + sub)) rows.push({ id, section: "Do", title, sub, hint, run }); };
+  act("new", "New chat", "", "Ctrl+N", () => $("new-chat").click());
+  act("temp", "Temporary chat", "Not saved", "Ctrl+Shift+N", () => $("temp-chat").click());
+  act("mode-ask", "Mode: Ask", "Chat only", "", () => setComposerMode("ask"));
+  act("mode-tools", "Mode: Tools", "Research and project commands, each step reviewed", "", () => setComposerMode("tools"));
+  act("mode-act", "Mode: Act", "Do the next message on the desktop", "", () => setComposerMode("act"));
+  act("model", "Choose model", "This chat's model", "", () => $("meta-model").click());
+  act("routing", "Models & routing", "", "Ctrl+M", () => openRouting().catch(report));
+  act("memory", "Memory", "What Mobius remembers", "", () => reactMemory?.open());
+  act("find", "Find in this chat", "", "Ctrl+F", () => openFindBar());
+  act("export", "Export this chat", "Markdown", "Ctrl+Shift+C", () => $("export-chat").click());
+  act("fork", "Fork this chat", "Continue from here in a new chat", "Ctrl+Shift+F", () => forkChat());
+  SLASH_COMMANDS.filter((c) => ["/image", "/web", "/attach", "/tools"].includes(c.cmd)).forEach((c) => act("slash" + c.cmd, c.cmd.slice(1)[0].toUpperCase() + c.cmd.slice(2) + "…", c.desc, c.cmd, () => { input.focus(); input.value = c.cmd + " "; grow(); syncSendEnabled(); }));
+  return rows;
+}
+const reactPalette = window.HelixMobiusReact?.palette($("palette-host"), {
+  items: (query) => paletteItems(query),
+  openChat: (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report),
+  newChatWith: (text) => invoke("chat_new").then(() => { input.value = text; grow(); syncSendEnabled(); input.focus(); }).catch(report),
+});
+
 $("meta-tools").onclick = () => reactTools?.open(view);
 $("meta-agent-desk").onclick = () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report);
