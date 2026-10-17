@@ -47,6 +47,7 @@ pick mobius-title   && run mobius-title mobius-title-test.sh mobius-nested.sh "H
 pick mobius-queue   && run mobius-queue mobius-queue-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=600
 pick mobius-mode    && run mobius-mode mobius-mode-test.sh mobius-nested.sh "$WIDE"
 pick mobius-mention && run mobius-mention mobius-mention-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+pick mobius-chart   && run mobius-chart mobius-chart-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is the data.\n\n```chart\n{"type":"bar","title":"Sales by quarter","labels":["Q1","Q2","Q3","Q4"],"values":[3,5,4,8]}\n```\n\n```chart\n{"type":"line","title":"Two series","labels":["Mon","Tue","Wed"],"series":[{"name":"a","values":[1,3,2]},{"name":"b","values":[2,2,4]}]}\n```\n\n```chart\n{"type":"pie","title":"Share","data":[["Rent",50],["Food",30],["Other",20]]}\n```\n\n```chart\nnot json\n```\n'
 pick mobius-hint    && run mobius-hint mobius-hint-test.sh mobius-nested.sh "$WIDE" "HELIX_EMBED_DIR=${HELIX_EMBED_DIR:-$HOME/.cache/helix-experiments/embed/bge-small-en-v1.5}"
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
