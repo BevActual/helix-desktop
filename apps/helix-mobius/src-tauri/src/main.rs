@@ -1311,6 +1311,93 @@ async fn web_answer(
     dispatch_turn(app, turn).await
 }
 
+/// One row of the composer's `@` picker: a file in the chat's project folder, or another chat.
+#[derive(Serialize)]
+struct Mention {
+    kind: &'static str,
+    key: String,
+    title: String,
+    detail: String,
+}
+
+#[tauri::command]
+fn mentions_search(app: AppHandle, query: String) -> Vec<Mention> {
+    let (workspace, current) = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        (
+            state.chat.conversation.workspace.clone(),
+            state.chat.conversation.id.clone(),
+        )
+    };
+    let mut out = Vec::new();
+    if !workspace.is_empty() {
+        let root = std::path::Path::new(&workspace);
+        for (rel, path) in attach::find_files(root, &query, 6) {
+            out.push(Mention {
+                kind: "file",
+                key: path.display().to_string(),
+                title: rel.rsplit('/').next().unwrap_or(&rel).to_string(),
+                detail: rel,
+            });
+        }
+    }
+    let needle = query.to_lowercase();
+    for chat in summaries()
+        .into_iter()
+        .filter(|c| c.id != current)
+        .filter(|c| {
+            needle.is_empty()
+                || c.title.to_lowercase().contains(&needle)
+                || c.preview.to_lowercase().contains(&needle)
+        })
+        .take(4)
+    {
+        out.push(Mention {
+            kind: "chat",
+            key: chat.id,
+            title: chat.title,
+            detail: "Chat".into(),
+        });
+    }
+    out
+}
+
+#[tauri::command]
+fn mentions_resolve(app: AppHandle, kind: String, key: String) -> Result<attach::Attachment, String> {
+    match kind.as_str() {
+        "file" => {
+            let workspace = {
+                let shared = shared(&app);
+                let state = shared.lock().expect("state");
+                state.chat.conversation.workspace.clone()
+            };
+            if workspace.is_empty() {
+                return Err("This chat has no project folder. Set one in the mode menu.".into());
+            }
+            attach::read_inside(std::path::Path::new(&workspace), &key)
+        }
+        "chat" => {
+            let chat = load(&key).ok_or("That chat could not be opened.")?;
+            let transcript = chat
+                .messages
+                .iter()
+                .map(|m| {
+                    let who = if matches!(m.role, helix_chat::chat::Role::User) {
+                        "Person"
+                    } else {
+                        "Assistant"
+                    };
+                    format!("{who}: {}", m.text)
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            Ok(attach::chat_text(&chat.id, &chat.title, &transcript))
+        }
+        _ => Err("Unknown mention.".into()),
+    }
+}
+
 #[tauri::command]
 async fn chat_pick_attachments() -> Result<attach::Selection, String> {
     tauri::async_runtime::spawn_blocking(attach::pick_and_read)
@@ -2853,6 +2940,8 @@ fn main() {
             chat_status,
             chat_send,
             chat_pick_attachments,
+            mentions_search,
+            mentions_resolve,
             tools_pick_folder,
             tools_configure,
             tools_open_desk_terminal,

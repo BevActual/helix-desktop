@@ -77,9 +77,38 @@ From Cursor's documentation and reviews of Cursor 2.0 (I could not run Cursor he
 ### Order
 
 1. **Mode control**: done. A chip beside Send (Ask, Tools, Act) opens a menu; Shift+Tab cycles. Tools is the chat's own setting; Act is for the next message only, then the composer returns to what it was. The folder chip shows only while Tools are on; "Project folder…" is in the menu. `tools/nested/mobius-mode-test.sh`; the act and tools suites now switch mode first. Menus now stay inside the window (the mode menu ran off the right edge).
-2. **`@` pills and the context ring** (shows what the model sees; the ring needs the loaded model's window from the inference service).
+2. **`@` pills**: done. Typing `@` before a word offers files from the chat's project folder (a bounded walk: text extensions only, no hidden or build folders, kept inside the folder, secrets refused as for any attachment) and other chats; choosing one adds a chip, the same chip as a picked file, which previews and removes. `tools/nested/mobius-mention-test.sh`. **The context ring** is still to do: it needs the loaded model's window from the inference service.
 3. **Checkpoints and the Changes panel** (trust in Tools and Act; needs the agent-desk snapshot).
 4. **Running indicators, `/side`, Plan**.
 5. **Auto with the decision lane**, which needs the `Embed` call.
 
 Not taken: cloud-first model pricing and usage pools; many cloud agents in worktrees (Mobius is one person's assistant on one computer); anything that sends text off the computer by default.
+
+
+## Other platforms, and tools (2026-10-17, from their documentation and reviews)
+
+What each does that a local, private desktop assistant could use, and what we leave.
+
+| Source | What it does | For Helix |
+|---|---|---|
+| **LM Studio** | A built-in model browser that says whether a model fits the GPU's memory | The library lists size already; add **"fits / tight / too big"** against the free VRAM and RAM, and the tokens per second measured on this machine once a model has run. Easy switching between local models starts with knowing what will run. |
+| **Jan** | Conversations in a sidebar, model switching, project files indexed for questions, no telemetry | Matches Mobius (projects, per-chat model). Its indexing of a project folder is the retrieval row in `mobius-product.md`; do it with measured recall first. |
+| **Open WebUI / Ollama** | A server with a UI on top; models pulled by name; many connections | Helix has the service and the library. Not a model to follow; the lesson is that "add a model by name or URL" belongs in the library's first screen. |
+| **Raycast AI** | **Presets** (model, instructions, creativity and tools in one named thing, with a shared directory); **tools as `@` mentions** inside a message; **Quick AI** for a one-off question that continues in the chat | Mobius personas are close to presets: add the model and Tools mode to a persona so one click gives "Code reviewer on the 7B with the project folder". Tools as `@` mentions (`@web`, `@desktop`) would unify `@` with Tools and Act. A quick answer in the launcher that **opens in Mobius to continue** is a small bridge between the two. |
+| **Zed** | The agent panel next to the editor; **changes reviewed in one view with accept or reject per hunk**; an open protocol (ACP) so any agent can use its UI | The Changes panel (next on the list) should accept or reject per file and per hunk. The protocol idea matters: an agent from another program using Mobius's surface is the shape of Agent Surface already. |
+| **Warp** | Notifies you, in the app and on the desktop, when an agent needs approval, review or help | The shell's notifications already exist: an approval waiting for an agent task that is not on screen should raise one, with the action in it. |
+| **GNOME HIG, libadwaita** | Adaptive layouts (one design from phone to desktop width), patterns shown in a demo app rather than rules | Mobius's chat list already collapses below 720 px; every app should be looked at at that width (the nested harness cannot yet set it, see "Seen, not changed") and at the light theme. |
+
+### Tools worth researching (what an assistant could call)
+
+* **MCP (Model Context Protocol) servers**: the common way to give an assistant tools (files, git, browser, calendars). Helix has its own tool tiers, grants and confirmer; MCP would be one more source of tools behind the same grants, local servers only, each shown by name in the Tools sheet. The risk to design first: a tool's description is text the model reads, so a server can steer it (the synthetic-input threat model's lesson).
+* **ACP (Agent Client Protocol)**: an agent in its own process, the UI as a client. Worth reading whether Mobius could host Claude Code or another agent in a chat, with Helix's approvals in front.
+* **Whisper-class dictation and local TTS** (Mobius has dictation; read-aloud is open in `mobius-product.md`).
+* **Local retrieval** (embedding search over a project folder or all chats): the nomic embedder in `decision-model.md` is the same piece, so one `Embed` call serves routing, `@` search by meaning and project knowledge.
+
+### Order of the next work
+
+1. `Embed` in the inference service (routing, `@` by meaning, retrieval share it).
+2. Context ring, Changes panel with per-hunk accept, checkpoints.
+3. Model library: fits-on-this-machine, measured speed, add by name.
+4. Persona as preset (model plus Tools plus folder).

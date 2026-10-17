@@ -126,7 +126,7 @@ const reactChips = window.HelixMobiusReact
   : null;
 let slashShown = [];
 const reactSlash = window.HelixMobiusReact
-  ? window.HelixMobiusReact.slash($("slash-menu"), (index) => { if (slashShown[index]) runSlash(slashShown[index]); })
+  ? window.HelixMobiusReact.slash($("slash-menu"), (index) => { if (mentionRows.length) pickMention(mentionRows[index]); else if (slashShown[index]) runSlash(slashShown[index]); })
   : null;
 
 function drawAttachChips() {
@@ -551,6 +551,62 @@ function showSlashMenu(filter) {
     host.append(row);
   });
   host.hidden = false;
+}
+
+
+// `@` in the composer: a word starting with @ before the caret offers files from the chat's project folder and other chats. Choosing one
+// attaches it as a chip (the same chips as a picked file), so what the model sees stays visible and removable.
+let mentionRows = [];
+let mentionToken = null;
+let mentionSeq = 0;
+function mentionAtCaret() {
+  const caret = input.selectionStart ?? input.value.length;
+  const before = input.value.slice(0, caret);
+  const found = /(^|\s)@([^\s@]*)$/.exec(before);
+  return found ? { start: caret - found[2].length - 1, end: caret, query: found[2] } : null;
+}
+function hideMentions() {
+  if (!mentionRows.length && !mentionToken) return;
+  mentionRows = [];
+  mentionToken = null;
+  hideSlashMenu();
+}
+function drawMentions() {
+  slashIndex = Math.max(0, Math.min(slashIndex, mentionRows.length - 1));
+  slashShown = [];
+  if (reactSlash) reactSlash.set(mentionRows.map((row) => ({ cmd: (row.kind === "chat" ? "Chat · " : "") + row.title, desc: row.detail })), slashIndex);
+  $("slash-menu").hidden = !mentionRows.length;
+}
+function maybeMentionFromInput() {
+  const token = mentionAtCaret();
+  if (!token || input.value.startsWith("/")) { hideMentions(); return false; }
+  mentionToken = token;
+  const seq = ++mentionSeq;
+  invoke("mentions_search", { query: token.query }).then((rows) => {
+    if (seq !== mentionSeq || !mentionToken) return;
+    mentionRows = rows;
+    if (!rows.length) { $("slash-menu").hidden = true; return; }
+    slashIndex = 0;
+    drawMentions();
+  }).catch(() => hideMentions());
+  return true;
+}
+function pickMention(row) {
+  const token = mentionToken || mentionAtCaret();
+  hideMentions();
+  if (token) {
+    input.value = (input.value.slice(0, token.start) + input.value.slice(token.end)).replace(/ {2,}/g, " ");
+    input.setSelectionRange(token.start, token.start);
+    grow(); syncSendEnabled();
+  }
+  invoke("mentions_resolve", { kind: row.kind, key: row.key }).then((file) => {
+    if (pendingAttachments.some((a) => a.path === file.path)) return;
+    if (pendingAttachments.length >= attachmentMaxFiles) { report(`A message can include up to ${attachmentMaxFiles} files.`); return; }
+    pendingAttachments.push(file);
+    drawAttachChips();
+    syncSendEnabled();
+    input.focus();
+  }).catch(report);
 }
 
 function runSlash(item) {
@@ -1399,7 +1455,7 @@ function grow() {
 }
 input.addEventListener("input", () => {
   grow();
-  maybeSlashFromInput();
+  if (!maybeSlashFromInput()) maybeMentionFromInput();
   if (promptHistoryIndex >= 0 && input.value !== promptHistory[promptHistoryIndex]) {
     promptHistoryIndex = -1;
     promptDraft = "";
@@ -1411,6 +1467,16 @@ input.addEventListener("keydown", (event) => {
     const order = ["ask", "tools", "act"];
     setComposerMode(order[(order.indexOf(composerMode()) + 1) % order.length]);
     return;
+  }
+  if (mentionRows.length && !$("slash-menu").hidden) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      slashIndex = (slashIndex + (event.key === "ArrowDown" ? 1 : mentionRows.length - 1)) % mentionRows.length;
+      drawMentions();
+      return;
+    }
+    if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); pickMention(mentionRows[slashIndex]); return; }
+    if (event.key === "Escape") { event.preventDefault(); hideMentions(); return; }
   }
   const slashOpen = !$("slash-menu").hidden;
   if (slashOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {

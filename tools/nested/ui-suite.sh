@@ -46,6 +46,7 @@ pick settings-sound && run settings-sound settings-sound-test.sh settings-fake-n
 pick mobius-title   && run mobius-title mobius-title-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_AUTO_TITLE=1 "HELIX_FAKE_REPLY=Cron versus systemd timers"
 pick mobius-queue   && run mobius-queue mobius-queue-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=600
 pick mobius-mode    && run mobius-mode mobius-mode-test.sh mobius-nested.sh "$WIDE"
+pick mobius-mention && run mobius-mention mobius-mention-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
