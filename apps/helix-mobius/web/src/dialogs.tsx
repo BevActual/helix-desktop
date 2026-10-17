@@ -20,7 +20,7 @@ export interface LabView {
 /** The symbols a persona may pick from (must match `ICONS` in helix-chat). */
 const ICONS = ["sparkle", "music", "palette", "fork", "clipboard", "eye", "shield", "sun", "moon", "bolt", "pin", "image", "folder", "lock"];
 interface PersonaStore { active: string; personas: Persona[]; }
-interface Route { backend?: string; model?: string; label?: string; }
+interface Route { backend?: string; model?: string; label?: string; own?: boolean; }
 
 export interface DialogHooks {
   report: (error: unknown) => void;
@@ -40,7 +40,7 @@ export interface DialogHandle {
   openPersona: (create?: boolean) => void;
   openEdit: (index: number, text: string) => void;
   /** A small menu above an anchor: the persona list or the style list. */
-  openMenu: (kind: "persona" | "style", anchor: { left: number; top: number; width: number }) => void;
+  openMenu: (kind: "persona" | "style" | "model", anchor: { left: number; top: number; width: number }) => void;
 }
 
 function initials(name: string): string {
@@ -99,7 +99,9 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
     readLab();
     return () => { stops.forEach((stop) => stop.then((fn) => fn())); };
   }, [readLab]);
-  const [menu, setMenu] = useState<{ kind: "persona" | "style"; left: number; top: number; width: number } | null>(null);
+  const [menu, setMenu] = useState<{ kind: "persona" | "style" | "model"; left: number; top: number; width: number } | null>(null);
+  // What the model menu lists: the installed models with their friendly names, and where the chat is routed now.
+  const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[] }>; route: Route | null } | null>(null);
   useEffect(() => {
     if (!menu) return;
     const close = (event: Event) => {
@@ -172,6 +174,22 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
     setSheet("persona");
   };
 
+  const openModelSheet = async () => {
+    try {
+      const route = await invoke<Route>("chat_current_route");
+      const model = route?.model || "";
+      const which = route?.backend || "local";
+      setCurrent(model);
+      setCustom(model);
+      setBackend(which);
+      setBackends((old) => (old.some((entry) => entry.value === which) ? old : [...old, { value: which, label: route?.label || which }]));
+      await loadModels(which);
+      setSheet("model");
+    } catch (error) {
+      report(error);
+    }
+  };
+
   useEffect(() => {
     register({
       openRename: (value) => { setTitle(value || "New chat"); setSheet("rename"); },
@@ -181,27 +199,35 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         invoke<LabView>("lab_get").then((view) => setProjectText(view.project_instructions || ""), () => setProjectText(""));
         setSheet("project");
       },
-      openMenu: (kind, anchor) => setMenu({ kind, ...anchor }),
+      openMenu: (kind, anchor) => {
+        if (kind !== "model") { setMenu({ kind, ...anchor }); return; }
+        Promise.all([
+          invoke<string[]>("routing_list_models").catch(() => [] as string[]),
+          invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[] }[]>("library_list").catch(() => []),
+          invoke<Route>("chat_current_route").catch(() => null),
+        ]).then(([models, cards, route]) => {
+          const byFile: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[] }> = {};
+          cards.filter((card) => card.installed).forEach((card) => { byFile[card.file] = card; });
+          setPicker({ models: Array.isArray(models) ? models : [], cards: byFile, route });
+          setMenu({ kind, ...anchor });
+        });
+      },
       openPersona,
       openEdit: (index, text) => { setEditIndex(index); setEditText(text); setSheet("edit"); },
-      openModel: async () => {
-        try {
-          const route = await invoke<Route>("chat_current_route");
-          const model = route?.model || "";
-          const which = route?.backend || "local";
-          setCurrent(model);
-          setCustom(model);
-          setBackend(which);
-          setBackends((old) => (old.some((entry) => entry.value === which) ? old : [...old, { value: which, label: route?.label || which }]));
-          await loadModels(which);
-          setSheet("model");
-        } catch (error) {
-          report(error);
-        }
-      },
+      openModel: () => openModelSheet(),
     });
   });
 
+  /** Switching in the menu applies at once, on this computer: the next message goes to that model. */
+  const useLocalModel = async (model: string) => {
+    setMenu(null);
+    try {
+      await invoke("chat_set_route", { backend: "local", model });
+      hooksRef.current.routeChanged("local", model);
+    } catch (error) {
+      report(error);
+    }
+  };
   const pickBackend = (which: string) => {
     setBackend(which);
     loadModels(which);
@@ -254,7 +280,42 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
       {menu
         ? createPortal(
             <div className="hx-menu" data-test={`menu-${menu.kind}`} style={{ left: menu.left, bottom: window.innerHeight - menu.top + 6, minWidth: Math.max(220, menu.width) }} role="menu">
-              {menu.kind === "persona" ? (
+              {menu.kind === "model" ? (
+                <>
+                  <div className="hx-menu-label">Model</div>
+                  {picker?.route && picker.route.backend !== "local" ? (
+                    <button className="hx-menu-item current" role="menuitemradio" aria-checked data-test="menu-model-remote" onClick={() => setMenu(null)}>
+                      <span className="mi-text"><span className="mi-title">{picker.route.model || "Auto"}</span><span className="mi-sub">{picker.route.label || picker.route.backend} · not on this computer</span></span>
+                      <span className="mi-check">✓</span>
+                    </button>
+                  ) : null}
+                  <button className={`hx-menu-item${picker?.route?.backend === "local" && !picker.route.model ? " current" : ""}`} role="menuitemradio" aria-checked={picker?.route?.backend === "local" && !picker.route.model} data-test="menu-model-auto" onClick={() => useLocalModel("")}>
+                    <span className="mi-text"><span className="mi-title">Auto</span><span className="mi-sub">The service picks, and keeps the model already loaded</span></span>
+                    {picker?.route?.backend === "local" && !picker.route.model ? <span className="mi-check">✓</span> : null}
+                  </button>
+                  {(picker?.models ?? []).map((id) => {
+                    const info = picker?.cards[id];
+                    const on = picker?.route?.backend === "local" && picker.route.model === id;
+                    return (
+                      <button key={id} className={`hx-menu-item${on ? " current" : ""}`} role="menuitemradio" aria-checked={on} data-test={`menu-model-${id}`} onClick={() => useLocalModel(id)}>
+                        <span className="mi-text">
+                          <span className="mi-title">{info?.title || id}</span>
+                          <span className="mi-sub">{info ? `${(info.bytes / 1e9).toFixed(1)} GB${info.vision ? " · sees pictures" : ""}${info.tasks.includes("code") ? " · code" : ""} · ` : ""}{info?.loaded ? "ready now" : "loads on first use"}</span>
+                        </span>
+                        {on ? <span className="mi-check">✓</span> : null}
+                      </button>
+                    );
+                  })}
+                  {picker?.route?.own ? (
+                    <button className="hx-menu-item" data-test="menu-model-default" onClick={() => { setMenu(null); invoke("chat_use_default_route").then(() => window.dispatchEvent(new CustomEvent("mobius-route-changed")), report); }}>
+                      <span className="mi-text"><span className="mi-title">Use the default model</span><span className="mi-sub">This chat follows Models &amp; routing again</span></span>
+                    </button>
+                  ) : null}
+                  <div className="hx-menu-sep" />
+                  <button className="hx-menu-item" data-test="menu-model-more" onClick={() => { setMenu(null); openModelSheet(); }}><span className="mi-text"><span className="mi-title">Other backends and custom ids…</span></span></button>
+                  <button className="hx-menu-item" data-test="menu-model-routing" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models")); }}><span className="mi-text"><span className="mi-title">Models &amp; routing…</span></span></button>
+                </>
+              ) : menu.kind === "persona" ? (
                 <>
                   <div className="hx-menu-label">Persona</div>
                   {store.personas.map((p, index) => (

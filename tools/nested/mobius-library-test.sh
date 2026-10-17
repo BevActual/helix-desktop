@@ -17,8 +17,8 @@ PY
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
 has_id attach-picture && echo "ok: the composer has a picture button" || fail "no picture button"
 click_id meta-model; sleep 1.2
-has_id model-browse && echo "ok: the picker links to the library" || fail "no library link in the picker"
-click_id model-browse; sleep 1.5
+has_id menu-model-routing && echo "ok: the model menu links to Models & routing" || fail "no routing link in the model menu"
+click_id menu-model-routing; sleep 1.5
 has_id models-nav-local && echo "ok: the library opened from the picker" || fail "the library did not open"
 click_id models-nav-local; sleep 1.5
 shot library

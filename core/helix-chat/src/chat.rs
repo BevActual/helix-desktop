@@ -200,6 +200,10 @@ pub struct Conversation {
     pub brief: String,
     pub tools_enabled: bool,
     pub workspace: String,
+    /// The backend and model this chat was set to (a backend id such as `local`, and a model id; both empty = the default routing). Chosen
+    /// from the model menu, so one chat can use a different model from another.
+    pub route_backend: String,
+    pub route_model: String,
     /// Desktop tasks handed over from this chat (Act), oldest first. Not messages: see [`DesktopTask`].
     pub tasks: Vec<DesktopTask>,
 }
@@ -365,6 +369,8 @@ impl Conversation {
             brief: String::new(),
             tools_enabled: false,
             workspace: String::new(),
+            route_backend: String::new(),
+            route_model: String::new(),
             tasks: Vec::new(),
         })
     }
@@ -621,6 +627,8 @@ impl Conversation {
         next.brief = self.brief.clone();
         next.tools_enabled = self.tools_enabled;
         next.workspace = self.workspace.clone();
+        next.route_backend = self.route_backend.clone();
+        next.route_model = self.route_model.clone();
         if self.messages.is_empty() {
             next.title = "Forked chat".into();
             next.project = self.project.clone();
@@ -674,6 +682,8 @@ impl Conversation {
             "brief": self.brief,
             "tools_enabled": self.tools_enabled,
             "workspace": self.workspace,
+            "route_backend": self.route_backend,
+            "route_model": self.route_model,
             "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text, "images": m.images, "sources": m.sources, "activities": m.activities, "stats": m.stats})).collect::<Vec<_>>(),
             "tasks": self.tasks.iter().map(|t| json!({"id": t.id, "after": t.after.min(self.messages.len()), "request": t.request, "outcome": t.outcome, "summary": t.summary, "detail": t.detail, "before": t.before, "after_text": t.after_text, "undone": t.undone, "at": t.at})).collect::<Vec<_>>(),
         })
@@ -898,6 +908,16 @@ impl Conversation {
                 .chars()
                 .take(4096)
                 .collect(),
+            route_backend: value
+                .get("route_backend")
+                .and_then(Value::as_str)
+                .map(|t| sanitize_for_display(t, 64))
+                .unwrap_or_default(),
+            route_model: value
+                .get("route_model")
+                .and_then(Value::as_str)
+                .map(|t| sanitize_for_display(t, 120))
+                .unwrap_or_default(),
             analysis_model: value
                 .get("analysis_model")
                 .and_then(Value::as_str)
@@ -1012,6 +1032,9 @@ pub struct ChatView {
     pub brief: String,
     pub tools_enabled: bool,
     pub workspace: String,
+    /// This chat's own model choice; empty = the default routing.
+    pub route_backend: String,
+    pub route_model: String,
     /// Desktop tasks handed over from this chat; each is shown after `after` messages.
     pub tasks: Vec<DesktopTask>,
 }
@@ -1182,6 +1205,12 @@ impl Chat {
         self.conversation.title = title;
         self.conversation.updated = now;
         Ok(())
+    }
+
+    /// This chat's model: the next message goes to it. Both empty returns the chat to the default routing. The chat is not moved in the list.
+    pub fn set_route(&mut self, backend: &str, model: &str) {
+        self.conversation.route_backend = sanitize_for_display(backend.trim(), 64);
+        self.conversation.route_model = sanitize_for_display(model.trim(), 120);
     }
 
     pub fn set_pinned(&mut self, pinned: bool, now: u64) {
@@ -1590,6 +1619,8 @@ impl Chat {
             brief: self.conversation.brief.clone(),
             tools_enabled: self.conversation.tools_enabled,
             workspace: self.conversation.workspace.clone(),
+            route_backend: self.conversation.route_backend.clone(),
+            route_model: self.conversation.route_model.clone(),
             tasks: self
                 .conversation
                 .tasks
@@ -1949,6 +1980,46 @@ mod tests {
         let messages = Conversation::auto_title_messages("Q", "A");
         assert_eq!(messages[0].0, "system");
         assert!(messages[1].1.contains("Person: Q") && messages[1].1.contains("Assistant: A"));
+    }
+
+    #[test]
+    fn a_chat_keeps_its_own_model_through_saving_and_forking() {
+        let mut chat = chat();
+        chat.send("hello", 3).unwrap();
+        assert_eq!(
+            (
+                chat.conversation.route_backend.as_str(),
+                chat.conversation.route_model.as_str()
+            ),
+            ("", ""),
+            "new chats follow the default"
+        );
+        chat.set_route("local", " qwen2.5-1.5b-instruct-q4_k_m.gguf ");
+        assert_eq!(
+            chat.conversation.route_model,
+            "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+        );
+        let again = Conversation::from_json(&chat.conversation.to_json()).unwrap();
+        assert_eq!(
+            (again.route_backend.as_str(), again.route_model.as_str()),
+            ("local", "qwen2.5-1.5b-instruct-q4_k_m.gguf")
+        );
+        let fork = again.fork("bbbbbbbbbbbbbbbb", None, 4).unwrap();
+        assert_eq!(
+            fork.route_model, "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+            "a fork continues on the same model"
+        );
+        assert_eq!(chat.view().route_model, "qwen2.5-1.5b-instruct-q4_k_m.gguf");
+        chat.set_route("", "");
+        assert!(
+            chat.conversation.route_model.is_empty() && chat.conversation.route_backend.is_empty()
+        );
+        // an old saved chat has none
+        let old = chat
+            .conversation
+            .to_json()
+            .replace("\"route_model\":\"\"", "\"x\":1");
+        assert_eq!(Conversation::from_json(&old).unwrap().route_model, "");
     }
 
     #[test]
