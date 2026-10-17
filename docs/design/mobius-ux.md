@@ -56,3 +56,31 @@ Measured with the real models, switching in one chat (the 5.5 GB vision model, t
 
 The Mobius suites were run on `main` and failed the same way there, so these failures did not come from the changes above. Most were one cause, fixed in the suite: the nested window is 640 px wide, below the 720 px at which the chat list becomes a button and the sheets scroll, so tests that click the list or fill a sheet missed. They now run in a 1100 px window (the KDL for that has to be on several lines: one line with a nested block does not parse, and niri then starts with no spawned program). Now passing: `mobius`, `mobius-search`, `mobius-context`, `mobius-pictures`, `mobius-tools`, `mobius-lab`, `models`, and `mobius-dialogs` (its persona step looked for a rail that is hidden while the persona chip is on, and its model step for the old sheet; both updated, and the slash-menu check counts instead of assuming a number). Nothing in the Mobius suites fails now.
 
+
+## Cursor, studied (2026-10-17)
+
+From Cursor's documentation and reviews of Cursor 2.0 (I could not run Cursor here, so this is what it documents, not a hands-on session). What it does, and what Mobius should take from it, kept to what suits a local, private assistant.
+
+| Cursor | Mobius today | Take |
+|---|---|---|
+| **Mode picker in the composer** (Agent, Ask, Plan, Debug), switched with Shift+Tab | "Tools" is a sheet; "Act" is an unexplained button beside Send | **One mode control** in the composer: Ask (chat only), Tools (research with approval), Act (desktop), Plan (a reviewable plan before anything runs). Shift+Tab cycles. Replaces the Act button and the Tools sheet's switch. |
+| **One model control** and Auto with a stated policy (Cost, Balance, Intelligence) | A model menu with Auto as a row | Done in part. Add what Auto picked on the reply ("Auto → Qwen2.5 1.5B"), and the decision lane ([decision-model.md](decision-model.md)) behind Auto. |
+| **`@` mentions**: files, folders, terminals, past chats, git diffs, browser | `/` commands, drag and drop, Context chip | **`@` in the composer** with a picker: files in the agent desk, other chats, the open window's title, the clipboard. Chosen items are pills above the text, each removable, so what the model sees is visible. |
+| **Context ring**: a small ring by the input; click for a breakdown (system, tools, rules, history) | A "Context" chip in the settings row | A ring that fills as the chat approaches the loaded model's window, with the breakdown on click, and a "summarise earlier turns" action at the limit. Matters more locally, where windows are 4 to 32k. |
+| **Checkpoints**: before significant edits the agent saves a restore point; restore returns the state without removing the chat | Act has Undo for one action; the agent desk has no restore | A checkpoint per Tools or Act turn that changed anything, shown on the message ("Restore"), built on `act-undo.md` for desktop actions and a snapshot of the agent desk folder for files. |
+| **Review of changes**: a diff while it runs, Stop (Cmd+Shift+Backspace), Accept or Reject per file, a Review pass | Tools mode shows steps for approval; saved files show a preview | A **Changes** panel for a turn: files touched, a diff for each, Accept or Reject each, Stop in the composer while it runs. |
+| **Queue**: Enter queues, Cmd+Enter sends now, drag to reorder | Queue list with Send now and Remove | Done. Add Cmd+Enter and drag to reorder. |
+| **Several agents** side by side, each with status, in a list | One chat at a time; the list shows titles | A running indicator in the chat list for a chat still writing or waiting for approval, so leaving a chat does not hide it. |
+| **Side chats** (`/side`) for a question that must not touch the main thread | None | `/side`: a one-off question in a small panel that sees the chat but does not join it. |
+| **Plan mode**: researches, asks clarifying questions, produces a plan you edit, then builds | None | Plan in the mode control, with an editable checklist before Tools or Act runs it. |
+| **Many models, one click**; per-model pricing | Menu shows size and abilities | Add a one-line reason per model ("Fast", "Sees pictures", "Best for code") and, for local ones, memory and measured tokens per second from the reply stats. |
+
+### Order
+
+1. **Mode control** (replaces Act and the Tools switch; the biggest clarity win, no new engine work).
+2. **`@` pills and the context ring** (shows what the model sees; the ring needs the loaded model's window from the inference service).
+3. **Checkpoints and the Changes panel** (trust in Tools and Act; needs the agent-desk snapshot).
+4. **Running indicators, `/side`, Plan**.
+5. **Auto with the decision lane**, which needs the `Embed` call.
+
+Not taken: cloud-first model pricing and usage pools; many cloud agents in worktrees (Mobius is one person's assistant on one computer); anything that sends text off the computer by default.
