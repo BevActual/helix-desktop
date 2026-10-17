@@ -1,3 +1,4 @@
+import { Chart, parseChart } from "./chart";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Icon, invoke, listen } from "@helix/ui";
@@ -176,7 +177,9 @@ function Blocks({ blocks, needle, report, onSaveSnippet }: { blocks: Block[]; ne
               </div>
             </div>;
           }
-          case "code":
+          case "code": {
+            const chart = block.language === "chart" ? parseChart(block.text) : null;
+            if (chart) return <Chart key={index} spec={chart} />;
             return (
               <div key={index} className="code-block">
                 <div className="code-bar">
@@ -189,6 +192,7 @@ function Blocks({ blocks, needle, report, onSaveSnippet }: { blocks: Block[]; ne
                 <pre><code>{highlight(block.text, needle)}</code></pre>
               </div>
             );
+          }
         }
       })}
     </>

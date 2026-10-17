@@ -1463,3 +1463,8 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .mode-chip.mode-act { background: var(--accent); color: var(--on-accent); }
 .act-hint { display: block; width: fit-content; margin: 0 0 6px 12px; padding: 3px 10px; border-radius: 999px; font-size: 12px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .act-hint[hidden] { display: none; }
+.chart { margin: 10px 0; padding: 10px 12px 6px; border: 1px solid var(--hairline); border-radius: 12px; background: var(--fill-1); max-width: 620px; }
+.chart figcaption { font-weight: 650; font-size: 13px; margin-bottom: 4px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .chart-text { fill: var(--label-2); font-size: 11px; }
+.chart .chart-grid { stroke: var(--hairline); stroke-width: 1; }
