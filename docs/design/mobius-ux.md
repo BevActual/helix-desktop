@@ -158,3 +158,13 @@ restore of the whole turn in one click, and files the snapshot does not cover (b
 **Checklist (done).** `{"type":"checklist","title":"…","items":["a",{"label":"b","done":true}]}`: up to 20 items with a progress bar and an "n of m" count. Ticks are the person's own and stay in this browser (keyed by the list's text, so they survive a reload and are lost harmlessly); "Tell Mobius where I am" sends "Done: …  Left: …" as a message when the person wants the model to know.
 
 **Diagrams (done).** A fenced block labelled `diagram`: one edge per line (`Build -> Test : on push`), nodes named by their words or declared `id[Label]`, an optional first line `LR` for left to right. Mobius lays it out in layers (longest path from a start) and draws an SVG; a line that goes back to an earlier step is drawn as a dashed curve round the others, so loops are kept. Up to 30 nodes and 60 edges; a block it cannot read stays code. `apps/helix-mobius/web/src/diagram.tsx`, in `mobius-chart-test.sh`.
+
+
+### Models: will it run here, and how fast (done)
+
+The library and the model menu now say what a person choosing between local models needs (LM Studio shows fit; nobody shows speed measured on the person's own machine):
+
+* **Fit**, worked out from this computer (`hardware.rs`): the graphics memory (`nvidia-smi`, or the kernel's AMD files) and the memory available to the system (`/proc/meminfo`). The service keeps one model in memory at a time, so the whole GPU is what counts. "Fits your graphics card" up to 85% of it, "Tight" up to 97%, "Runs on the processor (slower)" beyond that when system memory allows (80% of what is available), else "Too big for this computer". A model with no catalog figure is its file size plus 15% and 0.4 GB for the context.
+* **Speed**: every reply of 20 tokens or more updates that model's running figure (smoothed 70/30), kept in `speeds.json`, shown as "41 tok/s here" in the library and the model menu once a model has answered on this computer.
+
+Not yet: adding a model by name or Hugging Face link from the library's first screen, and a "Fast / Best quality" line per model.

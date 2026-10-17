@@ -104,7 +104,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   const [menu, setMenu] = useState<{ kind: "persona" | "style" | "model" | "mode"; left: number; top: number; width: number } | null>(null);
   const [modeState, setModeState] = useState<ModeState>({ mode: "ask", folder: "", busy: false });
   // What the model menu lists: the installed models with their friendly names, and where the chat is routed now.
-  const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[] }>; route: Route | null } | null>(null);
+  const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }>; route: Route | null } | null>(null);
   useEffect(() => {
     if (!menu) return;
     const close = (event: Event) => {
@@ -159,7 +159,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         : await invoke<string[]>("routing_list_remote_models", { backendId: which });
       setModels(Array.isArray(list) ? list : []);
       if (which === "local") {
-        const cards = await invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[] }[]>("library_list").catch(() => []);
+        const cards = await invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[]; fit: string; speed: number | null }[]>("library_list").catch(() => []);
         const next: typeof shelf = {};
         cards.filter((c) => c.installed).forEach((c) => { next[c.file] = c; });
         setShelf(next);
@@ -207,10 +207,10 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         if (kind !== "model") { setMenu({ kind, ...anchor }); return; }
         Promise.all([
           invoke<string[]>("routing_list_models").catch(() => [] as string[]),
-          invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[] }[]>("library_list").catch(() => []),
+          invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[]; fit: string; speed: number | null }[]>("library_list").catch(() => []),
           invoke<Route>("chat_current_route").catch(() => null),
         ]).then(([models, cards, route]) => {
-          const byFile: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[] }> = {};
+          const byFile: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }> = {};
           cards.filter((card) => card.installed).forEach((card) => { byFile[card.file] = card; });
           setPicker({ models: Array.isArray(models) ? models : [], cards: byFile, route });
           setMenu({ kind, ...anchor });
@@ -323,7 +323,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                       <button key={id} className={`hx-menu-item${on ? " current" : ""}`} role="menuitemradio" aria-checked={on} data-test={`menu-model-${id}`} onClick={() => useLocalModel(id)}>
                         <span className="mi-text">
                           <span className="mi-title">{info?.title || id}</span>
-                          <span className="mi-sub">{info ? `${(info.bytes / 1e9).toFixed(1)} GB${info.vision ? " · sees pictures" : ""}${info.tasks.includes("code") ? " · code" : ""} · ` : ""}{info?.loaded ? "ready now" : "loads on first use"}</span>
+                          <span className="mi-sub">{info ? `${(info.bytes / 1e9).toFixed(1)} GB${info.vision ? " · sees pictures" : ""}${info.tasks.includes("code") ? " · code" : ""} · ` : ""}{info?.loaded ? "ready now" : "loads on first use"}{info?.speed ? ` · ${Math.round(info.speed)} tok/s here` : ""}{info?.fit === "cpu" ? " · CPU, slower" : info?.fit === "no" ? " · too big" : ""}</span>
                         </span>
                         {on ? <span className="mi-check">✓</span> : null}
                       </button>

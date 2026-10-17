@@ -65,7 +65,14 @@ interface Probe { text: string; ok: boolean; }
 interface Progress { phase: "downloading" | "verifying" | "failed"; done: number; total: number; error: string; }
 interface Card {
   id: string; file: string; title: string; maker: string; blurb: string; tasks: string[]; vision: boolean; license: string;
-  bytes: number; memory_gb: number; installed: boolean; loaded: boolean; in_catalog: boolean; progress: Progress | null;
+  bytes: number; memory_gb: number; installed: boolean; loaded: boolean; in_catalog: boolean; progress: Progress | null; fit: "gpu" | "tight" | "cpu" | "no" | ""; speed: number | null;
+}
+
+/** How the model sits on this computer, and how fast it has run here. */
+const FIT_WORD: Record<string, string> = { gpu: "Fits your graphics card", tight: "Tight on your graphics card", cpu: "Runs on the processor (slower)", no: "Too big for this computer" };
+function FitTag({ card }: { card: Card }) {
+  if (!card.fit) return null;
+  return <span className={`lib-tag fit-${card.fit}`} data-test={`lib-fit-${card.id}`} title="Worked out from this computer's graphics and system memory">{FIT_WORD[card.fit]}{card.speed ? ` · ${Math.round(card.speed)} tok/s here` : ""}</span>;
 }
 
 function size(bytes: number): string {
@@ -104,6 +111,7 @@ function Library({ cards, draft, needle, onAssign, report }: {
                 <div className="lib-tags">
                   {card.tasks.map((t) => <span key={t} className="lib-tag">{TASK_WORD[t] ?? t}</span>)}
                   {card.vision ? <span className="lib-tag vision">Sees pictures</span> : null}
+                  <FitTag card={card} />
                 </div>
               </header>
               <p className="lib-blurb">{card.blurb}</p>
@@ -150,6 +158,7 @@ function Library({ cards, draft, needle, onAssign, report }: {
                 <div className="lib-tags">
                   {card.tasks.map((t) => <span key={t} className="lib-tag">{TASK_WORD[t] ?? t}</span>)}
                   {card.vision ? <span className="lib-tag vision">Sees pictures</span> : null}
+                  <FitTag card={card} />
                 </div>
               </header>
               <p className="lib-blurb">{card.blurb}</p>

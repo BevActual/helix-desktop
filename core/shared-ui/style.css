@@ -1509,3 +1509,4 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .diagram .diagram-edge { stroke: var(--label-2); stroke-width: 1.5; }
 .diagram .diagram-arrow { fill: var(--label-2); }
 .diagram .diagram-back { stroke-dasharray: 5 4; }
+.lib-tag.fit-gpu { color: #2fb344; } .lib-tag.fit-tight { color: #f08c00; } .lib-tag.fit-cpu { color: #f08c00; } .lib-tag.fit-no { color: #e03131; }

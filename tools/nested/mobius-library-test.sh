@@ -24,4 +24,5 @@ click_id models-nav-local; sleep 1.5
 shot library
 has_id lib-get-qwen2.5-3b && echo "ok: downloadable models are offered" || fail "no downloadable model card"
 has_id lib-get-qwen2.5-vl-7b && echo "ok: a vision model is offered" || fail "no vision model card"
+has_id lib-fit-qwen2.5-3b && echo "ok: a model says whether it fits this computer" || fail "no fit tag on the model card"
 [ $FAILED = 0 ] && echo "PASS" || echo "FAILED"
