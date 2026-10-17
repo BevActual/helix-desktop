@@ -15,6 +15,13 @@ pub struct Checkpoint {
     pub path: PathBuf,
     pub before: Option<String>,
     pub after: String,
+    /// False when the change left no file (it was deleted): undo then expects the file to still be absent.
+    #[serde(default = "yes")]
+    pub after_present: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 /// A path inside `root` that the edit tool may touch: relative, no `..`, no hidden file or folder (so no `.git`, `.ssh`), not a file that
@@ -73,6 +80,7 @@ pub fn plan(root: &Path, rel: &str, old: &str, new: &str) -> Result<Checkpoint, 
             path: target,
             before: None,
             after: new.to_string(),
+            after_present: true,
         });
     }
     let meta = std::fs::metadata(&target).map_err(|_| "That file does not exist.".to_string())?;
@@ -89,6 +97,7 @@ pub fn plan(root: &Path, rel: &str, old: &str, new: &str) -> Result<Checkpoint, 
                 path: target,
                 before: Some(before),
                 after,
+                after_present: true,
             })
         }
         n => Err(format!(
@@ -115,7 +124,10 @@ pub fn undo(store: &Path) -> Result<PathBuf, String> {
     let checkpoint: Checkpoint =
         serde_json::from_str(&body).map_err(|_| "The restore point is damaged.".to_string())?;
     let current = std::fs::read_to_string(&checkpoint.path).ok();
-    if current.as_deref() != Some(checkpoint.after.as_str()) {
+    let expected = checkpoint
+        .after_present
+        .then_some(checkpoint.after.as_str());
+    if current.as_deref() != expected {
         return Err("The file has changed since this edit, so it was left alone.".into());
     }
     match &checkpoint.before {
@@ -138,6 +150,125 @@ pub fn diff_text(rel: &str, old: &str, new: &str) -> String {
     }
     for line in new.lines() {
         out.push_str(&format!("+ {line}\n"));
+    }
+    out
+}
+
+/// One file a turn changed, as the Changes card shows it.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FileChange {
+    pub path: String,
+    /// `added`, `modified` or `deleted`.
+    pub kind: String,
+    pub diff: String,
+    pub added: usize,
+    pub removed: usize,
+    #[serde(default)]
+    pub reverted: bool,
+}
+
+/// The text files of a project folder (relative path to content), bounded: 2,000 files, 512 KiB each, 30 MB in all, six levels deep, no
+/// hidden or build folders. What a turn is compared against to say what it changed.
+pub fn snapshot(root: &Path) -> std::collections::BTreeMap<String, String> {
+    const SKIP: &[&str] = &[
+        "node_modules",
+        "target",
+        "dist",
+        "build",
+        "__pycache__",
+        "vendor",
+    ];
+    let mut out = std::collections::BTreeMap::new();
+    let mut total = 0u64;
+    let mut stack = vec![(root.to_path_buf(), 0usize)];
+    while let Some((dir, depth)) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with('.') {
+                continue;
+            }
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
+            let path = entry.path();
+            if kind.is_dir() {
+                if depth < 6 && !SKIP.contains(&name.as_str()) {
+                    stack.push((path, depth + 1));
+                }
+            } else if kind.is_file() && out.len() < 2000 {
+                let Ok(meta) = entry.metadata() else { continue };
+                if meta.len() > MAX_FILE_BYTES || total + meta.len() > 30 * 1024 * 1024 {
+                    continue;
+                }
+                if let Ok(text) = std::fs::read_to_string(&path) {
+                    total += meta.len();
+                    out.insert(
+                        path.strip_prefix(root)
+                            .unwrap_or(&path)
+                            .to_string_lossy()
+                            .into_owned(),
+                        text,
+                    );
+                }
+            }
+        }
+    }
+    out
+}
+
+/// What changed in `root` since `before` was taken: one entry per file, with a unified diff (cut at 8,000 characters) and the checkpoint that
+/// reverts it.
+pub fn changes_since(
+    root: &Path,
+    before: &std::collections::BTreeMap<String, String>,
+) -> Vec<(FileChange, Checkpoint)> {
+    let after = snapshot(root);
+    let mut out = Vec::new();
+    let paths: std::collections::BTreeSet<&String> = before.keys().chain(after.keys()).collect();
+    for path in paths {
+        let (old, new) = (before.get(path), after.get(path));
+        if old == new {
+            continue;
+        }
+        let (kind, old_text, new_text) = match (old, new) {
+            (None, Some(n)) => ("added", "", n.as_str()),
+            (Some(o), None) => ("deleted", o.as_str(), ""),
+            (Some(o), Some(n)) => ("modified", o.as_str(), n.as_str()),
+            (None, None) => continue,
+        };
+        let diff = similar::TextDiff::from_lines(old_text, new_text);
+        let (mut added, mut removed) = (0, 0);
+        for change in diff.iter_all_changes() {
+            match change.tag() {
+                similar::ChangeTag::Insert => added += 1,
+                similar::ChangeTag::Delete => removed += 1,
+                similar::ChangeTag::Equal => {}
+            }
+        }
+        let text: String = diff
+            .unified_diff()
+            .context_radius(2)
+            .to_string()
+            .chars()
+            .take(8000)
+            .collect();
+        let abs = root.join(path);
+        out.push((
+            FileChange {
+                path: path.clone(),
+                kind: kind.into(),
+                diff: text,
+                added,
+                removed,
+                reverted: false,
+            },
+            Checkpoint {
+                path: abs,
+                before: old.cloned(),
+                after: new.cloned().unwrap_or_default(),
+                after_present: new.is_some(),
+            },
+        ));
     }
     out
 }
@@ -216,5 +347,47 @@ mod tests {
     fn the_diff_marks_each_line() {
         assert_eq!(diff_text("a.rs", "x\ny", "z"), "a.rs\n- x\n- y\n+ z\n");
         assert!(diff_text("n.rs", "", "z").starts_with("new file n.rs"));
+    }
+
+    #[test]
+    fn says_what_changed_and_reverts_each_file() {
+        let root = folder();
+        std::fs::write(root.join("keep.txt"), "same\n").unwrap();
+        std::fs::write(root.join("edit.txt"), "one\ntwo\n").unwrap();
+        std::fs::write(root.join("gone.txt"), "bye\n").unwrap();
+        let before = snapshot(&root);
+        std::fs::write(root.join("edit.txt"), "one\nTWO\nthree\n").unwrap();
+        std::fs::remove_file(root.join("gone.txt")).unwrap();
+        std::fs::write(root.join("new.txt"), "hi\n").unwrap();
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::write(root.join(".git/x"), "ignored").unwrap();
+        let changes = changes_since(&root, &before);
+        let kinds: Vec<_> = changes
+            .iter()
+            .map(|(c, _)| (c.path.as_str(), c.kind.as_str(), c.added, c.removed))
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                ("edit.txt", "modified", 2, 1),
+                ("gone.txt", "deleted", 0, 1),
+                ("new.txt", "added", 1, 0)
+            ]
+        );
+        assert!(changes[0].0.diff.contains("-two") && changes[0].0.diff.contains("+TWO"));
+        for (i, (_, cp)) in changes.iter().enumerate() {
+            let store = root.join(format!("cp{i}.json"));
+            std::fs::write(&store, serde_json::to_string(cp).unwrap()).unwrap();
+            undo(&store).unwrap();
+        }
+        assert_eq!(
+            std::fs::read_to_string(root.join("edit.txt")).unwrap(),
+            "one\ntwo\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join("gone.txt")).unwrap(),
+            "bye\n"
+        );
+        assert!(!root.join("new.txt").exists());
     }
 }

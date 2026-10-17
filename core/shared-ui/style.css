@@ -1485,3 +1485,15 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .diff .diff-head { font-weight: 650; color: var(--label); }
 .diff .diff-add { display: block; background: color-mix(in srgb, #2fb344 18%, transparent); color: var(--label); }
 .diff .diff-del { display: block; background: color-mix(in srgb, #e03131 18%, transparent); color: var(--label); }
+.diff .diff-head:not(:first-child) { color: var(--label-3); font-weight: 500; }
+.changes-card { margin: 10px 0; border: 1px solid var(--hairline); border-radius: 12px; background: var(--fill-1); max-width: 720px; overflow: hidden; }
+.changes-head { display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; font-size: 13px; } .changes-head span { color: var(--label-2); }
+.changes-card details { border-top: 1px solid var(--hairline); }
+.changes-card summary { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; list-style: none; }
+.changes-card summary::-webkit-details-marker { display: none; }
+.changes-card .change-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono, monospace); font-size: 12.5px; }
+.changes-card .change-count { color: var(--label-2); font-size: 12px; }
+.changes-card .change-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 6px; background: var(--fill-2); }
+.changes-card .change-kind.added { color: #2fb344; } .changes-card .change-kind.deleted { color: #e03131; }
+.changes-card details.reverted summary { opacity: .55; }
+.changes-card .diff { margin: 0; padding: 4px 12px 10px; font-size: 12px; }

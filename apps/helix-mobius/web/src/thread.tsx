@@ -125,9 +125,33 @@ function Spans({ spans, needle }: { spans: Span[]; needle: string }) {
 }
 
 /** The diff of a proposed or applied file edit: the path, then removed lines in red and added lines in green. */
-function Diff({ text, testId }: { text: string; testId?: string }) {
+function Diff({ text, testId, unified }: { text: string; testId?: string; unified?: boolean }) {
   const lines = text.replace(/\n$/, "").split("\n");
-  return <pre className="diff" data-test={testId}>{lines.map((line, i) => <span key={i} className={i === 0 ? "diff-head" : line.startsWith("+ ") ? "diff-add" : line.startsWith("- ") ? "diff-del" : ""}>{line || " "}</span>)}</pre>;
+  const kind = (line: string, i: number) => unified
+    ? (line.startsWith("@@") ? "diff-head" : line.startsWith("+") ? "diff-add" : line.startsWith("-") ? "diff-del" : "")
+    : (i === 0 ? "diff-head" : line.startsWith("+ ") ? "diff-add" : line.startsWith("- ") ? "diff-del" : "");
+  return <pre className="diff" data-test={testId}>{lines.map((line, i) => <span key={i} className={kind(line, i)}>{line || " "}</span>)}</pre>;
+}
+
+interface FileChange { path: string; kind: string; diff: string; added: number; removed: number; reverted: boolean }
+
+/** Everything a Tools turn changed in the project folder, file by file with its diff, and a way to put each file back. */
+function ChangesCard({ activity, streaming, hooks }: { activity: { id: string; input: string; output: string }; streaming: boolean; hooks: ThreadHooks }) {
+  let files: FileChange[] = [];
+  try { files = JSON.parse(activity.input); } catch { /* shown as empty */ }
+  return <section className="changes-card" data-test="changes-card" aria-label="Changes made to the project folder">
+    <div className="changes-head"><strong>Changes</strong><span>{activity.output}</span></div>
+    {files.map((file, i) => <details key={file.path} className={file.reverted ? "reverted" : ""} data-test={`change-${i}`}>
+      <summary>
+        <span className={`change-kind ${file.kind}`}>{file.kind}</span>
+        <span className="change-path">{file.path}</span>
+        <span className="change-count">{file.reverted ? "reverted" : `+${file.added} −${file.removed}`}</span>
+        {!file.reverted && <button type="button" className="mini" data-test={`change-revert-${i}`} disabled={streaming}
+          onClick={(event) => { event.preventDefault(); invoke("tools_revert_change", { activityId: activity.id, index: i }).catch(hooks.report); }}>Revert</button>}
+      </summary>
+      <Diff text={file.diff} unified />
+    </details>)}
+  </section>;
 }
 
 function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void }) {
@@ -313,7 +337,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
           <Fragment key={index}>{boundary}<div className={`msg ${message.role}${last && streaming ? " live" : ""}`} data-test={`msg-${index}`}>
             <div className="msg-body">
               {message.images?.map((id) => <GeneratedPicture key={id} id={id} streaming={streaming} hooks={hooks} />)}
-              {!!message.activities?.length && <section className="tool-activities" aria-label="Task steps">{message.activities.map((activity) => <div className={`tool-activity ${activity.state}`} key={activity.id} data-test={`tool-${activity.tool}`}>
+              {!!message.activities?.length && <section className="tool-activities" aria-label="Task steps">{message.activities.map((activity) => activity.tool === "changes" ? <ChangesCard key={activity.id} activity={activity} streaming={streaming} hooks={hooks} /> : <div className={`tool-activity ${activity.state}`} key={activity.id} data-test={`tool-${activity.tool}`}>
                 <div className="tool-heading"><strong>{({ planning: "Choosing next step", web_search: "Search the web", web_read: "Read a page", terminal: "Project command", answer: "Write answer", edit_file: "Edit a file" } as Record<string, string>)[activity.tool] || activity.tool}</strong><span>{activity.state === "waiting" ? "Needs your review" : activity.state}</span></div>
                 {activity.state === "waiting" ? <>{activity.tool === "edit_file" ? <Diff text={activity.input} testId="tool-command" /> : <pre data-test="tool-command">{activity.input}</pre>}<p className="sheet-note">{activity.output}</p><div className="tool-review"><button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : "Allow lookup"}</button><button data-test="tool-decline" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: false }).catch(hooks.report)}>Skip</button></div></> : (activity.input || activity.output) && <><details open={activity.tool === "edit_file" || (activity.state === "running" && activity.tool === "terminal")}><summary>Details</summary>{activity.input && (activity.tool === "edit_file" ? <Diff text={activity.input} /> : <pre>{activity.input}</pre>)}{activity.output && <pre>{activity.output}</pre>}</details>{activity.tool === "edit_file" && activity.state === "completed" && <button type="button" className="mini" data-test="tool-undo-edit" disabled={streaming} onClick={() => invoke("tools_undo_edit", { activityId: activity.id }).catch(hooks.report)}>Undo edit</button>}</>}
               </div>)}</section>}

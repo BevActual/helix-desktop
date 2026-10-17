@@ -1361,6 +1361,40 @@ fn tools_undo_edit(app: AppHandle, activity_id: String) -> Result<String, String
     Ok(path.display().to_string())
 }
 
+#[tauri::command]
+fn tools_revert_change(app: AppHandle, activity_id: String, index: usize) -> Result<(), String> {
+    let chat_id = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Wait for the reply to finish, or stop it.".into());
+        }
+        state.chat.conversation.id.clone()
+    };
+    edits::undo(&edit_store(&chat_id, &format!("{activity_id}-{index}")))?;
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        for message in state.chat.conversation.messages.iter_mut() {
+            for activity in message
+                .activities
+                .iter_mut()
+                .filter(|a| a.id == activity_id)
+            {
+                let mut list: Vec<edits::FileChange> =
+                    serde_json::from_str(&activity.input).unwrap_or_default();
+                if let Some(change) = list.get_mut(index) {
+                    change.reverted = true;
+                }
+                activity.input = serde_json::to_string(&list).unwrap_or_default();
+            }
+        }
+    }
+    persist(&app);
+    emit_view(&app);
+    Ok(())
+}
+
 /// One row of the composer's `@` picker: a file in the chat's project folder, or another chat.
 #[derive(Serialize)]
 struct Mention {
@@ -3003,6 +3037,7 @@ fn main() {
             tools_open_desk_terminal,
             tools_review,
             tools_undo_edit,
+            tools_revert_change,
             web_lookup,
             web_cancel,
             web_open_source,
