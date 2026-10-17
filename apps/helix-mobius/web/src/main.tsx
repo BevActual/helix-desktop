@@ -10,6 +10,7 @@ import { Analysis, type AnalysisHandle } from "./analysis";
 import { OnlineResearch, type WebHandle } from "./web";
 import { Welcome, type WelcomeHandle, type WelcomeHooks } from "./welcome";
 import { ChatContext, type ContextHandle, type ContextInfo } from "./context";
+import { Memory, type MemoryHandle } from "./memory";
 import { CreateImage, type CreateImageHandle } from "./create-image";
 
 /** Mounts a component that registers a handle once it is ready; calls made before that wait and run when it is. */
@@ -48,6 +49,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   context: (host: HTMLElement) => {
     const run = handled<ContextHandle>(host, (register) => <ChatContext register={register} />);
     return { open: (view: Parameters<ContextHandle["open"]>[0]) => run((h) => h.open(view)) };
+  },
+  memory: (host: HTMLElement) => {
+    const run = handled<MemoryHandle>(host, (register) => <Memory register={register} />);
+    return { open: () => run((h) => h.open()) };
   },
   createImage: (host: HTMLElement) => {
     const run = handled<CreateImageHandle>(host, (register) => <CreateImage register={register} />);

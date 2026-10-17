@@ -2,6 +2,7 @@
 
 pub mod chat;
 pub mod markdown;
+pub mod memory;
 pub mod mobius_lab;
 pub mod model_catalog;
 pub mod personas;
