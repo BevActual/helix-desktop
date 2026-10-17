@@ -20,7 +20,7 @@ desktop act goes through `helix-assistant` or MCP clients with their own grants.
 
 1. **Observe** — `status`, window list, clipboard read, desktop capture (PNG path)
 2. **Act (semantic)** — panel open/toggle, settings, bar visibility, workspace step, focus window, notify, clipboard write
-3. **Input (synthetic)** — virtual pointer/keyboard / AT-tree click *(phase 2; not v1)*
+3. **Input (synthetic)** — virtual pointer/keyboard / AT-tree click *(phase 2; not v1; threat model and build order in `synthetic-input-threat-model.md`)*
 4. **Dangerous** — session logout/reboot/shutdown, unrestricted raw IPC *(blocked or confirmed)*
 
 v1 implements tiers 1–2 only. Trust model: same as the user’s graphical session (Unix socket
