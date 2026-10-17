@@ -452,14 +452,100 @@ fn record(app: &AppHandle, kind: &str, ms: u64, ok: bool) {
     );
 }
 
+/// Names a chat after its first exchange: one short background request to the model that answered, only when that model is on this computer, so
+/// no text goes anywhere it did not already go. The title the chat was given from its first message stays if the model gives nothing usable, if the
+/// person renames the chat meanwhile, or if another chat is open when the answer comes.
+fn auto_title(app: &AppHandle) {
+    if std::env::var_os("HELIX_MOBIUS_NO_AUTO_TITLE").is_some() {
+        return;
+    }
+    let (id, made_with, user, reply) = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        if state.chat.temporary {
+            return;
+        }
+        let Some((user, reply)) = state.chat.conversation.auto_title_source() else {
+            return;
+        };
+        (
+            state.chat.conversation.id.clone(),
+            state.chat.conversation.title.clone(),
+            user,
+            reply,
+        )
+    };
+    let routing = inference_routing::load();
+    let persona = personas::load().active_persona().clone();
+    let (task, model, is_local, _) = resolve_route(&routing, &persona);
+    if !is_local {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result: Result<String, String> = async {
+            let mut args = chat_args(
+                &Conversation::auto_title_messages(&user, &reply),
+                &[],
+                &task,
+                &model,
+            )
+            .map_err(|e| e.to_string())?;
+            // A name is a few words, and it must never delay the person's next message.
+            args.insert("priority", Value::from("background".to_string()));
+            args.insert("max_tokens", Value::U32(24));
+            args.insert("temperature", Value::F64(0.0));
+            let connection = connection().await.map_err(|e| e.to_string())?;
+            let proxy = proxy(&connection).await.map_err(|e| e.to_string())?;
+            let operation: u64 = proxy
+                .call("Action", &("chat", args))
+                .await
+                .map_err(|e| e.to_string())?;
+            let hub = app.state::<Arc<dictate::Hub>>().inner().clone();
+            hub.expect(operation);
+            let (ok, text) = hub.wait(operation).await?;
+            if !ok {
+                return Err("the model could not title the chat".into());
+            }
+            Ok(serde_json::from_str::<serde_json::Value>(&text)
+                .ok()
+                .and_then(|v| v["text"].as_str().map(str::to_string))
+                .unwrap_or_default())
+        }
+        .await;
+        let Ok(raw) = result else { return };
+        let applied = {
+            let shared = shared(&app);
+            let mut state = shared.lock().expect("state");
+            let applied = state
+                .chat
+                .conversation
+                .apply_auto_title(&id, &made_with, &raw);
+            if applied && !state.chat.temporary {
+                save(&state.chat.conversation);
+            }
+            applied
+        };
+        if applied {
+            eprintln!("MOBIUS titled the chat");
+            emit_view(&app);
+            emit_list(&app);
+        }
+    });
+}
+
 fn ended(app: &AppHandle, outcome: Outcome) {
     eprintln!("MOBIUS turn ended {outcome:?}");
+    let finished = matches!(outcome, Outcome::Finished);
     let started = shared(app).lock().expect("state").turn_started.take();
     let ms = started.map_or(0, |at| at.elapsed().as_millis() as u64);
     record(app, "turn", ms, matches!(outcome, Outcome::Finished));
     persist(app);
     emit_view(app);
     emit_list(app);
+    if finished {
+        auto_title(app);
+    }
 }
 
 /// Follows the model service's streaming signals for as long as the app runs (they are sent to the requester only).
