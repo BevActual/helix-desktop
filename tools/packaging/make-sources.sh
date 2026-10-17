@@ -27,10 +27,11 @@ echo "wrote $OUT/$NAME.tar.gz"
 # Rust: vendor from the tree being packaged, so Cargo.lock is the one in the archive. cargo prints the source-replacement config (including the
 # git source of the compositor's smithay) on stdout; the spec appends it to .cargo/config.toml.
 cd "$WORK/$NAME"
-mkdir -p "$WORK/v/vendor"
-cargo vendor ${OFFLINE:+--offline} --locked "$WORK/v/vendor" > "$WORK/v/vendor/cargo-config.toml"
-# The config refers to the directory as "vendor"; the archive unpacks it at the top of the source tree.
-tar -C "$WORK/v" --zstd -cf "$OUT/$NAME-vendor.tar.zst" vendor
+mkdir -p "$WORK/v"
+# cargo empties the directory it vendors into, so the config goes beside it, not in it.
+cargo vendor ${OFFLINE:+--offline} --locked "$WORK/v/vendor" > "$WORK/v/cargo-vendor-config.toml"
+# The config refers to the directory as "vendor"; the archive unpacks both at the top of the source tree.
+tar -C "$WORK/v" --zstd -cf "$OUT/$NAME-vendor.tar.zst" vendor cargo-vendor-config.toml
 echo "wrote $OUT/$NAME-vendor.tar.zst ($(du -h "$OUT/$NAME-vendor.tar.zst" | cut -f1))"
 
 # JavaScript: one npm workspace at the root.

@@ -129,7 +129,7 @@ the old one), and enable greetd.service.
 tar --zstd -xf %{SOURCE1}
 tar --zstd -xf %{SOURCE2}
 mkdir -p .cargo
-cat vendor/cargo-config.toml >> .cargo/config.toml
+cat cargo-vendor-config.toml >> .cargo/config.toml
 %endif
 
 %build
