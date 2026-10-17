@@ -25,6 +25,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 | [desktop-contract-tests.md](desktop-contract-tests.md) | What bus/integration tests must pass for Tauri + Settings; cleanup backlog |
 | [layering.md](layering.md) | Cargo workspace dependency rules and the `layering` check |
 | [trusted-surface.md](trusted-surface.md) | Trust boundaries for shell surfaces |
+| [synthetic-input-threat-model.md](synthetic-input-threat-model.md) | Tier 3 (agent pointer and keyboard): threats, scope rule, build order, open decisions |
 
 ## Surfaces and apps
 

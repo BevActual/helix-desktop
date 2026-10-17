@@ -73,7 +73,7 @@ acts on it, and a nested test asserts the exact requests sent.
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
 | Act loop, next step: show the resulting state (what changed, not only the shell's sentence) and offer undo where an action can be undone | M | The live restore commands reply with the pair. `GetState` carries `before`, `after`, and `undoable`, and `Undo` writes the previous value back. The chat note and the shell's Act door show Undo while the shell still says that task can be undone. Confirm-tier undo is not built. `act-undo.md` | `mobius-product.md` priority 5 |
-| Threat model for tier 3 (synthetic input) before any implementation | S | None | `agentic-os.md` marks it phase 2; `trusted-surface.md` |
+| Tier 3 (synthetic input): decide the three open questions in `synthetic-input-threat-model.md`, then build in its order (semantic AT-SPI on agent-desk windows first) | M | The person's decisions; the keyboard path in `trusted-surface.md` proven first | `synthetic-input-threat-model.md` |
 | Project knowledge: explicit notes and selected files reused across chats, with visible sources | L | Retrieval measured first | `mobius-product.md` priority 4 |
 | Read-aloud replies with playback and cancel | M | TTS engine choice | `mobius-product.md` |
 | Measured evals for model-dependent behaviour (Tools-mode planning, retrieval) | M | `tests/eval` | `mobius-product.md` "How to judge a delivery" |
