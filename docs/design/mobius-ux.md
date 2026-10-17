@@ -28,7 +28,7 @@ The lens is `helix-hig.md`: calm, quiet chrome, one obvious thing to do, nothing
 
 ## Tests
 
-The Mobius nested suites were run on `main` and on this change with the same result, so none of the failures below comes from it. Several fail on `main`:
+`mobius`, `mobius-tools`, `mobius-search`, `mobius-pictures` and `mobius-context` were run on `main` and on this change and failed the same way, so none of the failures below comes from it; `mobius-act`, `mobius-welcome`, `mobius-reply-save` and `mobius-attachments` pass on this change. Several fail on `main`:
 
 * `mobius-search` and `mobius-context` failed because the nested window is 640 px wide, below the 720 px at which the chat list becomes a button; the tests click the list. They now run in a 1100 px window and pass.
 * `mobius` (chat list actions: search with no match, delete, new chat), `mobius-pictures` (opening a saved chat: `chat-0`, `edit-0`) and `mobius-tools` (`meta-tools`) still fail; at 1100 px they fail on other controls (`input`, `chat-0`, `meta-tools`), so they need their own look.
