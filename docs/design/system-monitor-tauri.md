@@ -35,12 +35,12 @@ Timers are documented; no anonymous `setInterval` in the page for sampling — t
 
 ## Budgets
 
-Own process. Record USS/RSS after first nested run:
+Own process. Memory is PSS of the app and its WebKit processes:
 
 | Measurement | Value | Notes |
 |-------------|-------|-------|
-| Nested Overview with fake `/proc` | _pending_ | `tools/nested/system-monitor-test.sh` |
-| USS after first nested run | _pending_ | |
+| Nested Overview with fake `/proc` | not measured | The nested compositor's start-up (about 14 s) dominates; it says nothing about the app |
+| Memory after first nested run (PSS, app and its WebKit processes) | about 296 MB | `tools/nested/measure-app.sh` with `MEASURE_READY=page-overview MEASURE_BIN=helix-system-monitor`; unchanged 15 s later (295.5 MB). Measured 2026-10-16 on a `fast` build |
 
 ## Nested tests
 
