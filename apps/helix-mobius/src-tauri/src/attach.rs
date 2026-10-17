@@ -108,7 +108,7 @@ fn is_probably_text(path: &Path, bytes: &[u8]) -> bool {
 
 /// Files that hold secrets are never sent to a model, whatever the person picked: a private key or a credentials file is one slip away
 /// from leaving the computer when the backend is a remote one.
-fn is_secret_file(path: &Path, text: &str) -> bool {
+pub(crate) fn is_secret_file(path: &Path, text: &str) -> bool {
     let name = path
         .file_name()
         .and_then(|n| n.to_str())

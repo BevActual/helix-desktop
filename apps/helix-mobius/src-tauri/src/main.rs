@@ -7,6 +7,7 @@ mod analysis;
 mod attach;
 mod decide;
 mod dictate;
+mod edits;
 mod generation;
 mod images;
 mod lan;
@@ -1310,6 +1311,54 @@ async fn web_answer(
     };
     record(&app, "web-answer", 0, true);
     dispatch_turn(app, turn).await
+}
+
+/// Where the restore point of an applied file edit is kept (per chat, per tool step); see `edits`.
+fn edit_store(chat_id: &str, activity_id: &str) -> PathBuf {
+    let safe = |s: &str| {
+        s.chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .collect::<String>()
+    };
+    data_home()
+        .join("helix/mobius/checkpoints")
+        .join(safe(chat_id))
+        .join(format!("{}.json", safe(activity_id)))
+}
+
+#[tauri::command]
+fn tools_undo_edit(app: AppHandle, activity_id: String) -> Result<String, String> {
+    let chat_id = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Wait for the reply to finish, or stop it.".into());
+        }
+        state.chat.conversation.id.clone()
+    };
+    let path = edits::undo(&edit_store(&chat_id, &activity_id))?;
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        for message in state.chat.conversation.messages.iter_mut() {
+            for activity in message
+                .activities
+                .iter_mut()
+                .filter(|a| a.id == activity_id)
+            {
+                activity.state = "undone".into();
+                activity.output = format!(
+                    "Undone: {} is back as it was.",
+                    path.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("the file")
+                );
+            }
+        }
+    }
+    persist(&app);
+    emit_view(&app);
+    Ok(path.display().to_string())
 }
 
 /// One row of the composer's `@` picker: a file in the chat's project folder, or another chat.
@@ -2953,6 +3002,7 @@ fn main() {
             tools_configure,
             tools_open_desk_terminal,
             tools_review,
+            tools_undo_edit,
             web_lookup,
             web_cancel,
             web_open_source,
