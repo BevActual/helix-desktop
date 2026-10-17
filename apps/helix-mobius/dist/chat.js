@@ -1095,7 +1095,8 @@ listen("chat-view", (event) => {
   const key = `${view.id}|${view.route_backend || ""}|${view.route_model || ""}`;
   if (key !== routeKey) { routeKey = key; refreshRoute(); }
   drawChat();
-  if (wasStreaming && !view.streaming) { recordArtifacts(); flushQueue(); }
+  if (workspaceChat !== view.id) { if (workspaceChat) { setWorkspace("chat"); } workspaceChat = view.id; }
+  if (wasStreaming && !view.streaming) { recordArtifacts(); reactCode?.refresh(); flushQueue(); }
 });
 listen("chat-stream", (event) => {
   if (reactThread) {
@@ -2588,6 +2589,9 @@ function paletteItems(query) {
   act("mode-act", "Mode: Act", "Do the next message on the desktop", "", () => setComposerMode("act"));
   act("model", "Choose model", "This chat's model", "", () => $("meta-model").click());
   act("routing", "Models & routing", "", "Ctrl+M", () => openRouting().catch(report));
+  act("ws-chat", "Workspace: Chat", "Just the conversation", "", () => setWorkspace("chat"));
+  act("ws-write", "Workspace: Write", "A document beside the chat", "", () => setWorkspace("write"));
+  act("ws-code", "Workspace: Code", "Project files and changes beside the chat", "", () => setWorkspace("code"));
   act("memory", "Memory", "What Mobius remembers", "", () => reactMemory?.open());
   act("find", "Find in this chat", "", "Ctrl+F", () => openFindBar());
   act("export", "Export this chat", "Markdown", "Ctrl+Shift+C", () => $("export-chat").click());
@@ -2599,20 +2603,79 @@ function paletteItems(query) {
 // The stage (docs/design/mobius-workspaces.md): the open document goes to the model with the next message, as a chip that can be dropped.
 let stageOpen = null;      // { title, text } while a document is open
 let stageAttach = true;    // whether it is sent with the next message
+let workspace = "chat";    // chat | write | code: how the window is laid out (docs/design/mobius-workspaces.md)
+let workspaceChat = "";
 function drawStageChip() {
   const chip = $("stage-chip");
   chip.hidden = !stageOpen;
-  document.body.classList.toggle("stage-open", !!stageOpen);
+  $("workspace-btn").textContent = ({ chat: "Chat", write: "Write", code: "Code" })[workspace] + " ▾";
+  document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code");
   if (!stageOpen) return;
   chip.textContent = stageAttach ? `${stageOpen.title} · sent with your message ×` : `${stageOpen.title} · not sent (click to send)`;
   chip.classList.toggle("off", !stageAttach);
 }
 $("stage-chip").onclick = () => { stageAttach = !stageAttach; drawStageChip(); };
-const reactStage = window.HelixMobiusReact?.stage($("stage-host"), {
+const reactStage = window.HelixMobiusReact?.stage($("stage-doc"), {
   chatId: () => view.id,
   report: (error) => report(error),
   changed: (open) => { if (!stageOpen && open) stageAttach = true; stageOpen = open; drawStageChip(); },
 });
+
+const reactCode = window.HelixMobiusReact?.codeStage($("stage-code"), {
+  report: (error) => report(error),
+  folder: () => view.workspace || "",
+  chooseFolder: () => reactTools?.open(view),
+  changes: () => {
+    for (let i = view.messages.length - 1; i >= 0; i--) {
+      const a = (view.messages[i].activities || []).find((x) => x.tool === "changes");
+      if (a) { try { return { activityId: a.id, files: JSON.parse(a.input) }; } catch { return null; } }
+      if (view.messages[i].role === "user") break;
+    }
+    return null;
+  },
+  shown: (open) => { stageOpen = open; stageAttach = true; drawStageChip(); },
+});
+function setWorkspace(next) {
+  if (next === workspace) return;
+  if (workspace === "write") reactStage?.close();
+  if (workspace === "code") reactCode?.close();
+  workspace = next;
+  stageOpen = null;
+  if (next === "code") reactCode?.open();
+  if (next === "write") reactStage?.open("Untitled", "");
+  drawStageChip();
+}
+function openWorkspaceMenu() {
+  document.querySelectorAll(".workspace-menu").forEach((m) => m.remove());
+  const box = $("workspace-btn").getBoundingClientRect();
+  const menu = el("div", "hx-menu workspace-menu");
+  menu.dataset.test = "workspace-menu";
+  menu.style.right = (window.innerWidth - box.right) + "px";
+  menu.style.top = (box.bottom + 6) + "px";
+  menu.style.bottom = "auto";
+  menu.style.minWidth = "260px";
+  const row = (id, title, sub, enabled) => {
+    const b = el("button", "hx-menu-item" + (workspace === id ? " current" : ""));
+    b.type = "button";
+    b.disabled = !enabled;
+    b.dataset.test = "workspace-" + id;
+    const text = el("span", "mi-text");
+    text.append(el("span", "mi-title", title), el("span", "mi-sub", sub));
+    b.append(text);
+    if (workspace === id) b.append(el("span", "mi-check", "✓"));
+    b.onclick = () => { menu.remove(); setWorkspace(id); };
+    menu.append(b);
+  };
+  row("chat", "Chat", "Just the conversation", true);
+  row("write", "Write", "A document beside the chat; Mobius drafts, you edit", true);
+  row("code", "Code", "Your project's files and what changed, beside the chat", true);
+  const soon = el("div", "hx-menu-label", "Planned: Image · Design · Browse");
+  menu.append(soon);
+  document.body.append(menu);
+  const close = (event) => { if (!menu.contains(event.target)) { menu.remove(); window.removeEventListener("mousedown", close, true); } };
+  setTimeout(() => window.addEventListener("mousedown", close, true), 0);
+}
+$("workspace-btn").onclick = () => openWorkspaceMenu();
 // A reply that wrote documents: keep each as a version, then show the newest text if that document is open.
 async function recordArtifacts() {
   const last = view.messages[view.messages.length - 1];

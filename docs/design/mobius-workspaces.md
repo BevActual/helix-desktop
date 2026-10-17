@@ -58,3 +58,12 @@ the document on the stage, where the person edits it (it saves as they type, as 
 sees earlier versions, copies it, or saves it as a file. While a document is open it is attached to what the person sends, as a chip they can
 remove, so "make the second paragraph shorter" works on the text in front of them. `artifacts.rs` keeps the versions (up to 20 per document,
 per chat); `workpanel.tsx` is the panel; `tools/nested/mobius-stage-test.sh` runs it.
+
+## Second slice (built): the workspace switcher and the Code stage
+
+* **The switcher**: "Chat ▾" in the header (Write and Code, with Image, Design and Browse listed as planned), and "Workspace: …" in the palette. Switching closes the other stage, and a different chat starts in Chat again.
+* **Write** opens the Document stage ("Untitled" if the chat has no document yet).
+* **Code** shows the chat's project folder beside the conversation: a filterable file list (text files, bounded, no hidden or build folders), a viewer with line numbers (first 3,000 lines, same boundary as the edit tool), and the files the last turn changed marked with their kind. A changed file shows its **diff** with **Revert this change** instead of its text. The file in view goes to the model with the next message as the same visible chip a document uses. Without a project folder the stage offers to choose one.
+* `code_tree` and `code_read` in `main.rs`, `codestage.tsx`, `tools/nested/mobius-code-test.sh` (open Code, list files, view one, the chip, a turn's edit shows as marked with its diff, revert from the stage).
+
+Still to do for Code: a real folder tree (it is a flat list with the folder in grey), editing in the viewer through the same reviewed `edit_file` path, the terminal and test output on the stage, and search across files.

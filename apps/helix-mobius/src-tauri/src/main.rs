@@ -1444,6 +1444,66 @@ fn memory_remove(id: u64) -> Vec<helix_chat::memory::Item> {
     memory.items
 }
 
+#[derive(Serialize)]
+struct CodeTree {
+    root: String,
+    files: Vec<String>,
+}
+
+/// The text files of the chat's project folder, for the Code stage's tree (bounded; see `attach::find_files`).
+#[tauri::command]
+fn code_tree(app: AppHandle) -> Result<CodeTree, String> {
+    let workspace = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        state.chat.conversation.workspace.clone()
+    };
+    if workspace.is_empty() {
+        return Err("This chat has no project folder yet.".into());
+    }
+    let root = terminal::workspace(&workspace)?;
+    let mut files: Vec<String> = attach::find_files(&root, "", 600)
+        .into_iter()
+        .map(|(rel, _)| rel)
+        .collect();
+    files.sort();
+    Ok(CodeTree {
+        root: root.display().to_string(),
+        files,
+    })
+}
+
+#[derive(Serialize)]
+struct CodeFile {
+    text: String,
+    truncated: bool,
+}
+
+/// One file of the project folder for the Code stage's viewer: the first 3,000 lines. Same boundary as the edit tool (inside the folder, not
+/// hidden, not a link, not credentials).
+#[tauri::command]
+fn code_read(app: AppHandle, path: String) -> Result<CodeFile, String> {
+    let workspace = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        state.chat.conversation.workspace.clone()
+    };
+    let root = terminal::workspace(&workspace)?;
+    let file = edits::resolve(&root, &path)?;
+    let meta = std::fs::metadata(&file).map_err(|_| "That file does not exist.".to_string())?;
+    if !meta.is_file() || meta.len() > edits::MAX_FILE_BYTES {
+        return Err("That is not a text file small enough to show.".into());
+    }
+    let text = std::fs::read_to_string(&file)
+        .map_err(|_| "That file is not readable text.".to_string())?;
+    let lines: Vec<&str> = text.lines().collect();
+    let truncated = lines.len() > 3000;
+    Ok(CodeFile {
+        text: terminal::display(&lines[..lines.len().min(3000)].join("\n"), usize::MAX),
+        truncated,
+    })
+}
+
 /// The project rules Tools mode will read from a folder (for the Tools sheet).
 #[tauri::command]
 fn tools_rules(folder: String) -> Option<rules::Rules> {
@@ -3118,6 +3178,8 @@ fn main() {
             artifacts::stage_get,
             artifacts::stage_record,
             tools_rules,
+            code_tree,
+            code_read,
             memory_list,
             memory_add,
             memory_remove,
