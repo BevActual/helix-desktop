@@ -1516,3 +1516,4 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .thinking { margin: 4px 0 10px; color: var(--label-2); font-size: 13px; }
 .thinking summary { cursor: pointer; font-weight: 600; list-style: none; } .thinking summary::before { content: "◦ "; }
 .thinking p { margin: 6px 0 0 14px; padding-left: 10px; border-left: 2px solid var(--hairline); white-space: pre-wrap; }
+.tools-rules { margin: 8px 0; } .tools-rules summary { cursor: pointer; } .tools-rules pre { max-height: 140px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
