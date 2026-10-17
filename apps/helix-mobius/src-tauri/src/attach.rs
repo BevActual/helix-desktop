@@ -388,17 +388,27 @@ mod tests {
     }
 }
 
-
 /// A text file under `root` that matches `query` (every word of it appears in the path, any case), for the composer's `@` picker. A bounded
 /// breadth-first walk: no hidden or build folders, a few thousand entries at most, and only files whose extension is text.
 pub fn find_files(root: &Path, query: &str, limit: usize) -> Vec<(String, PathBuf)> {
-    const SKIP: &[&str] = &["node_modules", "target", "dist", "build", "__pycache__", "vendor"];
+    const SKIP: &[&str] = &[
+        "node_modules",
+        "target",
+        "dist",
+        "build",
+        "__pycache__",
+        "vendor",
+    ];
     let words: Vec<String> = query.split_whitespace().map(|w| w.to_lowercase()).collect();
     let mut hits: Vec<(String, PathBuf)> = Vec::new();
     let mut queue = std::collections::VecDeque::from([(root.to_path_buf(), 0usize)]);
     let mut visited = 0usize;
     while let Some((dir, depth)) = queue.pop_front() {
-        let mut entries: Vec<_> = std::fs::read_dir(&dir).into_iter().flatten().flatten().collect();
+        let mut entries: Vec<_> = std::fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .collect();
         entries.sort_by_key(|e| e.file_name());
         for entry in entries {
             visited += 1;
@@ -409,18 +419,28 @@ pub fn find_files(root: &Path, query: &str, limit: usize) -> Vec<(String, PathBu
             if name.starts_with('.') {
                 continue;
             }
-            let Ok(kind) = entry.file_type() else { continue };
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
             let path = entry.path();
             if kind.is_dir() {
                 if depth < 5 && !SKIP.contains(&name.as_str()) {
                     queue.push_back((path, depth + 1));
                 }
             } else if kind.is_file() {
-                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                let ext = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
                 if !TEXT_EXTENSIONS.contains(&ext.as_str()) {
                     continue;
                 }
-                let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().to_lowercase();
+                let rel = path
+                    .strip_prefix(root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_lowercase();
                 if words.iter().all(|w| rel.contains(w)) {
                     hits.push((rel_display(root, &path), path));
                 }
@@ -438,13 +458,20 @@ pub fn find_files(root: &Path, query: &str, limit: usize) -> Vec<(String, PathBu
 }
 
 fn rel_display(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root).unwrap_or(path).to_string_lossy().into_owned()
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Read one file the `@` picker offered. It must still be inside `root` (the chat's project folder), whatever the front end sends.
 pub fn read_inside(root: &Path, path: &str) -> Result<Attachment, String> {
-    let root = root.canonicalize().map_err(|e| format!("The project folder is not available: {e}"))?;
-    let file = PathBuf::from(path).canonicalize().map_err(|e| format!("Could not open {path}: {e}"))?;
+    let root = root
+        .canonicalize()
+        .map_err(|e| format!("The project folder is not available: {e}"))?;
+    let file = PathBuf::from(path)
+        .canonicalize()
+        .map_err(|e| format!("Could not open {path}: {e}"))?;
     if !file.starts_with(&root) {
         return Err("That file is outside the project folder.".into());
     }
