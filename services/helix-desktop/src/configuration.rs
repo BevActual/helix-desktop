@@ -106,15 +106,20 @@ fn json_equivalent(a: &JsonValue, b: &JsonValue) -> bool {
     }
 }
 
+/// Any client of the person's session may edit an ordered list, as any may change a scalar setting with `Update`: Settings is its own
+/// application. A Helix desktop (the shell) must be registered, since these lists configure it.
 fn apply_ordered_list_update(
     state: &mut State,
-    sender: &str,
     id: &str,
     expected: &[OwnedValue],
     value: &[OwnedValue],
 ) -> fdo::Result<()> {
     use helix_config::ordered_lists;
-    require_desktop(state, sender)?;
+    if state.desktop.is_none() {
+        return Err(fdo::Error::InvalidArgs(
+            "Ordered desktop lists require Helix desktop".into(),
+        ));
+    }
     let display_names = display_output_names(state, true);
     let catalog = state.config.full_catalog(true, &display_names);
     let entry = ordered_lists::catalog_entry(&catalog, id)
@@ -298,16 +303,11 @@ impl Configuration {
 
     async fn update_ordered_list(
         &self,
-        #[zbus(header)] header: Header<'_>,
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         id: &str,
         expected: Vec<OwnedValue>,
         value: Vec<OwnedValue>,
     ) -> fdo::Result<()> {
-        let sender = header
-            .sender()
-            .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
-            .to_string();
         let mut state = self.state.lock().await;
         if state.desktop.is_none() {
             return Err(fdo::Error::InvalidArgs(
@@ -315,7 +315,7 @@ impl Configuration {
             ));
         }
         state.config.force_reload();
-        apply_ordered_list_update(&mut state, &sender, id, &expected, &value)?;
+        apply_ordered_list_update(&mut state, id, &expected, &value)?;
         drop(state);
         Self::changed(&emitter).await.ok();
         Ok(())
@@ -323,19 +323,14 @@ impl Configuration {
 
     async fn update_application_list(
         &self,
-        #[zbus(header)] header: Header<'_>,
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         id: &str,
         expected: Vec<OwnedValue>,
         value: Vec<OwnedValue>,
     ) -> fdo::Result<()> {
-        let sender = header
-            .sender()
-            .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
-            .to_string();
         let mut state = self.state.lock().await;
         state.config.force_reload();
-        apply_ordered_list_update(&mut state, &sender, id, &expected, &value)?;
+        apply_ordered_list_update(&mut state, id, &expected, &value)?;
         drop(state);
         Self::changed(&emitter).await.ok();
         Ok(())
