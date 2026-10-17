@@ -199,3 +199,7 @@ Still to do: a search box in the menu for the full OpenRouter catalog (and per-m
 ### Memory (done)
 
 `/remember <fact>` keeps a fact; `/memory` opens the list (add, forget). At most 40 facts of 300 characters in one file (`memory.json`), the newest 1,500 characters of them added to the system prompt, and **only when the model runs on this computer**: a cloud route never receives them. The model cannot write to it; only the person does. `core/helix-chat/src/memory.rs` (unit tested), `tools/nested/mobius-memory-test.sh`.
+
+### Thinking, folded (done)
+
+A reasoning model (Qwen3, DeepSeek-R1 and the like) writes `<think>…</think>` before its answer; it used to print raw. It is now a folded "Thought it through" row above the answer (open as "Thinking…" while it is written), the answer reads as the reply, and the thinking is **not sent back** as history, not used for the chat's auto-title and not in the Markdown export. Only a tag at the very start counts. `markdown::split_thinking` / `parse_reply` (unit tested), `tools/nested/mobius-think-test.sh`.

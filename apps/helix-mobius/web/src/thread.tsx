@@ -15,7 +15,8 @@ export type Block =
   | { kind: "rule" }
   | { kind: "table"; headers: Span[][]; rows: Span[][][]; alignments: ("left" | "center" | "right")[] }
   | { kind: "list"; ordered: boolean; items: Span[][] }
-  | { kind: "code"; language: string; text: string };
+  | { kind: "code"; language: string; text: string }
+  | { kind: "thinking"; text: string; done: boolean };
 interface Source { provider?: string; title: string; url: string; kind: string; fetched: number }
 /** A desktop task handed over from this chat (Act) and how it ended. Shown after `after` messages; never part of what a model is sent. */
 export interface DesktopTask { id: number; after: number; request: string; outcome: string; summary: string; detail: string; before?: string; after_text?: string; undone?: boolean; at: number }
@@ -211,6 +212,11 @@ function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend }: { block
               </div>
             </div>;
           }
+          case "thinking":
+            return <details key={index} className="thinking" data-test="thinking" open={!block.done}>
+              <summary>{block.done ? "Thought it through" : "Thinking…"}</summary>
+              <p>{block.text}</p>
+            </details>;
           case "code": {
             const chart = block.language === "chart" ? parseChart(block.text) : null;
             if (chart) return <Chart key={index} spec={chart} />;
