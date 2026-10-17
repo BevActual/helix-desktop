@@ -387,3 +387,105 @@ mod tests {
         assert!(is_probably_text(Path::new("a.txt"), b"hello"));
     }
 }
+
+
+/// A text file under `root` that matches `query` (every word of it appears in the path, any case), for the composer's `@` picker. A bounded
+/// breadth-first walk: no hidden or build folders, a few thousand entries at most, and only files whose extension is text.
+pub fn find_files(root: &Path, query: &str, limit: usize) -> Vec<(String, PathBuf)> {
+    const SKIP: &[&str] = &["node_modules", "target", "dist", "build", "__pycache__", "vendor"];
+    let words: Vec<String> = query.split_whitespace().map(|w| w.to_lowercase()).collect();
+    let mut hits: Vec<(String, PathBuf)> = Vec::new();
+    let mut queue = std::collections::VecDeque::from([(root.to_path_buf(), 0usize)]);
+    let mut visited = 0usize;
+    while let Some((dir, depth)) = queue.pop_front() {
+        let mut entries: Vec<_> = std::fs::read_dir(&dir).into_iter().flatten().flatten().collect();
+        entries.sort_by_key(|e| e.file_name());
+        for entry in entries {
+            visited += 1;
+            if visited > 4000 {
+                break;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with('.') {
+                continue;
+            }
+            let Ok(kind) = entry.file_type() else { continue };
+            let path = entry.path();
+            if kind.is_dir() {
+                if depth < 5 && !SKIP.contains(&name.as_str()) {
+                    queue.push_back((path, depth + 1));
+                }
+            } else if kind.is_file() {
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                if !TEXT_EXTENSIONS.contains(&ext.as_str()) {
+                    continue;
+                }
+                let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().to_lowercase();
+                if words.iter().all(|w| rel.contains(w)) {
+                    hits.push((rel_display(root, &path), path));
+                }
+            }
+        }
+    }
+    // The name matching the start of the query first, then the shorter path.
+    let first = words.first().cloned().unwrap_or_default();
+    hits.sort_by_key(|(rel, _)| {
+        let file = rel.rsplit('/').next().unwrap_or(rel).to_lowercase();
+        (!file.starts_with(&first), rel.len())
+    });
+    hits.truncate(limit);
+    hits
+}
+
+fn rel_display(root: &Path, path: &Path) -> String {
+    path.strip_prefix(root).unwrap_or(path).to_string_lossy().into_owned()
+}
+
+/// Read one file the `@` picker offered. It must still be inside `root` (the chat's project folder), whatever the front end sends.
+pub fn read_inside(root: &Path, path: &str) -> Result<Attachment, String> {
+    let root = root.canonicalize().map_err(|e| format!("The project folder is not available: {e}"))?;
+    let file = PathBuf::from(path).canonicalize().map_err(|e| format!("Could not open {path}: {e}"))?;
+    if !file.starts_with(&root) {
+        return Err("That file is outside the project folder.".into());
+    }
+    read_one(&file)
+}
+
+/// A past chat as an attachment: its messages as plain text, cut to the size of a file.
+pub fn chat_text(id: &str, title: &str, transcript: &str) -> Attachment {
+    let original_chars = transcript.chars().count();
+    let content: String = transcript.chars().take(MAX_ATTACH_FILE_CHARS).collect();
+    Attachment {
+        name: format!("Chat: {}", title.chars().take(100).collect::<String>()),
+        path: format!("chat:{id}"),
+        chars: content.chars().count(),
+        original_chars,
+        content,
+    }
+}
+
+#[cfg(test)]
+mod mention_tests {
+    use super::*;
+
+    #[test]
+    fn finds_text_files_by_every_word_and_skips_build_folders() {
+        let dir = std::env::temp_dir().join(format!("mention-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src/ui")).unwrap();
+        std::fs::create_dir_all(dir.join("node_modules/x")).unwrap();
+        std::fs::write(dir.join("src/ui/notes-plan.md"), "plan").unwrap();
+        std::fs::write(dir.join("src/main.rs"), "fn main() {}").unwrap();
+        std::fs::write(dir.join("src/logo.png"), [0u8, 1]).unwrap();
+        std::fs::write(dir.join("node_modules/x/notes.md"), "no").unwrap();
+        let hits = find_files(&dir, "notes", 10);
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert_eq!(hits[0].0, "src/ui/notes-plan.md");
+        assert_eq!(find_files(&dir, "src main", 10).len(), 1);
+        assert!(find_files(&dir, "logo", 10).is_empty(), "binary extension");
+        // a path outside the folder is refused whatever the front end sends
+        assert!(read_inside(&dir, "/etc/hostname").is_err());
+        assert!(read_inside(&dir, dir.join("src/main.rs").to_str().unwrap()).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

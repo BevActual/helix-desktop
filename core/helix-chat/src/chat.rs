@@ -32,7 +32,7 @@ pub const SYSTEM_PROMPT: &str = "You are Mobius, the assistant built into the pe
 in plain text; put code and commands in fenced code blocks.\n\
 You are a chat assistant: you cannot change anything on the computer, open apps or run commands, and you must never say or imply that \
 you did. If the person asks you to change something on the desktop (volume, brightness, Wi-Fi, windows, files, settings), reply in one \
-sentence that you can't do that from chat and that the Act button (Ctrl+Shift+A) can. Never write \"Act (...)\".\n\
+sentence that you can't do that from chat and that Act mode (the mode menu beside Send, or Shift+Tab) can. Never write \"Act (...)\".\n\
 When a command could delete or overwrite data, say what it does, name the risk, and suggest a safer step first.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
