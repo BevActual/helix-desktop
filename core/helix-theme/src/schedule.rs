@@ -25,6 +25,24 @@ pub struct LocalTime {
     pub gmt_offset_secs: i64,
 }
 
+impl LocalTime {
+    /// The wall clock now.
+    pub fn now() -> Self {
+        // SAFETY: `time` and `localtime_r` are called with valid pointers; `tm` is plain data.
+        unsafe {
+            let now = libc::time(std::ptr::null_mut());
+            let mut tm: libc::tm = std::mem::zeroed();
+            libc::localtime_r(&now, &mut tm);
+            Self {
+                minute_of_day: tm.tm_hour * 60 + tm.tm_min,
+                second: tm.tm_sec,
+                day_of_year: tm.tm_yday + 1,
+                gmt_offset_secs: tm.tm_gmtoff,
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Evaluation {
     pub night: bool,

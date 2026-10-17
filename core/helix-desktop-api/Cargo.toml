@@ -9,7 +9,6 @@ description = "zbus client for org.helix.Desktop. Method names are checked again
 [dependencies]
 futures-util = { workspace = true }
 helix-theme = { workspace = true }
-libc = { workspace = true }
 tokio = { workspace = true, features = ["time", "macros"] }
 serde_json = { workspace = true }
 zbus = { workspace = true, features = ["tokio"] }

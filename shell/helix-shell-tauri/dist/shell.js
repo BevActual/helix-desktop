@@ -916,7 +916,7 @@ $("tile-dark").addEventListener("click", () => invoke("quick_set_dark", { on: $(
 $("tile-night").addEventListener("click", () => invoke("quick_set_night_light", { on: $("tile-night").dataset.on !== "1" }));
 function drawQuick(view) {
   // The shell follows the system theme: the same setting the Dark theme tile changes.
-  document.documentElement.dataset.theme = view.dark === false ? "light" : "dark";
+  document.documentElement.dataset.theme = view.resolved_dark === false ? "light" : "dark";
   if (reactControls) { queueReport(); return; }
   const dark = view.dark !== null && view.dark !== undefined;
   $("tile-dark").style.display = dark ? "" : "none";

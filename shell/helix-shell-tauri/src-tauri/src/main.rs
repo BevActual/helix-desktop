@@ -1102,14 +1102,34 @@ async fn refresh_quick(app: &AppHandle) {
         Some(desktop) => desktop.settings().await.unwrap_or(serde_json::Value::Null),
         None => serde_json::Value::Null,
     };
-    let quick = Quick::from_settings(&settings);
+    let mut quick = Quick::from_settings(&settings);
+    quick.set_resolved_dark(helix_desktop_api::theme_is_dark_json(
+        &settings,
+        helix_desktop_api::LocalTime::now(),
+    ));
     let view = quick.view();
     shell_state(app).lock().expect("shell state").quick = quick;
     let _ = app.emit("quick-view", view);
 }
 
-/// Follows Configuration1.Changed (no polling), coalesced like the others.
+/// Follows Configuration1.Changed (no polling), coalesced like the others. Under Automatic the theme also turns at sunset and sunrise,
+/// so once a minute (only then) the tiles are read again.
 fn watch_quick(app: AppHandle) {
+    let ticking = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            let automatic = shell_state(&ticking)
+                .lock()
+                .expect("shell state")
+                .quick
+                .mode()
+                == Some("auto");
+            if automatic {
+                refresh_quick(&ticking).await;
+            }
+        }
+    });
     tauri::async_runtime::spawn(async move {
         let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
         loop {

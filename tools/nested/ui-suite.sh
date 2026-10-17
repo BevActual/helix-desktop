@@ -20,6 +20,7 @@ sel=("$@")
 pick() { [ ${#sel[@]} -eq 0 ] && return 0; for n in "${sel[@]}"; do [ "$n" = "$1" ] && return 0; done; return 1; }
 pick launcher       && run launcher launcher-test.sh tauri-shell.sh
 pick qs             && run qs quick-settings-test.sh tauri-fake-desktop.sh
+pick shell-auto-theme && run shell-auto-theme shell-auto-theme-test.sh tauri-fake-desktop.sh
 pick net            && run net network-test.sh tauri-fake-desktop.sh
 pick bt             && run bt bluetooth-test.sh tauri-fake-desktop.sh
 pick ctl            && run ctl shell-control-test.sh tauri-shell.sh
