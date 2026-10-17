@@ -156,3 +156,5 @@ each. Still to do: accept or reject before a command runs (a command cannot be p
 restore of the whole turn in one click, and files the snapshot does not cover (binaries, large files, ignored folders).
 
 **Checklist (done).** `{"type":"checklist","title":"…","items":["a",{"label":"b","done":true}]}`: up to 20 items with a progress bar and an "n of m" count. Ticks are the person's own and stay in this browser (keyed by the list's text, so they survive a reload and are lost harmlessly); "Tell Mobius where I am" sends "Done: …  Left: …" as a message when the person wants the model to know.
+
+**Diagrams (done).** A fenced block labelled `diagram`: one edge per line (`Build -> Test : on push`), nodes named by their words or declared `id[Label]`, an optional first line `LR` for left to right. Mobius lays it out in layers (longest path from a start) and draws an SVG; a line that goes back to an earlier step is drawn as a dashed curve round the others, so loops are kept. Up to 30 nodes and 60 edges; a block it cannot read stays code. `apps/helix-mobius/web/src/diagram.tsx`, in `mobius-chart-test.sh`.

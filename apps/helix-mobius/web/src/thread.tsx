@@ -1,4 +1,5 @@
 import { Chart, parseChart } from "./chart";
+import { FlowDiagram, parseDiagram } from "./diagram";
 import { Ephemeral, parseUi } from "./ephemeral";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -213,6 +214,8 @@ function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend }: { block
           case "code": {
             const chart = block.language === "chart" ? parseChart(block.text) : null;
             if (chart) return <Chart key={index} spec={chart} />;
+            const flow = block.language === "diagram" ? parseDiagram(block.text) : null;
+            if (flow) return <FlowDiagram key={index} diagram={flow} />;
             const ui = block.language === "ui" ? parseUi(block.text) : null;
             if (ui) return <Ephemeral key={index} spec={ui} live={!!live && !!onSend} onSend={onSend ?? (() => undefined)} />;
             return (
