@@ -21,7 +21,7 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 |---|---|---|
 | Merge the `land-greeter-sync-and-doc-reset` branch | S | Greeter appearance sync, Sound page, Act task card, build and docs reset |
 | Pin the toolchain (`rust-toolchain.toml`) | S | Fedora `rustc` with a rustup `clippy-driver` on one `PATH` fails with "incompatible version of rustc" |
-| Write the RPM spec over `tools/install.sh --require-session`, with a systemd user preset and a decision on how the compositor is packaged | M | `PACKAGING.md`; the installer now covers the whole session |
+| RPM follow-ups (`PACKAGING.md` "Not done"): a COPR project with automatic builds, a CI job for `tools/packaging/rpm-test.sh`, signing, aarch64, SELinux for the greeter; then publish the install steps in `docs/user` | M | `packaging/helix.spec` exists | `PACKAGING.md` |
 | Move CI to a Fedora container and install the real dependency list from `BUILDING.md` | M | CI builds on Arch with a list trimmed from the C++ one, so it is not the platform we ship on |
 | Audit the remaining `docs/user` pages (configuration, services, launcher, control-center, theming, ipc) against what the Tauri shell does, rewrite or retire each | M | Most still describe the previous TOML-configured shell; the overview says so |
 | Run the soak checklist on the real session now that C++ is gone | M | `rust-desktop-soak.md` |

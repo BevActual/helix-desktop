@@ -15,7 +15,7 @@ One Git tree builds everything:
   build runs `npm ci` first (offline against a vendored cache, or with network access allowed for that step).
 - Vendor Cargo and npm dependencies for an offline build (`cargo vendor`, an npm cache); both lock files are committed.
 
-Build and install commands are in [BUILDING.md](BUILDING.md). The packager's usual sequence:
+Build and install commands are in [BUILDING.md](BUILDING.md). The sequence a non-RPM packager runs:
 
 ```sh
 npm ci
@@ -46,6 +46,54 @@ Options: `--prefix`, `--destdir`, `--profile`, `--no-build`, `--services-only` (
 Not installed, on purpose: the compositor (`tools/install-trusted-niri.sh`), greetd's configuration (`tools/install-greeter.sh`, which
 edits `/etc/greetd`), and any per-user niri configuration. Units are installed disabled; enabling is per user
 (`systemctl --user enable --now helix-shell-strut helix-shell-bar helix-wallpaper helix-idle`), or with a preset file in the package.
+
+## RPM
+
+`packaging/helix.spec` builds three packages from this tree. Fedora on x86_64 is the only target that has been built and checked.
+
+| Package | Holds | License | Why separate |
+|---|---|---|---|
+| `helix` | the services, the session shell and the apps, the systemd user units and a user preset, D-Bus activation files, polkit policy, desktop entries, icons, theme templates, agent policy tables | MIT, and the licenses of what it links | the product |
+| `helix-niri` | the compositor as `/usr/bin/niri`, `niri-session`, the Wayland session entry, portal config, units, shell completions, a system `/etc/niri/config.kdl` | GPL-3.0-or-later, and what it links | a different license, and a person may want only the compositor |
+| `helix-greeter` | the login screen, its session script, its private compositor config, a greetd configuration to copy | MIT, and what it links | it needs greetd and changes how logging in works, so it is opt-in |
+
+Build, from a clean checkout (a package must not be built from a tree with a model engine in `third_party/`; rpmbuild rejects the build path it
+leaves in the binaries):
+
+```sh
+tools/packaging/make-sources.sh              # rpm-sources/: the committed tree, vendored crates, node_modules
+rpmbuild -bb --define "_sourcedir $PWD/rpm-sources" packaging/helix.spec
+```
+
+`make-sources.sh` needs network once; the build does not (`--locked --offline`, the crates vendored with the cargo config that points at them, `node_modules` unpacked so each
+app's `build.rs` builds its web view). Make the two dependency archives again whenever `Cargo.lock` or `package-lock.json` changes.
+
+Check the spec without a release build: `tools/packaging/rpm-test.sh` builds the packages from the binaries already in `target/fast` (build them first, as its header says) and
+checks what came out: every installed file is packaged, the compositor replaces `niri`, nothing touches `/etc/greetd`, every unit the preset enables is shipped, the license lines are current.
+
+### Decisions
+
+* **The compositor installs `/usr/bin/niri`, conflicts with the distribution's `niri` and provides it.** The binary keeps its name (`compositor/HELIX.md`), the greeter and
+  `niri-session` run `/usr/bin/niri`, and the shell finds the fork by the `helix` in its version string. Renaming it would need every launcher changed for no gain; the cost
+  is that installing it removes stock niri, which is what a person who wants Helix's compositor expects.
+* **`/etc/niri/config.kdl` is the default config plus the `trusted-surface` block naming `/usr/bin/helix-shell-tauri`.** Without that block the compositor cannot protect the
+  approval dialog, and the shell then refuses confirm-tier actions (`docs/design/trusted-surface.md`). A person with their own `~/.config/niri/config.kdl` includes
+  `/usr/share/helix/niri/helix-trusted-surface.kdl` in it. It is `%config(noreplace)`.
+* **Units are enabled by a preset, not by the person.** `90-helix.preset` enables the strut, bar, wallpaper and idle units; the package's post-install script applies it
+  (`systemd-update-helper install-user-units`). The panels unit is wanted by the bar; the desktop and inference services start by D-Bus activation.
+* **greetd is never written.** The greeter package ships `/usr/share/helix-greeter/greetd-config.toml` to copy; replacing `/etc/greetd/config.toml` is the administrator's act, as
+  `tools/install-greeter.sh` makes it for a source install (with a backup).
+* **The model engines and their workers are not packaged** (`helix-transcribe`, `helix-image` are removed from the install). They are built by hand into `third_party/`; the
+  inference service runs without them.
+* **Bundled dependencies.** The crates and node modules are vendored, which Fedora's own repositories do not accept; this spec is for a COPR or an own repository. The
+  `License:` lines are generated from Cargo metadata and `package-lock.json` (`tools/packaging/licenses.py --write`, checked by `rpm-test.sh`). `bundled(crate(...))`
+  provides are not generated.
+* **No debuginfo package** (`debug_package` is nil): Rust debuginfo for this tree is very large. The workspace's release profile decides code generation; the build keeps
+  only the link hardening from the distribution's flags.
+
+### Not done
+
+Signing, a COPR project and its automatic builds, a CI job that runs `rpm-test.sh`, aarch64, SELinux policy for the greeter's runtime directory, `bundled()` provides.
 
 ## Identity
 

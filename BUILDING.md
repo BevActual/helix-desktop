@@ -81,3 +81,6 @@ just uninstall                        # remove what install put under the prefix
 `tools/install.sh --help` lists the options (`--services-only` skips the session half and the web view libraries it needs). It does
 not touch greetd's configuration (`tools/install-greeter.sh` writes `/etc/greetd`), the compositor (`tools/install-trusted-niri.sh`)
 or the per-user niri configuration; the model runtime has its own `tools/install-inference.sh`.
+
+As RPM packages (`helix`, `helix-niri`, `helix-greeter`): `tools/packaging/make-sources.sh`, then `rpmbuild -bb --define "_sourcedir $PWD/rpm-sources" packaging/helix.spec`. The decisions behind the
+spec, and what is not done, are in [PACKAGING.md](PACKAGING.md).
