@@ -3,6 +3,7 @@
 //! never run real installs.
 
 mod catalog;
+mod rpm;
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
@@ -16,6 +17,7 @@ use base64::Engine;
 use catalog::{Info, Remote};
 use helix_software_model::software::{
     valid_id, Discover, JobState, JobView, Jobs, Kind, Mutation, Package, PackageView, Store,
+    STORE_KINDS,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -43,6 +45,9 @@ struct State {
     /// The last appstream index, kept so a catalog read can re-attach it at once.
     meta: HashMap<String, helix_software_model::software::Meta>,
     cancels: HashMap<u64, Arc<AtomicBool>>,
+    /// The Fedora applications of the catalog (desktop id, icon, origin) and the names behind the System software row.
+    rpm_apps: HashMap<String, rpm::RpmApp>,
+    rpm_system_names: Vec<String>,
 }
 
 type Shared = Arc<Mutex<State>>;
@@ -109,12 +114,13 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
         guard.error.clear();
     }
     changed(app);
+    let flatpak_on = std::env::var_os("HELIX_SOFTWARE_NO_FLATPAK").is_none();
     const COLUMNS: &str = "--columns=application,name,description,version,origin,download-size";
     // Each installation is read on its own: one remote without a cached summary must not hide the rest, or the installed apps.
     let mut remote_text = String::new();
     let mut update_text = String::new();
     let mut remote_error = String::new();
-    for scope in ["--user", "--system"] {
+    for scope in ["--user", "--system"].into_iter().filter(|_| flatpak_on) {
         match flatpak(&[scope, "remote-ls", "--cached", "--app", COLUMNS]) {
             Ok(text) => remote_text.push_str(&text),
             Err(error) => remote_error = error,
@@ -130,12 +136,25 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
             update_text.push_str(&text);
         }
     }
-    let installed = flatpak(&[
-        "list",
-        "--app",
-        "--columns=application,name,version,origin,installation,size",
-    ]);
-    let remotes = flatpak(&["remotes", "--columns=name,title,url,options"]);
+    let installed = if flatpak_on {
+        flatpak(&[
+            "list",
+            "--app",
+            "--columns=application,name,version,origin,installation,size",
+        ])
+    } else {
+        Err("Flatpak is switched off.".to_string())
+    };
+    let remotes = if flatpak_on {
+        flatpak(&["remotes", "--columns=name,title,url,options"])
+    } else {
+        Err(String::new())
+    };
+    // Fedora's applications, through PackageKit. Where PackageKit is not there (another distribution) the store is Flatpak only.
+    let rpm = read_rpm();
+    if let Err(error) = &rpm {
+        eprintln!("SOFTWARE rpm backend unavailable: {error}");
+    }
     let mut guard = state.lock().expect("state");
     guard.loading = false;
     match installed {
@@ -155,6 +174,11 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
                 &user_remotes,
             );
             packages.extend(firmware_updates());
+            if let Ok((catalog, system)) = rpm {
+                packages.extend(catalog.packages);
+                guard.rpm_apps = catalog.apps;
+                guard.rpm_system_names = system;
+            }
             guard.store.set(packages);
             let kept = guard.meta.clone();
             guard.store.apply_meta(&kept);
@@ -166,13 +190,36 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
             }
         }
         Err(error) => {
-            eprintln!("SOFTWARE catalog error: {error}");
-            guard.error = format!("Could not read the software catalog: {error}");
+            if let Ok((catalog, system)) = rpm {
+                // No Flatpak (or switched off): the Fedora catalog is the store.
+                let mut packages = catalog.packages;
+                packages.extend(firmware_updates());
+                guard.store.set(packages);
+                guard.rpm_apps = catalog.apps;
+                guard.rpm_system_names = system;
+                guard.remotes = Vec::new();
+                guard.icons.clear();
+            } else {
+                eprintln!("SOFTWARE catalog error: {error}");
+                guard.error = format!("Could not read the software catalog: {error}");
+            }
         }
     }
     drop(guard);
     changed(app);
     build_index(state, app);
+}
+
+/// The Fedora catalog merged with what PackageKit says is installed and updatable, and the names behind the System software row.
+fn read_rpm() -> Result<(rpm::RpmCatalog, Vec<String>), String> {
+    let apps = rpm::read_catalog();
+    let packagekit = rpm::PackageKit::connect()?;
+    let installed = packagekit.installed()?;
+    // Updates need the repository metadata; without it the catalog is still right about what is installed.
+    let updates = packagekit.updates().unwrap_or_default();
+    let catalog = rpm::build(apps, &installed, &updates);
+    let system = rpm::system_update_names(&updates, &catalog.apps);
+    Ok((catalog, system))
 }
 
 /// Reads the appstream documents of the configured remotes once and attaches categories, release dates and verification to the catalog,
@@ -272,7 +319,14 @@ fn refresh_in_background(app: &AppHandle, network: bool) {
             }
             changed(&app);
             // Fetch fresh appstream and summaries; a failure (offline) leaves the cached catalog in place.
-            let result = flatpak(&["update", "--appstream", "-y", "--noninteractive"]);
+            let result = if std::env::var_os("HELIX_SOFTWARE_NO_FLATPAK").is_some() {
+                Ok(String::new())
+            } else {
+                flatpak(&["update", "--appstream", "-y", "--noninteractive"])
+            };
+            // Fedora's repositories, through PackageKit (absent on other distributions: then there is nothing to refresh).
+            let refreshed =
+                rpm::PackageKit::connect().and_then(|packagekit| packagekit.refresh(None));
             let mut guard = state.lock().expect("state");
             guard.checking = false;
             if result.is_ok() {
@@ -280,6 +334,11 @@ fn refresh_in_background(app: &AppHandle, network: bool) {
             }
             if let Err(error) = result {
                 guard.error = format!("Could not check for updates: {error}");
+                drop(guard);
+                changed(&app);
+            } else if let Err(error) = refreshed {
+                eprintln!("SOFTWARE rpm refresh: {error}");
+                guard.error = format!("Could not refresh the Fedora repositories: {error}");
                 drop(guard);
                 changed(&app);
             }
@@ -365,11 +424,14 @@ fn software_view(
                 });
             let fake = state.fake;
             let has_icon = |p: &Package| {
-                fake || catalog::icon_paths(&p.remote, &p.id, &p.installation)
-                    .iter()
-                    .any(|path| path.is_file())
+                fake || match state.rpm_apps.get(&p.id).filter(|_| p.kind == Kind::Rpm) {
+                    Some(app) => rpm::icon_paths(app).iter().any(|path| path.is_file()),
+                    None => catalog::icon_paths(&p.remote, &p.id, &p.installation)
+                        .iter()
+                        .any(|path| path.is_file()),
+                }
             };
-            let found = state.store.discover(Kind::Flatpak, day, 12, &has_icon);
+            let found = state.store.discover(&STORE_KINDS, day, 12, &has_icon);
             if std::env::var_os("HELIX_SOFTWARE_DEBUG").is_some() {
                 eprintln!(
                     "SOFTWARE discover hero={} shelves={:?}",
@@ -392,13 +454,13 @@ fn software_view(
             };
             let page = state
                 .store
-                .explore_in(Kind::Flatpak, &query, in_category, offset, limit);
+                .explore_in(&STORE_KINDS, &query, in_category, offset, limit);
             (page.rows, page.total)
         }
         "library" => {
             let all: Vec<PackageView> = state
                 .store
-                .library(Kind::Flatpak)
+                .library(&STORE_KINDS)
                 .into_iter()
                 .filter(|p| {
                     needle.is_empty()
@@ -443,7 +505,7 @@ fn software_view(
             Vec::new()
         },
         update_count: state.store.updates().len(),
-        installed_count: state.store.library(Kind::Flatpak).len(),
+        installed_count: state.store.library(&STORE_KINDS).len(),
         loading: state.loading,
         checking: state.checking,
         error: state.error.clone(),
@@ -470,10 +532,14 @@ struct InfoView {
 /// The long description, developer, licence and categories from the appstream data of the package's remote.
 #[tauri::command]
 async fn software_info(app: AppHandle, id: String) -> InfoView {
-    let (package, fake_text) = {
+    let (package, fake_text, rpm_app) = {
         let shared = shared(&app);
         let state = shared.lock().expect("state");
-        (state.store.detail(&id), state.fake_info.get(&id).cloned())
+        (
+            state.store.detail(&id),
+            state.fake_info.get(&id).cloned(),
+            state.rpm_apps.get(&id).cloned(),
+        )
     };
     if let Some(description) = fake_text {
         return InfoView {
@@ -494,6 +560,20 @@ async fn software_info(app: AppHandle, id: String) -> InfoView {
         };
     };
     tauri::async_runtime::spawn_blocking(move || {
+        if package.kind == Kind::Rpm {
+            // A Fedora application: its description is in the distribution's catalog.
+            let block = rpm_app.as_ref().and_then(rpm::find_block);
+            return match block {
+                Some(block) => InfoView {
+                    info: catalog::parse_component(&block),
+                    found: true,
+                },
+                None => InfoView {
+                    info: Info::default(),
+                    found: false,
+                },
+            };
+        }
         let order: [&str; 2] = if package.installation == "system" {
             ["system", "user"]
         } else {
@@ -616,7 +696,8 @@ async fn software_screenshots(app: AppHandle, id: String) -> Vec<ScreenView> {
             })
             .collect();
     }
-    let Some(package) = package else {
+    // Only Flatpak remotes publish screenshots from a host this app is willing to fetch from.
+    let Some(package) = package.filter(|p| p.kind == Kind::Flatpak) else {
         return Vec::new();
     };
     tauri::async_runtime::spawn_blocking(move || {
@@ -717,7 +798,15 @@ fn software_icon(app: AppHandle, id: String) -> Option<String> {
         return Some(uri.clone());
     }
     let package = state.store.detail(&id)?;
-    let found = catalog::icon_paths(&package.remote, &package.id, &package.installation)
+    let candidates = match state
+        .rpm_apps
+        .get(&id)
+        .filter(|_| package.kind == Kind::Rpm)
+    {
+        Some(app) => rpm::icon_paths(app),
+        None => catalog::icon_paths(&package.remote, &package.id, &package.installation),
+    };
+    let found = candidates
         .into_iter()
         .find_map(|path| {
             std::fs::read(path)
@@ -822,17 +911,47 @@ fn plan_command(
     id: &str,
     mutation: Mutation,
     package: Option<&PackageView>,
-) -> Result<Vec<String>, String> {
+) -> Result<Plan, String> {
     if state.fake {
-        return Ok(Vec::new());
+        return Ok(Plan::Fake);
     }
     let s = |args: &[&str]| args.iter().map(|a| a.to_string()).collect::<Vec<_>>();
     if id == "*" {
-        return Ok(s(&["flatpak", "update", "-y", "--noninteractive"]));
+        // Every kind that has something to update, in turn; a failure stops the rest.
+        let has = |kind: Kind| state.store.updates().iter().any(|p| p.kind == kind);
+        let mut steps = Vec::new();
+        if has(Kind::Flatpak) {
+            steps.push(Step::Command(s(&[
+                "flatpak",
+                "update",
+                "-y",
+                "--noninteractive",
+            ])));
+        }
+        if has(Kind::Rpm) {
+            steps.push(Step::Rpm(rpm::Op::Update(None)));
+        }
+        return Ok(Plan::Steps(steps));
     }
     let package = package.ok_or("Unknown package.")?;
     if package.kind == Kind::Firmware {
-        return Ok(s(&["fwupdmgr", "update", "-y", "--no-reboot-check"]));
+        return Ok(Plan::Steps(vec![Step::Command(s(&[
+            "fwupdmgr",
+            "update",
+            "-y",
+            "--no-reboot-check",
+        ]))]));
+    }
+    if package.kind == Kind::Rpm {
+        let op = match mutation {
+            Mutation::Install => rpm::Op::Install(package.id.clone()),
+            Mutation::Remove => rpm::Op::Remove(package.id.clone()),
+            Mutation::Update if package.id == rpm::SYSTEM_UPDATES => {
+                rpm::Op::Update(Some(state.rpm_system_names.clone()))
+            }
+            Mutation::Update => rpm::Op::Update(Some(vec![package.id.clone()])),
+        };
+        return Ok(Plan::Steps(vec![Step::Rpm(op)]));
     }
     let scope = |installation: &str| {
         if installation == "user" {
@@ -841,7 +960,7 @@ fn plan_command(
             "--system"
         }
     };
-    Ok(match mutation {
+    Ok(Plan::Steps(vec![Step::Command(match mutation {
         Mutation::Install => {
             // A user installation of the remote needs no authentication, so it wins.
             let user = state
@@ -885,7 +1004,181 @@ fn plan_command(
             scope(&package.installation).into(),
             package.id.clone(),
         ],
-    })
+    })]))
+}
+
+/// What a confirmed change runs: the page never builds a command, the store's own knowledge of the package does.
+enum Plan {
+    /// The fake catalog of the nested tests.
+    Fake,
+    Steps(Vec<Step>),
+}
+
+enum Step {
+    /// A Flatpak or fwupd command line.
+    Command(Vec<String>),
+    /// A change made through PackageKit.
+    Rpm(rpm::Op),
+}
+
+/// Runs the fake backend: a few visible steps so the page can be tested.
+fn run_fake(
+    app: &AppHandle,
+    job: u64,
+    id: &str,
+    mutation: Mutation,
+    cancel: &Arc<AtomicBool>,
+) -> (JobState, String) {
+    let state = shared(app);
+    // Fake backend: a few visible steps so the page can be tested.
+    let delay = std::env::var("HELIX_SOFTWARE_FAKE_STEP_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(250);
+    let mut outcome = (JobState::Done, String::new());
+    for step in 1..=4u8 {
+        std::thread::sleep(Duration::from_millis(delay));
+        if cancel.load(Ordering::SeqCst) {
+            outcome = (JobState::Cancelled, "Cancelled.".into());
+            break;
+        }
+        state
+            .lock()
+            .expect("state")
+            .jobs
+            .progress(job, step * 25 - 5);
+        changed(app);
+    }
+    if outcome.0 == JobState::Done && std::env::var_os("HELIX_SOFTWARE_FAKE_FAIL").is_some() {
+        outcome = (JobState::Failed, "The remote could not be reached.".into());
+    }
+    if outcome.0 == JobState::Done {
+        eprintln!("SOFTWARE fake {:?} {id}", mutation);
+    }
+    outcome
+}
+
+/// Runs a command line, parsing its progress, until it ends or the job is cancelled.
+fn run_command(
+    app: &AppHandle,
+    job: u64,
+    plan: &[String],
+    cancel: &Arc<AtomicBool>,
+) -> (JobState, String) {
+    let spawned = Command::new(&plan[0])
+        .args(&plan[1..])
+        .env("LC_ALL", "C")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn();
+    match spawned {
+        Err(error) => (JobState::Failed, error.to_string()),
+        Ok(mut child) => {
+            let tail = Arc::new(Mutex::new(String::new()));
+            let mut readers = Vec::new();
+            for stream in [
+                child
+                    .stdout
+                    .take()
+                    .map(|s| Box::new(s) as Box<dyn Read + Send>),
+                child
+                    .stderr
+                    .take()
+                    .map(|s| Box::new(s) as Box<dyn Read + Send>),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                let app = app.clone();
+                let tail = tail.clone();
+                readers.push(std::thread::spawn(move || {
+                    let mut stream = stream;
+                    let mut buffer = [0u8; 2048];
+                    while let Ok(n) = stream.read(&mut buffer) {
+                        if n == 0 {
+                            break;
+                        }
+                        let text = String::from_utf8_lossy(&buffer[..n]).into_owned();
+                        if let Some(percent) = last_percent(&text) {
+                            shared(&app)
+                                .lock()
+                                .expect("state")
+                                .jobs
+                                .progress(job, percent);
+                            changed(&app);
+                        }
+                        let mut tail = tail.lock().expect("tail");
+                        tail.push_str(&text);
+                        if tail.len() > 4000 {
+                            let cut = tail.len() - 2000;
+                            *tail = tail[cut..].to_string();
+                        }
+                    }
+                }));
+            }
+            let status = loop {
+                if cancel.load(Ordering::SeqCst) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break None;
+                }
+                match child.try_wait() {
+                    Ok(Some(status)) => break Some(status),
+                    Ok(None) => std::thread::sleep(Duration::from_millis(120)),
+                    Err(_) => break None,
+                }
+            };
+            for reader in readers {
+                let _ = reader.join();
+            }
+            match status {
+                None => (JobState::Cancelled, "Cancelled.".into()),
+                Some(status) if status.success() => (JobState::Done, String::new()),
+                Some(_) => {
+                    let tail = tail.lock().expect("tail");
+                    let last = tail
+                        .split(['\n', '\r'])
+                        .rev()
+                        .map(str::trim)
+                        .find(|l| !l.is_empty() && !l.ends_with('%'))
+                        .unwrap_or("The command failed.");
+                    (
+                        JobState::Failed,
+                        last.trim_start_matches("error: ").to_string(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/// Runs a PackageKit change, with its progress on the job.
+fn run_rpm(
+    app: &AppHandle,
+    job: u64,
+    op: &rpm::Op,
+    cancel: &Arc<AtomicBool>,
+) -> (JobState, String) {
+    let packagekit = match rpm::PackageKit::connect() {
+        Ok(packagekit) => packagekit,
+        Err(error) => return (JobState::Failed, error),
+    };
+    let result = packagekit.run(op, cancel, |percent| {
+        shared(app)
+            .lock()
+            .expect("state")
+            .jobs
+            .progress(job, percent);
+        changed(app);
+    });
+    match result {
+        Ok(()) => (JobState::Done, String::new()),
+        Err(message) if cancel.load(Ordering::SeqCst) && message == "Cancelled." => {
+            (JobState::Cancelled, message)
+        }
+        Err(message) => (JobState::Failed, message),
+    }
 }
 
 fn run_job(
@@ -893,128 +1186,32 @@ fn run_job(
     job: u64,
     id: String,
     mutation: Mutation,
-    plan: Vec<String>,
+    plan: Plan,
     cancel: Arc<AtomicBool>,
 ) {
     let state = shared(&app);
-    let (state_result, message) = if plan.is_empty() {
-        // Fake backend: a few visible steps so the page can be tested.
-        let delay = std::env::var("HELIX_SOFTWARE_FAKE_STEP_MS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(250);
-        let mut outcome = (JobState::Done, String::new());
-        for step in 1..=4u8 {
-            std::thread::sleep(Duration::from_millis(delay));
-            if cancel.load(Ordering::SeqCst) {
-                outcome = (JobState::Cancelled, "Cancelled.".into());
-                break;
-            }
-            state
-                .lock()
-                .expect("state")
-                .jobs
-                .progress(job, step * 25 - 5);
-            changed(&app);
-        }
-        if outcome.0 == JobState::Done && std::env::var_os("HELIX_SOFTWARE_FAKE_FAIL").is_some() {
-            outcome = (JobState::Failed, "The remote could not be reached.".into());
-        }
-        if outcome.0 == JobState::Done {
-            eprintln!("SOFTWARE fake {:?} {id}", mutation);
-        }
-        outcome
-    } else {
-        let spawned = Command::new(&plan[0])
-            .args(&plan[1..])
-            .env("LC_ALL", "C")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn();
-        match spawned {
-            Err(error) => (JobState::Failed, error.to_string()),
-            Ok(mut child) => {
-                let tail = Arc::new(Mutex::new(String::new()));
-                let mut readers = Vec::new();
-                for stream in [
-                    child
-                        .stdout
-                        .take()
-                        .map(|s| Box::new(s) as Box<dyn Read + Send>),
-                    child
-                        .stderr
-                        .take()
-                        .map(|s| Box::new(s) as Box<dyn Read + Send>),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    let app = app.clone();
-                    let tail = tail.clone();
-                    readers.push(std::thread::spawn(move || {
-                        let mut stream = stream;
-                        let mut buffer = [0u8; 2048];
-                        while let Ok(n) = stream.read(&mut buffer) {
-                            if n == 0 {
-                                break;
-                            }
-                            let text = String::from_utf8_lossy(&buffer[..n]).into_owned();
-                            if let Some(percent) = last_percent(&text) {
-                                shared(&app)
-                                    .lock()
-                                    .expect("state")
-                                    .jobs
-                                    .progress(job, percent);
-                                changed(&app);
-                            }
-                            let mut tail = tail.lock().expect("tail");
-                            tail.push_str(&text);
-                            if tail.len() > 4000 {
-                                let cut = tail.len() - 2000;
-                                *tail = tail[cut..].to_string();
-                            }
-                        }
-                    }));
-                }
-                let status = loop {
-                    if cancel.load(Ordering::SeqCst) {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        break None;
-                    }
-                    match child.try_wait() {
-                        Ok(Some(status)) => break Some(status),
-                        Ok(None) => std::thread::sleep(Duration::from_millis(120)),
-                        Err(_) => break None,
-                    }
+    let (state_result, message) = match &plan {
+        Plan::Fake => run_fake(&app, job, &id, mutation, &cancel),
+        Plan::Steps(steps) => {
+            let mut outcome = (JobState::Done, String::new());
+            for step in steps {
+                outcome = match step {
+                    Step::Command(command) => run_command(&app, job, command, &cancel),
+                    Step::Rpm(op) => run_rpm(&app, job, op, &cancel),
                 };
-                for reader in readers {
-                    let _ = reader.join();
-                }
-                match status {
-                    None => (JobState::Cancelled, "Cancelled.".into()),
-                    Some(status) if status.success() => (JobState::Done, String::new()),
-                    Some(_) => {
-                        let tail = tail.lock().expect("tail");
-                        let last = tail
-                            .split(['\n', '\r'])
-                            .rev()
-                            .map(str::trim)
-                            .find(|l| !l.is_empty() && !l.ends_with('%'))
-                            .unwrap_or("The command failed.");
-                        (
-                            JobState::Failed,
-                            last.trim_start_matches("error: ").to_string(),
-                        )
-                    }
+                if outcome.0 != JobState::Done {
+                    break;
                 }
             }
+            outcome
         }
     };
     {
         let mut guard = state.lock().expect("state");
         guard.cancels.remove(&job);
+        if state_result == JobState::Failed {
+            eprintln!("SOFTWARE job {id} failed: {message}");
+        }
         guard.jobs.finish(job, state_result, &message);
         if state_result == JobState::Done && id != "*" {
             let _ = guard.store.apply(&id, mutation);
@@ -1056,15 +1253,28 @@ fn software_open(app: AppHandle, id: String) -> Result<(), String> {
     let shared = shared(&app);
     let state = shared.lock().expect("state");
     let package = state.store.detail(&id).ok_or("Unknown application.")?;
-    if !package.installed || package.kind != Kind::Flatpak || !valid_id(&id) {
+    if !package.installed || package.kind == Kind::Firmware || !valid_id(&id) {
         return Err("That application is not installed.".into());
     }
     if state.fake {
         eprintln!("SOFTWARE fake open {id}");
         return Ok(());
     }
-    let mut child = Command::new("flatpak")
-        .args(["run", &id])
+    let mut launch = Command::new("flatpak");
+    if package.kind == Kind::Rpm {
+        // A desktop entry the catalog named for this package, started the way a menu would.
+        let desktop = state
+            .rpm_apps
+            .get(&id)
+            .map(|app| app.desktop_id.trim_end_matches(".desktop").to_string())
+            .filter(|name| valid_id(name))
+            .ok_or("That application has no launcher.")?;
+        launch = Command::new("gtk-launch");
+        launch.arg(desktop);
+    } else {
+        launch.args(["run", &id]);
+    }
+    let mut child = launch
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -1159,6 +1369,10 @@ fn load_fake(path: &PathBuf, state: &mut State) {
                 })
                 .unwrap_or_default(),
             released: row.get("released").and_then(|v| v.as_u64()).unwrap_or(0),
+            update_only: row
+                .get("update_only")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
             verified: row
                 .get("verified")
                 .and_then(|v| v.as_bool())
@@ -1314,6 +1528,8 @@ fn main() {
                 indexing: false,
                 meta: HashMap::new(),
                 cancels: HashMap::new(),
+                rpm_apps: HashMap::new(),
+                rpm_system_names: Vec::new(),
             };
             let fake_path = std::env::var_os("HELIX_SOFTWARE_FAKE").map(PathBuf::from);
             if let Some(path) = &fake_path {

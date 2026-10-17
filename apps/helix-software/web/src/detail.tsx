@@ -58,7 +58,7 @@ export function Detail({ pkg, job, blocked, onOpen, onRequest }: {
                 ) : (
                   <Button kind="primary" data-test="detail-action" disabled={blocked} onClick={() => onRequest(action)}>{VERB[action]}</Button>
                 )}
-                {pkg.installed && pkg.kind === "flatpak" ? (
+                {pkg.installed && pkg.kind !== "firmware" ? (
                   <Button kind="destructive" data-test="detail-remove" disabled={blocked} onClick={() => onRequest("remove")}>Remove</Button>
                 ) : null}
                 {pkg.update ? <Chip tone="accent">Update available</Chip> : pkg.installed ? <Chip tone="ok">Installed</Chip> : null}
