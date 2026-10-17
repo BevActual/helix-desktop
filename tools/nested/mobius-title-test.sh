@@ -29,6 +29,16 @@ click_id send
 for _ in $(seq 1 60); do grep -q 'MOBIUS titled the chat' "$SCRATCH/program.log" && break; sleep 0.5; done
 grep -q 'MOBIUS titled the chat' "$SCRATCH/program.log" && echo "ok: the chat was named" || fail "never named: $(grep MOBIUS "$SCRATCH/program.log" | tail -3)"
 [ "$(title)" = "Cron versus systemd timers" ] && echo "ok: saved with the model's title" || fail "title is '$(title)'"
+echo "--- 1b. the reply remembers what it cost"
+python3 - "$CHATS" <<'PY' && echo "ok: tokens and time are saved with the reply" || fail "no stats on the saved reply"
+import glob, json, sys
+chat = json.load(open(glob.glob(sys.argv[1] + "/*.json")[0]))
+stats = chat["messages"][-1].get("stats")
+assert stats and stats["tokens"] > 0 and stats["ms"] >= 0, stats
+assert chat["messages"][0].get("stats") is None
+PY
+for _ in $(seq 1 20); do has_id stats-1 && break; sleep 0.25; done
+has_id stats-1 && echo "ok: the details sit beside the reply's actions" || fail "no details on the reply"
 echo "--- 2. a second message does not rename it"
 click_id composer; wtype "And what about anacron?"; sleep 0.3; click_id send
 sleep 6

@@ -45,6 +45,8 @@ const MAX_CONVERSATIONS: usize = 200;
 struct State {
     /// When the turn now in flight was sent (for the duration in the usage log).
     turn_started: Option<std::time::Instant>,
+    /// The model the running turn asked for (empty: whichever the service chose), for the reply's details.
+    turn_model: String,
     chat: Chat,
     /// Last backend label shown after a turn (local / LAN name).
     last_backend: String,
@@ -540,6 +542,12 @@ fn ended(app: &AppHandle, outcome: Outcome) {
     let started = shared(app).lock().expect("state").turn_started.take();
     let ms = started.map_or(0, |at| at.elapsed().as_millis() as u64);
     record(app, "turn", ms, matches!(outcome, Outcome::Finished));
+    if finished {
+        let shared = shared(app);
+        let mut state = shared.lock().expect("state");
+        let model = state.turn_model.clone();
+        state.chat.note_reply(&model, ms);
+    }
     persist(app);
     emit_view(app);
     emit_list(app);
@@ -973,6 +981,7 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
         }
         let args =
             chat_args(&turn.messages, &pictures, &task, &model).map_err(|e| e.to_string())?;
+        shared(&app).lock().expect("state").turn_model = model.clone();
         let operation: u64 = proxy
             .call("Action", &("chat", args))
             .await
@@ -2867,6 +2876,7 @@ fn main() {
             app.manage(Arc::new(dictate::Hub::default()));
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 turn_started: None,
+                turn_model: String::new(),
                 chat: Chat::new(fresh),
                 last_backend: "On this computer".into(),
             })));
