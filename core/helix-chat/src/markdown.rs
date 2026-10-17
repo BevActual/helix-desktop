@@ -222,6 +222,48 @@ fn list_item(line: &str) -> Option<(bool, &str)> {
     None
 }
 
+/// The text of a reply that is still being written, with an emphasis or code mark that has not been closed yet closed for it, so the words
+/// after `**` show bold as they arrive instead of the two stars showing until the closing pair comes. A mark with nothing after it yet is left out.
+pub fn close_open_marks(text: &str) -> String {
+    // Only the last line can have an open mark (and only outside a code fence).
+    let fences = text
+        .lines()
+        .filter(|l| l.trim_start().starts_with("```"))
+        .count();
+    if fences % 2 == 1 {
+        return text.to_string();
+    }
+    let start = text.rfind('\n').map_or(0, |i| i + 1);
+    let line: Vec<char> = text[start..].chars().collect();
+    let (mut in_code, mut in_bold) = (false, false);
+    let (mut open_at, mut i) = (None, 0usize);
+    while i < line.len() {
+        if line[i] == '`' {
+            in_code = !in_code;
+            open_at = in_code.then_some(i);
+        } else if !in_code && line[i] == '*' && line.get(i + 1) == Some(&'*') {
+            in_bold = !in_bold;
+            open_at = in_bold.then_some(i);
+            i += 1;
+        }
+        i += 1;
+    }
+    let mut out = text[..start].to_string();
+    let mut kept: String = line.iter().collect();
+    if in_code || in_bold {
+        let at = open_at.unwrap_or(0);
+        let width = if in_code { 1 } else { 2 };
+        if at + width >= line.len() {
+            // nothing after the mark yet
+            kept = line[..at].iter().collect();
+        } else {
+            kept.push_str(if in_code { "`" } else { "**" });
+        }
+    }
+    out.push_str(&kept);
+    out
+}
+
 pub fn parse(input: &str) -> Vec<Block> {
     let mut blocks: Vec<Block> = Vec::new();
     let mut paragraph: Vec<&str> = Vec::new();
@@ -521,6 +563,50 @@ mod tests {
                 spans: vec![t("<script>alert(1)</script>")]
             }
         );
+    }
+
+    #[test]
+    fn a_reply_being_written_shows_open_emphasis_closed() {
+        assert_eq!(
+            close_open_marks("first, a **scheduler"),
+            "first, a **scheduler**"
+        );
+        assert_eq!(close_open_marks("run `cron"), "run `cron`");
+        assert_eq!(
+            close_open_marks("a **bold** and **mor"),
+            "a **bold** and **mor**"
+        );
+        assert_eq!(
+            close_open_marks("a word **"),
+            "a word ",
+            "a mark with nothing after it yet is held back"
+        );
+        assert_eq!(close_open_marks("a `"), "a ");
+        assert_eq!(close_open_marks("fine **bold** text"), "fine **bold** text");
+        assert_eq!(
+            close_open_marks("line one\n- item **bo"),
+            "line one\n- item **bo**"
+        );
+        assert_eq!(
+            close_open_marks("```sh\nls **x"),
+            "```sh\nls **x",
+            "inside a code block nothing changes"
+        );
+        assert_eq!(
+            close_open_marks("code `a ** b` end"),
+            "code `a ** b` end",
+            "stars inside code are not emphasis"
+        );
+        let blocks = parse(&close_open_marks("first, a **scheduler"));
+        match &blocks[0] {
+            Block::Paragraph { spans } => assert!(
+                spans
+                    .iter()
+                    .any(|s| matches!(s, Span::Bold { text } if text == "scheduler")),
+                "{spans:?}"
+            ),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]
