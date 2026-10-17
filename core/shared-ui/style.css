@@ -1421,3 +1421,22 @@ body.chat .online-sheet .sheet-actions { flex-wrap: wrap; }
 .tool-activity details { margin-top: 8px; }
 .tool-review { display: flex; gap: 8px; }
 .save-reply-text { width: 100%; min-height: 12rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; resize: vertical; }
+
+/* Mobius: a calmer conversation and a start screen that fits (docs/design/mobius-ux.md) -------------------------------------------------- */
+/* The actions under a message (copy, edit, regenerate) appear on hover; they no longer hold their space when hidden, which made every gap between
+   turns about 55 px. They sit in the gap below their message instead. */
+body.chat #messages { gap: 28px; }
+body.chat .msg { position: relative; }
+body.chat .msg-actions { position: absolute; top: 100%; left: 0; margin-top: 0; display: flex; gap: 2px; z-index: 1; }
+body.chat .msg.user .msg-actions { left: auto; right: 0; }
+/* The start screen: eight tasks fit without scrolling at the window's usual size. */
+body.chat #empty { margin-top: clamp(12px, 3vh, 36px); }
+body.chat .welcome-tools { gap: 8px; margin-top: 16px; }
+body.chat .welcome-tool { align-items: center; padding: 9px 12px; gap: 10px; border-radius: 12px; }
+body.chat .welcome-tool-icon { width: 28px; height: 28px; border-radius: 8px; }
+body.chat .welcome-tool-icon svg { width: 16px; height: 16px; }
+body.chat .welcome-tool-text { gap: 1px; }
+body.chat .welcome-tool-text > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* The row of chat settings above the composer: legible, and it looks like what it is (things to press). */
+body.chat .meta-chip { color: var(--label-2); font-size: 12px; font-weight: 500; padding: 3px 9px; }
+body.chat .meta-chip:hover, body.chat .meta-chip:focus-visible { background: var(--fill-2); color: var(--label); }

@@ -10,14 +10,14 @@ export type WelcomeAction = "web" | "tools" | "files" | "picture" | "image" | "v
 export interface WelcomeHandle { set: (starters: string[], listening: boolean, busy: string) => void }
 export interface WelcomeHooks { action: (action: WelcomeAction) => void; starter: (text: string) => void }
 const tools: { action: WelcomeAction; icon: string; title: string; detail: string }[] = [
-  { action: "tools", icon: "sparkle", title: "Research in chat", detail: "Turn on Tools mode: search and read pages in the thread, with your approval on each step." },
-  { action: "web", icon: "search", title: "Pick sources yourself", detail: "Choose pages manually, then ask Mobius about the excerpts." },
-  { action: "files", icon: "paperclip", title: "Work with files", detail: "Add text or source files to your next message." },
-  { action: "picture", icon: "image", title: "Ask about a picture", detail: "Attach a picture, then write your question." },
-  { action: "image", icon: "sparkle", title: "Create an image", detail: "Describe an image to generate on this computer." },
-  { action: "voice", icon: "mic", title: "Dictate a message", detail: "Record locally and review the words before sending." },
-  { action: "analysis", icon: "eye", title: "Inspect Linux software", detail: "Analyze a compiled program with local evidence." },
-  { action: "brief", icon: "pin", title: "Set a chat brief", detail: "Keep goals and decisions available as this chat grows." },
+  { action: "tools", icon: "sparkle", title: "Research in chat", detail: "Search and read pages here; you approve each step." },
+  { action: "web", icon: "search", title: "Pick sources yourself", detail: "Choose pages, then ask about the excerpts." },
+  { action: "files", icon: "paperclip", title: "Work with files", detail: "Add text or source files to your message." },
+  { action: "picture", icon: "image", title: "Ask about a picture", detail: "Attach a picture, then ask about it." },
+  { action: "image", icon: "sparkle", title: "Create an image", detail: "Describe it; it is made on this computer." },
+  { action: "voice", icon: "mic", title: "Dictate a message", detail: "Record here; review the words before sending." },
+  { action: "analysis", icon: "eye", title: "Inspect Linux software", detail: "Analyse a compiled program locally." },
+  { action: "brief", icon: "pin", title: "Set a chat brief", detail: "Keep goals and decisions as the chat grows." },
 ];
 export function Welcome({ register, hooks }: { register: (handle: WelcomeHandle) => void; hooks: WelcomeHooks }) {
   const [starters, setStarters] = useState<string[]>([]);
