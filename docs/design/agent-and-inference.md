@@ -311,7 +311,7 @@ Not done: a VRAM budget alongside other GPU users, multi-step requests, and
 `tests/inference_eval.cpp` runs 92 realistic requests (`tests/eval/desktop_requests.json`: 82 to act on across 10 families,
 10 that must be declined) against a real model through the whole stack: queue, grammar and the live command schema, with
 the read-only, everyday and `act` tiers (115 tools). Accepted answers are listed per request, and accepted arguments
-default to none, so a hallucinated argument is not scored as correct. `tools/run-inference-eval.py` runs the matrix. RTX 4080
+default to none, so a hallucinated argument is not scored as correct. The C++ runner is gone; `tools/run-assistant-eval.sh` (below) is its replacement. RTX 4080
 Laptop GPU, Vulkan, greedy decoding, one run per cell, warm-up excluded; roughly +/-3 points of noise on 82 requests.
 
 | Model | Configuration | Exact | Right tool | Declined correctly | Acted instead of declining | Median latency |
@@ -395,6 +395,37 @@ set is no longer fully independent. The honest claim is "about 90% exact on requ
 Declining is the weak spot and hints did not move it: 5/8 impossible requests still get a nearby tool, including
 `power-cycle next` for "Restart my laptop" and `session lock` for "Log me out". That is why the assistant client must
 show every state-changing call before running it and rely on the Agent Surface tiers, never on the model refusing.
+
+### Re-measured 2026-10-16 with the Rust harness
+
+`helix-assistant-eval` (`services/helix-assistant/src/bin/`, run through `tools/run-assistant-eval.sh`) asks the same question the assistant
+asks: the live tool catalog and grammar, the shipped prompt and examples, `Inference1` over D-Bus, the three tiers the assistant offers. A call to
+a tool the shell cannot carry out counts as a decline, as it does in the assistant (`--raw` turns that off). Nothing is run on the desktop. One
+run per cell, greedy decoding, first request excluded from latency, RTX 4080 Laptop GPU. The case files drifted from the table above
+(79 to act on and 10 to decline, not 82 and 10), so these numbers are not comparable with it row for row. The second file is held out: it was
+not used to choose the prompt or examples, so a change that helps the first set and not the second was tuned to it.
+
+| Model | Cases | Exact | Right tool | Declined correctly | Acted instead of declining | Median latency |
+|---|---|---|---|---|---|---|
+| 7B | main (79 + 10) | 96% (76/79) | 99% | 4 / 10 | 6 | 0.49 s |
+| 7B | held out (52 + 8) | 87% (45/52) | 90% | 3 / 8 | 5 | 0.45 s |
+| 1.5B | main | 82% (65/79) | 87% | 2 / 10 | 8 | 0.35 s |
+| 1.5B | held out | 83% (43/52) | 85% | 0 / 8 | 8 | 0.35 s |
+
+Every reply was a valid call in every run. What the misses say:
+
+* **Declining is the weak spot, and the 7B is not safe there.** It acts on "Reboot the computer" (`power-set reboot`), "Shut down the PC"
+  (`power-set power-saver`), "Turn off Wi-Fi" (`wifi-status`, a read, which is why it looks harmless), "Open Spotify" and "Connect to Tailscale".
+  The confirmation step (`AskFirst`) is what stands between that and a change, so the confirmation wording matters more than the model.
+  The earlier table had the 7B declining 7 of 10; the catalog has grown since, which is the likely reason, not proven.
+* **Arguments are free strings in the grammar.** The 7B answered "Volume to 75 percent" with `volume-set ["../../config/volume.json"]` and the
+  1.5B answered "Put the volume at 20" with `["value:20"]`. Downstream validation is what rejects these; the grammar could stop them (a number
+  type for numeric arguments, the listed choices for enumerated ones). That is a change to the schema, measured by this harness.
+* **Near-neighbour tools are mixed up in both directions**: `volume-set 100` for "turn it up" (1.5B, repeatedly), `brightness-set` for "make
+  everything bright", `color-scheme-set` for "dark theme", `desktop-capture` for "read the text off my screen".
+
+Reproduce: `tools/run-assistant-eval.sh [--model ID] [--raw] [--json out.json] [cases.json ...]`; add `--min-exact 90` to fail below a rate.
+It starts its own `helix-inference` on a private bus (the model directory is `~/.local/share/helix/models`).
 
 ## Build order
 
