@@ -16,6 +16,8 @@ run() {  # name script program [env...]
   HELIX_NESTED_SCRIPT="$ROOT/tools/nested/$script" timeout 420 "$ROOT/tools/nested/run.sh" "suite-$name" "$ROOT/tools/nested/$program" "$@" >"$out" 2>&1
   if grep -qE 'FAIL|TIMEOUT|NOT FOUND|FAILED' "$out"; then echo "FAIL  $name   ($out)"; grep -E 'FAIL|TIMEOUT|NOT FOUND' "$out" | head -3; else echo "ok    $name"; fi
 }
+# A window wide enough to show Mobius's chat list (below 720 px it is behind a button). One line of KDL cannot hold the nested block, so it has newlines.
+WIDE=$'HELIX_NESTED_KDL=layout {\n gaps 0\n default-column-width { fixed 1100; }\n}'
 sel=("$@")
 pick() { [ ${#sel[@]} -eq 0 ] && return 0; for n in "${sel[@]}"; do [ "$n" = "$1" ] && return 0; done; return 1; }
 pick launcher       && run launcher launcher-test.sh tauri-shell.sh
@@ -49,18 +51,18 @@ pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh 
 pick ui-scale          && run ui-scale ui-scale-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick ui-theme          && run ui-theme ui-theme-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
-pick mobius         && run mobius mobius-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick mobius         && run mobius mobius-test.sh mobius-nested.sh "$WIDE"
 pick greeter        && run greeter greeter-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick greeter-session && run greeter-session greeter-session-test.sh greeter-session-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software       && run software software-test.sh software-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software-real && run software-real software-real-test.sh software-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software-rpm   && run software-rpm software-rpm-test.sh software-rpm-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick monitor        && run monitor system-monitor-test.sh system-monitor-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
-pick models         && run models models-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick models         && run models models-test.sh mobius-nested.sh "$WIDE"
 pick mobius-real    && [ -n "${HELIX_SUITE_HEAVY:-}" -o ${#sel[@]} -gt 0 ] && run mobius-real mobius-real-test.sh mobius-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
-pick mobius-dialogs && run mobius-dialogs mobius-dialogs-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
-pick mobius-lab     && run mobius-lab mobius-lab-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_MOBIUS_LOG_PROMPT=1
-pick mobius-pictures && run mobius-pictures mobius-pictures-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_SEED_PICTURE=1
+pick mobius-dialogs && run mobius-dialogs mobius-dialogs-test.sh mobius-nested.sh "$WIDE"
+pick mobius-lab     && run mobius-lab mobius-lab-test.sh mobius-nested.sh "$WIDE" HELIX_MOBIUS_LOG_PROMPT=1
+pick mobius-pictures && run mobius-pictures mobius-pictures-test.sh mobius-nested.sh "$WIDE" HELIX_NESTED_SEED_PICTURE=1
 pick mobius-dictate && run mobius-dictate mobius-dictate-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_SEED_AUDIO=1
 pick mobius-library && run mobius-library mobius-library-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 if pick mobius-image-generation; then
@@ -87,10 +89,10 @@ if pick mobius-tables; then
 | Large | 5 |" HELIX_FAKE_DELAY_MS=10 RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
 fi
 # These two read the chat list, which is behind a button below 720 px: they run in a window wide enough to show it.
-pick mobius-search && run mobius-search mobius-search-test.sh mobius-search-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; default-column-width { fixed 1100; } }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+pick mobius-search && run mobius-search mobius-search-test.sh mobius-search-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
 pick mobius-attachments && run mobius-attachments mobius-attachments-test.sh mobius-attachments-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10
-pick mobius-context && run mobius-context mobius-context-test.sh mobius-context-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; default-column-width { fixed 1100; } }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_MOBIUS_LOG_PROMPT=1 HELIX_FAKE_DELAY_MS=400
+pick mobius-context && run mobius-context mobius-context-test.sh mobius-context-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_MOBIUS_LOG_PROMPT=1 HELIX_FAKE_DELAY_MS=400
 pick mobius-welcome && run mobius-welcome mobius-welcome-test.sh mobius-welcome-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_NESTED_SEED_AUDIO=1 HELIX_FAKE_DELAY_MS=10
 pick mobius-web && run mobius-web mobius-web-test.sh mobius-web-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
-pick mobius-tools && run mobius-tools mobius-tools-test.sh mobius-tools-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
+pick mobius-tools && run mobius-tools mobius-tools-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
 pick mobius-reply-save && run mobius-reply-save mobius-reply-save-test.sh mobius-reply-save-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10
