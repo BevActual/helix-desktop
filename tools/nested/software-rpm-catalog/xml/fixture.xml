@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<components origin="fixture" version="0.8">
+<component type="desktop">
+<id>org.helix.Calc.desktop</id>
+<pkgname>helix-calc</pkgname>
+<name>Helix Calc</name>
+<summary>A calculator in the repositories</summary>
+<description>
+<p>Adds numbers, subtracts them, and tells you what the sum of the parts is.</p>
+</description>
+<icon type="cached" height="64" width="64">calc.png</icon>
+<categories>
+<category>Utility</category>
+</categories>
+<project_license>MIT</project_license>
+<releases>
+<release version="2.0" timestamp="1760000000"/>
+</releases>
+</component>
+<component type="desktop">
+<id>org.helix.Writer.desktop</id>
+<pkgname>helix-writer</pkgname>
+<name>Helix Writer</name>
+<summary>A word processor</summary>
+<description>
+<p>Writes words.</p>
+</description>
+<icon type="cached" height="64" width="64">writer.png</icon>
+<categories>
+<category>Office</category>
+</categories>
+</component>
+<component type="desktop">
+<id>org.helix.Locked.desktop</id>
+<pkgname>helix-locked</pkgname>
+<name>Helix Locked</name>
+<summary>Something another package needs</summary>
+<icon type="cached" height="64" width="64">locked.png</icon>
+</component>
+<component type="generic">
+<id>helix-release</id>
+<pkgname>helix-release</pkgname>
+<name>Helix release package</name>
+</component>
+</components>

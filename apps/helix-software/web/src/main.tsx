@@ -297,7 +297,9 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
                 : pending.action === "remove"
                   ? "It will be removed from this computer. Its settings and data are kept."
                   : pending.action === "update"
-                    ? "The new version replaces the installed one."
+                    ? pending.id === "system-updates"
+                      ? "System packages are updated now; some, such as the kernel, take effect after a restart."
+                      : "The new version replaces the installed one."
                     : "It will be installed from its source."}
           </p>
         </Sheet>

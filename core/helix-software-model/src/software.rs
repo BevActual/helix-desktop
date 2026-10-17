@@ -40,6 +40,8 @@ pub struct Package {
     pub released: u64,
     /// The publisher is verified by its remote.
     pub verified: bool,
+    /// Only ever an update row (System software): never listed to install, browse or open.
+    pub update_only: bool,
 }
 
 /// What the appstream index adds to a package.
@@ -125,6 +127,9 @@ pub enum SoftwareError {
     WrongKind,
 }
 
+/// The kinds the store lists to install and to open: Flatpak applications and Fedora (RPM) applications. Firmware only ever appears on Updates.
+pub const STORE_KINDS: [Kind; 2] = [Kind::Flatpak, Kind::Rpm];
+
 #[derive(Clone, Debug, Default)]
 pub struct Store {
     packages: Vec<Package>,
@@ -154,15 +159,16 @@ impl Store {
                     .collect(),
                 released: p.released,
                 verified: p.verified,
+                update_only: p.update_only,
             })
             .collect();
     }
 
-    pub fn explore(&self, kind: Kind, query: &str) -> Vec<PackageView> {
+    pub fn explore(&self, kinds: &[Kind], query: &str) -> Vec<PackageView> {
         let q = sanitize_for_display(query, MAX_QUERY).to_ascii_lowercase();
         self.packages
             .iter()
-            .filter(|p| p.kind == kind)
+            .filter(|p| kinds.contains(&p.kind) && !p.update_only)
             .filter(|p| {
                 q.is_empty()
                     || p.title.to_ascii_lowercase().contains(&q)
@@ -174,14 +180,14 @@ impl Store {
     }
 
     /// A ranked window of the catalog: title matches first (exact, prefix, word prefix, contains), then id, then summary; ties by title.
-    pub fn explore_page(&self, kind: Kind, query: &str, offset: usize, limit: usize) -> Page {
-        self.explore_in(kind, query, "", offset, limit)
+    pub fn explore_page(&self, kinds: &[Kind], query: &str, offset: usize, limit: usize) -> Page {
+        self.explore_in(kinds, query, "", offset, limit)
     }
 
     /// As `explore_page`, limited to one store category (an appstream name from [`CATEGORIES`]; empty = all).
     pub fn explore_in(
         &self,
-        kind: Kind,
+        kinds: &[Kind],
         query: &str,
         category: &str,
         offset: usize,
@@ -191,7 +197,7 @@ impl Store {
         let mut ranked: Vec<(u8, String, &Package)> = self
             .packages
             .iter()
-            .filter(|p| p.kind == kind)
+            .filter(|p| kinds.contains(&p.kind) && !p.update_only)
             .filter(|p| category.is_empty() || in_category(p, category))
             .filter_map(|p| {
                 let title = p.title.to_ascii_lowercase();
@@ -228,11 +234,11 @@ impl Store {
         }
     }
 
-    pub fn library(&self, kind: Kind) -> Vec<PackageView> {
+    pub fn library(&self, kinds: &[Kind]) -> Vec<PackageView> {
         let mut rows: Vec<PackageView> = self
             .packages
             .iter()
-            .filter(|p| p.kind == kind && p.installed)
+            .filter(|p| kinds.contains(&p.kind) && p.installed && !p.update_only)
             .map(view_of)
             .collect();
         rows.sort_by_key(|row| row.title.to_ascii_lowercase());
@@ -270,13 +276,17 @@ impl Store {
     /// that would show a lettered tile off the shelves.
     pub fn discover(
         &self,
-        kind: Kind,
+        kinds: &[Kind],
         day: u64,
         per_shelf: usize,
         has_icon: &dyn Fn(&Package) -> bool,
     ) -> Discover {
         let good = |p: &&Package| {
-            p.kind == kind && !p.title.is_empty() && !p.summary.is_empty() && has_icon(p)
+            kinds.contains(&p.kind)
+                && !p.update_only
+                && !p.title.is_empty()
+                && !p.summary.is_empty()
+                && has_icon(p)
         };
         // Quality order: verified first, then the most recently released.
         let order =
@@ -560,18 +570,64 @@ mod tests {
     }
 
     #[test]
+    fn the_store_lists_flatpak_and_fedora_applications_but_not_firmware() {
+        let mut s = Store::default();
+        let mk = |id: &str, kind: Kind| Package {
+            id: id.into(),
+            title: id.into(),
+            summary: "x".into(),
+            kind,
+            installed: true,
+            ..Default::default()
+        };
+        s.set(vec![
+            mk("org.a.App", Kind::Flatpak),
+            mk("gimp", Kind::Rpm),
+            mk("fwupd-0", Kind::Firmware),
+        ]);
+        let ids = |rows: Vec<PackageView>| rows.into_iter().map(|r| r.id).collect::<Vec<_>>();
+        assert_eq!(ids(s.explore(&STORE_KINDS, "")), ["org.a.App", "gimp"]);
+        assert_eq!(ids(s.library(&STORE_KINDS)), ["gimp", "org.a.App"]);
+        assert_eq!(s.explore_in(&[Kind::Rpm], "", "", 0, 10).total, 1);
+    }
+
+    #[test]
+    fn an_update_only_row_is_never_browsed_or_installed_but_is_an_update() {
+        let mut s = Store::default();
+        let row = Package {
+            id: "system-updates".into(),
+            title: "System software".into(),
+            summary: "3 updates".into(),
+            kind: Kind::Rpm,
+            update: true,
+            update_only: true,
+            ..Default::default()
+        };
+        s.set(vec![row]);
+        assert!(s.explore(&STORE_KINDS, "").is_empty());
+        assert_eq!(s.explore_in(&STORE_KINDS, "system", "", 0, 10).total, 0);
+        assert!(s.library(&STORE_KINDS).is_empty());
+        assert!(s
+            .discover(&STORE_KINDS, 0, 12, &|_| true)
+            .shelves
+            .is_empty());
+        assert_eq!(s.updates().len(), 1);
+        assert!(s.prepare("system-updates", Mutation::Update).is_ok());
+    }
+
+    #[test]
     fn explore_filters_by_kind_and_query() {
         let s = store();
-        assert_eq!(s.explore(Kind::Flatpak, "").len(), 2);
-        assert_eq!(s.explore(Kind::Flatpak, "calc").len(), 1);
-        assert_eq!(s.explore(Kind::Rpm, "").len(), 1);
-        assert!(s.explore(Kind::Firmware, "").is_empty());
+        assert_eq!(s.explore(&[Kind::Flatpak], "").len(), 2);
+        assert_eq!(s.explore(&[Kind::Flatpak], "calc").len(), 1);
+        assert_eq!(s.explore(&[Kind::Rpm], "").len(), 1);
+        assert!(s.explore(&[Kind::Firmware], "").is_empty());
     }
 
     #[test]
     fn library_and_updates() {
         let s = store();
-        assert_eq!(s.library(Kind::Flatpak).len(), 1);
+        assert_eq!(s.library(&[Kind::Flatpak]).len(), 1);
         assert_eq!(s.updates().len(), 1);
         assert_eq!(
             s.detail("org.gnome.Calculator").unwrap().title,
@@ -626,19 +682,19 @@ mod tests {
             p("d.Four", "Spreadsheet", "does calc things"),
             p("e.Five", "Notes", ""),
         ]);
-        let page = s.explore_page(Kind::Flatpak, "calc", 0, 10);
+        let page = s.explore_page(&[Kind::Flatpak], "calc", 0, 10);
         let titles: Vec<_> = page.rows.iter().map(|r| r.title.as_str()).collect();
         assert_eq!(
             titles,
             vec!["Calc", "Calculator", "Zebra Calc", "Spreadsheet"]
         );
         assert_eq!(page.total, 4);
-        let window = s.explore_page(Kind::Flatpak, "calc", 1, 2);
+        let window = s.explore_page(&[Kind::Flatpak], "calc", 1, 2);
         assert_eq!(window.rows.len(), 2);
         assert_eq!(window.total, 4);
         // No query: every package, by title.
         assert_eq!(
-            s.explore_page(Kind::Flatpak, "", 0, 100)
+            s.explore_page(&[Kind::Flatpak], "", 0, 100)
                 .rows
                 .first()
                 .unwrap()
@@ -679,7 +735,7 @@ mod tests {
             );
         }
         s.apply_meta(&meta);
-        let found = s.discover(Kind::Flatpak, 3, 12, &|_| true);
+        let found = s.discover(&[Kind::Flatpak], 3, 12, &|_| true);
         let hero = found.hero.expect("a hero");
         assert!(hero.verified);
         let titles: Vec<_> = found
@@ -695,10 +751,10 @@ mod tests {
             .iter()
             .all(|shelf| shelf.rows.iter().all(|r| r.id != hero.id)));
         // An app without an icon is kept off the shelves.
-        let none = s.discover(Kind::Flatpak, 0, 12, &|_| false);
+        let none = s.discover(&[Kind::Flatpak], 0, 12, &|_| false);
         assert!(none.hero.is_none() && none.shelves.is_empty());
         // Category pages use the same grouping.
-        let games = s.explore_in(Kind::Flatpak, "", "Game", 0, 50);
+        let games = s.explore_in(&[Kind::Flatpak], "", "Game", 0, 50);
         assert_eq!(games.total, 4);
     }
 
@@ -739,6 +795,6 @@ mod tests {
             remote: "".into(),
             ..Default::default()
         }]);
-        assert!(s.explore(Kind::Flatpak, "").is_empty());
+        assert!(s.explore(&[Kind::Flatpak], "").is_empty());
     }
 }

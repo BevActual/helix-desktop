@@ -229,7 +229,7 @@ fn decode(text: &str) -> String {
 }
 
 /// The text between `<tag ...>` and `</tag>` on one line.
-fn element(line: &str, tag: &str) -> Option<String> {
+pub(crate) fn element(line: &str, tag: &str) -> Option<String> {
     let open = line.find(&format!("<{tag}"))?;
     let start = line[open..].find('>')? + open + 1;
     let end = line[start..].find(&format!("</{tag}>"))? + start;

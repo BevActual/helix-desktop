@@ -13,6 +13,7 @@ Standalone package store as a Tauri toplevel. Pure package models live in `helix
 - Secrets do not appear (no passwords in this app). Logs never include package payload bodies.
 - `--app=<id>` deep-link only accepts a short allowlisted id shape (alphanumeric, `.`, `-`, `_`); unknown ids open Explore empty.
 - The app does not hold Agent Surface roles and does not talk to the desktop service for v1 catalog work.
+- PackageKit changes use only package names the store already lists (from the distribution's catalog), resolved to ids by PackageKit itself; the page sends an id and an action, never a package spec. Removal never takes dependents with it.
 
 ## What it does today (Flatpak)
 
@@ -31,18 +32,37 @@ Standalone package store as a Tauri toplevel. Pure package models live in `helix
 Tests: `cargo test -p helix-software` (parsers), `tools/nested/ui-suite.sh software` (fake catalog, windowed list, search, detail, install
 with progress, Update All) and `software-real` (this machine's real catalog and library, read-only; skipped without Flatpak apps).
 
-Not done: the Fedora RPM backend (PackageKit), adding or removing sources, screenshots, ratings, and following the system's light theme (apps
-render dark until the appearance mode is exposed to them).
+Not done: adding or removing sources, screenshots for Fedora applications, ratings, and Fedora repositories on the Sources page.
+
+## Fedora applications (PackageKit)
+
+`apps/helix-software/src-tauri/src/rpm.rs`. Flatpak and Fedora applications share Explore, Discover, Library and Updates (`STORE_KINDS` in the model); a row says which it is
+by its source. Where PackageKit is not on the system bus (another distribution) the store is Flatpak only, and with no Flatpak it is Fedora only.
+
+| Area | Behaviour |
+|---|---|
+| Catalog | The distribution's AppStream data on disk (`/usr/share/swcatalog`, `/var/cache/swcatalog`, `/usr/share/app-info`; `.xml` and `.xml.gz`): desktop applications that name a package, one row per package, with name, summary, categories, newest release and the cached icon. About a thousand applications on Fedora 44 (the rest of the 2,300 components are not applications or have no valid package name). The package name is the row's id. |
+| Installed and updates | `GetPackages(installed)` and `GetUpdates` on a PackageKit transaction, merged by name and the machine's architecture. An update is offered only for an application that is installed. Every other package update is **one row, "System software"**, so the Updates page is not a list of 200 libraries; updating it runs those packages and the dialog says some (the kernel) take effect after a restart. |
+| Install, remove, update | `InstallPackages`, `RemovePackages`, `UpdatePackages` on a PackageKit transaction, with progress from `ItemProgress` and `Percentage`, and **Cancel** calling the transaction's `Cancel`. Install resolves the name to the first *available* package of this machine's architecture (or noarch), never another one. Remove passes `allow_deps = false` and `autoremove = false`: if another package needs it, PackageKit refuses and the row says so in its words, and nothing else is removed. Update All runs the Flatpak update and then one PackageKit update of everything. |
+| Authentication | PackageKit asks polkit, and the shell's polkit agent shows the dialog, as for a system Flatpak. The app never handles a password. |
+| Open | `gtk-launch <desktop id>` for the entry the catalog names. |
+| Detail | The description, licence and categories come from the same catalog (read on demand). Fedora applications show no screenshots (the catalog's hosts are not on the allowed list). |
+| Check for Updates | `RefreshCache` on a PackageKit transaction, after the Flatpak appstream refresh. |
+
+Tests: `rpm.rs` unit tests (catalog parsing, package ids, the merge, icon paths); `tools/nested/software-rpm-test.sh` runs the real client against `tools/nested/fake-packagekit.py` on a
+private bus with a fixture catalog (library, search, install with progress and architecture, a refused removal, cancel, Update All); and
+`cargo test -p helix-software -- --ignored --nocapture real_` reads this machine's real catalog and PackageKit (read only).
+Not tested: a real install, removal or update (it changes the system and needs authentication).
 
 ## Backends
 
 | Backend | Pages | Host commands (thin) |
 |---------|-------|----------------------|
 | Flatpak | Explore, Library, Updates, Sources | `flatpak remote-ls`, `list`, `update --appstream`, install/uninstall (queued) |
-| Fedora PackageKit | Explore (rpm), Library, Updates | PackageKit D-Bus via existing patterns / `pkcon` where needed |
+| Fedora PackageKit | Explore, Library, Updates | PackageKit D-Bus (`rpm.rs`) |
 | Firmware | Updates (fwupd section) | `fwupdmgr get-updates` / apply (confirm) |
 
-v1 ships Flatpak Explore / Library / Updates first; PackageKit + firmware + Sources land in the same crate next.
+Flatpak, PackageKit and firmware updates are in; adding and removing sources is next.
 
 ## Page map
 
