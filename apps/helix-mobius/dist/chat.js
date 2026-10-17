@@ -505,6 +505,13 @@ function drawQueue() {
   });
 }
 
+// Text the person chose on a piece of ephemeral UI goes as an ordinary message (queued if a reply is still being written).
+function sendPlain(text) {
+  if (view.streaming) { if (queue.length < MAX_QUEUE) { queue.push(text); drawQueue(); } return; }
+  stickToBottom = true;
+  invoke("chat_send", { text, attachments: null }).catch(report);
+}
+
 function flushQueue() {
   if (!queue.length || view.streaming) return;
   const text = queue.shift();
@@ -1151,6 +1158,7 @@ const reactThread = window.HelixMobiusReact
       input.focus();
     },
     fork: (index) => forkChat(index),
+    send: (text) => sendPlain(text),
     report: (error) => report(error),
     undo: (id) => invoke("chat_act_undo", { task: id })
       .then(() => { if (reactThread) reactThread.undo(id, false); })
