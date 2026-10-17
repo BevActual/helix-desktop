@@ -284,8 +284,14 @@ pub async fn run(session: &Session, desktop: &Desktop) {
         "the shell sees the other client's edit"
     );
     // The shell-only methods stay shell-only.
-    assert!(other.commit_overrides("", "[dock]\nenabled=false\n").await.is_err());
-    assert!(other.register_capabilities(&json!({"gamma-control": true})).await.is_err());
+    assert!(other
+        .commit_overrides("", "[dock]\nenabled=false\n")
+        .await
+        .is_err());
+    assert!(other
+        .register_capabilities(&json!({"gamma-control": true}))
+        .await
+        .is_err());
     desktop
         .reset_setting("keybinds.copy")
         .await
