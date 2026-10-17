@@ -2637,6 +2637,28 @@ async fn routing_list_remote_models(backend_id: String) -> Vec<String> {
     }
 }
 
+/// What the chat model menu offers from OpenRouter: whether it is set up with a key, and a short list of well-known models (no network).
+#[derive(Serialize)]
+struct CloudMenu {
+    has_key: bool,
+    models: Vec<String>,
+}
+
+#[tauri::command]
+fn routing_cloud_menu() -> CloudMenu {
+    let routing = inference_routing::load();
+    let has_key = routing.backend("openrouter").is_some_and(|b| {
+        !b.base_url.trim().is_empty() && secrets::for_backend(&b.id, &b.api_key_ref).is_some()
+    });
+    CloudMenu {
+        has_key,
+        models: inference_routing::openrouter_suggested_models()
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+    }
+}
+
 #[derive(Clone, Serialize)]
 struct RoutingPageInfo {
     config_path: String,
@@ -3108,6 +3130,7 @@ fn main() {
             routing_set_secret,
             routing_clear_secret,
             routing_ensure_openrouter,
+            routing_cloud_menu,
             routing_list_models,
             routing_list_remote_models,
             routing_page_info,

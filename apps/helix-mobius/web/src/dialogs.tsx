@@ -104,7 +104,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   const [menu, setMenu] = useState<{ kind: "persona" | "style" | "model" | "mode"; left: number; top: number; width: number } | null>(null);
   const [modeState, setModeState] = useState<ModeState>({ mode: "ask", folder: "", busy: false });
   // What the model menu lists: the installed models with their friendly names, and where the chat is routed now.
-  const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }>; route: Route | null } | null>(null);
+  const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }>; route: Route | null; cloud: { has_key: boolean; models: string[] } } | null>(null);
   useEffect(() => {
     if (!menu) return;
     const close = (event: Event) => {
@@ -209,10 +209,11 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
           invoke<string[]>("routing_list_models").catch(() => [] as string[]),
           invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[]; fit: string; speed: number | null }[]>("library_list").catch(() => []),
           invoke<Route>("chat_current_route").catch(() => null),
-        ]).then(([models, cards, route]) => {
+          invoke<{ has_key: boolean; models: string[] }>("routing_cloud_menu").catch(() => ({ has_key: false, models: [] as string[] })),
+        ]).then(([models, cards, route, cloud]) => {
           const byFile: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }> = {};
           cards.filter((card) => card.installed).forEach((card) => { byFile[card.file] = card; });
-          setPicker({ models: Array.isArray(models) ? models : [], cards: byFile, route });
+          setPicker({ models: Array.isArray(models) ? models : [], cards: byFile, route, cloud });
           setMenu({ kind, ...anchor });
         });
       },
@@ -228,6 +229,15 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
     try {
       await invoke("chat_set_route", { backend: "local", model });
       hooksRef.current.routeChanged("local", model);
+    } catch (error) {
+      report(error);
+    }
+  };
+  const useCloudModel = async (model: string) => {
+    setMenu(null);
+    try {
+      await invoke("chat_set_route", { backend: "openrouter", model });
+      hooksRef.current.routeChanged("openrouter", model);
     } catch (error) {
       report(error);
     }
@@ -329,6 +339,25 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                       </button>
                     );
                   })}
+                  {picker?.cloud ? (
+                    <>
+                      <div className="hx-menu-sep" />
+                      <div className="hx-menu-label">OpenRouter <span className="hx-menu-hint">leaves this computer</span></div>
+                      {picker.cloud.has_key ? picker.cloud.models.slice(0, 6).map((id) => {
+                        const on = picker.route?.backend === "openrouter" && picker.route.model === id;
+                        return (
+                          <button key={id} className={`hx-menu-item${on ? " current" : ""}`} role="menuitemradio" aria-checked={on} data-test={`menu-cloud-${id}`} onClick={() => useCloudModel(id)}>
+                            <span className="mi-text"><span className="mi-title">{id.split("/").pop()}</span><span className="mi-sub">{id.split("/")[0]} · cloud</span></span>
+                            {on ? <span className="mi-check">✓</span> : null}
+                          </button>
+                        );
+                      }) : (
+                        <button className="hx-menu-item" data-test="menu-cloud-setup" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models")); }}>
+                          <span className="mi-text"><span className="mi-title">Set up OpenRouter…</span><span className="mi-sub">Add an API key to use cloud models, one click each</span></span>
+                        </button>
+                      )}
+                    </>
+                  ) : null}
                   {picker?.route?.own ? (
                     <button className="hx-menu-item" data-test="menu-model-default" onClick={() => { setMenu(null); invoke("chat_use_default_route").then(() => window.dispatchEvent(new CustomEvent("mobius-route-changed")), report); }}>
                       <span className="mi-text"><span className="mi-title">Use the default model</span><span className="mi-sub">This chat follows Models &amp; routing again</span></span>
