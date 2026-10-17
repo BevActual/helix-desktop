@@ -1,14 +1,85 @@
 ---
 title: Installation
-description: Build Helix from source and install it on Fedora.
+description: Build Helix as RPM packages, or from source, and install it on Fedora.
 sidebar:
   order: 1
 ---
 
 Helix is built from the [Helix Desktop source repository](https://github.com/BevActual/helix-desktop). Fedora with helix-niri is the
-supported target. Packages for other distributions are not provided.
+supported target (x86_64). Packages for other distributions are not provided.
 
-## Build
+## Install the RPM packages
+
+The repository has an RPM spec that builds three packages. There is no public package repository yet, so you build them yourself once and
+install the result.
+
+| Package | What it is |
+|---|---|
+| `helix` | The desktop service, assistant and inference service, the session shell, Settings, Mobius, Software and System Monitor. |
+| `helix-niri` | The compositor, a fork of niri. It installs `/usr/bin/niri` and **replaces Fedora's `niri`**. |
+| `helix-greeter` | The login screen for greetd. Optional. |
+
+Build them from a clean checkout (the build needs the network once, to fetch the Rust crates and node modules; the build itself runs offline):
+
+```bash
+git clone https://github.com/BevActual/helix-desktop.git
+cd helix-desktop
+sudo dnf install rpm-build dnf-plugins-core
+sudo dnf builddep packaging/helix.spec
+tools/packaging/make-sources.sh                       # writes ./rpm-sources
+rpmbuild -bb --define "_sourcedir $PWD/rpm-sources" packaging/helix.spec
+```
+
+A release build takes a while and a lot of memory. The packages are written to `~/rpmbuild/RPMS/x86_64/`. Install them with
+`--allowerasing`, which lets `helix-niri` replace Fedora's compositor:
+
+```bash
+sudo dnf install --allowerasing ~/rpmbuild/RPMS/x86_64/helix-0.1.0-*.rpm ~/rpmbuild/RPMS/x86_64/helix-niri-0.1.0-*.rpm
+```
+
+Then log out and choose the **Niri** session on your login screen (that is the compositor's session entry; Helix's own parts start with it).
+The package enables the bar, strut, wallpaper and idle units for every user; the desktop service and the inference service start when
+something asks for them.
+
+### The compositor's configuration
+
+`helix-niri` installs `/etc/niri/config.kdl`: niri's default configuration plus a `trusted-surface` block that names the Helix shell. That
+block is what lets the compositor keep the approval dialog on top, out of screen captures and closed to synthetic input; without it the
+shell refuses actions that need approval. niri uses this file only when you have no `~/.config/niri/config.kdl`. If you do, add this line at the top
+level of your own file:
+
+```kdl
+include "/usr/share/helix/niri/helix-trusted-surface.kdl"
+```
+
+### The login screen (optional)
+
+```bash
+sudo dnf install ~/rpmbuild/RPMS/x86_64/helix-greeter-0.1.0-*.rpm
+```
+
+Installing it does not change how you log in. To use it, keep a copy of your greetd configuration, then copy the one the package ships over
+it and enable greetd:
+
+```bash
+sudo cp /etc/greetd/config.toml /etc/greetd/config.toml.before-helix
+sudo cp /usr/share/helix-greeter/greetd-config.toml /etc/greetd/config.toml
+sudo systemctl enable greetd.service
+```
+
+If the Helix login screen cannot start, greetd falls back to its text login, so a broken greeter cannot lock you out. To go back, copy your
+saved file over `/etc/greetd/config.toml`.
+
+### Update
+
+Build the new packages the same way and run `sudo dnf upgrade ./helix-*.rpm`. Your settings stay under `~/.config/helix`.
+
+## Build from source
+
+The rest of this page builds and installs without packages. Use it for development, or on a machine where you do not want to replace
+Fedora's `niri`.
+
+### Build
 
 Install the build dependencies, then build the workspace. The package list, profiles and optional pieces are in
 [BUILDING.md](https://github.com/BevActual/helix-desktop/blob/main/BUILDING.md).
@@ -25,7 +96,7 @@ The compositor is built from the same workspace:
 cargo build --release -p niri
 ```
 
-## Install
+### Install
 
 There are two ways to install, depending on whether you want Helix for one user from a checkout or on the whole system.
 
@@ -50,7 +121,7 @@ The login screen's greetd configuration is written by `tools/install-greeter.sh`
 `tools/install-trusted-niri.sh`; neither is part of `just install`. See [Running Helix](/helix/getting-started/running-the-shell/) to
 start a session.
 
-## Update or remove
+### Update or remove
 
 ```bash
 git pull

@@ -9,7 +9,13 @@ A Helix session is **greetd → helix-greeter → helix-niri + the shell**. With
 screen and the session starts on its own. Without it, start `niri-session` (or your compositor's session) from any display manager; the
 shell's systemd user units come up with the graphical session once they are installed.
 
-## Install and start
+## Start after installing the packages
+
+With the RPM packages (see [Installation](/helix/getting-started/installation/)) there is nothing to start by hand: log out and choose the
+**Niri** session, or use the Helix login screen if you installed `helix-greeter` and switched greetd to it. The bar, the strut that reserves
+space for it, the wallpaper and idle handling start with the session; a restart of one part is the same `systemctl --user restart helix-shell-bar` and so on.
+
+## Install and start from a checkout
 
 ```bash
 tools/switch-shell.sh install      # links the binaries and units; starts the shell only if it is not already running
