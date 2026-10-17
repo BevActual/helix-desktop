@@ -271,6 +271,27 @@ pub async fn run(session: &Session, desktop: &Desktop) {
         .update_setting("keybinds.copy", &edited)
         .await
         .is_err());
+    // Settings is its own application, not the registered shell: it may edit a list as it may change a scalar setting.
+    let other = Desktop::session().await.expect("a second client");
+    let key_now = json_array_value(&other.setting("keybinds.copy").await.expect("keybinds.copy"));
+    other
+        .update_ordered_list_json("keybinds.copy", &key_now, &json!(["Alt+F7"]))
+        .await
+        .expect("a client other than the shell edits a list");
+    assert_eq!(
+        json_array_value(&desktop.setting("keybinds.copy").await.unwrap()),
+        json!(["Alt+F7"]),
+        "the shell sees the other client's edit"
+    );
+    // The shell-only methods stay shell-only.
+    assert!(other
+        .commit_overrides("", "[dock]\nenabled=false\n")
+        .await
+        .is_err());
+    assert!(other
+        .register_capabilities(&json!({"gamma-control": true}))
+        .await
+        .is_err());
     desktop
         .reset_setting("keybinds.copy")
         .await
