@@ -490,7 +490,7 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
   const chat = draft.profiles.chat;
   const cards = [
     { kicker: "Inference", value: info?.inference_ready ? "Ready" : "Offline", detail: `${info?.local_model_count ?? 0} local GGUF(s)`, ok: !!info?.inference_ready },
-    { kicker: "Chat route", value: sourceLabel(chat.backend), detail: chat.model || "Auto model", ok: true, always: true },
+    { kicker: "Chat route", value: sourceLabel(chat.backend), detail: library.find((c) => c.file === chat.model)?.title || chat.model || "Auto model", ok: true, always: true },
     { kicker: "LAN", value: info?.lan_configured ? "Configured" : "Not set", detail: draft.lanUrl || "No endpoint", ok: !!info?.lan_configured },
     { kicker: "Cloud", value: info?.has_cloud_key ? "Key saved" : "No key", detail: draft.cloudUrl || "OpenRouter", ok: !!info?.has_cloud_key },
   ];

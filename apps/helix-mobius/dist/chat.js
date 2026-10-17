@@ -31,6 +31,13 @@ let searchTimer = null;
 // Follow-ups typed while a reply is being written, sent one after another when it ends (at most MAX_QUEUE).
 const MAX_QUEUE = 5;
 let queue = [];
+// Friendly names of the installed models (file name -> "Qwen2.5 VL 7B"), for the chip beside the composer.
+let modelTitles = {};
+function refreshModelTitles() {
+  return invoke("library_list")
+    .then((cards) => { modelTitles = {}; (cards || []).filter((c) => c.installed).forEach((c) => { modelTitles[c.file] = c.title; }); drawComposerMeta(); })
+    .catch(() => undefined);
+}
 let promptHistory = [];
 let promptHistoryIndex = -1;
 let promptDraft = "";
@@ -865,8 +872,9 @@ function drawComposerMeta() {
   }
   $("meta-route").textContent = label || "On this computer";
   $("meta-route").classList.toggle("remote", !!status.left_device);
+  const shownModel = modelTitles[currentModel] || currentModel;
   const modelLabel = currentModel
-    ? (currentBackend !== "local" ? (currentBackend + " · " + currentModel) : currentModel)
+    ? (currentBackend !== "local" ? (currentBackend + " · " + currentModel) : shownModel)
     : (currentBackend !== "local" ? (currentBackend + " · Auto") : "Auto model");
   $("meta-model").textContent = view.analysis_job ? (view.analysis_model || "Local analysis") : modelLabel;
   $("meta-model").disabled = !!view.analysis_job;
@@ -908,7 +916,9 @@ listen("model-loading", (event) => {
   const chip = $("loading-chip");
   const { model, fraction } = event.payload;
   if (fraction >= 1) { chip.hidden = true; return; }
-  chip.textContent = "Loading " + model + " · " + Math.round(fraction * 100) + "%";
+  // The event names the file without ".gguf"; show the model's own name when it is one the library knows.
+  const known = Object.entries(modelTitles).find(([file]) => file.replace(/\.gguf$/, "") === model);
+  chip.textContent = "Loading " + (known ? known[1] : model) + " · " + Math.round(fraction * 100) + "%";
   chip.hidden = false;
 });
 listen("image-progress", () => {
@@ -1491,7 +1501,12 @@ $("find-input").addEventListener("keydown", (event) => {
 $("find-prev").onclick = () => focusFindMatch(findIndex - 1);
 $("find-next").onclick = () => focusFindMatch(findIndex + 1);
 $("find-close").onclick = () => { closeFindBar(); input.focus(); };
-$("meta-model").onclick = () => openModelPicker().catch(report);
+$("meta-model").onclick = () => {
+  // A small menu above the chip: one click switches. The full sheet (other backends, a custom id) is its last row.
+  if (!reactDialogs) { openModelPicker().catch(report); return; }
+  const box = $("meta-model").getBoundingClientRect();
+  reactDialogs.openMenu("model", { left: box.left, top: box.top, width: box.width });
+};
 $("meta-persona").onclick = () => openMeta("persona");
 $("meta-style").onclick = () => openMeta("style");
 
@@ -2368,6 +2383,8 @@ invoke("chat_current_route").then((route) => {
   currentBackend = (route && route.backend) || "local";
   drawComposerMeta();
 }).catch(() => {});
+refreshModelTitles();
+listen("library-changed", () => { refreshModelTitles(); });
 invoke("personas_get").then(drawPersonas);
 invoke("chat_view").then((v) => { view = v; drawChat(); invoke("chat_list").then(drawList); });
 input.focus();

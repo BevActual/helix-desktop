@@ -17,7 +17,7 @@ print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
-has_id persona-dot-0 && has_id persona-dot-add && echo "ok: the persona rail is drawn" || fail "no persona rail"
+has_id meta-persona && echo "ok: the persona chip is beside the composer" || fail "no persona chip"
 click_id input; wtype "How does cron work?"; wtype -k Return
 for _ in $(seq 1 120); do grep -q "MOBIUS turn ended" "$LOG" && break; sleep 0.25; done; sleep 1
 echo "--- 1. rename"
@@ -36,17 +36,24 @@ grep -q "Homelab" "$F" && echo "ok: the project was saved" || fail "project not 
 for _ in $(seq 1 20); do has_id project-filter && break; sleep 0.25; done
 has_id project-filter && echo "ok: the project filter appeared" || fail "no project filter"
 echo "--- 3. a persona"
-click_id persona-dot-add; sleep 0.8
-has_id persona-edit-name && echo "ok: the persona sheet opened" || fail "no persona sheet"
+click_id meta-persona; sleep 1
+click_id menu-persona-new; sleep 0.8
+has_id persona-edit-name && echo "ok: the persona sheet opened (from the persona menu)" || fail "no persona sheet"
 shot persona-sheet
 wtype " Two"; sleep 0.3; click_id persona-save; sleep 1.5
-has_id persona-dot-1 && echo "ok: the new persona is on the rail" || fail "persona missing"
+click_id meta-persona; sleep 1
+has_id menu-persona-1 && echo "ok: the new persona is in the persona menu" || fail "persona missing"
+wtype -k Escape; sleep 0.5
 echo "--- 4. model picker"
 click_id meta-model; sleep 1.2
-has_id model-auto && echo "ok: the model picker opened" || fail "no model picker"
+has_id menu-model-auto && echo "ok: the model menu opened" || fail "no model menu"
+click_id menu-model-auto; sleep 1
+has_id menu-model-auto && fail "the menu stayed open after a choice" || echo "ok: choosing Auto closed the menu"
 click_id meta-model; sleep 1.2
+click_id menu-model-more; sleep 1.2
+has_id model-auto && echo "ok: the full sheet (other backends, custom id) opens from the menu" || fail "no model sheet"
 click_id model-auto; sleep 1
-has_id model-auto && fail "the picker stayed open" || echo "ok: Auto closed the picker"
+has_id model-auto && fail "the sheet stayed open" || echo "ok: Auto closed the sheet"
 echo "--- 5. find in the chat"
 click_id input; wtype "/find"; sleep 0.4; wtype -k Return; sleep 0.8
 has_id find-input && echo "ok: the find bar opened" || fail "no find bar"
@@ -70,8 +77,11 @@ M=$(ls "$CHATS"/*.json | wc -l)
 echo "--- 8. slash menu"
 click_id input; wtype "/"; sleep 0.8
 has_id slash-item-0 && echo "ok: the slash menu lists commands" || fail "no slash menu"
-wtype "mod"; sleep 0.6
-has_id slash-item-0 && ! has_id slash-item-3 && echo "ok: typing narrows the commands" || fail "slash menu not narrowed"
+slash_count() { python3 -c "import json,sys;print(sum(1 for k in json.load(open('$LAYOUT'))['elements'] if k.startswith('slash-item-')))"; }
+sleep 0.6; ALL=$(slash_count)
+wtype "mod"; sleep 0.8
+SOME=$(slash_count)
+[ "$SOME" -ge 1 ] && [ "$SOME" -lt "$ALL" ] && echo "ok: typing narrows the commands ($ALL -> $SOME)" || fail "slash menu not narrowed ($ALL -> $SOME)"
 wtype -k Escape; sleep 0.6
 has_id slash-item-0 && fail "Escape left the slash menu open" || echo "ok: Escape closed the slash menu"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED
