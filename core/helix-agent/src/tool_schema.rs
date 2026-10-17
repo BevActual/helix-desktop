@@ -116,6 +116,19 @@ fn offered_positionals(command: &Command) -> Vec<&Positional> {
         .collect()
 }
 
+/// A numeric argument the model is held to by the grammar: the whole numbers from `min` to `max`, as the shell parses them. Without this the
+/// grammar accepts any text, and a model has answered "Volume to 75 percent" with a file path.
+fn whole_number_range(command: &str, positional: &str) -> Option<(u32, u32)> {
+    matches!(
+        (command, positional),
+        ("volume-set", "value")
+            | ("mic-volume-set", "value")
+            | ("brightness-set", "value")
+            | ("keyboard-backlight-set", "value")
+    )
+    .then_some((0, 100))
+}
+
 fn string_schema(choices: &[String], allowed: Option<&BTreeSet<String>>) -> Value {
     if choices.is_empty() && allowed.is_none() {
         return json!({"type": "string", "minLength": 1, "maxLength": MAX_ARG_CHARS});
@@ -144,10 +157,17 @@ fn call_schema(command: &Command, allowed_first: Option<&BTreeSet<String>>) -> V
         open = true;
     } else {
         for (i, positional) in offered_positionals(command).into_iter().enumerate() {
-            prefix.push(string_schema(
-                &positional.choices,
-                if i == 0 { allowed_first } else { None },
-            ));
+            let range = whole_number_range(&command.name, &positional.name);
+            prefix.push(match range {
+                Some((min, max)) if positional.choices.is_empty() && allowed_first.is_none() => {
+                    let values: Vec<String> = (min..=max).map(|n| n.to_string()).collect();
+                    string_schema(&values, None)
+                }
+                _ => string_schema(
+                    &positional.choices,
+                    if i == 0 { allowed_first } else { None },
+                ),
+            });
             if positional.required {
                 required = i + 1;
             }
@@ -266,6 +286,8 @@ pub fn tool_catalog(
             } else if !positional.choices.is_empty() {
                 label.push_str(": ");
                 label.push_str(&positional.choices.join("|"));
+            } else if let Some((min, max)) = whole_number_range(name, &positional.name) {
+                label.push_str(&format!(": {min}-{max}"));
             }
             if positional.required {
                 out.push_str(&format!(" <{label}>"));
@@ -304,13 +326,52 @@ pub fn tool_catalog(
 mod tests {
     use super::*;
 
+    #[test]
+    fn numeric_arguments_are_whole_numbers_in_range() {
+        let policy = RiskPolicy::embedded();
+        let set = tiers(&[Tier::Observe, Tier::ObservePrivate, Tier::Act]);
+        let schema = tool_call_schema(&msg_commands(), &policy, &set, None, true);
+        let alternative = |tool: &str| {
+            schema["oneOf"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|a| a["properties"]["tool"]["const"] == tool)
+                .unwrap_or_else(|| panic!("{tool} is offered"))
+                .clone()
+        };
+        for tool in [
+            "volume-set",
+            "mic-volume-set",
+            "brightness-set",
+            "keyboard-backlight-set",
+        ] {
+            let value = &alternative(tool)["properties"]["args"]["prefixItems"][0];
+            let allowed: Vec<&str> = value["enum"]
+                .as_array()
+                .unwrap_or_else(|| panic!("{tool} takes a fixed set"))
+                .iter()
+                .map(|v| v.as_str().unwrap())
+                .collect();
+            assert_eq!(allowed.len(), 101, "{tool}");
+            assert!(allowed.contains(&"0") && allowed.contains(&"75") && allowed.contains(&"100"));
+            assert!(!allowed.contains(&"101") && !allowed.contains(&"75%"));
+        }
+        let catalog = tool_catalog(&msg_commands(), &policy, &set, None, true, None);
+        assert!(
+            catalog.contains("- volume-set <value: 0-100>"),
+            "the range is told to the model"
+        );
+    }
+
     fn tiers(list: &[Tier]) -> BTreeSet<Tier> {
         list.iter().copied().collect()
     }
 
-    /// The C++ implementation's output (`tests/golden/tool_schema.json`) is the reference.
+    /// `tests/golden/tool_schema.json` (first written from the C++ implementation) is the reference. After a deliberate change to the schema or
+    /// the catalog, rewrite it with `HELIX_UPDATE_GOLDEN=1 cargo test -p helix-agent tool_schema` and review the diff.
     #[test]
-    fn matches_the_cpp_goldens() {
+    fn matches_the_goldens() {
         let golden: Vec<Value> =
             serde_json::from_str(include_str!("../tests/golden/tool_schema.json")).unwrap();
         let policy = RiskPolicy::embedded();
@@ -337,6 +398,26 @@ mod tests {
             ),
             ("blocked_only", tiers(&[Tier::Blocked]), false, false),
         ];
+        if std::env::var_os("HELIX_UPDATE_GOLDEN").is_some() {
+            let rewritten: Vec<Value> = cases
+                .iter()
+                .map(|(name, set, decline, use_hints)| {
+                    json!({
+                        "name": name,
+                        "schema": tool_call_schema(&commands, &policy, set, None, *decline),
+                        "catalog": tool_catalog(&commands, &policy, set, None, *decline, use_hints.then_some(&hints)),
+                    })
+                })
+                .collect();
+            let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden/tool_schema.json");
+            let mut text = Vec::new();
+            let format = serde_json::ser::PrettyFormatter::with_indent(b" ");
+            let mut serializer = serde_json::Serializer::with_formatter(&mut text, format);
+            serde::Serialize::serialize(&rewritten, &mut serializer).unwrap();
+            text.push(b'\n');
+            std::fs::write(path, text).unwrap();
+            return;
+        }
         assert_eq!(golden.len(), cases.len());
         for (entry, (name, set, decline, use_hints)) in golden.iter().zip(cases) {
             assert_eq!(entry["name"], name);

@@ -1,7 +1,7 @@
 //! Measures how well the model behind the assistant chooses a desktop action, through the real stack: the live tool catalog and grammar,
 //! the shipped prompt (`build_messages`), and the Inference1 service the assistant itself uses. Nothing is run on the desktop.
 //!
-//!   helix-assistant-eval [CASES.json] [--model ID] [--limit N] [--raw] [--json OUT] [--min-exact PERCENT]
+//!   helix-assistant-eval [CASES.json] [--model ID] [--limit N] [--category NAME] [--raw] [--json OUT] [--min-exact PERCENT]
 //!
 //! CASES defaults to `tests/eval/desktop_requests.json` (`tests/eval/desktop_requests_heldout.json` is the second set, for checking that
 //! changes to the prompt or examples were not tuned to the first). A case has the accepted calls (`accept`, arguments default to none, so
@@ -33,6 +33,7 @@ struct Args {
     cases: String,
     model: String,
     limit: usize,
+    category: String,
     raw: bool,
     json_out: String,
     min_exact: Option<f64>,
@@ -53,6 +54,7 @@ fn parse_args() -> Result<Args, String> {
                     .parse()
                     .map_err(|_| "--limit is a number")?
             }
+            "--category" => args.category = value("--category")?,
             "--raw" => args.raw = true,
             "--json" => args.json_out = value("--json")?,
             "--min-exact" => {
@@ -167,7 +169,7 @@ async fn main() {
             if !message.is_empty() {
                 eprintln!("error: {message}");
             }
-            eprintln!("usage: helix-assistant-eval [CASES.json] [--model ID] [--limit N] [--raw] [--json OUT] [--min-exact PERCENT]");
+            eprintln!("usage: helix-assistant-eval [CASES.json] [--model ID] [--limit N] [--category NAME] [--raw] [--json OUT] [--min-exact PERCENT]");
             std::process::exit(2);
         }
     };
@@ -182,6 +184,9 @@ async fn main() {
 
 async fn run(args: Args) -> Result<i32, String> {
     let mut cases = load_cases(&args.cases)?;
+    if !args.category.is_empty() {
+        cases.retain(|case| case.category == args.category);
+    }
     if args.limit > 0 {
         cases.truncate(args.limit);
     }

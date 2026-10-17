@@ -424,6 +424,32 @@ Every reply was a valid call in every run. What the misses say:
 * **Near-neighbour tools are mixed up in both directions**: `volume-set 100` for "turn it up" (1.5B, repeatedly), `brightness-set` for "make
   everything bright", `color-scheme-set` for "dark theme", `desktop-capture` for "read the text off my screen".
 
+**Acted on the same day (2026-10-16):**
+
+1. *Numeric arguments are fixed sets in the grammar.* `volume-set`, `mic-volume-set`, `brightness-set` and `keyboard-backlight-set` take the whole
+   numbers 0 to 100 (an enum of 101 strings; the grammar converter takes only strings and string enums), and the catalog line says `<value: 0-100>`.
+   No file path or `value:20` can be produced. No latency cost measured (7B median 2.13 s without, 2.19 s with, in the same run conditions).
+2. *The prompt teaches declining.* Three decline examples join the five call examples (a non-desktop request, a desktop-adjacent action the tools
+   cannot do where only a status tool exists, and a physical-world request), and the instruction says to decline rather than use a status tool or a
+   different action as a stand-in. A unit test keeps every example out of the case files.
+
+| Model | Cases | Exact before → after | Declined correctly before → after |
+|---|---|---|---|
+| 7B | main | 96% → 95% (75/79) | 4 / 10 → 7 / 10 |
+| 7B | held out | 87% → 90% (47/52) | 3 / 8 → 5 / 8 |
+| 1.5B | main | 82% → 78% | 2 / 10 → 5 / 10 |
+| 1.5B | held out | 83% → 73% | 0 / 8 → 5 / 8 |
+
+The 7B gains on both sets and loses one case on the main one, which is inside the noise. The 1.5B declines far more but loses accuracy on real
+requests (it over-declines); that is acceptable because Act runs on the 7B (`inference-routing.toml`), but it means the 1.5B should not be
+routed to Act without re-measuring. Latency was 2 to 2.5 s for the 7B in these runs, against 0.5 s in the first ones: the GPU was shared with
+other programs, so compare latency only within a run.
+
+Still wrong, and not fixed by prompt wording: **the 7B still picks a stand-in** for "Turn off Wi-Fi" (`wifi-status`), "Connect to Tailscale"
+(`tailscale-status`), "Disable Bluetooth" (`bluetooth-status`) and "Log me out" (`session lock`). The status tools run immediately (they only read),
+so the person sees a status instead of a refusal: harmless but wrong. Also, some case files are stale against the shell's supported set ("Close this
+window" and "Show my clipboard history" are expected to decline but are now supported), so the decline column is a little pessimistic.
+
 Reproduce: `tools/run-assistant-eval.sh [--model ID] [--raw] [--json out.json] [cases.json ...]`; add `--min-exact 90` to fail below a rate.
 It starts its own `helix-inference` on a private bus (the model directory is `~/.local/share/helix/models`).
 
