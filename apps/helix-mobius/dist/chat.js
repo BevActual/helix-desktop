@@ -609,6 +609,26 @@ function pickMention(row) {
   }).catch(report);
 }
 
+
+// A message that reads like a desktop command ("turn the volume down") gets a one-click offer to send it with Act. A small embedding model
+// in this process decides (decide_message); without the model installed nothing is offered.
+let hintTimer = 0;
+let hintSeq = 0;
+function hideActHint() { $("act-hint").hidden = true; hintSeq++; clearTimeout(hintTimer); }
+function scheduleActHint() {
+  hideActHint();
+  const typed = input.value.trim();
+  if (composerMode() !== "ask" || view.streaming || typed.length < 8 || typed.startsWith("/") || /(^|\s)@\S*$/.test(typed)) return;
+  const seq = hintSeq;
+  hintTimer = setTimeout(() => {
+    invoke("decide_message", { text: typed }).then((decision) => {
+      if (seq !== hintSeq || input.value.trim() !== typed || composerMode() !== "ask") return;
+      $("act-hint").hidden = !(decision && decision.route === "act");
+    }).catch(() => undefined);
+  }, 500);
+}
+$("act-hint").onclick = () => { hideActHint(); setComposerMode("act"); };
+
 function runSlash(item) {
   hideSlashMenu();
   const typed = input.value; // commands that take text (/note, /act) read it here; the field is cleared first
@@ -1456,6 +1476,7 @@ function grow() {
 input.addEventListener("input", () => {
   grow();
   if (!maybeSlashFromInput()) maybeMentionFromInput();
+  scheduleActHint();
   if (promptHistoryIndex >= 0 && input.value !== promptHistory[promptHistoryIndex]) {
     promptHistoryIndex = -1;
     promptDraft = "";
@@ -1529,6 +1550,7 @@ input.addEventListener("keydown", (event) => {
 });
 $("composer").addEventListener("submit", (event) => {
   event.preventDefault();
+  hideActHint();
   hideSlashMenu();
   const text = input.value;
   if (!text.trim() && !pendingAttachments.length && !pendingPictures.length) return;
@@ -1568,6 +1590,7 @@ input.addEventListener("paste", (event) => {
 // The composer's mode: Ask (chat only), Tools (the chat's Tools mode) or Act (the next message goes to the desktop assistant).
 function composerMode() { return composerAct ? "act" : view.tools_enabled ? "tools" : "ask"; }
 function setComposerMode(next) {
+  hideActHint();
   if (next === "folder") { reactTools?.open(view); return; }
   if (next === "act") { composerAct = true; drawComposerMeta(); input.focus(); return; }
   composerAct = false;

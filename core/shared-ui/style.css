@@ -1461,3 +1461,5 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .mode-chip::after { content: " ▾"; font-size: 10px; opacity: .6; }
 .mode-chip.mode-tools { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .mode-chip.mode-act { background: var(--accent); color: var(--on-accent); }
+.act-hint { display: block; width: fit-content; margin: 0 0 6px 12px; padding: 3px 10px; border-radius: 999px; font-size: 12px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.act-hint[hidden] { display: none; }

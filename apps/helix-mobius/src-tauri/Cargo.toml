@@ -16,6 +16,7 @@ helix-chat = { workspace = true }
 helix-compositor = { workspace = true }
 helix-config = { workspace = true }
 helix-desktop-api = { workspace = true }
+helix-embed = { workspace = true }
 gtk = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
