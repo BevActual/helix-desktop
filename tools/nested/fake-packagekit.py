@@ -19,6 +19,7 @@ INSTALLED = {"helix-calc": "1.0-1", "helix-locked": "1.0-1", "bash": "5.3-1"}
 UPDATES = {"helix-calc": "2.0-1", "kernel": "7.2.11-1", "glibc": "2.43-1"}
 AVAILABLE = {"helix-writer": "1.5-1", "helix-calc": "2.0-1", "helix-locked": "1.0-1"}
 ARCH = "x86_64"
+REPOS = [("fixture", "Fixture Repository 1 - x86_64", True), ("fixture-source", "Fixture Repository 1 - Source", False), ("fixture-extra", "Fixture Extras", True)]
 transactions = {}
 counter = [0]
 connection = None
@@ -38,8 +39,10 @@ TX_XML = """<node><interface name="org.freedesktop.PackageKit.Transaction">
 <method name="RemovePackages"><arg type="t" direction="in"/><arg type="as" direction="in"/><arg type="b" direction="in"/><arg type="b" direction="in"/></method>
 <method name="UpdatePackages"><arg type="t" direction="in"/><arg type="as" direction="in"/></method>
 <method name="RefreshCache"><arg type="b" direction="in"/></method>
+<method name="GetRepoList"><arg type="t" direction="in"/></method>
 <method name="Cancel"/>
 <signal name="Package"><arg type="u"/><arg type="s"/><arg type="s"/></signal>
+<signal name="RepoDetail"><arg type="s"/><arg type="s"/><arg type="b"/></signal>
 <signal name="ItemProgress"><arg type="s"/><arg type="u"/><arg type="u"/></signal>
 <signal name="ErrorCode"><arg type="u"/><arg type="s"/></signal>
 <signal name="Finished"><arg type="u"/><arg type="u"/></signal>
@@ -123,6 +126,12 @@ def on_tx(conn, sender, path, iface, method, params, invocation):
                 if n in UPDATES:
                     INSTALLED[n] = UPDATES.pop(n)
         steps(path, ids[0], apply)
+    elif method == "GetRepoList":
+        def go():
+            for repo, description, enabled in REPOS:
+                emit(path, "RepoDetail", "(ssb)", (repo, description, enabled))
+            finish(path)
+        later(go)
     elif method == "RefreshCache":
         log("REFRESH")
         later(lambda: finish(path))

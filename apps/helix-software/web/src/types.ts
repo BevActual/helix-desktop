@@ -29,7 +29,7 @@ export interface PackageView {
 export interface Shelf { title: string; category: string; rows: PackageView[]; }
 export interface Discover { hero: PackageView | null; shelves: Shelf[]; }
 export interface PendingView { id: string; title: string; action: "install" | "remove" | "update"; kind: string; }
-export interface Remote { name: string; title: string; url: string; installation: string; enabled: boolean; }
+export interface Remote { name: string; title: string; url: string; installation: string; enabled: boolean; kind: "flatpak" | "rpm"; }
 export interface JobView {
   id: number;
   package_id: string;

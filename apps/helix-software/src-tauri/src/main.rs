@@ -159,6 +159,7 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
     guard.loading = false;
     match installed {
         Ok(installed) => {
+            let mut rpm_sources = Vec::new();
             let remotes = remotes
                 .map(|text| catalog::parse_remotes(&text))
                 .unwrap_or_default();
@@ -175,6 +176,7 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
             );
             packages.extend(firmware_updates());
             if let Ok((catalog, system)) = rpm {
+                rpm_sources = catalog.sources;
                 packages.extend(catalog.packages);
                 guard.rpm_apps = catalog.apps;
                 guard.rpm_system_names = system;
@@ -183,6 +185,7 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
             let kept = guard.meta.clone();
             guard.store.apply_meta(&kept);
             guard.remotes = remotes;
+            guard.remotes.extend(rpm_sources);
             guard.icons.clear();
             if remote_text.trim().is_empty() && !remote_error.is_empty() {
                 eprintln!("SOFTWARE catalog error: {remote_error}");
@@ -197,7 +200,7 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
                 guard.store.set(packages);
                 guard.rpm_apps = catalog.apps;
                 guard.rpm_system_names = system;
-                guard.remotes = Vec::new();
+                guard.remotes = catalog.sources;
                 guard.icons.clear();
             } else {
                 eprintln!("SOFTWARE catalog error: {error}");
@@ -219,6 +222,8 @@ fn read_rpm() -> Result<(rpm::RpmCatalog, Vec<String>), String> {
     let updates = packagekit.updates().unwrap_or_default();
     let catalog = rpm::build(apps, &installed, &updates);
     let system = rpm::system_update_names(&updates, &catalog.apps);
+    let mut catalog = catalog;
+    catalog.sources = rpm::sources(&packagekit.repos().unwrap_or_default());
     Ok((catalog, system))
 }
 
@@ -1387,6 +1392,7 @@ fn load_fake(path: &PathBuf, state: &mut State) {
             url: "https://dl.flathub.org/repo/".into(),
             installation: "user".into(),
             enabled: true,
+            kind: "flatpak".into(),
         },
         Remote {
             name: "fedora".into(),
@@ -1394,6 +1400,7 @@ fn load_fake(path: &PathBuf, state: &mut State) {
             url: "oci+https://registry.fedoraproject.org".into(),
             installation: "system".into(),
             enabled: true,
+            kind: "flatpak".into(),
         },
     ];
     state.fake = true;
