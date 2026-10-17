@@ -14,6 +14,8 @@ $("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
 
 let reporting = false;
 let reportTimer = null;
+let composerAct = false;
+let modeChat = "";
 let view = { id: "", title: "New chat", messages: [], streaming: false, error: "", temporary: false, pinned: false, project: "" };
 let status = { inference: "ready", backend: "On this computer", left_device: false };
 let personas = { active: "helix", personas: [] };
@@ -842,7 +844,9 @@ function composerPlaceholder() {
     input.placeholder = "Ask about the local analysis evidence";
     return;
   }
-  input.placeholder = view.tools_enabled
+  input.placeholder = composerAct
+    ? "Say what to do on the desktop"
+    : view.tools_enabled
     ? "Ask a task — each step is shown for your approval"
     : "Message Mobius — / for commands";
 }
@@ -898,6 +902,12 @@ function drawComposerMeta() {
   $("pin-chat").classList.toggle("active", !!view.pinned);
   $("pin-chat").title = view.pinned ? "Unpin chat" : "Pin chat";
   $("project-chat").title = view.project ? ("Project: " + view.project) : "Move to project";
+  if (modeChat !== view.id) { if (modeChat) composerAct = false; modeChat = view.id; }
+  const mode = composerMode();
+  $("mode").textContent = mode === "act" ? "Act" : mode === "tools" ? "Tools" : "Ask";
+  $("mode").className = "mode-chip" + (mode === "ask" ? "" : " mode-" + mode);
+  $("mode").title = mode === "act" ? "Act: the next message goes to the desktop assistant (Shift+Tab to change)" : "Mode: " + $("mode").textContent + " (Shift+Tab to change)";
+  $("meta-tools").hidden = !view.tools_enabled;
   $("meta-tools").textContent = toolsChipLabel();
   $("meta-tools").classList.toggle("tools-on", !!view.tools_enabled);
   $("meta-tools").disabled = !view.id || view.streaming || !!view.analysis_job;
@@ -1396,6 +1406,12 @@ input.addEventListener("input", () => {
   }
 });
 input.addEventListener("keydown", (event) => {
+  if (event.key === "Tab" && event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    const order = ["ask", "tools", "act"];
+    setComposerMode(order[(order.indexOf(composerMode()) + 1) % order.length]);
+    return;
+  }
   const slashOpen = !$("slash-menu").hidden;
   if (slashOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
     event.preventDefault();
@@ -1451,6 +1467,7 @@ $("composer").addEventListener("submit", (event) => {
   const text = input.value;
   if (!text.trim() && !pendingAttachments.length && !pendingPictures.length) return;
   if (text.trim().startsWith("/") && tryRunSlashSubmit()) return;
+  if (composerAct) { if (text.trim()) actFromComposer(text); return; }
   if (view.streaming) {
     if (!text.trim() || pendingPictures.length || pendingAttachments.length) { report("Wait for the reply, or stop it, before sending attachments."); return; }
     if (queue.length >= MAX_QUEUE) { report(`${MAX_QUEUE} follow-ups are already waiting.`); return; }
@@ -1482,15 +1499,36 @@ input.addEventListener("paste", (event) => {
   const files = event.clipboardData && event.clipboardData.files;
   if (files && files.length && addPictureFiles(files)) event.preventDefault();
 });
-$("act").onclick = () => {
-  const typed = input.value.trim();
-  const text = typed || (view.messages.slice().reverse().find((m) => m.role === "user") || {}).text || "";
-  if (!text.trim()) { report("Write something to act on."); return; }
-  // Handed over like a sent message: the draft goes, unless it was changed meanwhile or the hand-over failed.
-  actOnDesktop(text, typed ? () => {
-    if (input.value.trim() === typed) { input.value = ""; grow(); syncSendEnabled(); }
-  } : null);
+// The composer's mode: Ask (chat only), Tools (the chat's Tools mode) or Act (the next message goes to the desktop assistant).
+function composerMode() { return composerAct ? "act" : view.tools_enabled ? "tools" : "ask"; }
+function setComposerMode(next) {
+  if (next === "folder") { reactTools?.open(view); return; }
+  if (next === "act") { composerAct = true; drawComposerMeta(); input.focus(); return; }
+  composerAct = false;
+  drawComposerMeta();
+  const enabled = next === "tools";
+  if (enabled !== !!view.tools_enabled) {
+    invoke("tools_configure", { chatId: view.id, enabled, workspace: view.workspace || "" }).catch(report);
+  }
+  input.focus();
+}
+window.addEventListener("mobius-set-mode", (event) => setComposerMode(event.detail));
+function modeState() {
+  return { mode: composerMode(), folder: view.workspace || "", busy: !view.id || view.streaming || !!view.analysis_job };
+}
+$("mode").onclick = () => {
+  const box = $("mode").getBoundingClientRect();
+  if (reactDialogs) reactDialogs.openMenu("mode", { left: box.left, top: box.top, width: box.width }, modeState());
 };
+function actFromComposer(text) {
+  const typed = text.trim();
+  // Handed over like a sent message: the draft goes, unless it was changed meanwhile or the hand-over failed.
+  composerAct = false;
+  drawComposerMeta();
+  return actOnDesktop(typed, () => {
+    if (input.value.trim() === typed) { input.value = ""; grow(); syncSendEnabled(); }
+  });
+}
 $("new-chat").onclick = () => {
   invoke("chat_new").then(() => { clearAttachments(); input.focus(); closeSideDrawer(); }).catch(report);
 };
@@ -2356,7 +2394,7 @@ $("route-probe-cloud").onclick = () => {
   }
   host.append(el("div", "empty-kicker", "Mobius"));
   host.append(el("div", "empty-title", "How can I help?"));
-  host.append(el("div", "empty-note", "Ask anything, or type / for commands. Press Ctrl+Shift+A to have Mobius act on the desktop."));
+  host.append(el("div", "empty-note", "Ask anything, or type / for commands. Shift+Tab changes the mode (Ask, Tools, Act); Ctrl+Shift+A acts on the desktop."));
   const suggestions = el("div", "suggestions");
   host.append(suggestions);
   drawSuggestions();

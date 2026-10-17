@@ -16,8 +16,10 @@ PY
 click_id() { refresh_geometry; local pos; pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" "$1" "${2:-0.5}"); "$PT" $pos click; sleep 0.8; }
 wait_id() { for _ in $(seq 1 60); do has_id "$1" && return; sleep 0.25; done; echo "FAIL: missing $1"; exit 1; }
 paste_id() { click_id "$1"; wl-copy --primary "$2"; refresh_geometry; local pos; pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" "$1"); "$PT" $pos mclick; sleep 0.3; }
-wait_id meta-tools
-click_id meta-tools
+wait_id mode
+click_id mode
+wait_id menu-mode-folder
+click_id menu-mode-folder
 wait_id tools-panel
 click_id tools-enabled
 click_id tools-choose

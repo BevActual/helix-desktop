@@ -17,9 +17,9 @@ print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
-# Clicks the composer, types, and hands the text to the desktop assistant (the draft is cleared once it is handed over). The layout log is read after a pause so a
+# Switches the composer to Act, types, and hands the text to the desktop assistant (the draft is cleared once it is handed over). The layout log is read after a pause so a
 # card that has just appeared above the composer has already moved things.
-say() { sleep 1; click_id composer; sleep 0.6; wtype "$1"; sleep 0.4; click_id act; sleep 0.5; }
+say() { sleep 1; click_id mode; sleep 0.5; click_id menu-mode-act; sleep 0.4; click_id composer; sleep 0.6; wtype "$1"; sleep 0.4; wtype -k Return; sleep 0.5; }
 wait_id() { for _ in $(seq 1 60); do has_id "$1" && return 0; sleep 0.25; done; return 1; }
 gone_id() { for _ in $(seq 1 40); do has_id "$1" || return 0; sleep 0.25; done; return 1; }
 echo "--- 1. nothing is shown before anything is handed over"

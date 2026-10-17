@@ -3,7 +3,7 @@ import { ActTask, type ActHandle, type ActHooks, type ActState } from "./acttask
 import { createRoot } from "react-dom/client";
 import { ChatList, type ChatItem, type ChatListHandle, type ChatListHooks } from "./chatlist";
 import { AttachChips, SlashMenu, type Attachment, type ChipsHandle, type SlashHandle, type SlashItem } from "./composer";
-import { Dialogs, type DialogHandle, type DialogHooks } from "./dialogs";
+import { Dialogs, type DialogHandle, type DialogHooks, type ModeState } from "./dialogs";
 import { Thread, type Block, type DesktopTask, type Message, type ThreadHandle, type ThreadHooks } from "./thread";
 import { ModelsPage, type ModelsHandle, type ModelsHooks } from "./models";
 import { Analysis, type AnalysisHandle } from "./analysis";
@@ -81,7 +81,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
       openProject: (current: string, suggestions: string[]) => run((h) => h.openProject(current, suggestions)),
       openModel: () => run((h) => h.openModel()),
       openPersona: (create?: boolean) => run((h) => h.openPersona(create)),
-      openMenu: (kind: "persona" | "style", anchor: { left: number; top: number; width: number }) => run((h) => h.openMenu(kind, anchor)),
+      openMenu: (kind: "persona" | "style" | "model" | "mode", anchor: { left: number; top: number; width: number }, mode?: ModeState) => run((h) => h.openMenu(kind, anchor, mode)),
       openEdit: (index: number, text: string) => run((h) => h.openEdit(index, text)),
     };
   },

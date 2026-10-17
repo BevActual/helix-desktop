@@ -42,7 +42,6 @@ Measured with the real models, switching in one chat (the 5.5 GB vision model, t
 * **The chat settings row is still cryptic.** "Helix" is the persona, "On this computer" is where the model runs. A single model control (icon, name, location) that opens one popover would
   say it better, with persona and style inside it.
 * **Three attachment icons beside the composer** (file, picture, microphone) could be one "+" menu, the pattern people know; the composer would then have room for a longer line.
-* **"Act" is an unexplained word** on a button next to Send. Its tooltip says what it does; the label could say it ("Do on desktop") or the control could become a mode of the composer.
 * **The start screen is task-first, not conversation-first.** The composer is the most likely first action; the eight cards could fold into one row of four with "More" and the composer centred above them.
 * **Light theme** has not been looked at since the apps began to follow the system theme (`settings-audit.md`). Take the same pictures with the light theme and read them.
 * **Reordering the queue** (Cursor lets you drag queued messages).
@@ -77,7 +76,7 @@ From Cursor's documentation and reviews of Cursor 2.0 (I could not run Cursor he
 
 ### Order
 
-1. **Mode control** (replaces Act and the Tools switch; the biggest clarity win, no new engine work).
+1. **Mode control**: done. A chip beside Send (Ask, Tools, Act) opens a menu; Shift+Tab cycles. Tools is the chat's own setting; Act is for the next message only, then the composer returns to what it was. The folder chip shows only while Tools are on; "Project folder…" is in the menu. `tools/nested/mobius-mode-test.sh`; the act and tools suites now switch mode first. Menus now stay inside the window (the mode menu ran off the right edge).
 2. **`@` pills and the context ring** (shows what the model sees; the ring needs the loaded model's window from the inference service).
 3. **Checkpoints and the Changes panel** (trust in Tools and Act; needs the agent-desk snapshot).
 4. **Running indicators, `/side`, Plan**.
