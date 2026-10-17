@@ -49,4 +49,23 @@ sleep 1; shot second
 R=$(replies); echo "$R" | sed 's/^/reply: /'
 [ "$(echo "$R" | sed -n 1p | cut -d'|' -f1)" != "$(echo "$R" | sed -n 2p | cut -d'|' -f1)" ] && echo "ok: two different models wrote the two replies" || fail "the same model answered both: $R"
 echo "$R" | sed -n 2p | grep -q "^qwen2.5-1.5b-instruct-q4_k_m|" && echo "ok: the second reply is from the 1.5B" || fail "second reply model: $(echo "$R" | sed -n 2p)"
+echo "--- 4. the choice belongs to this chat: a new chat uses the default again"
+python3 - "$CHATS" <<'PY' && echo "ok: the first chat saved its own model" || fail "the first chat did not keep its model"
+import glob, json, sys
+chats = [json.load(open(f)) for f in glob.glob(sys.argv[1] + "/*.json")]
+assert len(chats) == 1 and chats[0]["route_model"] == "qwen2.5-1.5b-instruct-q4_k_m.gguf", [c.get("route_model") for c in chats]
+PY
+click_id new-chat; sleep 1.5
+click_id input; wtype "Say yes."; wtype -k Return
+T2=$(date +%s); wait_turn 3 300 && echo "ok: answered after $(( $(date +%s) - T2 )) s" || fail "no answer in the new chat"
+sleep 1
+python3 - "$CHATS" <<'PY' && echo "ok: the new chat was answered by the default model, the first chat keeps the 1.5B" || fail "the new chat did not use the default"
+import glob, json, sys
+chats = [json.load(open(f)) for f in glob.glob(sys.argv[1] + "/*.json")]
+assert len(chats) == 2, len(chats)
+fresh = next(c for c in chats if c["messages"][0]["text"] == "Say yes.")
+old = next(c for c in chats if c is not fresh)
+assert fresh["route_model"] == "" and fresh["messages"][-1]["stats"]["model"].startswith("Qwen2.5-VL-7B"), (fresh["route_model"], fresh["messages"][-1]["stats"])
+assert old["route_model"] == "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+PY
 [ "$FAILED" = 0 ] && echo "PASS: mobius routing real" || exit 1

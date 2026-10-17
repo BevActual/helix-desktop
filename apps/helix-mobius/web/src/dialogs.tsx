@@ -20,7 +20,7 @@ export interface LabView {
 /** The symbols a persona may pick from (must match `ICONS` in helix-chat). */
 const ICONS = ["sparkle", "music", "palette", "fork", "clipboard", "eye", "shield", "sun", "moon", "bolt", "pin", "image", "folder", "lock"];
 interface PersonaStore { active: string; personas: Persona[]; }
-interface Route { backend?: string; model?: string; label?: string; }
+interface Route { backend?: string; model?: string; label?: string; own?: boolean; }
 
 export interface DialogHooks {
   report: (error: unknown) => void;
@@ -306,6 +306,11 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                       </button>
                     );
                   })}
+                  {picker?.route?.own ? (
+                    <button className="hx-menu-item" data-test="menu-model-default" onClick={() => { setMenu(null); invoke("chat_use_default_route").then(() => window.dispatchEvent(new CustomEvent("mobius-route-changed")), report); }}>
+                      <span className="mi-text"><span className="mi-title">Use the default model</span><span className="mi-sub">This chat follows Models &amp; routing again</span></span>
+                    </button>
+                  ) : null}
                   <div className="hx-menu-sep" />
                   <button className="hx-menu-item" data-test="menu-model-more" onClick={() => { setMenu(null); openModelSheet(); }}><span className="mi-text"><span className="mi-title">Other backends and custom ids…</span></span></button>
                   <button className="hx-menu-item" data-test="menu-model-routing" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models")); }}><span className="mi-text"><span className="mi-title">Models &amp; routing…</span></span></button>

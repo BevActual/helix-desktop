@@ -145,13 +145,20 @@ struct Model {
     key: Option<String>,
     backend_id: String,
     key_ref: String,
+    /// The chat's own model choice this was captured with (empty: the default routing).
+    chat_route: (String, String),
     fingerprint: serde_json::Value,
 }
 impl Model {
-    fn capture() -> Result<Self, String> {
+    fn capture(chat_route: (String, String)) -> Result<Self, String> {
         let store = personas::load();
-        let persona = store.active_persona();
-        let routing = inference_routing::load();
+        let (routing, persona) = crate::apply_chat_route(
+            &inference_routing::load(),
+            store.active_persona(),
+            &chat_route.0,
+            &chat_route.1,
+        );
+        let persona = &persona;
         let (task, model, local, label) = crate::resolve_route(&routing, persona);
         if task == "act" {
             return Err(
@@ -189,12 +196,19 @@ impl Model {
             key,
             backend_id,
             key_ref,
+            chat_route,
             fingerprint: serde_json::json!({"routing": routing, "persona": persona}),
         })
     }
     fn unchanged(&self) -> bool {
         let store = personas::load();
-        let fingerprint = serde_json::json!({"routing": inference_routing::load(), "persona": store.active_persona()});
+        let (routing, persona) = crate::apply_chat_route(
+            &inference_routing::load(),
+            store.active_persona(),
+            &self.chat_route.0,
+            &self.chat_route.1,
+        );
+        let fingerprint = serde_json::json!({"routing": routing, "persona": persona});
         fingerprint == self.fingerprint
             && (self.local
                 || crate::secrets::for_backend(&self.backend_id, &self.key_ref) == self.key)
@@ -366,7 +380,7 @@ async fn execute(
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<(), String> {
     let generation = turn.generation;
-    let model = Model::capture()?;
+    let model = Model::capture(crate::chat_route_of(app))?;
     let folder = {
         let shared = crate::shared(app);
         let state = shared.lock().expect("state");
@@ -771,7 +785,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "explicit smoke test with the configured real local model"]
     async fn real_local_model_selects_research_tool() {
-        let model = Model::capture().unwrap();
+        let model = Model::capture((String::new(), String::new())).unwrap();
         assert!(model.local, "Select a local Talk model for this test.");
         let (_sender, receiver) = watch::channel(false);
         let messages = vec![

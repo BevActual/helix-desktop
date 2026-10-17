@@ -26,6 +26,18 @@ What those apps do that Mobius did not, kept to what fits a local, private assis
 * **A reply shows what it cost.** Beside its actions (on hover): the model, the tokens and the speed, e.g. `qwen2.5-7b-instruct-q4_k_m · 312 tokens · 41 tok/s`. Saved with the reply (`stats`), so it survives a restart; replies from before have none. What a person running a local model wants to know, and what Claude and ChatGPT do not have to show.
 * **The Tools sheet is two rows and a note.** It was two paragraphs, five buttons and two notes that scrolled in a narrow window; now a switch, a folder row and one note, with the agent desk folded away.
 
+## Models: tried in the real app, then changed
+
+Looked at with the real service and this machine's own routing (`tools/nested/mobius-routing-look-test.sh`; the real-app run copies the routing file read only and never writes it back), against how Cursor does it: one model control in the composer, a list that applies on a click, the choice kept with the chat.
+
+| Found | Changed |
+|---|---|
+| Switching a model was a modal: a backend dropdown, a list, a custom-id field, then **Use** (open, pick, confirm). The list showed file names where the library knew a friendly one (`Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf`, a shard `…-00001-of-00002.gguf`). | **A menu above the chip.** Auto, then each installed model with its name, size, what it can do (sees pictures, code) and whether it is `ready now` or `loads on first use`; a check on the one in use; one click switches and closes. "Other backends and custom ids…" opens the old sheet; "Models & routing…" the routing page. |
+| The chip beside the composer, the "Loading …" chip and the Chat route card on the routing page showed raw file names. | They use the model's own name (`Qwen2.5 VL 7B`). |
+| **The choice was global.** Picking a model for one chat rewrote the `chat` profile in the routing file, so every chat, and the next launch, followed it. | **The choice belongs to the chat** (`route_backend`, `route_model` in the chat file, kept through a fork). Other chats keep following the default routing; "Use the default model" returns a chat to it; Tools mode uses the chat's model too. The routing file is no longer written from the composer. |
+
+Measured with the real models, switching in one chat (the 5.5 GB vision model, then the 1.5B): the first reply 6 to 7 s (the model has to load), the reply after switching 1.6 s, and a new chat afterwards answered by the default model again. `tools/nested/mobius-routing-real-test.sh` runs that and reads which model wrote each reply from the saved details; it needs the two models installed and skips without them.
+
 ## Seen, not changed
 * **The chat settings row is still cryptic.** "Helix" is the persona, "On this computer" is where the model runs. A single model control (icon, name, location) that opens one popover would
   say it better, with persona and style inside it.
@@ -36,11 +48,11 @@ What those apps do that Mobius did not, kept to what fits a local, private assis
 * **Reordering the queue** (Cursor lets you drag queued messages).
 * **Branches in place.** Claude and ChatGPT keep every version of an edited message with a `‹ 2 / 3 ›` switch; Mobius forks into a new chat (which is clearer about what is where, but moves you).
 * **A side panel for what was made** (Claude's artifacts, ChatGPT's canvas): editable, versioned, exportable. Mobius has Save as file with a preview.
-* **Regenerate with another model**, and inline editing of a message instead of a sheet.
+* **Regenerate with another model** (the menu changes the model for the next message; a reply cannot yet be redone on another one), and inline editing of a message instead of a sheet.
+* **Choosing between models by what they are good at**: the routing page's task map is right for defaults, but the menu lists models flat; a first line ("Fast", "Sees pictures") per model would help someone who does not know the names.
 * **A narrow window** (below 720 px) hides the chat list behind a button; the look script's narrow picture did not take effect (`set-window-width` did nothing in the nested compositor), so that layout was not reviewed here.
 
 ## Tests
 
-The Mobius suites were run on `main` and failed the same way there, so these failures did not come from the changes above. Most were one cause, fixed in the suite: the nested window is 640 px wide, below the 720 px at which the chat list becomes a button and the sheets scroll, so tests that click the list or fill a sheet missed. They now run in a 1100 px window (the KDL for that has to be on several lines: one line with a nested block does not parse, and niri then starts with no spawned program). Now passing: `mobius`, `mobius-search`, `mobius-context`, `mobius-pictures`, `mobius-tools`, `mobius-lab`, `models`. Still failing:
+The Mobius suites were run on `main` and failed the same way there, so these failures did not come from the changes above. Most were one cause, fixed in the suite: the nested window is 640 px wide, below the 720 px at which the chat list becomes a button and the sheets scroll, so tests that click the list or fill a sheet missed. They now run in a 1100 px window (the KDL for that has to be on several lines: one line with a nested block does not parse, and niri then starts with no spawned program). Now passing: `mobius`, `mobius-search`, `mobius-context`, `mobius-pictures`, `mobius-tools`, `mobius-lab`, `models`, and `mobius-dialogs` (its persona step looked for a rail that is hidden while the persona chip is on, and its model step for the old sheet; both updated, and the slash-menu check counts instead of assuming a number). Nothing in the Mobius suites fails now.
 
-* `mobius-dialogs`: the persona rail (`persona-dot-0`, `persona-dot-add`) is not on the page it opens; the rename and project sheets in the same test pass.

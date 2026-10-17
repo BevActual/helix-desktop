@@ -31,6 +31,16 @@ let searchTimer = null;
 // Follow-ups typed while a reply is being written, sent one after another when it ends (at most MAX_QUEUE).
 const MAX_QUEUE = 5;
 let queue = [];
+let routeKey = "";
+function refreshRoute() {
+  return invoke("chat_current_route")
+    .then((route) => {
+      currentModel = (route && route.model) || "";
+      currentBackend = (route && route.backend) || "local";
+      drawComposerMeta();
+    })
+    .catch(() => undefined);
+}
 // Friendly names of the installed models (file name -> "Qwen2.5 VL 7B"), for the chip beside the composer.
 let modelTitles = {};
 function refreshModelTitles() {
@@ -972,6 +982,9 @@ $("jump-latest").onclick = () => scrollDown();
 listen("chat-view", (event) => {
   const wasStreaming = view.streaming;
   view = event.payload;
+  // Another chat, or this chat's own model changed: the chip shows the model the next message will use.
+  const key = `${view.id}|${view.route_backend || ""}|${view.route_model || ""}`;
+  if (key !== routeKey) { routeKey = key; refreshRoute(); }
   drawChat();
   if (wasStreaming && !view.streaming) flushQueue();
 });
@@ -2378,12 +2391,11 @@ new MutationObserver(queueReport).observe(document.body, { childList: true, subt
 
 invoke("layout_reporting").then((on) => { reporting = on; if (on) queueReport(); });
 invoke("chat_status").then((s) => { status = s; drawChat(); });
-invoke("chat_current_route").then((route) => {
-  currentModel = (route && route.model) || "";
-  currentBackend = (route && route.backend) || "local";
-  drawComposerMeta();
-}).catch(() => {});
+refreshRoute();
 refreshModelTitles();
+// The model is this chat's own: it follows the chat opened, a change from the menu, and the default routing.
+window.addEventListener("mobius-route-changed", () => { refreshRoute(); });
+listen("routing-view", () => { refreshRoute(); });
 listen("library-changed", () => { refreshModelTitles(); });
 invoke("personas_get").then(drawPersonas);
 invoke("chat_view").then((v) => { view = v; drawChat(); invoke("chat_list").then(drawList); });
