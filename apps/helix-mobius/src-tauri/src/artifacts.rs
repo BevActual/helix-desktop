@@ -103,6 +103,49 @@ impl Store {
     }
 }
 
+/// One document of any chat, for the Artifacts place.
+#[derive(Serialize)]
+pub struct Row {
+    pub chat_id: String,
+    pub chat_title: String,
+    pub title: String,
+    pub words: usize,
+    pub versions: usize,
+    pub at: u64,
+}
+
+/// Every document the chats have made, newest first (at most 100).
+#[tauri::command]
+pub fn stage_all() -> Vec<Row> {
+    let dir = crate::data_home().join("helix/mobius/stage");
+    let mut rows = Vec::new();
+    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some(chat_id) = name.strip_suffix(".json") else {
+            continue;
+        };
+        let Some(chat) = crate::load(chat_id) else {
+            continue;
+        };
+        for doc in Store::load(chat_id).documents {
+            let Some(last) = doc.versions.last() else {
+                continue;
+            };
+            rows.push(Row {
+                chat_id: chat_id.to_string(),
+                chat_title: chat.title.clone(),
+                title: doc.title.clone(),
+                words: last.body.split_whitespace().count(),
+                versions: doc.versions.len(),
+                at: last.at,
+            });
+        }
+    }
+    rows.sort_by(|a, b| b.at.cmp(&a.at));
+    rows.truncate(100);
+    rows
+}
+
 #[tauri::command]
 pub fn stage_get(chat_id: String) -> Store {
     Store::load(&chat_id)

@@ -89,6 +89,7 @@ const SLASH_COMMANDS = [
     });
   } },
   { cmd: "/memory", desc: "See and edit what Mobius remembers", run: () => { reactMemory?.open(); return Promise.resolve(); } },
+  { cmd: "/side", desc: "A side chat: ask something that reads this chat without adding to it", run: () => startSideChat().catch(report) },
   { cmd: "/tools", desc: "Configure Tools mode (research + project commands)", run: () => { reactTools?.open(view); return Promise.resolve(); } },
   { cmd: "/desk", desc: "Show the Helix agent desk workspace", run: () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report) },
   { cmd: "/context", desc: "Review recent history and chat brief", run: () => { openChatContext(); return Promise.resolve(); } },
@@ -1095,6 +1096,8 @@ listen("chat-view", (event) => {
   const key = `${view.id}|${view.route_backend || ""}|${view.route_model || ""}`;
   if (key !== routeKey) { routeKey = key; refreshRoute(); }
   drawChat();
+  if (sideOf && !view.temporary) sideOf = null;
+  drawSideChip();
   if (workspaceChat !== view.id) { if (workspaceChat) { setWorkspace("chat"); } workspaceChat = view.id; }
   if (wasStreaming && !view.streaming) { recordArtifacts(); reactCode?.refresh(); flushQueue(); }
 });
@@ -2592,6 +2595,8 @@ function paletteItems(query) {
   act("ws-chat", "Workspace: Chat", "Just the conversation", "", () => setWorkspace("chat"));
   act("ws-write", "Workspace: Write", "A document beside the chat", "", () => setWorkspace("write"));
   act("ws-code", "Workspace: Code", "Project files and changes beside the chat", "", () => setWorkspace("code"));
+  act("side", "Side chat", "Ask something that reads this chat without touching it", "/side", () => startSideChat().catch(report));
+  act("artifacts", "Artifacts", "Every document your chats made", "", () => showArtifacts(true));
   act("memory", "Memory", "What Mobius remembers", "", () => reactMemory?.open());
   act("find", "Find in this chat", "", "Ctrl+F", () => openFindBar());
   act("export", "Export this chat", "Markdown", "Ctrl+Shift+C", () => $("export-chat").click());
@@ -2636,14 +2641,15 @@ const reactCode = window.HelixMobiusReact?.codeStage($("stage-code"), {
   },
   shown: (open) => { stageOpen = open; stageAttach = true; drawStageChip(); },
 });
-function setWorkspace(next) {
-  if (next === workspace) return;
+function setWorkspace(next, doc) {
+  if (next === workspace && !(doc && next === "write")) return;
+  if (next === workspace) { reactStage?.open(doc); return; }
   if (workspace === "write") reactStage?.close();
   if (workspace === "code") reactCode?.close();
   workspace = next;
   stageOpen = null;
   if (next === "code") reactCode?.open();
-  if (next === "write") reactStage?.open("Untitled", "");
+  if (next === "write") { if (doc) reactStage?.open(doc); else reactStage?.open("Untitled", ""); }
   drawStageChip();
 }
 function openWorkspaceMenu() {
@@ -2678,6 +2684,62 @@ function openWorkspaceMenu() {
 }
 $("workspace-btn").onclick = () => openWorkspaceMenu();
 for (const id of ["chat", "write", "code"]) $("mode-" + id).onclick = () => setWorkspace(id);
+
+// Artifacts: every document the chats made, as a list in place of the chat list.
+let artifactsView = false;
+function drawArtifactsRow() {
+  $("mode-artifacts").classList.toggle("active", artifactsView);
+  $("chat-list-host").style.display = artifactsView ? "none" : "contents";
+  $("artifacts-list").hidden = !artifactsView;
+}
+async function showArtifacts(on) {
+  artifactsView = on;
+  drawArtifactsRow();
+  if (!on) return;
+  const host = $("artifacts-list");
+  host.replaceChildren();
+  const rows = await invoke("stage_all").catch(() => []);
+  if (!rows.length) { host.append(el("p", "artifacts-empty", "Nothing yet. When Mobius writes a document in a reply it appears here, with the chat it came from.")); return; }
+  rows.forEach((row, i) => {
+    const b = el("button", "artifact-row");
+    b.type = "button";
+    b.dataset.test = "artifact-row-" + i;
+    b.append(el("strong", "", row.title), el("span", "", `${row.chat_title} · ${row.words} words · ${row.versions} version${row.versions === 1 ? "" : "s"}`));
+    b.onclick = () => openArtifactRow(row);
+    host.append(b);
+  });
+}
+async function openArtifactRow(row) {
+  artifactsView = false;
+  drawArtifactsRow();
+  if (view.id !== row.chat_id) {
+    await invoke("chat_open", { id: row.chat_id }).catch(report);
+    for (let i = 0; i < 40 && view.id !== row.chat_id; i++) await new Promise((r) => setTimeout(r, 50));
+  }
+  setWorkspace("write", row.title);
+}
+$("mode-artifacts").onclick = () => showArtifacts(!artifactsView);
+
+// A side chat: a temporary chat that has been given the main chat to read, so a question can be asked without touching it.
+let sideOf = null;
+function drawSideChip() {
+  const chip = $("side-chip");
+  chip.hidden = !(sideOf && view.temporary);
+  if (!chip.hidden) chip.textContent = `Side chat · reads “${sideOf.title}” · back to it`;
+}
+async function startSideChat() {
+  if (!view.id || !view.messages.length) { report("Start a chat first; a side chat reads the one you are in."); return; }
+  if (view.temporary) { report("This is already a temporary chat."); return; }
+  const main = { id: view.id, title: view.title || "this chat" };
+  const context = await invoke("mentions_resolve", { kind: "chat", key: main.id });
+  await invoke("chat_temporary");
+  sideOf = main;
+  pendingAttachments = [context];
+  drawAttachChips();
+  drawSideChip();
+  input.focus();
+}
+$("side-chip").onclick = () => { const id = sideOf && sideOf.id; sideOf = null; drawSideChip(); if (id) invoke("chat_open", { id }).catch(report); };
 // A reply that wrote documents: keep each as a version, then show the newest text if that document is open.
 async function recordArtifacts() {
   const last = view.messages[view.messages.length - 1];

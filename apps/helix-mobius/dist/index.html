@@ -11,6 +11,7 @@
       <button type="button" id="mode-chat" class="mode-row active" data-test="mode-chat" title="Chat: just the conversation"><i data-icon="chat"></i><span>Chat</span></button>
       <button type="button" id="mode-write" class="mode-row" data-test="mode-write" title="Write: a document beside the chat"><i data-icon="doc"></i><span>Write</span></button>
       <button type="button" id="mode-code" class="mode-row" data-test="mode-code" title="Code: your project beside the chat"><i data-icon="code"></i><span>Code</span></button>
+      <button type="button" id="mode-artifacts" class="mode-row" data-test="mode-artifacts" title="Artifacts: every document your chats made"><i data-icon="grid"></i><span>Artifacts</span></button>
     </nav>
     <div id="chat-list-host" style="display: contents">
     <label class="chat-search" for="chat-search">
@@ -20,6 +21,7 @@
     <div id="project-filter" class="project-filter" data-test="project-filter" hidden></div>
     <nav id="chats" data-test="chats"></nav>
     </div>
+    <div id="artifacts-list" class="artifacts-list" data-test="artifacts-list" hidden></div>
     <div id="side-footer">
       <button id="temp-chat" class="temp-chat" data-test="temp-chat" type="button" title="Temporary chat — not saved">
         <i data-icon="eye"></i><span>Temporary chat</span>
@@ -74,6 +76,7 @@
       <button id="jump-latest" class="jump-latest" data-test="jump-latest" type="button" hidden title="Jump to latest">Latest</button>
       <div class="composer-wrap">
         <div id="act-task-host" data-test="act-task-host"></div>
+        <button id="side-chip" class="act-hint side-chip" data-test="side-chip" type="button" hidden></button>
         <button id="stage-chip" class="act-hint stage-chip" data-test="stage-chip" type="button" hidden title="Click to stop sending the document with your message"></button>
         <button id="act-hint" class="act-hint" data-test="act-hint" type="button" hidden>Looks like a desktop action · Use Act</button>
         <div id="composer-meta" class="composer-meta" data-test="composer-meta">
