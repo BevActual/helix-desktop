@@ -5,7 +5,18 @@ sidebar:
   order: 99
 ---
 
-If you installed Helix Shell from this repository, remove it from the same source checkout and build directory.
+Remove Helix the way you installed it.
+
+### Packages
+
+```bash
+sudo dnf remove helix helix-greeter helix-niri
+```
+
+Removing `helix-niri` removes the compositor, which also provides `/usr/bin/niri`. Reinstall Fedora's with `sudo dnf install niri` before you log
+out. If you used the Helix login screen, put your greetd configuration back first (`sudo cp /etc/greetd/config.toml.before-helix
+/etc/greetd/config.toml`, if you made that copy), otherwise greetd will look for a login screen that is gone and fall back to its text login.
+`/etc/niri/config.kdl` is kept if you edited it.
 
 ### Source installation
 
@@ -17,15 +28,14 @@ just uninstall release
 
 ## Cleaning Up
 
-The shell's personal configuration, state, and cache are separate from installed files. These paths are shared with upstream Helix, so remove them only if you no longer need that data.
+The shell's personal configuration, state, and cache are separate from installed files. Remove them only if you no longer need that data (your settings, chats and Mobius projects are in them).
 
 ### Configuration and Cache
 
 Helix stores its configuration and cache in the standard XDG directories. To remove them:
 
 ```bash
-rm -rf ~/.local/state/helix
-rm -rf ~/.cache/helix
+rm -rf ~/.config/helix ~/.local/state/helix ~/.local/share/helix ~/.cache/helix
 ```
 
 ### Generated Templates
