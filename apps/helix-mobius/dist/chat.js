@@ -2491,8 +2491,9 @@ $("route-probe-cloud").onclick = () => {
 
 function queueReport() {
   if (!reporting) return;
-  clearTimeout(reportTimer);
-  reportTimer = setTimeout(sendReport, 120);
+  // Throttled, not debounced: a reply being written changes the page all the time, and a debounce would never report during it.
+  if (reportTimer) return;
+  reportTimer = setTimeout(() => { reportTimer = 0; sendReport(); }, 120);
 }
 const layoutErrors = [];
 window.addEventListener("error", (event) => {
