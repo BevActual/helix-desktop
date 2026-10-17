@@ -28,7 +28,9 @@ let currentModel = "";
 let currentBackend = "local";
 let searchHits = null;
 let searchTimer = null;
-let pendingQueue = "";
+// Follow-ups typed while a reply is being written, sent one after another when it ends (at most MAX_QUEUE).
+const MAX_QUEUE = 5;
+let queue = [];
 let promptHistory = [];
 let promptHistoryIndex = -1;
 let promptDraft = "";
@@ -456,28 +458,42 @@ function forkChat(throughIndex) {
     .catch(report);
 }
 
-function drawQueueChip() {
-  const chip = $("queue-chip");
-  if (!pendingQueue) {
-    chip.hidden = true;
-    chip.textContent = "";
-    return;
-  }
-  chip.hidden = false;
-  const short = pendingQueue.length > 42 ? pendingQueue.slice(0, 42) + "…" : pendingQueue;
-  chip.textContent = "Queued · " + short;
-  chip.title = "Click to clear queue";
+function drawQueue() {
+  const list = $("queue-list");
+  list.replaceChildren();
+  list.hidden = queue.length === 0;
+  queue.forEach((text, index) => {
+    const row = el("div", "queue-item");
+    row.dataset.test = `queue-item-${index}`;
+    const label = el("span", "queue-text", text.length > 80 ? text.slice(0, 80) + "…" : text);
+    label.title = text;
+    const now = el("button", "mini", "Send now");
+    now.type = "button";
+    now.dataset.test = `queue-now-${index}`;
+    now.title = "Stop the reply being written and send this next";
+    now.onclick = () => {
+      queue.unshift(queue.splice(index, 1)[0]);
+      drawQueue();
+      if (view.streaming) invoke("chat_stop"); else flushQueue();
+    };
+    const drop = el("button", "mini", "Remove");
+    drop.type = "button";
+    drop.dataset.test = `queue-remove-${index}`;
+    drop.setAttribute("aria-label", "Remove this queued message");
+    drop.onclick = () => { queue.splice(index, 1); drawQueue(); input.focus(); };
+    row.append(el("span", "queue-mark", "Next"), label, now, drop);
+    list.append(row);
+  });
 }
 
 function flushQueue() {
-  if (!pendingQueue || view.streaming) return;
-  const text = pendingQueue;
-  pendingQueue = "";
-  drawQueueChip();
+  if (!queue.length || view.streaming) return;
+  const text = queue.shift();
+  drawQueue();
   stickToBottom = true;
   invoke("chat_send", { text, attachments: null })
     .then(() => invoke("chat_status").then((s) => { status = s; drawComposerMeta(); }))
-    .catch((error) => { pendingQueue = text; drawQueueChip(); report(error); });
+    .catch((error) => { queue.unshift(text); drawQueue(); report(error); });
 }
 
 function updateJumpLatest() {
@@ -876,7 +892,7 @@ function drawComposerMeta() {
   $("meta-context").textContent = context?.omitted_messages ? "Context · recent only" : (view.brief ? "Context · brief" : "Context");
   $("meta-context").classList.toggle("context-limited", !!context?.omitted_messages);
   $("meta-context").disabled = !view.id;
-  drawQueueChip();
+  drawQueue();
   drawProjectFilter();
   updateJumpLatest();
   composerPlaceholder();
@@ -943,7 +959,6 @@ $("scroller").addEventListener("scroll", () => {
   updateJumpLatest();
 });
 $("jump-latest").onclick = () => scrollDown();
-$("queue-chip").onclick = () => { pendingQueue = ""; drawQueueChip(); };
 listen("chat-view", (event) => {
   const wasStreaming = view.streaming;
   view = event.payload;
@@ -1415,11 +1430,12 @@ $("composer").addEventListener("submit", (event) => {
   if (text.trim().startsWith("/") && tryRunSlashSubmit()) return;
   if (view.streaming) {
     if (!text.trim() || pendingPictures.length || pendingAttachments.length) { report("Wait for the reply, or stop it, before sending attachments."); return; }
-    pendingQueue = text.trim();
+    if (queue.length >= MAX_QUEUE) { report(`${MAX_QUEUE} follow-ups are already waiting.`); return; }
+    queue.push(text.trim());
     rememberPrompt(text);
     input.value = "";
     grow();
-    drawQueueChip();
+    drawQueue();
     return;
   }
   const attachments = attachmentPayload();
@@ -1591,9 +1607,9 @@ document.addEventListener("keydown", (event) => {
       hideSlashMenu();
       return;
     }
-    if (pendingQueue) {
-      pendingQueue = "";
-      drawQueueChip();
+    if (queue.length) {
+      queue = [];
+      drawQueue();
       return;
     }
     if (view.streaming) invoke("chat_stop");

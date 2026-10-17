@@ -17,7 +17,14 @@ interface Source { provider?: string; title: string; url: string; kind: string; 
 /** A desktop task handed over from this chat (Act) and how it ended. Shown after `after` messages; never part of what a model is sent. */
 export interface DesktopTask { id: number; after: number; request: string; outcome: string; summary: string; detail: string; before?: string; after_text?: string; undone?: boolean; at: number }
 interface Activity { id: string; tool: string; input: string; state: string; output: string }
-export interface Message { activities?: Activity[]; sources?: Source[]; role: string; text: string; blocks: Block[]; images?: string[]; }
+interface ReplyStats { model: string; tokens: number; ms: number }
+export interface Message { activities?: Activity[]; sources?: Source[]; role: string; text: string; blocks: Block[]; images?: string[]; stats?: ReplyStats | null; }
+/** What a reply cost, in a few words: the model, its tokens, and how fast they came. */
+function replyDetails(stats: ReplyStats | null | undefined): string {
+  if (!stats || !stats.tokens) return "";
+  const rate = stats.ms >= 500 ? ` · ${Math.round(stats.tokens / (stats.ms / 1000))} tok/s` : "";
+  return [stats.model, `${stats.tokens} tokens${rate}`].filter(Boolean).join(" · ");
+}
 
 const pictureUrls = new Map<string, Promise<string>>();
 /** A stored picture as an object URL, fetched once. */
@@ -316,6 +323,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               {last && !streaming && !message.images?.length && !message.activities?.length ? (
                 <button className="mini" data-test="regenerate" onClick={() => invoke("chat_regenerate").catch(hooks.report)}>Regenerate</button>
               ) : null}
+              {!streaming && replyDetails(message.stats) ? <span className="msg-stats" data-test={`stats-${index}`}>{replyDetails(message.stats)}</span> : null}
             </div>
           </div></Fragment>
         );

@@ -123,6 +123,14 @@ impl DesktopTask {
     }
 }
 
+/// What a reply cost, for the person who wants to know: which model wrote it, how many tokens, and how long it took. Written when a turn finishes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct ReplyStats {
+    pub model: String,
+    pub tokens: u32,
+    pub ms: u64,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
     pub role: Role,
@@ -131,6 +139,7 @@ pub struct Message {
     pub images: Vec<String>,
     pub sources: Vec<WebSource>,
     pub activities: Vec<ToolActivity>,
+    pub stats: Option<ReplyStats>,
 }
 
 impl Message {
@@ -414,6 +423,7 @@ impl Conversation {
                 images: Vec::new(),
                 sources: Vec::new(),
                 activities: Vec::new(),
+                stats: None,
             });
         }
         self.updated = now;
@@ -664,7 +674,7 @@ impl Conversation {
             "brief": self.brief,
             "tools_enabled": self.tools_enabled,
             "workspace": self.workspace,
-            "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text, "images": m.images, "sources": m.sources, "activities": m.activities})).collect::<Vec<_>>(),
+            "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text, "images": m.images, "sources": m.sources, "activities": m.activities, "stats": m.stats})).collect::<Vec<_>>(),
             "tasks": self.tasks.iter().map(|t| json!({"id": t.id, "after": t.after.min(self.messages.len()), "request": t.request, "outcome": t.outcome, "summary": t.summary, "detail": t.detail, "before": t.before, "after_text": t.after_text, "undone": t.undone, "at": t.at})).collect::<Vec<_>>(),
         })
         .to_string()
@@ -775,12 +785,30 @@ impl Conversation {
             if role == Role::Assistant && text.is_empty() && !activities.is_empty() {
                 text = "This tools task was interrupted.".into();
             }
+            // What a saved reply cost (replies from before this was recorded have none).
+            let stats = entry
+                .get("stats")
+                .filter(|v| v.is_object())
+                .map(|v| ReplyStats {
+                    model: sanitize_for_display(
+                        v.get("model").and_then(Value::as_str).unwrap_or_default(),
+                        60,
+                    ),
+                    tokens: v
+                        .get("tokens")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0)
+                        .min(u64::from(u32::MAX)) as u32,
+                    ms: v.get("ms").and_then(Value::as_u64).unwrap_or(0),
+                })
+                .filter(|_| role == Role::Assistant);
             messages.push(Message {
                 role,
                 text,
                 images,
                 sources,
                 activities,
+                stats,
             });
         }
         let first_user = messages
@@ -940,6 +968,8 @@ pub struct Chat {
     pub error: String,
     /// When true, the hub must not write this conversation to disk (ChatGPT temporary chat).
     pub temporary: bool,
+    /// Tokens of the reply that just ended (the model service reports them with the end of the turn).
+    last_tokens: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -950,6 +980,7 @@ pub struct MessageView {
     pub images: Vec<String>,
     pub sources: Vec<WebSource>,
     pub activities: Vec<ToolActivity>,
+    pub stats: Option<ReplyStats>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -997,6 +1028,7 @@ fn view_of(message: &Message) -> MessageView {
         images: message.images.clone(),
         sources: message.sources.clone(),
         activities: message.activities.clone(),
+        stats: message.stats.clone(),
     }
 }
 
@@ -1008,6 +1040,24 @@ impl Chat {
             generation: 0,
             error: String::new(),
             temporary: false,
+            last_tokens: 0,
+        }
+    }
+
+    /// The turn that just finished: records which model answered, its tokens and how long it took on the reply.
+    pub fn note_reply(&mut self, model: &str, ms: u64) {
+        let tokens = self.last_tokens;
+        if let Some(message) = self
+            .conversation
+            .messages
+            .last_mut()
+            .filter(|m| m.role == Role::Assistant && !m.text.trim().is_empty())
+        {
+            message.stats = Some(ReplyStats {
+                model: sanitize_for_display(model.trim_end_matches(".gguf"), 60),
+                tokens,
+                ms,
+            });
         }
     }
 
@@ -1118,6 +1168,7 @@ impl Chat {
             images,
             sources: Vec::new(),
             activities: Vec::new(),
+            stats: None,
         });
         self.begin_assistant_turn(now, system)
     }
@@ -1227,6 +1278,7 @@ impl Chat {
             images: Vec::new(),
             sources,
             activities: Vec::new(),
+            stats: None,
         });
         self.conversation.updated = now;
         self.generation += 1;
@@ -1369,6 +1421,11 @@ impl Chat {
         let stopped = streaming.stopping;
         self.streaming = None;
         let value: Value = serde_json::from_str(result).unwrap_or(Value::Null);
+        self.last_tokens = value
+            .get("completion_tokens")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            .min(u64::from(u32::MAX)) as u32;
         let cancelled = value
             .get("cancelled")
             .and_then(Value::as_bool)
@@ -1846,6 +1903,7 @@ mod tests {
             images: Vec::new(),
             sources: Vec::new(),
             activities: Vec::new(),
+            stats: None,
         };
         c.messages = vec![
             mk(Role::User, "How does cron work?"),
@@ -1891,6 +1949,40 @@ mod tests {
         let messages = Conversation::auto_title_messages("Q", "A");
         assert_eq!(messages[0].0, "system");
         assert!(messages[1].1.contains("Person: Q") && messages[1].1.contains("Assistant: A"));
+    }
+
+    #[test]
+    fn a_reply_remembers_its_model_tokens_and_time() {
+        let mut chat = chat();
+        let now = 5;
+        let turn = chat.send("hello", now).unwrap();
+        chat.started(turn.generation, 1);
+        chat.delta(1, "Hi there.");
+        // the turn ends with the service's numbers
+        let outcome = chat.complete(1, true, r#"{"ok":true,"completion_tokens":42}"#);
+        assert_eq!(outcome, Some(Outcome::Finished));
+        chat.note_reply("qwen2.5-7b-instruct-q4_k_m.gguf", 1500);
+        let stats = chat
+            .conversation
+            .messages
+            .last()
+            .unwrap()
+            .stats
+            .clone()
+            .expect("stats on the reply");
+        assert_eq!(
+            (stats.model.as_str(), stats.tokens, stats.ms),
+            ("qwen2.5-7b-instruct-q4_k_m", 42, 1500)
+        );
+        let again = Conversation::from_json(&chat.conversation.to_json()).unwrap();
+        assert_eq!(again.messages.last().unwrap().stats, Some(stats));
+        assert!(again.messages[0].stats.is_none(), "a question has none");
+        // an old saved chat without the field still loads, and a user message cannot carry one
+        let text = chat
+            .conversation
+            .to_json()
+            .replace("\"stats\":null", "\"x\":1");
+        assert!(Conversation::from_json(&text).is_some());
     }
 
     #[test]
@@ -2091,6 +2183,7 @@ mod tests {
                 images: vec!["00000000000000a1".into()],
                 sources: Vec::new(),
                 activities: Vec::new(),
+                stats: None,
             },
             Message {
                 role: Role::Assistant,
@@ -2098,6 +2191,7 @@ mod tests {
                 images: vec![],
                 sources: Vec::new(),
                 activities: Vec::new(),
+                stats: None,
             },
             Message {
                 role: Role::User,
@@ -2105,6 +2199,7 @@ mod tests {
                 images: vec!["00000000000000a2".into()],
                 sources: Vec::new(),
                 activities: Vec::new(),
+                stats: None,
             },
         ];
         let (wire, pictures) = c.conversation.context_with_pictures("Custom persona");
@@ -2145,6 +2240,7 @@ mod tests {
             images: vec![],
             sources: Vec::new(),
             activities: Vec::new(),
+            stats: None,
         });
         let before = c.conversation.context_info(false);
         assert_eq!(before.truncated_chars, 25);
@@ -2155,6 +2251,7 @@ mod tests {
             images: vec![],
             sources: Vec::new(),
             activities: Vec::new(),
+            stats: None,
         });
         assert_eq!(before, c.conversation.context_info(true));
         assert!(
@@ -2175,6 +2272,7 @@ mod tests {
                 images: Vec::new(),
                 sources: Vec::new(),
                 activities: Vec::new(),
+                stats: None,
             });
             c.conversation.messages.push(Message {
                 role: Role::Assistant,
@@ -2182,6 +2280,7 @@ mod tests {
                 images: Vec::new(),
                 sources: Vec::new(),
                 activities: Vec::new(),
+                stats: None,
             });
         }
         let ctx = c.conversation.context();

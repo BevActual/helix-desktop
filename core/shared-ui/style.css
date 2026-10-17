@@ -1440,3 +1440,18 @@ body.chat .welcome-tool-text > span { display: -webkit-box; -webkit-box-orient: 
 /* The row of chat settings above the composer: legible, and it looks like what it is (things to press). */
 body.chat .meta-chip { color: var(--label-2); font-size: 12px; font-weight: 500; padding: 3px 9px; }
 body.chat .meta-chip:hover, body.chat .meta-chip:focus-visible { background: var(--fill-2); color: var(--label); }
+/* The Tools sheet: two rows, a note, and the agent desk folded away. */
+body.chat .tools-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: .5px solid var(--hairline); }
+body.chat .tools-row-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+body.chat .tools-row-text > span, body.chat .tools-row-text code { font-size: 12.5px; color: var(--label-2); overflow-wrap: anywhere; }
+body.chat .tools-row-actions { display: flex; gap: 6px; flex: none; }
+body.chat .tools-desk { margin-top: 10px; }
+body.chat .tools-desk summary { cursor: default; font-weight: 600; color: var(--label-2); padding: 6px 0; }
+/* A reply's model, tokens and speed, beside its actions (shown with them, on hover). */
+body.chat .msg-stats { align-self: center; margin-left: 8px; font-size: 11.5px; color: var(--label-3); white-space: nowrap; }
+/* Follow-ups waiting for the reply to end: one row each, above the composer. */
+body.chat .queue-list { display: flex; flex-direction: column; gap: 4px; padding: 0 4px 6px; }
+body.chat .queue-list[hidden] { display: none; }
+body.chat .queue-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border-radius: 12px; background: var(--fill-1); font-size: 13px; }
+body.chat .queue-mark { flex: none; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--label-2); }
