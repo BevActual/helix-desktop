@@ -2608,6 +2608,7 @@ let workspaceChat = "";
 function drawStageChip() {
   const chip = $("stage-chip");
   chip.hidden = !stageOpen;
+  for (const id of ["chat", "write", "code"]) $("mode-" + id).classList.toggle("active", workspace === id);
   $("workspace-btn").textContent = ({ chat: "Chat", write: "Write", code: "Code" })[workspace] + " ▾";
   document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code");
   if (!stageOpen) return;
@@ -2676,6 +2677,7 @@ function openWorkspaceMenu() {
   setTimeout(() => window.addEventListener("mousedown", close, true), 0);
 }
 $("workspace-btn").onclick = () => openWorkspaceMenu();
+for (const id of ["chat", "write", "code"]) $("mode-" + id).onclick = () => setWorkspace(id);
 // A reply that wrote documents: keep each as a version, then show the newest text if that document is open.
 async function recordArtifacts() {
   const last = view.messages[view.messages.length - 1];

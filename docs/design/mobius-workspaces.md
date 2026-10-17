@@ -67,3 +67,9 @@ per chat); `workpanel.tsx` is the panel; `tools/nested/mobius-stage-test.sh` run
 * `code_tree` and `code_read` in `main.rs`, `codestage.tsx`, `tools/nested/mobius-code-test.sh` (open Code, list files, view one, the chip, a turn's edit shows as marked with its diff, revert from the stage).
 
 Still to do for Code: a real folder tree (it is a flat list with the folder in grey), editing in the viewer through the same reviewed `edit_file` path, the terminal and test output on the stage, and search across files.
+
+## Modes as places in the sidebar (built, after looking at ChatGPT, Claude and Muse)
+
+ChatGPT puts Library, Projects, Plugins, Scheduled, Codex and Explore at the top of its sidebar; Claude puts Projects, Code, Artifacts, Scheduled and Dispatch there; Muse keeps reorderable tabs (Main chat, Feed, Ideas, Goals, Library) above a separate list of side chats. The shared idea is that **a mode is a place you go**, listed before the conversations, not a setting inside one. Mobius now has the same: **Chat, Write and Code** as rows at the top of the sidebar (the header menu stays for narrow windows). When a stage is open on a window under 1400 px the sidebar shrinks to a rail of the three icons, so the work gets the room and the way back to Chat is always one click away.
+
+What the three apps have that Mobius should add next, as places of their own: **Scheduled** (timers that start a prompt or an Act task, listed and editable), **Projects** (a project's chats, files, instructions and memory on one page), **Artifacts** (every document and chart this chat or project made, openable on the stage), and **side chats** (a one-off question that sees the main chat without joining it; Muse lists them under the tabs, Cursor has `/side`). Muse also lets the person **reorder** the tabs and decide which exist; the same should hold here, with the later stages (Image, Design, Browse) appearing as places only once they work.

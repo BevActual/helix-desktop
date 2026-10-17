@@ -49,4 +49,11 @@ PY
 shot code-diff; sleep 1; shot code-diff
 click_id code-revert; sleep 2
 [ "$(cat "$SCRATCH/home/project/notes.txt")" = "$(printf 'alpha\nbeta')" ] && echo "ok: reverted from the stage" || fail "not reverted: $(cat "$SCRATCH/home/project/notes.txt")"
+echo "--- the sidebar's workspace rail goes back to Chat"
+has_id mode-chat && echo "ok: the workspace rail is on screen beside the stage" || fail "no rail"
+shot rail; sleep 1; shot rail
+click_id mode-chat; sleep 1
+has_id code-stage && fail "the stage stayed after choosing Chat" || echo "ok: Chat closed the stage"
+click_id mode-code; sleep 1
+has_id code-stage && echo "ok: Code opened again from the rail" || fail "rail did not open Code"
 echo "PASS: mobius code stage"
