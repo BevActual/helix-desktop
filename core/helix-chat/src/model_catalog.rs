@@ -155,6 +155,22 @@ pub const CATALOG: &[CatalogModel] = &[
         }],
     },
     CatalogModel {
+        id: "qwen3-4b",
+        title: "Qwen3 4B (thinks first)",
+        maker: "Alibaba Qwen",
+        blurb: "Reasons before it answers, so it does better on puzzles, maths and planning than models of its size that answer straight away. Replies start later because it thinks first; add /no_think to a message to skip that.",
+        tasks: &["chat", "reasoning"],
+        vision: false,
+        license: "Apache-2.0",
+        memory_gb: 3.5,
+        files: &[CatalogFile {
+            name: "Qwen3-4B-Q4_K_M.gguf",
+            url: "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+            sha256: "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+            bytes: 2_497_280_256,
+        }],
+    },
+    CatalogModel {
         id: "qwen2.5-7b",
         title: "Qwen2.5 7B",
         maker: "Alibaba Qwen",

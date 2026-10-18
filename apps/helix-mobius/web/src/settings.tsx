@@ -74,7 +74,7 @@ export interface SettingsHooks {
 export interface SettingsHandle { open: (section?: string) => void; }
 
 const FIT_WORD: Record<string, string> = { gpu: "Fits your graphics card", tight: "Tight on your graphics card", cpu: "Runs on the processor (slower)", no: "Too big for this computer" };
-const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation", embedding: "Meaning search" };
+const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation", embedding: "Meaning search", reasoning: "Thinks first" };
 
 function size(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
@@ -222,7 +222,7 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, onM
   );
 }
 
-type Filter = "all" | "installed" | "chat" | "code" | "vision" | "speech" | "image" | "embedding" | "fits";
+type Filter = "all" | "installed" | "chat" | "code" | "vision" | "reasoning" | "speech" | "image" | "embedding" | "fits";
 type Sort = "best" | "smallest" | "name";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
@@ -230,6 +230,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "chat", label: "Chat" },
   { id: "code", label: "Code" },
   { id: "vision", label: "Pictures" },
+  { id: "reasoning", label: "Thinks first" },
   { id: "speech", label: "Speech" },
   { id: "image", label: "Images" },
   { id: "embedding", label: "Meaning" },
@@ -237,10 +238,17 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 /** Every model Mobius can use on this computer: search, narrow by what it does, and get or remove it. */
-function Library({ cards, draft, filter, setFilter, onAssign, act }: {
-  cards: Card[]; draft: Draft; filter: Filter; setFilter: (filter: Filter) => void; onAssign: (task: Task, backend: string, model: string) => void; act: (command: string, id: string) => void;
+function Library({ cards, draft, filter, setFilter, onAssign, act, report }: {
+  cards: Card[]; draft: Draft; filter: Filter; setFilter: (filter: Filter) => void; onAssign: (task: Task, backend: string, model: string) => void; act: (command: string, id: string) => void; report: (error: unknown) => void;
 }) {
   const [needle, setNeedle] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState("");
+  const addFile = () => {
+    setAdding(true);
+    setAdded("");
+    invoke<string | null>("library_import").then((name) => { if (name) setAdded(name); }, report).finally(() => setAdding(false));
+  };
   const [sort, setSort] = useState<Sort>("best");
   const text = needle.trim().toLowerCase();
   const matches = (card: Card) => {
@@ -270,6 +278,12 @@ function Library({ cards, draft, filter, setFilter, onAssign, act }: {
           </select>
         </label>
       </div>
+      <div className="lib-add">
+        <button type="button" data-test="lib-import" disabled={adding} onClick={addFile}>{adding ? "Adding…" : "Add a model file…"}</button>
+        <button type="button" data-test="lib-folder" onClick={() => invoke("library_reveal").catch(report)}>Open the models folder</button>
+        <span className="set-hint">A <code>.gguf</code> file you already have. Mobius checks that it is one and keeps your original.</span>
+      </div>
+      {added ? <p className="set-offer" data-test="lib-added"><span className="set-offer-text"><span><strong>{added}</strong> was added. It is not checked against a published list, so Mobius cannot say what it is or whether it is intact.</span></span></p> : null}
       <div className="lib-chips" role="group" aria-label="Filter models">
         {FILTERS.map((f) => (
           <button key={f.id} type="button" className={`lib-chip${filter === f.id ? " on" : ""}`} aria-pressed={filter === f.id} data-test={`lib-filter-${f.id}`} onClick={() => setFilter(f.id)}>{f.label}</button>
@@ -290,6 +304,7 @@ function Library({ cards, draft, filter, setFilter, onAssign, act }: {
                 <div className="lib-tags">
                   {card.tasks.map((t) => <span key={t} className="lib-tag">{TASK_WORD[t] ?? t}</span>)}
                   {card.vision ? <span className="lib-tag vision">Sees pictures</span> : null}
+                  {!card.in_catalog ? <span className="lib-tag" data-test={`lib-unchecked-${card.id}`}>Added by you</span> : null}
                   <FitTag card={card} />
                 </div>
               </header>
@@ -310,9 +325,9 @@ function Library({ cards, draft, filter, setFilter, onAssign, act }: {
                       {card.progress?.phase === "failed" ? "Try again" : `Get · ${size(card.bytes)}`}
                     </button>
                   )}
-                  {card.installed && card.in_catalog ? (
+                  {card.installed ? (
                     <button type="button" className="lib-remove" data-test={`lib-remove-${card.id}`}
-                      onClick={() => { if (window.confirm(`Remove ${card.title} (${size(card.bytes)}) from this computer? You can download it again later.`)) act("library_remove", card.id); }}>
+                      onClick={() => { if (window.confirm(card.in_catalog ? `Remove ${card.title} (${size(card.bytes)}) from this computer? You can download it again later.` : `Remove ${card.title} (${size(card.bytes)}) from the models folder? Your original file, if you added it from somewhere else, is not touched.`)) act("library_remove", card.id); }}>
                       Remove
                     </button>
                   ) : null}
@@ -581,8 +596,8 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
 
           <section className="models-panel active set-panel" data-test="models-panel-library" hidden={section !== "library"}>
             <h3 className="models-h3">Library</h3>
-            <p className="models-lead">Everything Mobius can run on this computer. Nothing downloads until you press Get, and each file is checked against a published checksum before it is used.</p>
-            <Library cards={library} draft={draft} filter={filter} setFilter={setFilter} onAssign={assign} act={act} />
+            <p className="models-lead">Everything Mobius can run on this computer. Nothing downloads until you press Get, and each download is checked against a published checksum before it is used.</p>
+            <Library cards={library} draft={draft} filter={filter} setFilter={setFilter} onAssign={assign} act={act} report={report} />
           </section>
 
           <section className="models-panel active set-panel" data-test="models-panel-cloud" hidden={section !== "cloud"}>

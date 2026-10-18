@@ -81,6 +81,7 @@ pick software-rpm   && run software-rpm software-rpm-test.sh software-rpm-nested
 pick monitor        && run monitor system-monitor-test.sh system-monitor-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick models         && run models models-test.sh mobius-nested.sh "$WIDE"
 pick mobius-real    && [ -n "${HELIX_SUITE_HEAVY:-}" -o ${#sel[@]} -gt 0 ] && run mobius-real mobius-real-test.sh mobius-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick mobius-think-real && [ ${#sel[@]} -gt 0 ] && run mobius-think-real mobius-think-real-test.sh mobius-think-real-nested.sh "$WIDE"
 pick mobius-dialogs && run mobius-dialogs mobius-dialogs-test.sh mobius-nested.sh "$WIDE"
 pick mobius-lab     && run mobius-lab mobius-lab-test.sh mobius-nested.sh "$WIDE" HELIX_MOBIUS_LOG_PROMPT=1
 pick mobius-pictures && run mobius-pictures mobius-pictures-test.sh mobius-nested.sh "$WIDE" HELIX_NESTED_SEED_PICTURE=1
@@ -88,6 +89,7 @@ pick mobius-dictate && run mobius-dictate mobius-dictate-test.sh mobius-nested.s
 pick mobius-library && run mobius-library mobius-library-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-settings && run mobius-settings mobius-settings-test.sh mobius-nested.sh "$WIDE"
 pick mobius-cloudmodels && run mobius-cloudmodels mobius-cloudmodels-test.sh mobius-cloud-nested.sh "$WIDE"
+pick mobius-import && run mobius-import mobius-import-test.sh mobius-import-nested.sh "$WIDE"
 if pick mobius-image-generation; then
   image_models=${HELIX_MODEL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/helix/models}
   if [ -f "$image_models/image/stable-diffusion-v2-1-turbo-Q4_0.gguf" ]; then

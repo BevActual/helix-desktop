@@ -38,9 +38,12 @@ A model is built for something, and a job accepts only models built for it. `rec
 | Type | Does | Jobs that take it |
 |---|---|---|
 | Chat, Code, Pictures | Language models; Code ones are tuned for code, Pictures ones read images | Chat, Code, Pictures, Summaries, Act (Pictures needs one that sees) |
+| **Thinks first** (new) | A chat model that reasons before it answers: Qwen3 4B. Its reasoning shows as the folded "Thought it through" row | Chat, Code, Summaries (it is a chat model with a tag) |
 | Speech | Speech to text, on the processor | Dictation |
 | Image generation | Pictures from a description | Image creation |
 | **Meaning search** (new) | Reads what text means, in about 10 ms on the processor: bge-small-en-v1.5 | Meaning search |
+
+Checked on 2026-10-18: the bundled llama 0.6.0 supports the Qwen3, Qwen3.5, Gemma 3 and DeepSeek architectures, and Qwen3 4B Q4_K_M (downloaded from Qwen's own repository, size and SHA-256 matching Hugging Face's published values) loads in the real inference service, answers 17 × 23 = 391 and has its `<think>` text folded (`mobius-think-real`, 32 s for the turn including the load).
 
 A specialist never appears under a chat job, and a chat model never under a specialist's. Cloud models carry their own tags from OpenRouter's data: sees pictures, thinks first, uses tools, makes pictures, free, long documents.
 
@@ -52,8 +55,12 @@ The meaning-search model is now in the library as a checked download (three file
 
 What the other products do, from their own pages: Cursor lets you add and search models in Settings and picks one itself under **Auto**; ChatGPT shows three choices (Instant, Thinking, Pro) with automatic switching to deeper reasoning behind a Configure link; OpenRouter filters by input kind, context length and series. Mobius takes the curated switcher (Cursor) and the filters and price lines (OpenRouter), and leaves automatic switching to the decision lane in `decision-model.md`.
 
+## Adding a model you already have
+
+Library → **Add a model file…** takes a `.gguf` from this computer. It must start with the GGUF marker (a renamed document is refused) and be at least 1 KiB; its name is cleaned to letters, digits and `. - _`; a catalog file name or one already in the folder is refused. It is **hard-linked** when it is on the same disk (instant, no second copy, the original untouched), else copied under a `.part` name and renamed when whole. It is listed as **Added by you**, with the plain statement that Mobius has not checked it against a published list. It can be used for Chat, Code or Summaries and removed again (only a plain file directly in the models folder, never one the catalog owns). **Open the models folder** is there for people who prefer to drop files in. `mobius-import` tests it with a fake picker.
+
 ## Not built
 
-* Finding models that are not in the curated list: search, add by link, import a `.gguf` from disk. Anything fetched needs a pinned checksum or a clear "unverified" state, a fixed https host, a size limit, and the person's yes per download.
+* Finding models that are not in the curated list: search and add by link. Anything fetched needs a pinned checksum or a clear "unverified" state, a fixed https host, a size limit, and the person's yes per download.
 * A Knowledge section (indexed folders, reference packs) once `knowledge.md` is wired in.
 * Rules and Memory as sections (they are dialogs today).

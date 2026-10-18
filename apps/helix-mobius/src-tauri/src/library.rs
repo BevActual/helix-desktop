@@ -155,7 +155,7 @@ pub fn list(downloads: &Downloads, loaded: &[String]) -> Vec<Card> {
             file: name.clone(),
             title: stem,
             maker: String::new(),
-            blurb: "Added by hand to the models folder.".into(),
+            blurb: "Added by you. Not checked against a published list, so Mobius cannot say what it is or whether it is intact.".into(),
             tasks: vec!["chat".into()],
             vision: false,
             license: String::new(),
@@ -407,9 +407,26 @@ pub fn cancel(downloads: &Downloads, id: &str) {
 
 /// Removes a catalog model's files (and any half-finished download of it).
 pub fn remove(id: &str) -> Result<(), String> {
-    let model =
-        model_catalog::find(id).ok_or("Only models from the library can be removed here.")?;
-    let dir = models_dir();
+    remove_in(&models_dir(), id)
+}
+
+fn remove_in(dir: &Path, id: &str) -> Result<(), String> {
+    let Some(model) = model_catalog::find(id) else {
+        // A model added by the person: only a plain file directly in the models folder, never one the catalog owns.
+        let owned = model_catalog::CATALOG
+            .iter()
+            .any(|m| m.files.iter().any(|f| f.name == id));
+        if owned || !model_catalog::safe_file_name(id) || id.contains('/') {
+            return Err("Only models in the models folder can be removed here.".into());
+        }
+        let path = dir.join(id);
+        if !path.is_file() {
+            return Err("That model is not in the models folder.".into());
+        }
+        std::fs::remove_file(&path).map_err(|e| format!("Could not remove it: {e}"))?;
+        let _ = std::fs::remove_file(dir.join(format!("{id}.part")));
+        return Ok(());
+    };
     for file in model.files {
         let _ = std::fs::remove_file(dir.join(file.name));
         let _ = std::fs::remove_file(dir.join(format!("{}.part", file.name)));
@@ -423,9 +440,176 @@ pub fn remove(id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The name a file is kept under in the models folder: its own name, with anything but letters, digits and `. - _` turned into `-`.
+pub fn import_name(path: &Path) -> Result<String, String> {
+    let raw = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("That file has no usable name.")?;
+    let stem = raw
+        .strip_suffix(".gguf")
+        .or_else(|| raw.strip_suffix(".GGUF"));
+    let stem = stem.ok_or("Only .gguf model files can be added.")?;
+    let cleaned: String = stem
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let cleaned = cleaned.trim_start_matches('.').to_string();
+    let name = format!("{cleaned}.gguf");
+    if cleaned.is_empty() || !model_catalog::safe_file_name(&name) {
+        return Err("That file name cannot be used. Rename it with letters and digits.".into());
+    }
+    Ok(name)
+}
+
+/// Adds a `.gguf` file from elsewhere on this computer to the models folder. It must start with the GGUF marker, so a renamed
+/// document is refused. A hard link is made when the file is on the same disk (instant, no second copy), else it is copied under a
+/// `.part` name and renamed when whole, so a half-copied file is never offered. Returns the name it was kept under.
+pub fn import(path: &Path) -> Result<String, String> {
+    import_into(&models_dir(), path)
+}
+
+fn import_into(dir: &Path, path: &Path) -> Result<String, String> {
+    let name = import_name(path)?;
+    let metadata =
+        std::fs::metadata(path).map_err(|_| "Mobius cannot read that file.".to_string())?;
+    if !metadata.is_file() || metadata.len() < 1024 {
+        return Err("That is not a model file.".into());
+    }
+    let mut magic = [0u8; 4];
+    std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut magic))
+        .map_err(|_| "Mobius cannot read that file.".to_string())?;
+    if &magic != b"GGUF" {
+        return Err("That file is not in the GGUF model format.".into());
+    }
+    if model_catalog::CATALOG
+        .iter()
+        .any(|m| m.files.iter().any(|f| f.name == name))
+    {
+        return Err(
+            "The library already has a model with that file name. Rename the file first.".into(),
+        );
+    }
+    std::fs::create_dir_all(dir).map_err(|_| "Could not create the models folder.".to_string())?;
+    let target = dir.join(&name);
+    if target.exists() {
+        return Err(format!("{name} is already in the models folder."));
+    }
+    if std::fs::hard_link(path, &target).is_ok() {
+        return Ok(name);
+    }
+    let part = dir.join(format!("{name}.part"));
+    let copied = std::fs::copy(path, &part).and_then(|_| std::fs::rename(&part, &target));
+    if let Err(error) = copied {
+        let _ = std::fs::remove_file(&part);
+        return Err(format!("Could not copy the file: {error}"));
+    }
+    Ok(name)
+}
+
+/// Asks for a `.gguf` file with the system's file picker. `None` when the person cancels.
+pub fn pick_model_file() -> Result<Option<PathBuf>, String> {
+    for (command, args) in [
+        (
+            "zenity",
+            vec![
+                "--file-selection",
+                "--title=Add a model file",
+                "--file-filter=Model files (GGUF) | *.gguf",
+            ],
+        ),
+        (
+            "kdialog",
+            vec![
+                "--getopenfilename",
+                ".",
+                "*.gguf",
+                "--title",
+                "Add a model file",
+            ],
+        ),
+    ] {
+        if let Ok(output) = std::process::Command::new(command).args(args).output() {
+            if output.status.code() == Some(1) {
+                return Ok(None);
+            }
+            if output.status.success() {
+                let text = String::from_utf8(output.stdout)
+                    .map_err(|_| "The chosen path is not text.".to_string())?;
+                let text = text.trim_end_matches(['\r', '\n']);
+                return Ok((!text.is_empty()).then(|| PathBuf::from(text)));
+            }
+        }
+    }
+    Err("No file picker is available. Install zenity or kdialog.".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn scratch(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("helix-import-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn import_names_are_cleaned_and_only_gguf_is_taken() {
+        assert_eq!(
+            import_name(Path::new("/x/My Model (Q4).gguf")).unwrap(),
+            "My-Model--Q4-.gguf"
+        );
+        assert_eq!(
+            import_name(Path::new("/x/.hidden.gguf")).unwrap(),
+            "hidden.gguf"
+        );
+        assert!(import_name(Path::new("/x/notes.txt")).is_err());
+        assert!(import_name(Path::new("/x/.gguf")).is_err());
+    }
+
+    #[test]
+    fn imports_a_gguf_once_and_refuses_look_alikes() {
+        let from = scratch("from");
+        let into = scratch("into");
+        let mut good = b"GGUF".to_vec();
+        good.resize(4096, 0);
+        std::fs::write(from.join("my model.gguf"), &good).unwrap();
+        std::fs::write(from.join("fake.gguf"), vec![b'x'; 4096]).unwrap();
+        std::fs::write(from.join("tiny.gguf"), b"GGUF").unwrap();
+        assert_eq!(
+            import_into(&into, &from.join("my model.gguf")).unwrap(),
+            "my-model.gguf"
+        );
+        assert!(into.join("my-model.gguf").is_file());
+        assert!(import_into(&into, &from.join("my model.gguf"))
+            .unwrap_err()
+            .contains("already"));
+        assert!(import_into(&into, &from.join("fake.gguf"))
+            .unwrap_err()
+            .contains("GGUF"));
+        assert!(import_into(&into, &from.join("tiny.gguf")).is_err());
+        // it is listed, as the person's own, and can be removed; a catalog file cannot be removed by its file name
+        assert!(unknown_models(&into)
+            .iter()
+            .any(|(name, _)| name == "my-model.gguf"));
+        assert!(remove_in(&into, "../my-model.gguf").is_err());
+        assert!(remove_in(&into, model_catalog::CATALOG[2].files[0].name).is_err());
+        remove_in(&into, "my-model.gguf").unwrap();
+        assert!(!into.join("my-model.gguf").exists());
+        assert!(
+            from.join("my model.gguf").exists(),
+            "the original is untouched"
+        );
+    }
 
     #[test]
     fn lists_the_catalog_and_what_was_added_by_hand() {
@@ -449,7 +633,6 @@ mod tests {
             "partials and projectors are not models"
         );
         assert!(cards.iter().filter(|c| c.in_catalog).all(|c| !c.installed));
-        std::env::remove_var("HELIX_MODEL_DIR");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

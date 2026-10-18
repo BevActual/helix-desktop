@@ -52,6 +52,8 @@ shot settings-filter; shot settings-filter
 has_id lib-card-qwen2.5-3b && ! has_id lib-card-llama-3.2-3b && echo "ok: Installed shows only installed models" || fail "the Installed filter did not narrow"
 click_id lib-filter-speech; sleep 0.6
 has_id lib-card-whisper-small && ! has_id lib-card-qwen2.5-3b && echo "ok: Speech shows the speech model" || fail "the Speech filter did not narrow"
+click_id lib-filter-reasoning; sleep 0.6
+has_id lib-card-qwen3-4b && ! has_id lib-card-qwen2.5-3b && echo "ok: Thinks first shows the reasoning model" || fail "the Thinks-first filter did not narrow"
 click_id lib-filter-embedding; sleep 0.6
 has_id lib-card-bge-small-en && ! has_id lib-card-whisper-small && echo "ok: Meaning shows the meaning-search model" || fail "the Meaning filter did not narrow"
 click_id lib-filter-all; sleep 0.4
