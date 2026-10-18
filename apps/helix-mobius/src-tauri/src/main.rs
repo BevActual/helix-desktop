@@ -958,10 +958,43 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             }
         }
     }
+    // Passages from the person's own folders go to a model on this computer, never to a cloud one, and the reply remembers which.
+    let mut files: Vec<helix_chat::chat::FileRef> = Vec::new();
+    if is_local {
+        let question = turn
+            .messages
+            .iter()
+            .rev()
+            .find(|(role, _)| *role == "user")
+            .map(|(_, text)| text.clone());
+        if let Some(question) = question {
+            let found =
+                tauri::async_runtime::spawn_blocking(move || knowledge::relevant(&question))
+                    .await
+                    .unwrap_or_default();
+            if !found.is_empty() {
+                if let Some((_, system)) =
+                    turn.messages.iter_mut().find(|(role, _)| *role == "system")
+                {
+                    system.push_str(&knowledge::prompt_text(&found));
+                    eprintln!("MOBIUS knowledge-added {}", found.len());
+                }
+                files = found
+                    .iter()
+                    .map(|p| helix_chat::chat::FileRef {
+                        title: p.title.clone(),
+                        heading: p.heading.clone(),
+                        excerpt: p.text.chars().take(600).collect(),
+                    })
+                    .collect();
+            }
+        }
+    }
     {
         let shared = shared(&app);
         let mut state = shared.lock().expect("state");
         state.last_backend = label.clone();
+        state.chat.pending_files = files;
     }
     emit_view(&app);
 
@@ -2906,6 +2939,14 @@ async fn knowledge_remove_folder(app: AppHandle, path: String) -> Result<(), Str
     Ok(())
 }
 
+/// Whether chats on this computer may be given passages from the folders.
+#[tauri::command]
+async fn knowledge_set_use(app: AppHandle, on: bool) -> Result<(), String> {
+    knowledge::set_use_in_chat(on)?;
+    emit_knowledge(&app);
+    Ok(())
+}
+
 #[tauri::command]
 fn knowledge_cancel() {
     knowledge::cancel();
@@ -3623,6 +3664,7 @@ fn main() {
             knowledge_reindex,
             knowledge_remove_folder,
             knowledge_cancel,
+            knowledge_set_use,
             knowledge_search,
             hub_repo,
             hub_download,

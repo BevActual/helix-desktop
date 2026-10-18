@@ -169,4 +169,59 @@ fn main() {
             println!("{miss}");
         }
     }
+
+    // How similar is the best passage to a question that its pages answer, and to one that they cannot? A cut-off between the two
+    // decides when a chat may be given passages at all.
+    let prefix = "Represent this sentence for searching relevant passages: ";
+    let _ = prefix;
+    let meaning_only = SearchOptions {
+        limit: 1,
+        ..Default::default()
+    };
+    let top_similarity = |text: &str| -> f32 {
+        let vector = embedder.embed_query(text).expect("vector");
+        store
+            .search(
+                "",
+                Some(("bge-small-en-v1.5", vector.as_slice())),
+                &meaning_only,
+            )
+            .unwrap()
+            .first()
+            .and_then(|h| h.similarity)
+            .unwrap_or(0.0)
+    };
+    println!("\nbest similarity: questions the docs answer");
+    let mut on: Vec<f32> = questions
+        .iter()
+        .map(|q| top_similarity(q["q"].as_str().unwrap()))
+        .collect();
+    on.sort_by(|a, b| a.total_cmp(b));
+    println!(
+        "  min {:.2}  median {:.2}  max {:.2}",
+        on[0],
+        on[on.len() / 2],
+        on[on.len() - 1]
+    );
+    let off = [
+        "what is the weather like in Paris tomorrow",
+        "give me a recipe for banana pancakes",
+        "who won the football world cup in 2010",
+        "how do I train a puppy to sit",
+        "translate good morning into Japanese",
+        "write a poem about the sea",
+        "what is the capital of Australia",
+        "how many calories are in an apple",
+    ];
+    println!("best similarity: questions the docs cannot answer");
+    let mut off_sims: Vec<f32> = off.iter().map(|q| top_similarity(q)).collect();
+    for (q, v) in off.iter().zip(&off_sims) {
+        println!("  {v:.2}  {q}");
+    }
+    off_sims.sort_by(|a, b| a.total_cmp(b));
+    println!(
+        "  min {:.2}  max {:.2}",
+        off_sims[0],
+        off_sims[off_sims.len() - 1]
+    );
 }

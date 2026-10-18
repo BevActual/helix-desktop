@@ -25,7 +25,26 @@ interface Source { provider?: string; title: string; url: string; kind: string; 
 /** A desktop task handed over from this chat (Act) and how it ended. Shown after `after` messages; never part of what a model is sent. */
 export interface DesktopTask { id: number; after: number; request: string; outcome: string; summary: string; detail: string; before?: string; after_text?: string; undone?: boolean; at: number }
 interface Activity { id: string; tool: string; input: string; state: string; output: string }
-interface ReplyStats { model: string; tokens: number; ms: number }
+interface FileRef { title: string; heading: string; excerpt: string }
+
+/** The passages from the person's own folders a reply was given, behind a line that says how many. */
+function FileSources({ files, index }: { files: FileRef[]; index: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="kn-sources" data-test={`answer-files-${index}`} aria-label="Passages from your files that the model was given">
+      <button type="button" className="kn-sources-toggle" aria-expanded={open} data-test={`answer-files-toggle-${index}`} onClick={() => setOpen(!open)}>
+        {open ? "▾" : "▸"} From your files · {files.length}
+      </button>
+      {open ? files.map((file, i) => (
+        <div key={`${file.title}:${i}`} className="kn-source" data-test={`answer-file-${index}-${i}`}>
+          <div className="kn-source-title">[{i + 1}] {file.title}{file.heading ? ` › ${file.heading}` : ""}</div>
+          <div className="kn-source-text">{file.excerpt}</div>
+        </div>
+      )) : null}
+    </section>
+  );
+}
+interface ReplyStats { model: string; tokens: number; ms: number; files?: FileRef[] }
 export interface Message { activities?: Activity[]; sources?: Source[]; role: string; text: string; blocks: Block[]; images?: string[]; stats?: ReplyStats | null; }
 /** What a reply cost, in a few words: the model, its tokens, and how fast they came. */
 function replyDetails(stats: ReplyStats | null | undefined): string {
@@ -391,6 +410,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} onStage={hooks.stage} onEdits={hooks.applyEdits} writing={last && streaming} />
               {last && !streaming && message.stats ? <CompareBar index={index} current={{ text: message.text, model: message.stats.model, tokens: message.stats.tokens, ms: message.stats.ms }} streaming={streaming} report={hooks.report} /> : null}
               {!!message.sources?.length && <section className="answer-web-sources" data-test="answer-web-sources" aria-label="Online sources provided to the model"><strong>Online sources</strong>{message.sources.map((source, i) => <div key={`${i}:${source.url}`}><button type="button" className="web-citation" data-test={`answer-source-${index}-${i}`} title={source.url} onClick={() => invoke("web_open_source", { url: source.url }).catch(hooks.report)}>[{i + 1}] {source.title || source.url}</button><span>{source.kind === "page" ? "Page excerpt" : `Search snippet${source.provider ? ` · ${source.provider}` : ""}`} · retrieved {new Date(source.fetched * 1000).toLocaleDateString()}</span></div>)}</section>}
+              {!streaming && message.stats?.files?.length ? <FileSources files={message.stats.files} index={index} /> : null}
               {last && streaming && messages[index - 1]?.text.startsWith("/image ") && !messages[index - 1]?.sources?.length && <div className="image-progress" data-test="image-generation-progress"><p>{progress.stage}</p><progress value={Number.isFinite(progress.fraction) ? Math.max(0, Math.min(1, progress.fraction)) : 0} max={1} /><p className="sheet-note">On this computer · use Stop to cancel</p></div>}
               {!blocks.length && !message.activities?.some((activity) => activity.state === "waiting" || activity.state === "running") ? (
                 <span className="typing-dots" data-test="typing" aria-label="Thinking">

@@ -3,7 +3,7 @@ import { invoke } from "@helix/ui";
 
 interface FolderView { path: string; indexed: number; pages: number; passages: number; with_meaning: number; }
 interface Running { folder: string; done: number; total: number; }
-export interface KnowledgeStatus { meaning: boolean; folders: FolderView[]; running: Running | null; error: string; total_pages: number; }
+export interface KnowledgeStatus { meaning: boolean; folders: FolderView[]; running: Running | null; error: string; total_pages: number; use_in_chat: boolean; }
 interface Found { title: string; heading: string; snippet: string; key: string; by_meaning: boolean; }
 
 const home = (path: string) => path.replace(/^\/home\/[^/]+/, "~");
@@ -87,6 +87,11 @@ export function KnowledgePanel({ report, onGetModel }: { report: (error: unknown
         })}
         {empty ? <div className="set-row"><div className="set-row-note" data-test="kn-empty">No folders yet. Add a project, a notes folder, or documentation.</div></div> : null}
       </div>
+      <label className="sheet-check set-check" data-test="kn-use-row">
+        <input type="checkbox" data-test="kn-use" checked={status?.use_in_chat ?? true} disabled={!status}
+          onChange={(e) => { const on = e.target.checked; setStatus((old) => (old ? { ...old, use_in_chat: on } : old)); invoke("knowledge_set_use", { on }).catch(report); }} />
+        <span><strong>Use these folders when answering in chat</strong><br /><span className="set-hint">Passages that match your question closely are given to the model, and the reply lists them under "From your files". Only models on this computer are given them; a cloud model never is.</span></span>
+      </label>
       <div className="lib-add">
         <button type="button" className="primary" data-test="kn-add" disabled={adding || !!running} onClick={add}>{adding ? "Choosing…" : "Add a folder…"}</button>
         <span className="set-hint">Text and code files under 300 KB, up to 3000 per folder. Hidden folders, build output and links are skipped.</span>

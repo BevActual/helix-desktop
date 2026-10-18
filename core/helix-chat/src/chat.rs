@@ -125,12 +125,24 @@ impl DesktopTask {
     }
 }
 
+/// A passage from the person's own folders that was given to the model for a reply, kept so the reply can say where it came from.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct FileRef {
+    /// The file, as a path inside the folder it was read from.
+    pub title: String,
+    pub heading: String,
+    /// The start of the passage, as the model saw it.
+    pub excerpt: String,
+}
+
 /// What a reply cost, for the person who wants to know: which model wrote it, how many tokens, and how long it took. Written when a turn finishes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct ReplyStats {
     pub model: String,
     pub tokens: u32,
     pub ms: u64,
+    /// Passages from the person's folders the model was given for this reply.
+    pub files: Vec<FileRef>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -820,6 +832,29 @@ impl Conversation {
                         .unwrap_or(0)
                         .min(u64::from(u32::MAX)) as u32,
                     ms: v.get("ms").and_then(Value::as_u64).unwrap_or(0),
+                    files: v
+                        .get("files")
+                        .and_then(Value::as_array)
+                        .map(|list| {
+                            list.iter()
+                                .take(8)
+                                .filter_map(|f| {
+                                    let text = |key: &str, max: usize| {
+                                        sanitize_for_display(
+                                            f.get(key).and_then(Value::as_str).unwrap_or_default(),
+                                            max,
+                                        )
+                                    };
+                                    let title = text("title", 200);
+                                    (!title.is_empty()).then(|| FileRef {
+                                        title,
+                                        heading: text("heading", 200),
+                                        excerpt: text("excerpt", 600),
+                                    })
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 })
                 .filter(|_| role == Role::Assistant);
             messages.push(Message {
@@ -1000,6 +1035,8 @@ pub struct Chat {
     pub temporary: bool,
     /// Tokens of the reply that just ended (the model service reports them with the end of the turn).
     last_tokens: u32,
+    /// Passages from the person's folders given to the model for the turn now running; written onto the reply when it ends.
+    pub pending_files: Vec<FileRef>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1074,6 +1111,7 @@ impl Chat {
             error: String::new(),
             temporary: false,
             last_tokens: 0,
+            pending_files: Vec::new(),
         }
     }
 
@@ -1090,6 +1128,7 @@ impl Chat {
                 model: sanitize_for_display(model.trim_end_matches(".gguf"), 60),
                 tokens,
                 ms,
+                files: std::mem::take(&mut self.pending_files),
             });
         }
     }
@@ -2052,6 +2091,55 @@ mod tests {
             .to_json()
             .replace("\"route_model\":\"\"", "\"x\":1");
         assert_eq!(Conversation::from_json(&old).unwrap().route_model, "");
+    }
+
+    #[test]
+    fn a_reply_remembers_the_passages_it_was_given_and_only_that_reply() {
+        let mut chat = chat();
+        let turn = chat.send("how long for the sauce", 5).unwrap();
+        chat.started(turn.generation, 1);
+        chat.pending_files = vec![FileRef {
+            title: "notes/cooking.md".into(),
+            heading: "Cooking".into(),
+            excerpt: "Simmer for an hour.".into(),
+        }];
+        chat.delta(1, "About an hour.");
+        chat.complete(1, true, r#"{"ok":true,"completion_tokens":5}"#);
+        chat.note_reply("m.gguf", 100);
+        let files = chat
+            .conversation
+            .messages
+            .last()
+            .unwrap()
+            .stats
+            .clone()
+            .unwrap()
+            .files;
+        assert_eq!(files.len(), 1);
+        assert!(
+            chat.pending_files.is_empty(),
+            "taken by the reply, so the next one starts clean"
+        );
+        let again = Conversation::from_json(&chat.conversation.to_json()).unwrap();
+        assert_eq!(
+            again.messages.last().unwrap().stats.as_ref().unwrap().files,
+            files
+        );
+        // a saved reply from before this existed still loads, with no passages
+        let old = chat
+            .conversation
+            .to_json()
+            .replace("\"files\":", "\"other\":");
+        assert!(Conversation::from_json(&old)
+            .unwrap()
+            .messages
+            .last()
+            .unwrap()
+            .stats
+            .as_ref()
+            .unwrap()
+            .files
+            .is_empty());
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # Knowledge store
 
-Status (2026-10-18): the store, hybrid search and a measurement are built, and Mobius now reads folders into it (Settings → Knowledge) and can search them. Using it in chat answers, with cited sources, is next.
+Status (2026-10-18): the store, hybrid search and a measurement are built, and Mobius now reads folders into it (Settings → Knowledge) and can search them. Chats on this computer are now given close passages from the folders, and the reply lists them.
 
 ## Why a database
 
@@ -63,9 +63,20 @@ What this says:
 
 Tests: `knowledge::` unit tests (what is collected and skipped, a symlink loop, updating and forgetting, stopping, refused folders) and the nested `mobius-knowledge` (a fake picker, the real embedding model when present).
 
-## Not built
+## In chat
 
-* Using it in chat: retrieved passages given to a local model, and cited-source chips under the reply (next).
+When a message is sent to a model **on this computer**, `dispatch_turn` asks `knowledge::relevant` for passages and, if any come back, appends them to the system prompt (the same place and the same local-only rule as the memory) and writes them onto the reply's stats, so the reply shows **From your files · N**, which opens to the passages the model saw.
+
+* **Relevance cut-off 0.60** cosine similarity (`MIN_SIMILARITY`). Measured with the real model on this project's docs: questions the pages answer scored 0.62 to 0.77 against their best passage (median 0.70) and questions they cannot answer 0.46 to 0.58, so 0.60 separates them cleanly there. It is one corpus; if other folders disagree, this is the number to revisit. A hit found only by its words has no similarity and is never handed over: a shared word is too loose to give a model as evidence.
+* At most four passages of at most 900 characters, each from a different file.
+* **Needs the meaning model.** Without it chats get nothing from folders (words alone are not trusted) and the Knowledge page says so.
+* **Never to a cloud model.** The gate is the turn's route being local, as for the memory.
+* The passages are quoted material: the prompt says so and tells the model never to follow instructions written inside them.
+* A switch in Settings → Knowledge turns it off. Saved replies keep their sources (`stats.files`); older replies load without them.
+
+Tests: `knowledge::` (selection, the prompt text), `helix-chat` (a reply keeps the passages it was given, and only that reply; old chats load) and the nested `mobius-knowledge` (a tomato-sauce question gets the cooking note, opens to show it, the passages are saved with the reply, and an unrelated question gets none).
+
+## Not built
 * Markdown export and import.
 * Facts (a short statement with its source, a confidence and whether the person confirmed it) replacing the memory file.
 * An events table (what was retrieved, used and kept) to rank by use.

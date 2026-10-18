@@ -40,8 +40,32 @@ echo "--- 2. search"
 click_id kn-query; wtype "how long should I cook tomato sauce"; sleep 0.4; click_id kn-search; sleep 3
 wait_id kn-hit-0 && echo "ok: a search returns passages" || fail "no search results"
 shot knowledge-results; shot knowledge-results
-echo "--- 3. read again, then remove"
+echo "--- 3. read again"
 click_id "kn-reindex-$FOLDER"; sleep 3
 has_id "kn-folder-$FOLDER" && echo "ok: reading again keeps the folder" || fail "folder vanished"
+echo "--- 4. chat uses the folder"
+LOG=$SCRATCH/program.log
+if has_id kn-nomeaning; then
+  echo "skip: no meaning-search model here, so chat does not use folders"
+else
+  click_id models-back; sleep 1.2
+  click_id input; wtype "How long should the tomato sauce simmer?"; wtype -k Return
+  for _ in $(seq 1 60); do has_id answer-files-1 && break; sleep 0.5; done
+  grep -aq "MOBIUS knowledge-added" "$LOG" && echo "ok: passages were added to the prompt" || fail "no passages were added to the prompt"
+  has_id answer-files-1 && echo "ok: the reply lists the files it was given" || fail "no From-your-files list under the reply"
+  click_id answer-files-toggle-1; sleep 0.8
+  has_id answer-file-1-0 && echo "ok: opening it shows the passage the model was given" || fail "the passage did not open"
+  shot knowledge-chat; shot knowledge-chat
+  F=$(ls -t "$SCRATCH"/data/helix/mobius/chats/*.json | head -1)
+  python3 - "$F" <<'PY' && echo "ok: the passages are saved with the reply" || fail "passages not saved"
+import json, sys
+d = json.load(open(sys.argv[1])); files = d["messages"][-1]["stats"]["files"]
+assert files and files[0]["title"] == "cooking.md", files
+PY
+  BEFORE=$(grep -ac "MOBIUS knowledge-added" "$LOG")
+  click_id input; wtype "Write a poem about the sea"; wtype -k Return; sleep 5
+  [ "$(grep -ac "MOBIUS knowledge-added" "$LOG")" = "$BEFORE" ] && echo "ok: an unrelated question gets no passages" || fail "passages were added for an unrelated question"
+  click_id meta-more >/dev/null 2>&1 || true
+fi
 echo "note: Remove asks for confirmation, which the harness cannot answer; removal is covered by the unit tests"
 [ $FAILED = 0 ] && echo "PASS: mobius knowledge" || exit 1
