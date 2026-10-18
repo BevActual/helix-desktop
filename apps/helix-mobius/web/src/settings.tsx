@@ -74,7 +74,7 @@ export interface SettingsHooks {
 export interface SettingsHandle { open: (section?: string) => void; }
 
 const FIT_WORD: Record<string, string> = { gpu: "Fits your graphics card", tight: "Tight on your graphics card", cpu: "Runs on the processor (slower)", no: "Too big for this computer" };
-const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation", embedding: "Meaning search" };
+const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation", embedding: "Meaning search", reasoning: "Thinks first" };
 
 function size(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
@@ -222,7 +222,7 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, onM
   );
 }
 
-type Filter = "all" | "installed" | "chat" | "code" | "vision" | "speech" | "image" | "embedding" | "fits";
+type Filter = "all" | "installed" | "chat" | "code" | "vision" | "reasoning" | "speech" | "image" | "embedding" | "fits";
 type Sort = "best" | "smallest" | "name";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
@@ -230,6 +230,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "chat", label: "Chat" },
   { id: "code", label: "Code" },
   { id: "vision", label: "Pictures" },
+  { id: "reasoning", label: "Thinks first" },
   { id: "speech", label: "Speech" },
   { id: "image", label: "Images" },
   { id: "embedding", label: "Meaning" },

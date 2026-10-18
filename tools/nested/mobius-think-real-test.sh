@@ -35,5 +35,5 @@ print("reply (end):", reply[-160:].replace("\n", " "))
 assert "<think>" in reply and "</think>" in reply, "no reasoning block"
 assert "391" in reply.split("</think>")[-1], "no answer after the reasoning"
 PY
-has_id thinking-toggle && echo "ok: the reasoning is a folded row" || echo "note: no folded-row id found (see the screenshot)"
+has_id thinking && echo "ok: the reasoning is a folded row" || fail "no folded reasoning row"
 [ $FAILED = 0 ] && echo "PASS: reasoning model" || exit 1

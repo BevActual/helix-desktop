@@ -38,9 +38,12 @@ A model is built for something, and a job accepts only models built for it. `rec
 | Type | Does | Jobs that take it |
 |---|---|---|
 | Chat, Code, Pictures | Language models; Code ones are tuned for code, Pictures ones read images | Chat, Code, Pictures, Summaries, Act (Pictures needs one that sees) |
+| **Thinks first** (new) | A chat model that reasons before it answers: Qwen3 4B. Its reasoning shows as the folded "Thought it through" row | Chat, Code, Summaries (it is a chat model with a tag) |
 | Speech | Speech to text, on the processor | Dictation |
 | Image generation | Pictures from a description | Image creation |
 | **Meaning search** (new) | Reads what text means, in about 10 ms on the processor: bge-small-en-v1.5 | Meaning search |
+
+Checked on 2026-10-18: the bundled llama 0.6.0 supports the Qwen3, Qwen3.5, Gemma 3 and DeepSeek architectures, and Qwen3 4B Q4_K_M (downloaded from Qwen's own repository, size and SHA-256 matching Hugging Face's published values) loads in the real inference service, answers 17 × 23 = 391 and has its `<think>` text folded (`mobius-think-real`, 32 s for the turn including the load).
 
 A specialist never appears under a chat job, and a chat model never under a specialist's. Cloud models carry their own tags from OpenRouter's data: sees pictures, thinks first, uses tools, makes pictures, free, long documents.
 
