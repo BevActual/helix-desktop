@@ -463,6 +463,13 @@ async fn execute(
             }
         }
     }
+    // What the project folder holds before the turn, so the turn's changes (edits and whatever commands did) can be listed afterwards.
+    let before = match folder.clone() {
+        Some(folder) => tokio::task::spawn_blocking(move || crate::edits::snapshot(&folder))
+            .await
+            .ok(),
+        None => None,
+    };
     for step in 0..6 {
         if *cancel.borrow() {
             return Err("Tools task stopped.".into());
@@ -734,6 +741,47 @@ async fn execute(
             && planning.len() > 4
         {
             planning.drain(2..4);
+        }
+    }
+    if let (Some(root), Some(before)) = (folder.clone(), before) {
+        let found =
+            tokio::task::spawn_blocking(move || crate::edits::changes_since(&root, &before))
+                .await
+                .unwrap_or_default();
+        if !found.is_empty() {
+            let id = format!("changes-{generation}");
+            let chat_id = crate::shared(app)
+                .lock()
+                .expect("state")
+                .chat
+                .conversation
+                .id
+                .clone();
+            let mut list = Vec::new();
+            for (index, (change, checkpoint)) in found.into_iter().enumerate() {
+                let store = crate::edit_store(&chat_id, &format!("{id}-{index}"));
+                if let Some(dir) = store.parent() {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                let _ = std::fs::write(
+                    &store,
+                    serde_json::to_string(&checkpoint).unwrap_or_default(),
+                );
+                list.push(change);
+            }
+            let (added, removed) = list
+                .iter()
+                .fold((0, 0), |(a, r), c| (a + c.added, r + c.removed));
+            let summary = format!("{} file(s) changed · +{added} −{removed}", list.len());
+            activity(
+                app,
+                generation,
+                &id,
+                "changes",
+                &serde_json::to_string(&list).unwrap_or_default(),
+                "completed",
+                &summary,
+            );
         }
     }
     if *cancel.borrow() {

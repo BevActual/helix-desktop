@@ -149,5 +149,9 @@ links; files that look like they hold credentials; a text that is not found, or 
 files over 512 KiB; more than 20,000 characters a side. `tools/nested/mobius-edit-test.sh` runs review, apply, undo, decline and a path
 outside the folder.
 
-Still to do for the full Changes panel: one list of everything a turn changed (a command can change files too, so a snapshot of the folder
-before and after a command, shown as a diff), per-file accept and reject across a whole turn, and restore to the state before a turn.
+**The Changes card (done).** A Tools turn in a project folder is compared with the folder as it was before it started (a bounded snapshot of its
+text files: 2,000 files, 512 KiB each, 30 MB, no hidden or build folders), so the card lists everything the turn changed whether an edit or a
+command did it: each file as added, modified or deleted, with its unified diff (cut at 8,000 characters) and **Revert** per file. A revert puts the
+file back only if it still holds what the turn left. `tools/nested/mobius-edit-test.sh` runs a command that adds and changes a file and reverts
+each. Still to do: accept or reject before a command runs (a command cannot be previewed, so this stays review-before-run plus revert-after), a
+restore of the whole turn in one click, and files the snapshot does not cover (binaries, large files, ignored folders).

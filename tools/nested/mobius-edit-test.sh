@@ -54,4 +54,16 @@ paste_id input 'Write outside'
 click_id send
 wait_id tool-approve; click_id tool-approve; idle
 [ ! -e "$SCRATCH/home/escape.txt" ] && echo "ok: nothing written outside the folder" || { echo "FAIL: escaped"; exit 1; }
+echo "--- a command's changes are listed, with a way to revert each file"
+printf '[{"tool":"terminal","command":"printf one > made.txt; printf ALPHA > notes.txt"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+paste_id input 'Run the command'
+click_id send
+wait_id tool-approve; click_id tool-approve; idle
+wait_id changes-card && echo "ok: the Changes card appeared" || { echo "FAIL: no Changes card"; exit 1; }
+click_id change-0; sleep 1; shot changes; sleep 1; shot changes
+click_id change-revert-0; sleep 2
+[ ! -e "$SCRATCH/home/project/made.txt" ] && echo "ok: the added file was reverted away" || { echo "FAIL: made.txt still there"; exit 1; }
+[ "$(cat "$NOTES")" = "ALPHA" ] && echo "ok: the other file kept its change" || { echo "FAIL: notes: $(cat "$NOTES")"; exit 1; }
+click_id change-revert-1; sleep 2
+[ "$(cat "$NOTES")" = "$(printf 'alpha\nbeta')" ] && echo "ok: the modified file was restored" || { echo "FAIL: notes: $(cat "$NOTES")"; exit 1; }
 echo "PASS: mobius edit"
