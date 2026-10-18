@@ -26,6 +26,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 | [layering.md](layering.md) | Cargo workspace dependency rules and the `layering` check |
 | [trusted-surface.md](trusted-surface.md) | Trust boundaries for shell surfaces |
 | [synthetic-input-threat-model.md](synthetic-input-threat-model.md) | Tier 3 (agent pointer and keyboard): threats, scope rule, build order, open decisions |
+| [mobius-ux.md](mobius-ux.md) | Mobius interface review: what was found, what changed, what is left |
 
 ## Surfaces and apps
 

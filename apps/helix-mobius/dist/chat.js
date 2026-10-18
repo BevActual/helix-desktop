@@ -810,8 +810,8 @@ function composerPlaceholder() {
     return;
   }
   input.placeholder = view.tools_enabled
-    ? "Ask a task — Mobius will search, read pages, and show steps for you to approve"
-    : "Ask anything — type / for commands (try /tools for research in chat)";
+    ? "Ask a task — each step is shown for your approval"
+    : "Message Mobius — / for commands";
 }
 
 function drawAgentDeskChip() {
