@@ -28,6 +28,15 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
   const [version, setVersion] = useState(-1);
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState(true);
+  // Ask on the selection: the selected range, the bar's own instruction field, and a proposal waiting to be accepted or rejected.
+  const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
+  const [custom, setCustom] = useState("");
+  const [working, setWorking] = useState(false);
+  const [proposal, setProposal] = useState<{ start: number; end: number; old: string; text: string } | null>(null);
+  const [problem, setProblem] = useState("");
+  const area = useRef<HTMLTextAreaElement>(null);
+  const customField = useRef<HTMLInputElement>(null);
+  const accept = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const current = useRef({ title: "", text: "" });
   current.current = { title, text };
@@ -79,6 +88,31 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
       catch (reason) { hooks.report(reason); }
     }, 1500);
   };
+  const noteSelection = () => {
+    const el = area.current; if (!el) return;
+    const { selectionStart: start, selectionEnd: end } = el;
+    setSel(end - start >= 3 ? { start, end } : null);
+  };
+  const ask = async (kind: string, instruction = "") => {
+    if (!sel || working) return;
+    const old = text.slice(sel.start, sel.end);
+    setWorking(true); setProblem("");
+    try {
+      const edited = await invoke<string>("stage_transform", { kind, custom: instruction, text: old });
+      setProposal({ start: sel.start, end: sel.end, old, text: edited });
+      setCustom("");
+      setTimeout(() => accept.current?.focus(), 0);
+    } catch (reason) { setProblem(String(reason)); } finally { setWorking(false); }
+  };
+  const applyProposal = () => {
+    if (!proposal) return;
+    if (text.slice(proposal.start, proposal.end) !== proposal.old) { setProblem("The text changed while Mobius worked, so the suggestion was dropped."); setProposal(null); return; }
+    const next = text.slice(0, proposal.start) + proposal.text + text.slice(proposal.end);
+    setProposal(null); setSel(null);
+    edit(next);
+    setTimeout(() => { area.current?.focus(); area.current?.setSelectionRange(proposal.start, proposal.start + proposal.text.length); }, 0);
+  };
+  const rejectProposal = () => { setProposal(null); setTimeout(() => area.current?.focus(), 0); };
   const doc = store.documents.find((d) => d.title === title);
   const versions = doc?.versions ?? [];
   const pick = (index: number) => { const v = versions[index]; if (!v) return; setVersion(index); setText(v.body); setSaved(false); hooks.changed({ title, text: v.body }); };
@@ -96,8 +130,19 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
       <button type="button" className="icon-btn" aria-label="Close the document" data-test="stage-close" onClick={() => { setTitle(""); setText(""); hooks.changed(null); }}>×</button>
     </header>
     {notice && <p className="stage-notice" role="status" data-test="stage-notice">{notice}</p>}
-    <textarea data-test="stage-text" aria-label={`Edit ${title}`} spellCheck value={text} onChange={(e) => edit(e.target.value)} />
-    <footer>{text.split(/\s+/).filter(Boolean).length} words · It goes to Mobius with your next message, so you can ask for changes to what is here.</footer>
+    {proposal ? <div className="stage-proposal" data-test="stage-proposal" role="group" aria-label="Suggested change"
+        onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); rejectProposal(); } }}>
+      <div className="proposal-old" data-test="proposal-old"><span>Now</span>{proposal.old}</div>
+      <div className="proposal-new" data-test="proposal-new"><span>Suggested</span>{proposal.text}</div>
+      <div className="proposal-actions"><button type="button" ref={accept} className="primary" data-test="proposal-accept" onClick={applyProposal}>Accept <kbd>Enter</kbd></button><button type="button" data-test="proposal-reject" onClick={rejectProposal}>Reject <kbd>Esc</kbd></button></div>
+    </div> : sel && <div className="stage-selbar" data-test="stage-selbar" role="toolbar" aria-label="Ask Mobius about the selection" onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") e.preventDefault(); }}>
+      {[["improve", "Improve"], ["shorter", "Shorter"], ["longer", "Longer"], ["simplify", "Simplify"], ["fix", "Fix grammar"]].map(([kind, label]) => <button key={kind} type="button" disabled={working} data-test={`sel-${kind}`} onClick={() => ask(kind)}>{label}</button>)}
+      <input ref={customField} data-test="sel-custom" value={custom} disabled={working} placeholder={working ? "Working…" : "Ask Mobius to…  (Ctrl+I)"} maxLength={300} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && custom.trim()) { e.preventDefault(); ask("custom", custom); } }} />
+    </div>}
+    {problem && <p className="stage-notice" role="alert" data-test="stage-problem">{problem}</p>}
+    <textarea ref={area} data-test="stage-text" aria-label={`Edit ${title}`} spellCheck value={text} onChange={(e) => { edit(e.target.value); setSel(null); }}
+      onSelect={noteSelection} onMouseUp={noteSelection} onKeyUp={noteSelection} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "i" && sel) { e.preventDefault(); customField.current?.focus(); } }} />
+    <footer>{text.split(/\s+/).filter(Boolean).length} words{sel ? ` · ${sel.end - sel.start} characters selected` : ""} · It goes to Mobius with your next message, so you can ask for changes to what is here.</footer>
   </aside>;
 }
 

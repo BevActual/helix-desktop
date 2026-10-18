@@ -22,7 +22,7 @@ static const struct wl_registry_listener listener = {global, global_remove};
 static uint32_t now_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (uint32_t)(t.tv_sec * 1000 + t.tv_nsec / 1000000); }
 
 int main(int argc, char **argv) {
-  if (argc < 3) { fprintf(stderr, "usage: wl-pointer <fx> <fy> [click]\n"); return 2; }
+  if (argc < 3) { fprintf(stderr, "usage: wl-pointer <fx> <fy> [click|rclick|mclick|dclick|drag <tx> <ty>]\n"); return 2; }
   double fx = atof(argv[1]), fy = atof(argv[2]);
   struct wl_display *display = wl_display_connect(NULL);
   if (!display) { fprintf(stderr, "no wayland display\n"); return 1; }
@@ -41,6 +41,35 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[3], "click")) button = 0x110;        // BTN_LEFT
     else if (!strcmp(argv[3], "rclick")) button = 0x111;  // BTN_RIGHT
     else if (!strcmp(argv[3], "mclick")) button = 0x112;  // BTN_MIDDLE
+    else if (!strcmp(argv[3], "dclick")) button = 0x110;  // two clicks close together: selects a word
+  }
+  if (button && argc > 3 && !strcmp(argv[3], "dclick")) {
+    for (int i = 0; i < 2; i++) {
+      zwlr_virtual_pointer_v1_button(pointer, now_ms(), button, 1);
+      zwlr_virtual_pointer_v1_frame(pointer);
+      wl_display_roundtrip(display);
+      usleep(40000);
+      zwlr_virtual_pointer_v1_button(pointer, now_ms(), button, 0);
+      zwlr_virtual_pointer_v1_frame(pointer);
+      wl_display_roundtrip(display);
+      usleep(60000);
+    }
+    button = 0;
+  }
+  if (argc > 5 && !strcmp(argv[3], "drag")) {
+    // Press here, move to the target in a few steps, release there: selects text or draws a rectangle.
+    double tx = atof(argv[4]), ty = atof(argv[5]);
+    zwlr_virtual_pointer_v1_button(pointer, now_ms(), 0x110, 1);
+    zwlr_virtual_pointer_v1_frame(pointer);
+    wl_display_roundtrip(display);
+    for (int i = 1; i <= 8; i++) {
+      zwlr_virtual_pointer_v1_motion_absolute(pointer, now_ms(), (uint32_t)((fx + (tx - fx) * i / 8) * extent), (uint32_t)((fy + (ty - fy) * i / 8) * extent), extent, extent);
+      zwlr_virtual_pointer_v1_frame(pointer);
+      wl_display_roundtrip(display);
+      usleep(40000);
+    }
+    zwlr_virtual_pointer_v1_button(pointer, now_ms(), 0x110, 0);
+    zwlr_virtual_pointer_v1_frame(pointer);
   }
   if (button) {
     zwlr_virtual_pointer_v1_button(pointer, now_ms(), button, 1);  // pressed

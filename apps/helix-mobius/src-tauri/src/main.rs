@@ -14,6 +14,7 @@ mod hardware;
 mod imageops;
 mod images;
 mod imagestage;
+mod inline;
 mod lan;
 mod library;
 mod output;
@@ -3302,6 +3303,7 @@ fn main() {
             tools_review,
             tools_undo_edit,
             artifacts::stage_get,
+            inline::stage_transform,
             scheduled::scheduled_list,
             scheduled::scheduled_save,
             scheduled::scheduled_set_enabled,
