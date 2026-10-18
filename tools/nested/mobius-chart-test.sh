@@ -24,5 +24,6 @@ shot() { niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$S
 click_id input; wtype "Show me the numbers"; wtype -k Return
 wait_id chart 60 && echo "ok: the chart was drawn" || fail "no chart"
 for _ in $(seq 1 120); do ! has_id stop && break; sleep 0.5; done; sleep 2; shot chart; sleep 1; shot chart
+wait_id diagram 4 && echo "ok: a diagram was drawn" || fail "no diagram"
 wait_id save-code-block 4 && echo "ok: the block that is not a chart stayed code" || fail "the bad block disappeared"
 [ "$FAILED" = 0 ] && echo "PASS: mobius chart" || exit 1

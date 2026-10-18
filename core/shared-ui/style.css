@@ -1503,3 +1503,9 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .eph-count { font-weight: 500; color: var(--label-2); margin-left: 6px; }
 .eph-progress { height: 4px; border-radius: 2px; background: var(--fill-2); overflow: hidden; }
 .eph-progress i { display: block; height: 100%; background: var(--accent); transition: width var(--dur, .15s) var(--ease, ease); }
+.diagram svg { margin: 0 auto; }
+.diagram .diagram-node { fill: var(--fill-2); stroke: var(--accent); stroke-width: 1.3; }
+.diagram .diagram-label { fill: var(--label); font-size: 12px; font-weight: 600; }
+.diagram .diagram-edge { stroke: var(--label-2); stroke-width: 1.5; }
+.diagram .diagram-arrow { fill: var(--label-2); }
+.diagram .diagram-back { stroke-dasharray: 5 4; }
