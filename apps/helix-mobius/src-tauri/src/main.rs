@@ -3,6 +3,7 @@
 
 mod act;
 mod agent;
+mod alternates;
 mod analysis;
 mod artifacts;
 mod attach;
@@ -1866,11 +1867,43 @@ async fn chat_regenerate(
     let turn = {
         let shared = shared(&app);
         let mut state = shared.lock().expect("state");
+        // The reply that is about to be replaced is kept as another answer, so the two can be compared.
+        let old = state
+            .chat
+            .conversation
+            .messages
+            .last()
+            .filter(|m| m.role == helix_chat::chat::Role::Assistant && !m.text.trim().is_empty())
+            .map(|m| alternates::Alt {
+                text: m.text.clone(),
+                model: m
+                    .stats
+                    .as_ref()
+                    .map(|s| s.model.clone())
+                    .unwrap_or_default(),
+                tokens: m.stats.as_ref().map_or(0, |s| s.tokens),
+                ms: m.stats.as_ref().map_or(0, |s| s.ms),
+                at: now(),
+                ask: String::new(),
+            });
+        let index = state.chat.conversation.messages.len().saturating_sub(1);
+        let ask: String = index
+            .checked_sub(1)
+            .and_then(|i| state.chat.conversation.messages.get(i))
+            .map(|m| m.text.chars().take(300).collect())
+            .unwrap_or_default();
+        let old = old.map(|a| alternates::Alt { ask, ..a });
+        let chat_id = state.chat.conversation.id.clone();
         let turn = state
             .chat
             .regenerate_with_system(now(), &prompt)
             .map_err(|e| error_text(&e).to_string())?;
         state.once_route = once;
+        if let Some(old) = old {
+            let mut store = alternates::Store::load(&chat_id);
+            store.push(index, old);
+            let _ = store.save(&chat_id);
+        }
         turn
     };
     record(&app, "regenerate", 0, true);
@@ -3341,6 +3374,8 @@ fn main() {
             tools_review,
             tools_undo_edit,
             artifacts::stage_get,
+            alternates::alt_list,
+            alternates::alt_keep,
             artifacts::stage_rename,
             artifacts::stage_delete,
             artifacts::markdown_blocks,
