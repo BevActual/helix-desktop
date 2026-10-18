@@ -4,6 +4,7 @@
 mod act;
 mod agent;
 mod analysis;
+mod artifacts;
 mod attach;
 mod decide;
 mod dictate;
@@ -3114,6 +3115,8 @@ fn main() {
             tools_open_desk_terminal,
             tools_review,
             tools_undo_edit,
+            artifacts::stage_get,
+            artifacts::stage_record,
             tools_rules,
             memory_list,
             memory_add,

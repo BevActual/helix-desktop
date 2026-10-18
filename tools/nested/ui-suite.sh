@@ -53,6 +53,7 @@ pick mobius-cloud   && run mobius-cloud mobius-cloud-test.sh mobius-cloud-nested
 pick mobius-memory  && run mobius-memory mobius-memory-test.sh mobius-nested.sh "$WIDE" HELIX_MOBIUS_LOG_PROMPT=1
 pick mobius-think   && run mobius-think mobius-think-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=<think>The person asks for a sum. 2 plus 2 is 4.</think>\n\nIt is **4**.'
 pick mobius-palette && run mobius-palette mobius-palette-test.sh mobius-nested.sh "$WIDE"
+pick mobius-stage   && run mobius-stage mobius-stage-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n'
 pick mobius-hint    && run mobius-hint mobius-hint-test.sh mobius-nested.sh "$WIDE" "HELIX_EMBED_DIR=${HELIX_EMBED_DIR:-$HOME/.cache/helix-experiments/embed/bge-small-en-v1.5}"
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

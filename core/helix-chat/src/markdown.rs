@@ -341,12 +341,27 @@ pub fn parse(input: &str) -> Vec<Block> {
         if let Some(rest) = trimmed.strip_prefix("```") {
             end_paragraph(&mut blocks, &mut paragraph);
             end_list(&mut blocks, &mut list);
-            let language: String = rest
+            let language: String = match rest
                 .trim()
-                .chars()
-                .filter(|c| c.is_ascii_alphanumeric() || "+-#._".contains(*c))
-                .take(20)
-                .collect();
+                .get(..9)
+                .filter(|p| p.eq_ignore_ascii_case("artifact:"))
+            {
+                // A document for the stage keeps its title: `artifact:Quarterly plan`.
+                Some(_) => {
+                    let title: String = rest.trim()[9..]
+                        .chars()
+                        .filter(|c| c.is_alphanumeric() || " -_.,'()&".contains(*c))
+                        .take(80)
+                        .collect();
+                    format!("artifact:{}", title.trim())
+                }
+                None => rest
+                    .trim()
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric() || "+-#._".contains(*c))
+                    .take(20)
+                    .collect(),
+            };
             fence = Some((language, Vec::new()));
             continue;
         }
@@ -773,5 +788,24 @@ mod thinking_tests {
             Block::Thinking { done: false, .. }
         ));
         assert_eq!(parse_reply("plain"), parse("plain"));
+    }
+}
+
+#[cfg(test)]
+mod artifact_tests {
+    use super::*;
+
+    #[test]
+    fn a_document_fence_keeps_its_title() {
+        let blocks = parse("```artifact:Quarterly plan\nText\n```");
+        assert_eq!(
+            blocks,
+            vec![Block::Code {
+                language: "artifact:Quarterly plan".into(),
+                text: "Text".into()
+            }]
+        );
+        let blocks = parse("```rust\nfn x() {}\n```");
+        assert!(matches!(&blocks[0], Block::Code { language, .. } if language == "rust"));
     }
 }
