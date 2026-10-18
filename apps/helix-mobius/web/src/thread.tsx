@@ -1,5 +1,6 @@
 import { Chart, parseChart } from "./chart";
 import { ArtifactCard } from "./workpanel";
+import { Regenerate } from "./regenerate";
 import { EditsCard } from "./imagestage";
 import { FlowDiagram, parseDiagram } from "./diagram";
 import { Ephemeral, parseUi } from "./ephemeral";
@@ -405,7 +406,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               ) : null}
               {!streaming ? <button className="mini" data-test={`fork-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
               {last && !streaming && !message.images?.length && !message.activities?.length ? (
-                <button className="mini" data-test="regenerate" onClick={() => invoke("chat_regenerate").catch(hooks.report)}>Regenerate</button>
+                <Regenerate disabled={streaming} report={hooks.report} />
               ) : null}
               {!streaming && replyDetails(message.stats) ? <span className="msg-stats" data-test={`stats-${index}`}>{replyDetails(message.stats)}</span> : null}
             </div>

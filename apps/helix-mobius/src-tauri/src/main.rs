@@ -56,6 +56,8 @@ struct State {
     turn_started: Option<std::time::Instant>,
     /// The model the running turn asked for (empty: whichever the service chose), for the reply's details.
     turn_model: String,
+    /// A model chosen for the next turn only (Regenerate with another model); the chat's own choice is untouched. Taken when the turn starts.
+    once_route: Option<(String, String)>,
     chat: Chat,
     /// Last backend label shown after a turn (local / LAN name).
     last_backend: String,
@@ -885,7 +887,8 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
         }
     }
     let store = personas::load();
-    let (chat_backend, chat_model) = chat_route_of(&app);
+    let once = shared(&app).lock().expect("state").once_route.take();
+    let (chat_backend, chat_model) = once.unwrap_or_else(|| chat_route_of(&app));
     let (routing, persona) = apply_chat_route(
         &inference_routing::load(),
         store.active_persona(),
@@ -1803,7 +1806,11 @@ async fn chat_send(
 }
 
 #[tauri::command]
-async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
+async fn chat_regenerate(
+    app: AppHandle,
+    backend: Option<String>,
+    model: Option<String>,
+) -> Result<(), String> {
     if shared(&app)
         .lock()
         .expect("state")
@@ -1837,12 +1844,35 @@ async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
     let store = personas::load();
     let persona = store.active_persona().clone();
     let prompt = active_prompt(&app, &persona);
-    let turn = shared(&app)
-        .lock()
-        .expect("state")
-        .chat
-        .regenerate_with_system(now(), &prompt)
-        .map_err(|e| error_text(&e).to_string())?;
+    // Another model for this reply only: validated like a chat's own choice, kept for the one turn that is about to start.
+    let once = match model.filter(|m| !m.trim().is_empty()) {
+        Some(model) => {
+            let backend = backend.unwrap_or_default();
+            let routing = inference_routing::load();
+            let backend = if backend.is_empty() || backend == "local" {
+                "local".to_string()
+            } else if routing
+                .backend(&backend)
+                .is_some_and(|b| b.kind == BackendKind::Openai && !b.base_url.trim().is_empty())
+            {
+                backend
+            } else {
+                return Err(format!("Unknown backend “{backend}”."));
+            };
+            Some((backend, model.trim().chars().take(200).collect::<String>()))
+        }
+        None => None,
+    };
+    let turn = {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        let turn = state
+            .chat
+            .regenerate_with_system(now(), &prompt)
+            .map_err(|e| error_text(&e).to_string())?;
+        state.once_route = once;
+        turn
+    };
     record(&app, "regenerate", 0, true);
     dispatch_turn(app, turn).await
 }
@@ -3450,6 +3480,7 @@ fn main() {
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 turn_started: None,
                 turn_model: String::new(),
+                once_route: None,
                 chat: Chat::new(fresh),
                 last_backend: "On this computer".into(),
             })));
