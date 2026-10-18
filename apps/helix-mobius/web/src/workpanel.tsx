@@ -116,6 +116,8 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
     return () => watch.disconnect();
   }, [title]);
   const showOutline = outlinePref ?? wide;
+  // A menu that opens takes the keyboard: the first item is focused, Up and Down move, Escape closes (and gives the keyboard back).
+  useEffect(() => { if (menu) shell.current?.querySelector<HTMLButtonElement>(".write-menu button")?.focus(); }, [menu]);
 
   const adopt = useCallback((next: Store, want: string) => {
     setStore(next);
@@ -305,7 +307,15 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
   const pageStyle = { "--write-font": fontFamily, "--write-size": `${size}px` } as React.CSSProperties;
   const tool = (label: string, aria: string, run: () => void, extra = "") => <button type="button" className={`wt ${extra}`} aria-label={aria} title={aria} onMouseDown={(e) => e.preventDefault()} onClick={run} data-test={`fmt-${aria.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>{label}</button>;
   return <aside ref={shell} className={`stage write-stage${focus ? " focus" : ""}`} data-test="stage" aria-label="Document" style={pageStyle} onClick={() => { if (menu) setMenu(""); }}
-    onKeyDown={(e) => { if (e.key === "Escape" && !e.defaultPrevented) { if (menu) setMenu(""); else if (find) setFind(false); else if (history) setHistory(false); else if (focus) setFocus(false); } }}>
+    onKeyDown={(e) => {
+      if (menu && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        const items = Array.from(shell.current?.querySelectorAll<HTMLButtonElement>(".write-menu button") ?? []);
+        const at = items.indexOf(document.activeElement as HTMLButtonElement);
+        e.preventDefault();
+        items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+        return;
+      }
+      if (e.key === "Escape" && !e.defaultPrevented) { if (menu) { setMenu(""); area.current?.focus(); } else if (find) setFind(false); else if (history) setHistory(false); else if (focus) setFocus(false); } }}>
     <header className="write-head">
       <div className="write-docs">
         <button type="button" className="write-docbtn" data-test="stage-docs" aria-haspopup="menu" aria-expanded={menu === "docs"} onClick={(e) => { e.stopPropagation(); setMenu(menu === "docs" ? "" : "docs"); }}>
@@ -385,14 +395,14 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
           {[["improve", "Improve"], ["shorter", "Shorter"], ["longer", "Longer"], ["simplify", "Simplify"], ["fix", "Fix grammar"]].map(([kind, label]) => <button key={kind} type="button" disabled={working} data-test={`sel-${kind}`} onClick={() => ask(kind)}>{label}</button>)}
           <input ref={customField} data-test="sel-custom" value={custom} disabled={working} placeholder={working ? "Working…" : "Ask Mobius to…  (Ctrl+I)"} maxLength={300} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && custom.trim()) { e.preventDefault(); ask("custom", custom); } }} />
         </div>}
-        {mode === "write" && <input className="write-title-input" data-test="stage-title-input" aria-label="Title" value={draftTitle} maxLength={80} placeholder="Title"
+        {mode === "write" && <input className="write-title-input" data-test="stage-title-input" aria-label="Title" value={draftTitle} maxLength={80} placeholder="Untitled"
           onChange={(e) => setDraftTitle(e.target.value)} onBlur={() => rename(draftTitle)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); rename(draftTitle); area.current?.focus(); } else if (e.key === "Escape") { setDraftTitle(title); area.current?.focus(); } }} />}
         {slash && slashItems.length > 0 && mode === "write" && <div className="write-slash" role="listbox" aria-label="Insert" data-test="write-slash" style={{ left: Math.min(slashPoint.x, window.innerWidth - 280), top: Math.min(slashPoint.y + 4, window.innerHeight - 260) }}>
           {slashItems.map((i, n) => <button key={i.id} type="button" role="option" aria-selected={n === slashAt} className={n === slashAt ? "on" : ""} data-test={`slash-${i.id}`} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setSlashAt(n)} onClick={() => runSlash(i.id)}><span>{i.label}</span><kbd>{i.hint}</kbd></button>)}
         </div>}
         {mode === "write"
-          ? <textarea ref={area} className="write-text" data-test="stage-text" aria-label={`Edit ${title}`} spellCheck placeholder="Start writing, or ask Mobius to draft something." value={text}
+          ? <textarea ref={area} className="write-text" data-test="stage-text" aria-label={`Edit ${title}`} spellCheck placeholder="Start writing. Press / for blocks, or ask Mobius in the chat to draft something." value={text}
               onChange={(e) => { remember3(e.target.value); setSel(null); noteSlash(e.target.value, e.target.selectionStart); }} onSelect={noteSelection} onMouseUp={noteSelection} onKeyUp={noteSelection} onKeyDown={keys} />
           : <article className="write-read" data-test="stage-read"><h1 className="write-title">{title}</h1><Blocks blocks={blocks} needle="" report={hooks.report} /></article>}
       </div>

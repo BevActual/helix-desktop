@@ -3270,6 +3270,14 @@ fn main() {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         std::process::exit(runtime.block_on(scheduled::run(id)));
     }
+    // A nested test can ask for a theme without a desktop service to say it (`light` or `dark`).
+    if helix_base::nested_test_session() {
+        match std::env::var("HELIX_MOBIUS_TEST_THEME").as_deref() {
+            Ok("dark") => APP_THEME.store(1, std::sync::atomic::Ordering::Relaxed),
+            Ok("light") => APP_THEME.store(2, std::sync::atomic::Ordering::Relaxed),
+            _ => {}
+        }
+    }
     gtk::glib::set_prgname(Some("org.helix.Mobius"));
     if std::env::var_os("JSC_useJIT").is_none() {
         std::env::set_var("JSC_useJIT", "false");

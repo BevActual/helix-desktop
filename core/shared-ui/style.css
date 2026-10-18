@@ -1702,3 +1702,7 @@ textarea, .stage textarea { user-select: text; -webkit-user-select: text; }
   .write-page, .write-body { display: block !important; overflow: visible !important; } .write-read { padding: 0 !important; color: #000; animation: none; }
 }
 .write-slash { position: fixed !important; bottom: auto !important; margin: 0 !important; z-index: 50 !important; }
+/* A stage settles into place rather than appearing. */
+@keyframes stage-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+body.chat .stage-host .stage { animation: stage-in .22s cubic-bezier(.2, .7, .2, 1); }
+@media (prefers-reduced-motion: reduce) { body.chat .stage-host .stage { animation: none; } }
