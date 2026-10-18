@@ -15,6 +15,7 @@ members = [
     "core/helix-wallpaper-model",
     "core/helix-desktop-api",
     "core/helix-embed",
+    "core/helix-knowledge",
     "core/helix-theme",
     "services/helix-wallpaper",
     "services/helix-idle",
@@ -63,6 +64,7 @@ helix-shell-model = { path = "core/helix-shell-model" }
 helix-software-model = { path = "core/helix-software-model" }
 helix-desktop-api = { path = "core/helix-desktop-api" }
 helix-embed = { path = "core/helix-embed" }
+helix-knowledge = { path = "core/helix-knowledge" }
 helix-theme = { path = "core/helix-theme" }
 helix-wallpaper = { path = "services/helix-wallpaper" }
 helix-wallpaper-model = { path = "core/helix-wallpaper-model" }
