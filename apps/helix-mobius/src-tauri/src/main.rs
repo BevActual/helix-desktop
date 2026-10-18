@@ -5,6 +5,7 @@ mod act;
 mod agent;
 mod analysis;
 mod attach;
+mod decide;
 mod dictate;
 mod generation;
 mod images;
@@ -1364,7 +1365,11 @@ fn mentions_search(app: AppHandle, query: String) -> Vec<Mention> {
 }
 
 #[tauri::command]
-fn mentions_resolve(app: AppHandle, kind: String, key: String) -> Result<attach::Attachment, String> {
+fn mentions_resolve(
+    app: AppHandle,
+    kind: String,
+    key: String,
+) -> Result<attach::Attachment, String> {
     match kind.as_str() {
         "file" => {
             let workspace = {
@@ -2916,6 +2921,7 @@ fn follow_appearance(app: tauri::AppHandle) {
 }
 
 fn main() {
+    helix_embed::limit_threads();
     gtk::glib::set_prgname(Some("org.helix.Mobius"));
     if std::env::var_os("JSC_useJIT").is_none() {
         std::env::set_var("JSC_useJIT", "false");
@@ -2940,6 +2946,7 @@ fn main() {
             chat_status,
             chat_send,
             chat_pick_attachments,
+            decide::decide_message,
             mentions_search,
             mentions_resolve,
             tools_pick_folder,

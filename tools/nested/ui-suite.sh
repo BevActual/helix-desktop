@@ -47,6 +47,7 @@ pick mobius-title   && run mobius-title mobius-title-test.sh mobius-nested.sh "H
 pick mobius-queue   && run mobius-queue mobius-queue-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=600
 pick mobius-mode    && run mobius-mode mobius-mode-test.sh mobius-nested.sh "$WIDE"
 pick mobius-mention && run mobius-mention mobius-mention-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+pick mobius-hint    && run mobius-hint mobius-hint-test.sh mobius-nested.sh "$WIDE" "HELIX_EMBED_DIR=${HELIX_EMBED_DIR:-$HOME/.cache/helix-experiments/embed/bge-small-en-v1.5}"
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

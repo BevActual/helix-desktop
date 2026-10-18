@@ -108,7 +108,7 @@ What each does that a local, private desktop assistant could use, and what we le
 
 ### Order of the next work
 
-1. `Embed` in the inference service (routing, `@` by meaning, retrieval share it).
+1. Embeddings in Rust (`core/helix-embed`, done, no llama): routing, `@` by meaning and retrieval share it. The composer's Act offer uses it already.
 2. Context ring, Changes panel with per-hunk accept, checkpoints.
 3. Model library: fits-on-this-machine, measured speed, add by name.
 4. Persona as preset (model plus Tools plus folder).
