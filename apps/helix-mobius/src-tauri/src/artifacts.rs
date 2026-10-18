@@ -348,7 +348,7 @@ mod tests {
 
     #[test]
     fn the_html_export_is_escaped_complete_and_has_no_scripts() {
-        let html = document_html("A <b>title</b>", "# Head\n\nSome **bold** and `code <x>`.\n\n- one\n- two\n\n<script>alert(1)</script>\n\n| a | b |\n|---|--:|\n| 1 | 2 |");
+        let html = document_html("A <b>title</b>", "# Head\n\nSome **bold** and `code <x>`.\n\n- one\n- two\n\n<script>alert(1)</script>\n\n| a | b |\n|---|---:|\n| 1 | 2 |");
         assert!(
             html.starts_with("<!doctype html>")
                 && html.contains("<title>A &lt;b&gt;title&lt;/b&gt;</title>")
