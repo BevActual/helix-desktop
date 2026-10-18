@@ -1849,6 +1849,10 @@ document.addEventListener("keydown", (event) => {
     const end = input.value.length;
     input.setSelectionRange(end, end);
   }
+  if (meta && event.key === "\\" && document.body.classList.contains("stage-open")) {
+    event.preventDefault();
+    toggleLayout();
+  }
   if (meta && event.key.toLowerCase() === "m" && !event.shiftKey) {
     event.preventDefault();
     openRouting();
@@ -2638,11 +2642,31 @@ function drawStageChip() {
   for (const id of ["chat", "write", "image", "code"]) $("mode-" + id).classList.toggle("active", workspace === id);
   $("workspace-btn").textContent = ({ chat: "Chat", write: "Write", image: "Image", code: "Code" })[workspace] + " ▾";
   document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code" || workspace === "image");
+  drawLayout();
   if (!stageOpen) return;
   chip.textContent = stageAttach ? `${stageOpen.title} · sent with your message ×` : `${stageOpen.title} · not sent (click to send)`;
   chip.classList.toggle("off", !stageAttach);
 }
 $("stage-chip").onclick = () => { stageAttach = !stageAttach; drawStageChip(); };
+
+// Layout: beside (chat and stage side by side) or focus (the stage fills the window and the chat floats over it as a small window, like an
+// assistant in an editor). Remembered; only meaningful while a stage is open.
+let layoutFocus = false;
+try { layoutFocus = localStorage.getItem("mobius-layout") === "focus"; } catch { /* not remembered */ }
+function drawLayout() {
+  const open = document.body.classList.contains("stage-open");
+  document.body.classList.toggle("layout-stage", open && layoutFocus);
+  $("layout-btn").hidden = !open;
+  $("layout-btn").textContent = layoutFocus ? "⤡" : "⤢";
+  $("layout-btn").title = layoutFocus ? "Chat and work side by side (Ctrl+\\)" : "Focus the work: the chat becomes a small window over it (Ctrl+\\)";
+  $("layout-btn").setAttribute("aria-label", layoutFocus ? "Show the chat beside the work" : "Focus the work");
+}
+function toggleLayout() {
+  layoutFocus = !layoutFocus;
+  try { localStorage.setItem("mobius-layout", layoutFocus ? "focus" : "beside"); } catch { /* not remembered */ }
+  drawLayout();
+}
+$("layout-btn").onclick = () => toggleLayout();
 const reactStage = window.HelixMobiusReact?.stage($("stage-doc"), {
   chatId: () => view.id,
   report: (error) => report(error),

@@ -109,3 +109,17 @@ Not done: moving a chat to a project from the page (the chat header still does i
 * Tests: five unit tests for the operations (bounds, injection-shaped JSON, the original untouched, PNG/JPEG round trip); `tools/nested/mobius-image-test.sh`.
 
 Not done: text annotation (needs a font), freehand and arrows, background removal (needs a model), layers, and a way to give the model the picture and its edit list so it can propose the next step from what it sees (the vision model can already be asked about the picture).
+
+## Focus layout (built) and the more radical directions
+
+**Focus layout.** With a stage open, a button in the header (and Ctrl+\) turns the window inside out: the stage fills it, the sidebar is a rail, and the chat becomes a small window floating over the work, an assistant in an editor rather than a document beside a conversation. The choice is remembered. This is the first layout that is not "chat with a panel": the work is the main thing and the conversation serves it. `tools/nested/mobius-stage-test.sh` checks the stage grows and the chat becomes a small window, and that it goes back.
+
+Directions that follow from "Mobius reshapes itself for the task", roughly in the order they pay off:
+
+1. **Ask on the selection, in the work.** Select text in a document and a small bar appears on it (Shorter, Rewrite, Explain, Ask…): the reply comes back as a visible change to that text, accepted or rejected in place, not as a message to copy across. The same in Code (select lines, "Edit with Mobius", the diff on the stage) and on the Image (select an area, "Describe" or a suggested edit for it). The chat dock then only needs to be a command line.
+2. **A home that knows the task.** The empty-chat welcome (eight cards) becomes a surface of places to go: the workspaces with a preview of what is in each (the last document, the last picture, the folder's changed files), what is running or waiting for approval, scheduled results that arrived, and a single "What are you doing?" box that picks the workspace from the words (the embedder in `decision-model.md`).
+3. **The dock follows the work.** In focus layout the chat dock can be dragged, collapsed to a single line (the last reply and the composer), summoned by typing anywhere on the stage, and fades while the person works; a reply that needs a decision (an approval, a suggested edit) raises it.
+4. **Pinned live panels.** A chart, a table, a checklist or a `ui` block can be pinned to the stage as a panel that stays and can be re-run ("refresh this chart from that file"): ephemeral UI that becomes a small dashboard when the person wants it to.
+5. **Voice mode** as a layout: a quiet full-window surface for talking with the model on this computer (dictation exists; read-aloud and a conversation loop come first).
+6. **The conversation as a map**: forks, side chats and the documents each made, drawn as a tree the person can walk, instead of one long scroll.
+7. **Summon from anywhere**: a key that raises Mobius over whatever window is focused and hands it that window's title and selection (the Agent Surface already knows the focused window), with the same approvals.
