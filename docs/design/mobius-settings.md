@@ -31,6 +31,21 @@ Its sections are General, Appearance, Agents, Tab, Models, Voice, Rules/Skills/S
 * **Per-model parameters with "Restore default parameters"** and per-role overrides (a subagent can inherit, use a default, or be disabled). Mobius's analogue is Summaries and Act following Chat unless set.
 * **A Beta page** for experiments, which Experiments already is.
 
+## Model types
+
+A model is built for something, and a job accepts only models built for it. `recommend.ts` (`eligible`, `specialist`) holds the rule:
+
+| Type | Does | Jobs that take it |
+|---|---|---|
+| Chat, Code, Pictures | Language models; Code ones are tuned for code, Pictures ones read images | Chat, Code, Pictures, Summaries, Act (Pictures needs one that sees) |
+| Speech | Speech to text, on the processor | Dictation |
+| Image generation | Pictures from a description | Image creation |
+| **Meaning search** (new) | Reads what text means, in about 10 ms on the processor: bge-small-en-v1.5 | Meaning search |
+
+A specialist never appears under a chat job, and a chat model never under a specialist's. Cloud models carry their own tags from OpenRouter's data: sees pictures, thinks first, uses tools, makes pictures, free, long documents.
+
+The meaning-search model is now in the library as a checked download (three files, sizes and SHA-256 written in the catalog, verified against Hugging Face's published hashes), installed to `models/embed/bge-small-en-v1.5/`. `decide.rs` looks there first, then at `$HELIX_EMBED_DIR`, then at the folder earlier versions used, and looks again until it finds one, so a model downloaded while Mobius runs is used from then on. This is the same model the knowledge store (`knowledge.md`) will use for search by meaning.
+
 ## Cloud models
 
 `cloud.rs` reads OpenRouter's public `/models` list (price, context, input and output kinds, supported parameters such as tools and reasoning) and keeps it in `~/.local/share/helix/mobius/openrouter-models.json`, so the page opens at once and works offline. It is fetched only when the person presses **Refresh the list**, or once the first time after OpenRouter has a key; over https only, and **without the key** (the list is public). A price OpenRouter writes as -1 ("depends on the request") is shown as "Price varies", never as free. The pins live in `cloud-pins.json`; the chat's model menu shows the pins (or, until there are any, a short default list) and a "More cloud models…" link. A model menu taller than the room above its button now scrolls, opened at its bottom.

@@ -13,6 +13,7 @@ const library = [
   card("looker", { memory_gb: 6, tasks: ["vision", "chat"], vision: true }),
   card("whisper", { memory_gb: 0.7, tasks: ["speech"] }),
   card("sd", { memory_gb: 5, tasks: ["image"] }),
+  card("bge", { memory_gb: 0.3, tasks: ["embedding"] }),
 ];
 
 test("chat gets the most capable model that fits the graphics card, not one that only runs on the processor", () => {
@@ -48,4 +49,11 @@ test("a model that is not in the catalog is never suggested", () => {
 test("the list shows installed models first, then by fit, then the larger", () => {
   const sorted = [card("x", { fit: "cpu", installed: false }), card("y", { installed: true, fit: "cpu" }), card("z", { fit: "gpu", memory_gb: 3 }), card("w", { fit: "gpu", memory_gb: 8 })].sort(listOrder);
   assert.deepEqual(sorted.map((c) => c.id), ["y", "w", "z", "x"]);
+});
+
+test("a meaning-search model reads text for the one job and is never offered for chat, speech or images", () => {
+  const bge = library[7];
+  assert.equal(recommend("embedding", library)?.id, "bge");
+  for (const job of ["chat", "code", "vision", "summarize", "speech", "image"] as const) assert.equal(eligible(job, bge), false, job);
+  assert.equal(eligible("embedding", library[0]), false);
 });

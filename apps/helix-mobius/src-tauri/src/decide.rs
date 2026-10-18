@@ -3,7 +3,8 @@
 //! engine to start and no chat model is swapped out. Measured in `docs/design/decision-model.md`.
 //!
 //! The model is optional: a folder with `config.json`, `tokenizer.json` and `model.safetensors` (bge-small-en-v1.5) in
-//! `$HELIX_EMBED_DIR`, else `~/.local/share/helix/embed/bge-small-en-v1.5`. Without it every answer is "not sure".
+//! `$HELIX_EMBED_DIR`, else the models folder's `embed/bge-small-en-v1.5` (Settings → Library downloads it there), else
+//! `~/.local/share/helix/embed/bge-small-en-v1.5`. Without it every answer is "not sure".
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -21,17 +22,22 @@ struct Loaded {
     decider: Decider,
 }
 
-fn model_dir() -> PathBuf {
-    std::env::var_os("HELIX_EMBED_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| crate::data_home().join("helix/embed/bge-small-en-v1.5"))
+/// Where the embedding model is: `$HELIX_EMBED_DIR`, else the models folder (what Settings → Library downloads into), else the folder
+/// earlier versions used. The first of them that holds a model wins.
+fn model_dir() -> Option<PathBuf> {
+    let from_env = std::env::var_os("HELIX_EMBED_DIR").map(PathBuf::from);
+    [
+        from_env,
+        Some(crate::library::models_dir().join("embed/bge-small-en-v1.5")),
+        Some(crate::data_home().join("helix/embed/bge-small-en-v1.5")),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|dir| dir.join("model.safetensors").exists())
 }
 
 fn load() -> Option<Loaded> {
-    let dir = model_dir();
-    if !dir.join("model.safetensors").exists() {
-        return None;
-    }
+    let dir = model_dir()?;
     let embedder = Embedder::load(&dir, Pooling::Cls).ok()?;
     let table: BTreeMap<String, Vec<String>> = serde_json::from_str(ROUTES).ok()?;
     let mut routes = Vec::new();
@@ -45,7 +51,16 @@ fn load() -> Option<Loaded> {
     Some(Loaded { embedder, decider })
 }
 
-static LOADED: OnceLock<Option<Loaded>> = OnceLock::new();
+static LOADED: OnceLock<Loaded> = OnceLock::new();
+
+/// The loaded model. Looked for again each time until there is one, so a model downloaded while Mobius runs is used from then on.
+fn loaded() -> Option<&'static Loaded> {
+    if let Some(found) = LOADED.get() {
+        return Some(found);
+    }
+    let fresh = load()?;
+    Some(LOADED.get_or_init(|| fresh))
+}
 
 #[derive(Serialize)]
 pub struct Decision {
@@ -59,7 +74,7 @@ pub fn decide(text: &str) -> Option<Decision> {
     if text.chars().count() < 6 {
         return None;
     }
-    let loaded = LOADED.get_or_init(load).as_ref()?;
+    let loaded = loaded()?;
     let vector = loaded.embedder.embed(&[text.as_str()]).ok()?.pop()?;
     let choice = loaded.decider.decide(&vector)?;
     (choice.margin >= MIN_MARGIN).then_some(Decision {
