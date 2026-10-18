@@ -2838,12 +2838,12 @@ async fn library_cancel(app: AppHandle, id: String) {
 
 #[tauri::command]
 async fn library_remove(app: AppHandle, id: String) -> Result<(), String> {
-    let model =
-        model_catalog::find(&id).ok_or("Only models from the library can be removed here.")?;
+    // A library model is known by its id; one the person added is known by its file name.
+    let file = model_catalog::find(&id).map_or(id.as_str(), |model| model.model_file());
     let routing = inference_routing::load();
     let used: Vec<&str> = ["chat", "act", "code", "summarize", "vision"]
         .into_iter()
-        .filter(|task| routing.route(task).model == model.model_file())
+        .filter(|task| routing.route(task).model == file)
         .collect();
     if !used.is_empty() {
         return Err(format!(
@@ -2854,6 +2854,33 @@ async fn library_remove(app: AppHandle, id: String) -> Result<(), String> {
     library::remove(&id)?;
     emit_library(&app).await;
     Ok(())
+}
+
+/// Asks for a `.gguf` file and adds it to the models folder. `None` when the person cancels; otherwise the name it was kept under.
+#[tauri::command]
+async fn library_import(app: AppHandle) -> Result<Option<String>, String> {
+    let added = tauri::async_runtime::spawn_blocking(|| {
+        match library::pick_model_file()? {
+            Some(path) => library::import(&path).map(Some),
+            None => Ok(None),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    emit_library(&app).await;
+    Ok(added)
+}
+
+/// Shows the models folder in the file manager.
+#[tauri::command]
+fn library_reveal() -> Result<(), String> {
+    let dir = library::models_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::process::Command::new("xdg-open")
+        .arg(&dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|_| "No file manager could be opened.".to_string())
 }
 
 /// GGUF ids from `org.helix.Inference` (empty when the service is offline).
@@ -3495,6 +3522,8 @@ fn main() {
             library_download,
             library_cancel,
             library_remove,
+            library_import,
+            library_reveal,
             image_stage,
             image_pick,
             image_data,

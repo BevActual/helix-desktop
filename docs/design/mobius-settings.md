@@ -52,8 +52,12 @@ The meaning-search model is now in the library as a checked download (three file
 
 What the other products do, from their own pages: Cursor lets you add and search models in Settings and picks one itself under **Auto**; ChatGPT shows three choices (Instant, Thinking, Pro) with automatic switching to deeper reasoning behind a Configure link; OpenRouter filters by input kind, context length and series. Mobius takes the curated switcher (Cursor) and the filters and price lines (OpenRouter), and leaves automatic switching to the decision lane in `decision-model.md`.
 
+## Adding a model you already have
+
+Library → **Add a model file…** takes a `.gguf` from this computer. It must start with the GGUF marker (a renamed document is refused) and be at least 1 KiB; its name is cleaned to letters, digits and `. - _`; a catalog file name or one already in the folder is refused. It is **hard-linked** when it is on the same disk (instant, no second copy, the original untouched), else copied under a `.part` name and renamed when whole. It is listed as **Added by you**, with the plain statement that Mobius has not checked it against a published list. It can be used for Chat, Code or Summaries and removed again (only a plain file directly in the models folder, never one the catalog owns). **Open the models folder** is there for people who prefer to drop files in. `mobius-import` tests it with a fake picker.
+
 ## Not built
 
-* Finding models that are not in the curated list: search, add by link, import a `.gguf` from disk. Anything fetched needs a pinned checksum or a clear "unverified" state, a fixed https host, a size limit, and the person's yes per download.
+* Finding models that are not in the curated list: search and add by link. Anything fetched needs a pinned checksum or a clear "unverified" state, a fixed https host, a size limit, and the person's yes per download.
 * A Knowledge section (indexed folders, reference packs) once `knowledge.md` is wired in.
 * Rules and Memory as sections (they are dialogs today).
