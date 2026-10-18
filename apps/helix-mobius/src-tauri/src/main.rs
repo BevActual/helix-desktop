@@ -1505,6 +1505,100 @@ fn code_read(app: AppHandle, path: String) -> Result<CodeFile, String> {
     })
 }
 
+#[derive(Serialize)]
+struct ProjectChat {
+    id: String,
+    title: String,
+    updated: u64,
+}
+
+#[derive(Serialize)]
+struct ProjectDocument {
+    title: String,
+    chat_id: String,
+    chat_title: String,
+}
+
+#[derive(Serialize)]
+struct ProjectCard {
+    name: String,
+    instructions: String,
+    folder: String,
+    chats: Vec<ProjectChat>,
+    documents: Vec<ProjectDocument>,
+}
+
+fn project_cards() -> Vec<ProjectCard> {
+    let lab = mobius_lab::load();
+    let summaries = summaries();
+    let mut names: std::collections::BTreeSet<String> = lab.declared_projects.clone();
+    names.extend(lab.projects.keys().cloned());
+    names.extend(lab.project_folders.keys().cloned());
+    names.extend(
+        summaries
+            .iter()
+            .filter(|s| !s.project.is_empty())
+            .map(|s| s.project.clone()),
+    );
+    let documents = artifacts::stage_all();
+    names
+        .into_iter()
+        .map(|name| {
+            let chats: Vec<&Summary> = summaries.iter().filter(|s| s.project == name).collect();
+            let documents = documents
+                .iter()
+                .filter(|d| chats.iter().any(|c| c.id == d.chat_id))
+                .map(|d| ProjectDocument {
+                    title: d.title.clone(),
+                    chat_id: d.chat_id.clone(),
+                    chat_title: d.chat_title.clone(),
+                })
+                .collect();
+            ProjectCard {
+                instructions: lab.project_instructions(&name).to_string(),
+                folder: lab.project_folder(&name).to_string(),
+                chats: chats
+                    .iter()
+                    .take(40)
+                    .map(|c| ProjectChat {
+                        id: c.id.clone(),
+                        title: c.title.clone(),
+                        updated: c.updated,
+                    })
+                    .collect(),
+                documents,
+                name,
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+fn projects_overview() -> Vec<ProjectCard> {
+    project_cards()
+}
+
+#[tauri::command]
+fn project_create(name: String) -> Result<Vec<ProjectCard>, String> {
+    let mut lab = mobius_lab::load();
+    lab.declare_project(&name)?;
+    mobius_lab::save(&lab)?;
+    Ok(project_cards())
+}
+
+#[tauri::command]
+fn project_set_folder(project: String, folder: String) -> Result<Vec<ProjectCard>, String> {
+    let checked = if folder.trim().is_empty() {
+        String::new()
+    } else {
+        terminal::workspace(&folder)?.to_string_lossy().to_string()
+    };
+    let mut lab = mobius_lab::load();
+    lab.set_project_folder(&project, &checked)?;
+    mobius_lab::save(&lab)?;
+    Ok(project_cards())
+}
+
 /// The project rules Tools mode will read from a folder (for the Tools sheet).
 #[tauri::command]
 fn tools_rules(folder: String) -> Option<rules::Rules> {
@@ -1816,6 +1910,16 @@ fn chat_set_project(app: AppHandle, project: String) -> Result<(), String> {
             return Err("Temporary chats cannot join a project.".into());
         }
         state.chat.set_project(&project, now());
+        // A project with a folder gives it to a chat that has none yet (Tools mode stays as it was).
+        if state.chat.conversation.workspace.is_empty() {
+            let lab = mobius_lab::load();
+            let folder = lab
+                .project_folder(&state.chat.conversation.project)
+                .to_string();
+            if !folder.is_empty() && terminal::workspace(&folder).is_ok() {
+                state.chat.conversation.workspace = folder;
+            }
+        }
         save(&state.chat.conversation);
     }
     emit_view(&app);
@@ -3197,6 +3301,9 @@ fn main() {
             artifacts::stage_all,
             artifacts::stage_record,
             tools_rules,
+            projects_overview,
+            project_create,
+            project_set_folder,
             code_tree,
             code_read,
             memory_list,

@@ -60,6 +60,12 @@ pub struct Lab {
     /// Project name → instructions applied to every chat in it.
     #[serde(default)]
     pub projects: BTreeMap<String, String>,
+    /// Project name → the folder its chats work in (Tools mode and the Code stage start there).
+    #[serde(default)]
+    pub project_folders: BTreeMap<String, String>,
+    /// Projects made on the Projects page before any chat is in them.
+    #[serde(default)]
+    pub declared_projects: std::collections::BTreeSet<String>,
 }
 
 /// Built-in style overlays: (id, label, instruction).
@@ -139,6 +145,38 @@ impl Lab {
             self.projects.insert(project, cleaned);
         }
         Ok(())
+    }
+
+    /// Remembers a project name so it is listed before it has a chat.
+    pub fn declare_project(&mut self, project: &str) -> Result<String, String> {
+        let project = sanitize_for_display(project.trim(), 40);
+        if project.is_empty() {
+            return Err("name the project first".into());
+        }
+        if self.declared_projects.len() >= 40 && !self.declared_projects.contains(&project) {
+            return Err("40 projects already exist".into());
+        }
+        self.declared_projects.insert(project.clone());
+        Ok(project)
+    }
+
+    /// Sets (or with an empty folder, clears) the folder a project's chats work in. The caller has already checked the folder.
+    pub fn set_project_folder(&mut self, project: &str, folder: &str) -> Result<(), String> {
+        let project = self.declare_project(project)?;
+        if folder.trim().is_empty() {
+            self.project_folders.remove(&project);
+        } else {
+            self.project_folders
+                .insert(project, folder.trim().to_string());
+        }
+        Ok(())
+    }
+
+    pub fn project_folder(&self, project: &str) -> &str {
+        self.project_folders
+            .get(project)
+            .map(String::as_str)
+            .unwrap_or("")
     }
 
     pub fn project_instructions(&self, project: &str) -> &str {
@@ -395,6 +433,17 @@ mod tests {
         assert!(lab.style_prompt("").is_none() && lab.style_prompt("nope").is_none());
         assert!(lab.is_style("") && lab.is_style("pirate") && !lab.is_style("nope"));
         assert_eq!(lab.styles().len(), BUILTIN_STYLES.len() + 1);
+    }
+
+    #[test]
+    fn projects_can_be_declared_and_given_a_folder() {
+        let mut lab = Lab::default();
+        assert_eq!(lab.declare_project("  Homelab ").unwrap(), "Homelab");
+        assert!(lab.declare_project(" ").is_err());
+        lab.set_project_folder("Homelab", "/home/a/lab").unwrap();
+        assert_eq!(lab.project_folder("Homelab"), "/home/a/lab");
+        lab.set_project_folder("Homelab", "").unwrap();
+        assert_eq!(lab.project_folder("Homelab"), "");
     }
 
     #[test]
