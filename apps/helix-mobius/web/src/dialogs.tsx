@@ -360,12 +360,12 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                   ) : null}
                   {picker?.route?.own ? (
                     <button className="hx-menu-item" data-test="menu-model-default" onClick={() => { setMenu(null); invoke("chat_use_default_route").then(() => window.dispatchEvent(new CustomEvent("mobius-route-changed")), report); }}>
-                      <span className="mi-text"><span className="mi-title">Use the default model</span><span className="mi-sub">This chat follows Models &amp; routing again</span></span>
+                      <span className="mi-text"><span className="mi-title">Use the default model</span><span className="mi-sub">This chat follows your Settings again</span></span>
                     </button>
                   ) : null}
                   <div className="hx-menu-sep" />
                   <button className="hx-menu-item" data-test="menu-model-more" onClick={() => { setMenu(null); openModelSheet(); }}><span className="mi-text"><span className="mi-title">Other backends and custom ids…</span></span></button>
-                  <button className="hx-menu-item" data-test="menu-model-routing" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models")); }}><span className="mi-text"><span className="mi-title">Models &amp; routing…</span></span></button>
+                  <button className="hx-menu-item" data-test="menu-model-routing" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models")); }}><span className="mi-text"><span className="mi-title">Settings…</span></span></button>
                 </>
               ) : menu.kind === "persona" ? (
                 <>

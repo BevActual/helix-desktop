@@ -66,9 +66,9 @@ U=$(find "$SCRATCH/state" -name usage.jsonl 2>/dev/null | head -1)
 grep -q "cron" "$U" && fail "message text leaked into the usage log" || echo "ok: the usage log holds no message text"
 echo "--- 6. experiments switch the layers off"
 click_id open-models; sleep 1.5
-wait_id models-nav-advanced && click_id models-nav-advanced; sleep 0.8
+wait_id models-nav-experiments && click_id models-nav-experiments; sleep 0.8
 wait_id experiment-style_overlays && echo "ok: the experiments are listed" || fail "no experiments panel"
 click_id experiment-style_overlays; sleep 0.8
-click_id models-save; sleep 1.5
+click_id models-back; sleep 1.5
 click_id meta-more; sleep 0.5; has_id menu-more-style && fail "the style entry stayed after turning the experiment off" || echo "ok: turning style overlays off removes the chip"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

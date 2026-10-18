@@ -74,8 +74,9 @@ const SLASH_COMMANDS = [
   { cmd: "/new", desc: "Start a new chat", run: () => invoke("chat_new").then(() => { input.focus(); closeSideDrawer(); }) },
   { cmd: "/temp", desc: "Temporary chat (not saved)", run: () => invoke("chat_temporary").then(() => { input.focus(); closeSideDrawer(); }) },
   { cmd: "/model", desc: "Pick chat model / backend", run: () => openModelPicker() },
-  { cmd: "/models", desc: "Models & routing page", run: () => openRouting() },
-  { cmd: "/route", desc: "Models & routing page", run: () => openRouting() },
+  { cmd: "/settings", desc: "Settings: models, providers, generation", run: () => openRouting() },
+  { cmd: "/models", desc: "Settings: choose and get models", run: () => openRouting("models") },
+  { cmd: "/route", desc: "Settings: where each job runs", run: () => openRouting("models") },
   { cmd: "/attach", desc: "Attach text / source files", run: () => pickAttachments() },
   { cmd: "/web", desc: "Pick online sources yourself", run: (text) => { openWeb(text.replace(/^\/web\s*/i, "")); return Promise.resolve(); } },
   { cmd: "/remember", desc: "Remember something in every chat (local models only)", run: (typed) => {
@@ -1973,7 +1974,7 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     toggleLayout();
   }
-  if (meta && event.key.toLowerCase() === "m" && !event.shiftKey) {
+  if (meta && !event.shiftKey && (event.key.toLowerCase() === "m" || event.key === ",")) {
     event.preventDefault();
     openRouting();
   }
@@ -2339,7 +2340,7 @@ function closeModelsPage() {
   modelsDirty = false;
 }
 
-// The Models & routing page is React when the bundle is present; the hand-written page below is the fallback.
+// The Settings page is React when the bundle is present; the hand-written page below is the fallback.
 const reactModels = window.HelixMobiusReact
   ? window.HelixMobiusReact.models($("models-page"), {
     visible: (shown) => {
@@ -2391,10 +2392,10 @@ $("open-analysis").onclick = () => {
 };
 $("analysis-evidence").onclick = () => reactAnalysis?.open(view.analysis_job);
 
-async function openRouting() {
+async function openRouting(section) {
   closeHubMenu();
   closeSideDrawer();
-  if (reactModels) { reactModels.open(); return; }
+  if (reactModels) { reactModels.open(section); return; }
   await invoke("routing_ensure_openrouter").catch(() => {});
   const routing = await invoke("routing_get");
   const lan = (routing.backends || []).find((b) => b.id === "lan");
@@ -2737,7 +2738,7 @@ function paletteItems(query) {
   act("mode-tools", "Mode: Tools", "Research and project commands, each step reviewed", "", () => setComposerMode("tools"));
   act("mode-act", "Mode: Act", "Do the next message on the desktop", "", () => setComposerMode("act"));
   act("model", "Choose model", "This chat's model", "", () => $("meta-model").click());
-  act("routing", "Models & routing", "", "Ctrl+M", () => openRouting().catch(report));
+  act("routing", "Settings", "Models, providers and how replies are written", "Ctrl+,", () => openRouting().catch(report));
   act("ws-chat", "Workspace: Chat", "Just the conversation", "", () => setWorkspace("chat"));
   act("ws-write", "Workspace: Write", "A document beside the chat", "", () => setWorkspace("write"));
   act("ws-image", "Workspace: Image", "Edit a picture beside the chat", "", () => setWorkspace("image"));

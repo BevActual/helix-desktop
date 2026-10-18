@@ -940,7 +940,7 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
     if with_pictures && !is_local {
         shared(&app).lock().expect("state").chat.failed_to_start(
             turn.generation,
-            "Pictures are only read by a model on this computer. Set the vision route to a local model in Models & routing.",
+            "Pictures are only read by a model on this computer. Set the vision route to a local model in Settings → Models.",
         );
         emit_view(&app);
         return Ok(());
@@ -966,7 +966,7 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
         if !routing.allow_remote_on_battery_saver && power_saver_active() {
             shared(&app).lock().expect("state").chat.failed_to_start(
                 turn.generation,
-                "Battery saver is on. Enable “Allow remote on battery saver” in Models & routing, or use a local route.",
+                "Battery saver is on. Turn on “Use other providers when battery saver is on” in Settings → Generation, or use a model on this computer.",
             );
             emit_view(&app);
             return Ok(());
@@ -994,7 +994,7 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
         if base.contains("openrouter.ai") && api_key.is_none() {
             shared(&app).lock().expect("state").chat.failed_to_start(
                 turn.generation,
-                "Add an OpenRouter API key in Models & routing.",
+                "Add an OpenRouter API key in Settings → Models.",
             );
             emit_view(&app);
             return Ok(());
@@ -1150,7 +1150,7 @@ async fn dictate_stop(app: AppHandle) -> Result<String, String> {
         .map_err(|e| {
             let text = e.to_string();
             if text.contains("speech") {
-                "Speech to text is not set up. Get the speech model from Models & routing."
+                "Speech to text is not set up. Get the speech model in Settings → Models."
                     .to_string()
             } else {
                 text
@@ -1165,7 +1165,7 @@ async fn dictate_stop(app: AppHandle) -> Result<String, String> {
             .and_then(|v| v.as_str())
             .unwrap_or("The transcription failed.");
         return Err(if reason.contains("no speech model") {
-            "No speech model is installed. Get “Whisper small” from Models & routing.".to_string()
+            "No speech model is installed. Get “Whisper small” in Settings → Models.".to_string()
         } else {
             reason.to_string()
         });
@@ -2151,7 +2151,7 @@ fn chat_set_route(
             return Err("Chat backend must be local or OpenAI-compatible.".into());
         }
         if b.kind == BackendKind::Openai && b.base_url.trim().is_empty() {
-            return Err("That backend has no URL yet. Set it in Models & routing.".into());
+            return Err("That backend has no URL yet. Set it in Settings → Models.".into());
         }
         b.id
     };
@@ -2167,7 +2167,7 @@ fn chat_set_route(
         if state.chat.is_streaming() {
             return Err("Stop or finish the current reply before changing its model.".into());
         }
-        // This chat only: other chats keep following the default routing (Models & routing).
+        // This chat only: other chats keep following the default routing (Settings).
         state.chat.set_route(&backend, &model);
         if !state.chat.temporary {
             save(&state.chat.conversation);
@@ -3100,7 +3100,7 @@ async fn chat_generate_image(
         || !library::models_dir().join("image").join(&model).is_file()
     {
         return Err(
-            "Download SD-Turbo from Models & routing → My computer before generating pictures."
+            "Get SD-Turbo in Settings → Models before generating pictures."
                 .into(),
         );
     }
