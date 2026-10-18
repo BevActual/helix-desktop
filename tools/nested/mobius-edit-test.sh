@@ -20,6 +20,7 @@ shot() { niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$S
 idle() { sleep 1; for _ in $(seq 1 80); do ! has_id stop && break; sleep 0.25; done; sleep 1; }
 NOTES=$SCRATCH/home/project/notes.txt
 printf 'alpha\nbeta\n' > "$NOTES"
+printf 'Always answer in French.\n' > "$SCRATCH/home/project/AGENTS.md"
 wait_id mode
 click_id mode
 wait_id menu-mode-folder
@@ -27,6 +28,7 @@ click_id menu-mode-folder
 wait_id tools-panel
 click_id tools-enabled
 click_id tools-choose
+wait_id tools-rules && echo "ok: the Tools sheet shows the project's rules" || { echo 'FAIL: no rules in the sheet'; exit 1; }
 click_id tools-save
 echo "--- an edit is shown as a diff and waits for review"
 printf '[{"tool":"edit_file","path":"notes.txt","old":"beta","new":"gamma"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"

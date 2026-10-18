@@ -9,6 +9,11 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
   const [folder, setFolder] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [rules, setRules] = useState<{ file: string; text: string; total_chars: number } | null>(null);
+  useEffect(() => {
+    if (!folder) { setRules(null); return; }
+    invoke<{ file: string; text: string; total_chars: number } | null>("tools_rules", { folder }).then(setRules, () => setRules(null));
+  }, [folder]);
   useEffect(() => { register({ open: (snapshot) => { setView(snapshot); setEnabled(snapshot.tools_enabled); setFolder(snapshot.workspace || ""); setError(""); dialog.current?.showModal(); } }); }, [register]);
   const choose = async () => { setBusy(true); setError(""); try { const path = await invoke<string | null>("tools_pick_folder"); if (path) setFolder(path); } catch (reason) { setError(String(reason)); } finally { setBusy(false); } };
   const save = async () => { if (!view) return; setBusy(true); setError(""); try { await invoke("tools_configure", { chatId: view.id, enabled, workspace: folder }); dialog.current?.close(); } catch (reason) { setError(String(reason)); } finally { setBusy(false); } };
@@ -23,6 +28,11 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
         <span className="tools-row-text"><strong>Project folder</strong><code data-test="tools-folder">{folder || "None: web only"}</code></span>
         <span className="tools-row-actions"><button type="button" data-test="tools-choose" disabled={busy || view?.streaming} onClick={choose}>Choose…</button><button type="button" disabled={!folder || busy || view?.streaming} onClick={() => setFolder("")}>Clear</button></span>
       </div>
+      {rules && <details className="tools-rules" data-test="tools-rules">
+        <summary><strong>Project rules</strong> · {rules.file} · {rules.total_chars.toLocaleString()} characters{rules.total_chars > rules.text.length ? " (the first 4,000 are used)" : ""}</summary>
+        <pre>{rules.text}</pre>
+        <p className="sheet-note">The project's own guidance for assistants. Tools mode follows it as guidance; every command and edit still waits for your review.</p>
+      </details>}
       <p className="sheet-note">Commands can read and change this folder. They get no network, home folder or desktop session. Tool results are sent to the chat model.</p>
       <details className="tools-desk">
         <summary>Agent desk</summary>

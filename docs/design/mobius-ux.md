@@ -203,3 +203,7 @@ Still to do: a search box in the menu for the full OpenRouter catalog (and per-m
 ### Thinking, folded (done)
 
 A reasoning model (Qwen3, DeepSeek-R1 and the like) writes `<think>…</think>` before its answer; it used to print raw. It is now a folded "Thought it through" row above the answer (open as "Thinking…" while it is written), the answer reads as the reply, and the thinking is **not sent back** as history, not used for the chat's auto-title and not in the Markdown export. Only a tag at the very start counts. `markdown::split_thinking` / `parse_reply` (unit tested), `tools/nested/mobius-think-test.sh`.
+
+### Project rules for Tools mode (done)
+
+Like Cursor's rules and `AGENTS.md`: when the chat's project folder holds `AGENTS.md`, `.helix/rules.md` or `.cursorrules` (first found; a regular file, not a link, under 64 KiB), Tools mode gives its first 4,000 characters to the planner and to the answer. The Tools sheet shows the file, its size and its text, so nothing is hidden. It is framed as guidance from the project, lower priority than the person's request, and it never removes the review of commands and edits (a cloned repository's rules file is text someone else wrote). `rules.rs` (unit tested), `mobius-edit-test.sh` checks the sheet shows it.

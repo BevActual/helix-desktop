@@ -14,6 +14,7 @@ mod images;
 mod lan;
 mod library;
 mod output;
+mod rules;
 mod secrets;
 mod terminal;
 mod web;
@@ -1440,6 +1441,13 @@ fn memory_remove(id: u64) -> Vec<helix_chat::memory::Item> {
         let _ = memory.save(&memory_file());
     }
     memory.items
+}
+
+/// The project rules Tools mode will read from a folder (for the Tools sheet).
+#[tauri::command]
+fn tools_rules(folder: String) -> Option<rules::Rules> {
+    let root = terminal::workspace(&folder).ok()?;
+    rules::read(&root)
 }
 
 /// One row of the composer's `@` picker: a file in the chat's project folder, or another chat.
@@ -3106,6 +3114,7 @@ fn main() {
             tools_open_desk_terminal,
             tools_review,
             tools_undo_edit,
+            tools_rules,
             memory_list,
             memory_add,
             memory_remove,
