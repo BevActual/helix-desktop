@@ -112,3 +112,8 @@ What each does that a local, private desktop assistant could use, and what we le
 2. Context ring, Changes panel with per-hunk accept, checkpoints.
 3. Model library: fits-on-this-machine, measured speed, add by name.
 4. Persona as preset (model plus Tools plus folder).
+
+
+### Charts in replies (done)
+
+A reply can show numbers as a chart: a fenced block labelled `chart` holding JSON (`type` bar, line or pie; `labels` and `values`, or `series` of named values, or `data` pairs). Mobius draws it as an SVG from fixed shapes, with hover values, an accessible description and the theme's colours; the model only writes data and nothing it sends is run. Up to 60 points and 6 series; a block that does not parse stays an ordinary code block (so a small model's malformed JSON costs nothing). The system prompt says how in one sentence. `apps/helix-mobius/web/src/chart.tsx`, `tools/nested/mobius-chart-test.sh`. Next in the same family: diagrams from a few lines of text, and the side panel that keeps what was made.
