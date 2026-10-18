@@ -290,10 +290,28 @@ mod tests {
 
     #[test]
     fn only_expected_names_are_safe() {
-        for good in ["a-b_c.1.gguf", "speech/ggml-small-q5_1.bin", "image/x.gguf", "embed/bge-small-en-v1.5/model.safetensors", "embed/m/config.json"] {
+        for good in [
+            "a-b_c.1.gguf",
+            "speech/ggml-small-q5_1.bin",
+            "image/x.gguf",
+            "embed/bge-small-en-v1.5/model.safetensors",
+            "embed/m/config.json",
+        ] {
             assert!(safe_file_name(good), "{good}");
         }
-        for bad in ["", ".hidden.gguf", "../x.gguf", "a/b.gguf", "speech/x.gguf", "embed/m/evil.json", "embed/m/n/config.json", "embed//config.json", "embed/../config.json", "embed/m/model.safetensors/", "a b.gguf"] {
+        for bad in [
+            "",
+            ".hidden.gguf",
+            "../x.gguf",
+            "a/b.gguf",
+            "speech/x.gguf",
+            "embed/m/evil.json",
+            "embed/m/n/config.json",
+            "embed//config.json",
+            "embed/../config.json",
+            "embed/m/model.safetensors/",
+            "a b.gguf",
+        ] {
             assert!(!safe_file_name(bad), "{bad}");
         }
     }
