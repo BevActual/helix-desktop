@@ -42,6 +42,15 @@ function bucket(item: ChatItem, now: number): string {
   if (age < 30 * day) return "Previous 30 days";
   return "Earlier";
 }
+/** When a chat was last touched, in the fewest words that place it: the time today, the weekday this week, the date after that. */
+function when(updated: number | string | undefined, now: number): string {
+  const t = Number(updated || 0);
+  if (!t) return "";
+  const date = new Date(t * 1000), age = now - t, day = 86_400;
+  if (age < day && date.toDateString() === new Date(now * 1000).toDateString()) return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (age < 7 * day) return date.toLocaleDateString([], { weekday: "short" });
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
 function sectionOf(item: ChatItem, index: number, all: ChatItem[], now: number): string {
   const mine = bucket(item, now);
   return index === 0 || bucket(all[index - 1], now) !== mine ? mine : "";
@@ -119,7 +128,17 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
           <button key={name} type="button" className={`project-pill${project === name ? " active" : ""}`} onClick={() => setProject(name)}>{name}</button>
         ))}
       </div>
-      <nav id="chats" data-test="chats">
+      <nav id="chats" data-test="chats" onKeyDown={(event) => {
+        // Up and Down walk the list, Home and End jump to its ends; Enter opens the one that has the focus (it is a button).
+        const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
+        if (!keys.includes(event.key)) return;
+        const rows = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(".chat-open"));
+        const at = rows.indexOf(document.activeElement as HTMLButtonElement);
+        if (rows.length === 0) return;
+        event.preventDefault();
+        const next = event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1 : event.key === "ArrowDown" ? Math.min(rows.length - 1, at + 1) : Math.max(0, at - 1);
+        rows[next]?.focus();
+      }}>
         {!shown.length ? <div className="chat-empty" role="status" data-test="chat-search-status">{pending ? "Searching chats…" : searchError || (lower || project ? "No matching chats" : "No chats yet")}</div> : null}
         {shown.map((item, index) => {
           const snippet = snippets[item.id] || (lower && item.preview) || "";
@@ -135,10 +154,14 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
                     .catch(hooksRef.current.report);
                 }}
               >
-                {item.pinned ? <span className="chat-pin-mark"><Icon name="pin" /></span> : null}
-                <span className="chat-open-title">{item.title}</span>
+                <span className="chat-open-line">
+                  {item.pinned ? <span className="chat-pin-mark"><Icon name="pin" /></span> : null}
+                  <span className="chat-open-title">{item.title}</span>
+                  {!searching ? <span className="chat-open-when">{when(item.updated, now)}</span> : null}
+                </span>
+                {snippet && lower ? <span className="chat-open-snippet">{snippet}</span>
+                  : !searching && item.preview && item.preview.trim() !== (item.title || "").trim() ? <span className="chat-open-preview">{item.preview}</span> : null}
                 {item.project ? <span className="chat-open-project">{item.project}</span> : null}
-                {snippet && lower ? <span className="chat-open-snippet">{snippet}</span> : null}
               </button>
               <button
                 className="chat-delete"

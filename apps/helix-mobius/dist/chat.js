@@ -1728,6 +1728,37 @@ function openMoreMenu() {
   setTimeout(() => { window.addEventListener("mousedown", close, true); window.addEventListener("keydown", esc, true); }, 0);
 }
 $("meta-more").onclick = () => openMoreMenu();
+// "+" beside the composer: one place for everything that adds to a message (the microphone stays where it is wanted most, beside Send).
+function openPlusMenu() {
+  document.querySelectorAll(".plus-menu").forEach((m) => m.remove());
+  const box = $("plus").getBoundingClientRect();
+  const menu = el("div", "hx-menu plus-menu");
+  menu.dataset.test = "menu-plus";
+  menu.style.left = Math.max(8, box.left) + "px";
+  menu.style.bottom = (window.innerHeight - box.top + 8) + "px";
+  menu.style.minWidth = "250px";
+  const add = (id, title, sub, hint, run) => {
+    const b = el("button", "hx-menu-item");
+    b.type = "button";
+    b.dataset.test = "menu-plus-" + id;
+    const text = el("span", "mi-text");
+    text.append(el("span", "mi-title", title), el("span", "mi-sub", sub));
+    b.append(text);
+    if (hint) b.append(el("kbd", "", hint));
+    b.onclick = () => { menu.remove(); run(); };
+    menu.append(b);
+  };
+  add("files", "Attach files", "Text or source files", "Ctrl+U", () => $("attach").click());
+  add("picture", "Add a picture", "For a model that sees", "", () => $("attach-picture").click());
+  add("image", "Create an image", "Described, then made here", "", () => openCreateImage());
+  add("web", "Pick online sources", "Choose pages to ask about", "", () => openWeb());
+  document.body.append(menu);
+  const close = (event) => { if (!menu.contains(event.target)) { menu.remove(); window.removeEventListener("mousedown", close, true); window.removeEventListener("keydown", esc, true); } };
+  const esc = (event) => { if (event.key === "Escape") { menu.remove(); window.removeEventListener("mousedown", close, true); window.removeEventListener("keydown", esc, true); input.focus(); } };
+  setTimeout(() => { window.addEventListener("mousedown", close, true); window.addEventListener("keydown", esc, true); }, 0);
+}
+$("plus").onclick = () => openPlusMenu();
+
 $("meta-model").onclick = () => {
   // A small menu above the chip: one click switches. The full sheet (other backends, a custom id) is its last row.
   if (!reactDialogs) { openModelPicker().catch(report); return; }
