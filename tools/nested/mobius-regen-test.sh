@@ -37,4 +37,13 @@ R=$(CHAT)
 [ "${R##*|}" = "2" ] && echo "ok: the reply was replaced, not added to" || fail "message count: $R"
 [ "$(echo "$R" | cut -d"|" -f3)" = "fake-model" ] && echo "ok: the new reply says it was written by the chosen model" || fail "reply model: $R"
 case "$R" in "||"*) echo "ok: the chat's own model choice was not changed";; *) fail "the chat's route changed: $R";; esac
+echo "--- the replaced answer is kept, and the two can be compared"
+wait_id compare-bar 20 && echo "ok: the old answer was kept (Compare is offered)" || fail "no compare bar"
+click_id compare-open
+wait_id compare-view && wait_id compare-current && wait_id compare-other && echo "ok: the two answers are side by side" || fail "no compare view"
+shot compare; sleep 1; shot compare
+click_id compare-keep-other; sleep 2
+R2=$(CHAT)
+[ "$(echo "$R2" | cut -d"|" -f3)" = "" ] && echo "ok: Keep this one swapped the other answer in (its model is now on the reply)" || fail "after keep: $R2"
+wait_id compare-bar 20 && echo "ok: and the one it replaced is kept, so the choice can be undone" || fail "no alternative after the swap"
 [ "$FAILED" = 0 ] && echo "PASS: mobius regen" || exit 1
