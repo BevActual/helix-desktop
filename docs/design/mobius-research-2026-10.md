@@ -58,3 +58,43 @@ Every action in the ChatGPT app is a named command with a one-line description t
 * Plans, credits, usage meters and upgrade banners: nothing here is sold.
 * Telemetry and account-tied settings.
 * Cursor's and ChatGPT's own system prompts and tool schemas: not read, and not wanted.
+
+# How Cursor builds its tools around the agent
+
+Read the same way (the installed copy's extension manifests, the message and tool names in its agent bundle, and the native helper's strings). Cursor's terminal, browser, file explorer and checkout code are **ordinary tools the agent calls through one typed interface**, not features the agent is bolted on to.
+
+## Shape
+
+* **The agent runs in its own process**, apart from the interface (an "AgentExec" extension host), with separate services for retrieval (indexing and search), a file service, MCP, and a local-inference runtime "outside workspace extension hosts". The explorer extension is 20 KB: the file tree is a view, and the agent's file tools are what act on files.
+* **Every tool is a typed request with an enumerated result.** The vocabulary is small: list, read, write (edit), delete, grep, shell (streamed), background shell and write-to-its-stdin, diagnostics (from the language server), fetch, MCP, request-context, computer use, record screen. Each result is one of a fixed set, such as `success`, `file_not_found`, `read_permission_denied`, `write_permission_denied`, **`rejected`** (the person declined), `sandbox_unsupported`, `error`. Declining is a normal result the interface shows, not an exception.
+* **The browser is an MCP server** that the agent uses like any other tool (driven through the browser's debugging protocol): `snapshot` (the page as an accessibility tree, which is how the agent reads it), navigate, click, fill, fill form, type, hover, drag, scroll, select, press key, tabs, screenshot, bounding box, **highlight** (show the person what is about to be touched) and **lock** (so the person's own clicks do not collide with the agent's).
+* **Policy is layered and visible.** A sandboxing mode; **network** as an allowlist of domains with a separate "full network" request; whether git is sandboxed; a **read boundary** with an allowlist of extra paths the person may allow; a **command classifier** that returns each command's parts, a suggested sandbox mode and a **suggested allowlist entry** ("always allow this"); a command blocklist that always asks; per-MCP-server and per-tool allowlists; a browser allowlist; and a "smart" approval mode that decides routine requests and asks only about the rest.
+* **A hidden "shadow workspace" and worktrees** let an agent get diagnostics or work in parallel without touching the person's files.
+
+## The native sandbox helper (`cursorsandbox`, a static Rust binary, read with `strings`)
+
+* Two backends chosen automatically: **Landlock** (filesystem rules, no privileges needed) and **bubblewrap** with user namespaces, with a **preflight** that exits 2 when the computer cannot sandbox, so the interface can say so before running anything.
+* **seccomp** filters: one blocks the network, one blocks "dangerous syscalls". Capabilities are dropped; the process dies with its parent.
+* The policy is one JSON file: workspace **read-write** or **read-only**, plus an optional network policy.
+* **Config folders are blackholed**: an empty read-only directory is mounted over `.vscode`, `.idea`, `.cursorrules`, `worktrees`, `skills` and `agents`, so a command cannot rewrite the agent's own instructions.
+* **Network goes through a local proxy** with a domain deny list and allow list, reached by a forwarder inside the sandbox; direct sockets are blocked.
+
+## Where Helix stands
+
+Helix already has the pieces Cursor lacks: the **Agent Surface** (typed actions with tiers, grants and undo), a **compositor-enforced approval dialog** that a client cannot imitate (`trusted-surface.md`), and desktop control behind a confirmer. Mobius's Tools-mode terminal (`terminal.rs`) is stricter than Cursor's default: bubblewrap with `--unshare-all` (no network at all), all capabilities dropped, system folders read-only, the project mounted at `/workspace`, a cleared environment, no stdin.
+
+What Cursor's design suggests adding, in order of value:
+
+| # | Idea | Size |
+|---|---|---|
+| 1 | **Typed tool results with `rejected` and `sandbox_unsupported`** across Mobius's tools, so declining and "cannot confine here" are results the thread shows, and a preflight that says whether sandboxing works before offering Tools mode | S |
+| 2 | **Protect the project's own control files**: bind read-only (or blackhole) `.git/hooks`, `.git/config`, `.helix*` and the like inside the sandbox, so an approved command cannot plant a hook that runs later outside it | S |
+| 3 | **Read-only mode** for commands that only look (`ls`, `grep`, `git log`), chosen by a small classifier, writable only when needed | S |
+| 4 | **"Always allow this command"**: the classifier splits a command into parts and proposes an allowlist entry (`git status`, `cargo test`), stored per project and shown in Settings, so routine commands stop asking while the rest still do | M |
+| 5 | **A seccomp filter** (a deny list of syscalls such as `ptrace`, `keyctl`, `io_uring`, `bpf`) added to the bubblewrap run | M |
+| 6 | **Network by allowlist** instead of none: a local proxy that permits named domains (a package registry, for one approved install) and logs each request, shown in the thread | L |
+| 7 | **The browser stage as a tool**: page text and an accessibility-tree snapshot as the agent's view, **highlight before acting**, and a **lock** while it acts; page text stays untrusted data | L |
+| 8 | **Background commands** that keep running with their output followed, and a way to send them input | M |
+| 9 | **A scratch copy or a git worktree** for an agent's edits, shown as a reviewed change, so a long task cannot half-edit the real project | M |
+
+Not copied: Cursor's cloud agents, team policy and referral machinery, and its own system prompts and tool schemas (not read).
