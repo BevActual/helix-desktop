@@ -3,6 +3,7 @@ import { invoke } from "@helix/ui";
 import { eligible, listOrder, reason, recommend, specialist, type Job, type ModelCard } from "./recommend";
 import { CloudModels, type CloudView } from "./cloudmodels";
 import { Icon, Picker, type Option } from "./settingsui";
+import { HubFind } from "./hubfind";
 
 type Source = "local" | "lan" | "openrouter";
 type Section = "models" | "library" | "cloud" | "providers" | "generation" | "experiments";
@@ -283,6 +284,7 @@ function Library({ cards, draft, filter, setFilter, onAssign, act, report }: {
         <button type="button" data-test="lib-folder" onClick={() => invoke("library_reveal").catch(report)}>Open the models folder</button>
         <span className="set-hint">A <code>.gguf</code> file you already have. Mobius checks that it is one and keeps your original.</span>
       </div>
+      <HubFind report={report} />
       {added ? <p className="set-offer" data-test="lib-added"><span className="set-offer-text"><span><strong>{added}</strong> was added. It is not checked against a published list, so Mobius cannot say what it is or whether it is intact.</span></span></p> : null}
       <div className="lib-chips" role="group" aria-label="Filter models">
         {FILTERS.map((f) => (

@@ -52,6 +52,89 @@ pub struct Downloads {
     jobs: Mutex<HashMap<String, Job>>,
 }
 
+/// What a download needs: an id for its progress, and for each file its name here, where it comes from, its size and its checksum.
+/// A catalog model becomes one; so does a model chosen from Hugging Face, whose checksum comes from Hugging Face's own listing.
+#[derive(Clone, Debug)]
+pub struct Spec {
+    pub id: String,
+    pub files: Vec<SpecFile>,
+    /// Where a model that is not in the catalog came from, written beside it once it is whole and checked.
+    pub source: Option<Source>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SpecFile {
+    pub name: String,
+    pub url: String,
+    pub sha256: String,
+    pub bytes: u64,
+}
+
+/// The place a downloaded model came from.
+#[derive(Clone, Debug, Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct Source {
+    pub repo: String,
+    pub license: String,
+}
+
+impl Spec {
+    pub fn bytes(&self) -> u64 {
+        self.files.iter().map(|f| f.bytes).sum()
+    }
+
+    fn from_catalog(model: &CatalogModel) -> Spec {
+        Spec {
+            id: model.id.to_string(),
+            files: model
+                .files
+                .iter()
+                .map(|f| SpecFile {
+                    name: f.name.to_string(),
+                    url: f.url.to_string(),
+                    sha256: f.sha256.to_string(),
+                    bytes: f.bytes,
+                })
+                .collect(),
+            source: None,
+        }
+    }
+}
+
+/// Whether every file of `spec` is already in the models folder, whole.
+pub fn spec_installed(spec: &Spec) -> bool {
+    let dir = models_dir();
+    spec.files
+        .iter()
+        .all(|f| installed_size(&dir, &f.name) == Some(f.bytes))
+}
+
+/// Free space on the disk the models folder is on, in bytes, when it can be read.
+pub fn free_bytes() -> Option<u64> {
+    let dir = models_dir();
+    std::fs::create_dir_all(&dir).ok()?;
+    let out = std::process::Command::new("df")
+        .args(["--output=avail", "-B1"])
+        .arg(&dir)
+        .output()
+        .ok()?;
+    String::from_utf8(out.stdout)
+        .ok()?
+        .lines()
+        .nth(1)?
+        .trim()
+        .parse()
+        .ok()
+}
+
+/// Hosts a download may be redirected to: Hugging Face's own, over https. A redirect anywhere else stops the download.
+pub fn trusted_host(host: &str) -> bool {
+    let host = host.to_ascii_lowercase();
+    host == "huggingface.co"
+        || host == "hf.co"
+        || host.ends_with(".huggingface.co")
+        || host.ends_with(".hf.co")
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct Card {
     /// The catalog id, or the file name for a model that was put there by hand.
@@ -147,18 +230,23 @@ pub fn list(downloads: &Downloads, loaded: &[String]) -> Vec<Card> {
                 .copied(),
         })
         .collect();
+    let sources = load_sources(&dir);
     for (name, bytes) in unknown_models(&dir) {
         let stem = name.trim_end_matches(".gguf").to_string();
         let stem_for_speed = stem.clone();
+        let source = sources.get(&name);
         cards.push(Card {
             id: name.clone(),
             file: name.clone(),
             title: stem,
-            maker: String::new(),
-            blurb: "Added by you. Not checked against a published list, so Mobius cannot say what it is or whether it is intact.".into(),
+            maker: source.map(|s| s.repo.clone()).unwrap_or_default(),
+            blurb: match source {
+                Some(s) => format!("From huggingface.co/{}. Checked against the checksum Hugging Face publishes for it.", s.repo),
+                None => "Added by you. Not checked against a published list, so Mobius cannot say what it is or whether it is intact.".into(),
+            },
             tasks: vec!["chat".into()],
             vision: false,
-            license: String::new(),
+            license: source.map(|s| s.license.clone()).unwrap_or_default(),
             bytes,
             memory_gb: 0.0,
             installed: true,
@@ -169,6 +257,32 @@ pub fn list(downloads: &Downloads, loaded: &[String]) -> Vec<Card> {
                 .word()
                 .into(),
             speed: speeds.get(&stem_for_speed).copied(),
+        });
+    }
+    // Downloads of models that are not in the catalog (from Hugging Face) show as a card while they run.
+    for (id, job) in jobs.iter() {
+        if model_catalog::find(id).is_some() || cards.iter().any(|c| &c.id == id) {
+            continue;
+        }
+        cards.push(Card {
+            id: id.clone(),
+            file: id.clone(),
+            title: id.trim_end_matches(".gguf").to_string(),
+            maker: String::new(),
+            blurb: "Downloading from Hugging Face.".into(),
+            tasks: vec!["chat".into()],
+            vision: false,
+            license: String::new(),
+            bytes: job.progress.total,
+            memory_gb: 0.0,
+            installed: false,
+            loaded: false,
+            in_catalog: false,
+            progress: Some(job.progress.clone()),
+            fit: crate::hardware::fit(crate::hardware::needed_gb(0.0, job.progress.total), memory)
+                .word()
+                .into(),
+            speed: None,
         });
     }
     cards
@@ -208,10 +322,21 @@ pub fn start(
     notify: impl Fn() + Send + Sync + 'static,
 ) -> Result<(), String> {
     let model = model_catalog::find(id).ok_or("That model is not in the library.")?;
-    let dir = models_dir();
-    if complete(&dir, model) {
+    if complete(&models_dir(), model) {
         return Err("Already installed.".into());
     }
+    start_spec(downloads, Spec::from_catalog(model), notify)
+}
+
+/// Starts a download of the files in `spec`. Returns an error if it is already running.
+pub fn start_spec(
+    downloads: &Arc<Downloads>,
+    spec: Spec,
+    notify: impl Fn() + Send + Sync + 'static,
+) -> Result<(), String> {
+    let dir = models_dir();
+    let id = spec.id.clone();
+    let id = id.as_str();
     let cancel = Arc::new(AtomicBool::new(false));
     {
         let mut jobs = downloads.jobs.lock().expect("downloads");
@@ -227,7 +352,7 @@ pub fn start(
                 progress: Progress {
                     phase: Phase::Downloading,
                     done: 0,
-                    total: model.bytes(),
+                    total: spec.bytes(),
                     error: String::new(),
                 },
                 cancel: cancel.clone(),
@@ -237,9 +362,12 @@ pub fn start(
     let downloads = downloads.clone();
     let id = id.to_string();
     tauri::async_runtime::spawn(async move {
-        let result = run(&downloads, model, &dir, &cancel, &notify).await;
+        let result = run(&downloads, &spec, &dir, &cancel, &notify).await;
         match result {
             Ok(()) => {
+                if let Some(source) = &spec.source {
+                    record_source(&dir, &spec, source);
+                }
                 downloads.jobs.lock().expect("downloads").remove(&id);
             }
             Err(error) if cancel.load(Ordering::Relaxed) => {
@@ -252,7 +380,7 @@ pub fn start(
                 Progress {
                     phase: Phase::Failed,
                     done: 0,
-                    total: model.bytes(),
+                    total: spec.bytes(),
                     error,
                 },
             ),
@@ -264,7 +392,7 @@ pub fn start(
 
 async fn run(
     downloads: &Downloads,
-    model: &'static CatalogModel,
+    model: &Spec,
     dir: &Path,
     cancel: &AtomicBool,
     notify: &(impl Fn() + Send + Sync),
@@ -273,13 +401,22 @@ async fn run(
     let total = model.bytes();
     let mut finished: u64 = 0;
     let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(5))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            let allowed = attempt.previous().len() < 5
+                && attempt.url().scheme() == "https"
+                && attempt.url().host_str().is_some_and(trusted_host);
+            if allowed {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
         .connect_timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())?;
-    for file in model.files {
-        let target = dir.join(file.name);
-        if installed_size(dir, file.name) == Some(file.bytes) {
+    for file in &model.files {
+        let target = dir.join(&file.name);
+        if installed_size(dir, &file.name) == Some(file.bytes) {
             finished += file.bytes;
             continue;
         }
@@ -294,7 +431,7 @@ async fn run(
             have = 0;
         }
         if have < file.bytes {
-            let mut request = client.get(file.url);
+            let mut request = client.get(&file.url);
             if have > 0 {
                 request = request.header("Range", format!("bytes={have}-"));
             }
@@ -307,7 +444,7 @@ async fn run(
                 let _ = std::fs::remove_file(&part);
                 have = 0;
                 response = client
-                    .get(file.url)
+                    .get(&file.url)
                     .send()
                     .await
                     .map_err(|_| "Could not reach the download server.".to_string())?;
@@ -349,7 +486,7 @@ async fn run(
                     last_note = std::time::Instant::now();
                     set_progress(
                         downloads,
-                        model.id,
+                        &model.id,
                         Progress {
                             phase: Phase::Downloading,
                             done: finished + done,
@@ -368,7 +505,7 @@ async fn run(
         }
         set_progress(
             downloads,
-            model.id,
+            &model.id,
             Progress {
                 phase: Phase::Verifying,
                 done: finished + file.bytes,
@@ -382,7 +519,7 @@ async fn run(
             .jobs
             .lock()
             .expect("downloads")
-            .get(model.id)
+            .get(&model.id)
             .map(|j| j.cancel.clone())
             .unwrap_or_default();
         let sum = tauri::async_runtime::spawn_blocking(move || sha256_of(&part_for_hash, &flag))
@@ -397,6 +534,28 @@ async fn run(
         finished += file.bytes;
     }
     Ok(())
+}
+
+fn sources_path(dir: &Path) -> PathBuf {
+    dir.join("sources.json")
+}
+
+fn load_sources(dir: &Path) -> HashMap<String, Source> {
+    std::fs::read_to_string(sources_path(dir))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+/// Notes where a downloaded model came from, so its card can say so. Written only after the file is whole and its checksum matched.
+fn record_source(dir: &Path, spec: &Spec, source: &Source) {
+    let mut all = load_sources(dir);
+    for file in &spec.files {
+        all.insert(file.name.clone(), source.clone());
+    }
+    if let Ok(text) = serde_json::to_string_pretty(&all) {
+        let _ = std::fs::write(sources_path(dir), text);
+    }
 }
 
 pub fn cancel(downloads: &Downloads, id: &str) {
