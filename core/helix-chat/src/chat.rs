@@ -255,7 +255,93 @@ fn title_of(text: &str) -> String {
     }
 }
 
+/// The instruction for the one short request that names a chat after its first exchange.
+pub const TITLE_PROMPT: &str = "Write a title for this conversation: two to six words, no quotes, no full stop. Reply with the title only.";
+
+/// A model's answer cleaned into a chat title, or `None` when it is not one (empty, a sentence of chat, a list, far too long).
+pub fn clean_title(raw: &str) -> Option<String> {
+    let line = raw.lines().map(str::trim).find(|l| !l.is_empty())?;
+    // A model sometimes labels it, quotes it, or emphasises it.
+    let mut title = line;
+    for label in ["Title:", "title:", "TITLE:"] {
+        title = title.strip_prefix(label).unwrap_or(title).trim();
+    }
+    let title = title
+        .trim_matches(|c: char| {
+            matches!(
+                c,
+                '"' | '\'' | '`' | '*' | '#' | '“' | '”' | '‘' | '’' | ' ' | '.' | ':' | '!'
+            )
+        })
+        .trim();
+    let words = title.split_whitespace().count();
+    if title.is_empty() || words > 10 || title.chars().count() > 80 {
+        return None;
+    }
+    let lower = title.to_lowercase();
+    // Chat filler instead of a title ("Sure, here is...", "I'm sorry...").
+    if [
+        "sure",
+        "certainly",
+        "here is",
+        "here's",
+        "i'm sorry",
+        "i am sorry",
+        "as an ai",
+        "of course",
+    ]
+    .iter()
+    .any(|start| lower.starts_with(start))
+        || title.starts_with(['-', '•', '1'])
+    {
+        return None;
+    }
+    let title = sanitize_for_display(title, 48);
+    (!title.is_empty()).then_some(title)
+}
+
 impl Conversation {
+    /// The first exchange of a chat that still has the title made from its first message: what to name it from. `None` once the person renamed
+    /// it, the chat has gone on, it is an analysis chat, or the reply is empty.
+    pub fn auto_title_source(&self) -> Option<(String, String)> {
+        let [first, reply] = self.messages.as_slice() else {
+            return None;
+        };
+        if first.role != Role::User
+            || reply.role != Role::Assistant
+            || !self.analysis_job.is_empty()
+            || reply.text.trim().is_empty()
+            || self.title != title_of(&first.text)
+        {
+            return None;
+        }
+        let excerpt = |text: &str| text.chars().take(600).collect::<String>();
+        Some((excerpt(&first.text), excerpt(&reply.text)))
+    }
+
+    /// The messages that ask for the title.
+    pub fn auto_title_messages(user: &str, assistant: &str) -> Vec<(&'static str, String)> {
+        vec![
+            ("system", TITLE_PROMPT.to_string()),
+            ("user", format!("Person: {user}\n\nAssistant: {assistant}")),
+        ]
+    }
+
+    /// Gives the chat the title a model wrote, only if it is still the same chat with the title it was made with (the person may have renamed it,
+    /// or opened another chat, while the model worked). Does not move the chat in the list.
+    pub fn apply_auto_title(&mut self, id: &str, made_with: &str, raw: &str) -> bool {
+        if self.id != id || self.title != made_with {
+            return false;
+        }
+        match clean_title(raw) {
+            Some(title) => {
+                self.title = title;
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn new(id: &str, now: u64) -> Option<Conversation> {
         valid_id(id).then(|| Conversation {
             id: id.to_string(),
@@ -1465,7 +1551,7 @@ impl Chat {
             .messages
             .last()
             .filter(|m| m.role == Role::Assistant)
-            .map(|m| markdown::parse(&m.text))
+            .map(|m| markdown::parse(&markdown::close_open_marks(&m.text)))
             .unwrap_or_default()
     }
 
@@ -1714,6 +1800,97 @@ mod tests {
         );
         assert!(c.send("hi", 0).is_ok());
         assert_eq!(c.send("again", 0).unwrap_err(), ChatError::Busy);
+    }
+
+    #[test]
+    fn a_model_answer_becomes_a_title_or_nothing() {
+        assert_eq!(
+            clean_title("Cron versus systemd timers").as_deref(),
+            Some("Cron versus systemd timers")
+        );
+        assert_eq!(
+            clean_title("\"Planning a focused week\".").as_deref(),
+            Some("Planning a focused week")
+        );
+        assert_eq!(
+            clean_title("Title: **Fixing a flaky test**\n\nSome explanation").as_deref(),
+            Some("Fixing a flaky test")
+        );
+        assert_eq!(
+            clean_title("\n  Ubuntu to Fedora\n").as_deref(),
+            Some("Ubuntu to Fedora")
+        );
+        for bad in [
+            "",
+            "   ",
+            "Sure, here is a title for you:",
+            "Certainly! The title is",
+            "I'm sorry, I cannot",
+            "- first\n- second",
+            "1. Cron",
+            &"word ".repeat(12),
+            &"x".repeat(100),
+        ] {
+            assert_eq!(clean_title(bad), None, "{bad:?}");
+        }
+        let long = "Alpha beta gamma delta epsilon zeta eta theta";
+        assert!(clean_title(long).unwrap().chars().count() <= 48);
+    }
+
+    #[test]
+    fn only_the_untouched_first_exchange_is_named() {
+        let mut c = Conversation::new("aaaaaaaaaaaaaaaa", 1).unwrap();
+        let mk = |role, text: &str| Message {
+            role,
+            text: text.into(),
+            images: Vec::new(),
+            sources: Vec::new(),
+            activities: Vec::new(),
+        };
+        c.messages = vec![
+            mk(Role::User, "How does cron work?"),
+            mk(Role::Assistant, "It runs jobs."),
+        ];
+        c.title = title_of("How does cron work?");
+        let (user, reply) = c.auto_title_source().expect("a fresh first exchange");
+        assert_eq!(
+            (user.as_str(), reply.as_str()),
+            ("How does cron work?", "It runs jobs.")
+        );
+        let made_with = c.title.clone();
+        // the person renames it while the model works: the model's title is dropped
+        let mut renamed = c.clone();
+        renamed.title = "My notes".into();
+        assert!(!renamed.apply_auto_title("aaaaaaaaaaaaaaaa", &made_with, "Cron basics"));
+        assert_eq!(renamed.title, "My notes");
+        assert!(
+            renamed.auto_title_source().is_none(),
+            "a renamed chat is not named again"
+        );
+        // another chat is open now
+        assert!(!c
+            .clone()
+            .apply_auto_title("bbbbbbbbbbbbbbbb", &made_with, "Cron basics"));
+        // an answer that is not a title leaves it
+        assert!(!c
+            .clone()
+            .apply_auto_title("aaaaaaaaaaaaaaaa", &made_with, "Sure, here you go"));
+        assert!(c.apply_auto_title("aaaaaaaaaaaaaaaa", &made_with, "Cron basics"));
+        assert_eq!(
+            (c.title.as_str(), c.updated),
+            ("Cron basics", 1),
+            "the chat does not move in the list"
+        );
+        // it has gone on, or has no reply
+        c.messages.push(mk(Role::User, "More"));
+        assert!(c.auto_title_source().is_none());
+        let mut early = Conversation::new("aaaaaaaaaaaaaaaa", 1).unwrap();
+        early.messages = vec![mk(Role::User, "Hello")];
+        early.title = title_of("Hello");
+        assert!(early.auto_title_source().is_none());
+        let messages = Conversation::auto_title_messages("Q", "A");
+        assert_eq!(messages[0].0, "system");
+        assert!(messages[1].1.contains("Person: Q") && messages[1].1.contains("Assistant: A"));
     }
 
     #[test]

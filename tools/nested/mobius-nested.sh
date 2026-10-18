@@ -40,5 +40,7 @@ crontab -e
 \`\`\`}" HELIX_FAKE_DELAY_MS="${HELIX_FAKE_DELAY_MS:-250}" "$INFERENCE" > "$XDG_STATE_HOME/helix-inference.log" 2>&1 &
 echo $! > "$XDG_STATE_HOME/helix-service.pid"
 sleep 1
+# Chats keep the title made from their first message in tests, unless one asks for the model to name them (HELIX_NESTED_AUTO_TITLE=1).
+[ -n "${HELIX_NESTED_AUTO_TITLE:-}" ] || export HELIX_MOBIUS_NO_AUTO_TITLE=1
 echo $$ > "$XDG_STATE_HOME/shell.pid"
 exec "$BIN"
