@@ -27,6 +27,16 @@ click_id artifact-open
 wait_id stage-text && echo "ok: it opened on the stage" || fail "no stage"
 wait_id stage-chip && echo "ok: the document is attached as a visible chip" || fail "no chip"
 shot stage; sleep 1; shot stage
+echo "--- focus layout: the work fills the window and the chat floats over it"
+width() { python3 -c "import json;print(int(json.load(open('$SCRATCH/state/layout.json'))['elements'].get('$1',{}).get('w',0)))"; }
+BEFORE=$(width stage-text)
+click_id layout-btn; sleep 1.5
+AFTER=$(width stage-text); CHAT=$(width chat-surface)
+[ "$AFTER" -gt "$BEFORE" ] && [ "$CHAT" -lt 470 ] && echo "ok: the stage grew ($BEFORE to $AFTER px) and the chat is a $CHAT px window" || fail "focus layout: stage $BEFORE -> $AFTER, chat $CHAT"
+shot focus; sleep 1; shot focus
+click_id layout-btn; sleep 1.5
+BACK=$(width stage-text)
+[ "$BACK" -lt "$AFTER" ] && echo "ok: it goes back beside the chat" || fail "layout did not go back ($BACK)"
 echo "--- editing keeps a version"
 click_id stage-text; wtype " EDITED"; sleep 3
 STAGE=$(ls "$SCRATCH"/data/helix/mobius/stage/*.json | head -1)
