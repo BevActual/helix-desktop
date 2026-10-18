@@ -135,3 +135,19 @@ A piece of interface that exists for one moment, asked for by the reply and draw
 `apps/helix-mobius/web/src/ephemeral.tsx`, `tools/nested/mobius-ephemeral-test.sh`. Next components, in order of use: a checklist and steps that
 the person ticks, a diff with accept and reject per hunk (the Changes panel), a diagram from a few lines of text, a confirm card for an Act or
 Tools step, and a date or file picker. The same renderer is what the side panel for what was made would host.
+
+
+### Reviewed file edits (done: the first step of the Changes panel)
+
+Tools mode could run a command but not change a file in a way the person could read first. It has an `edit_file` step now: a path inside the
+project folder, the exact text to replace (empty to create a file) and the new text. The review card shows the **diff** (removed lines red,
+added lines green) with **Apply edit** and **Skip**; nothing is written before that. An applied edit keeps a **restore point** and its card
+offers **Undo edit**, which puts the file back only if it still holds what the edit left (a change made by hand since is never overwritten).
+
+What the tool refuses, whatever the model says (`edits.rs`, unit tested): an absolute path or `..`; hidden files and folders (`.git`, `.ssh`);
+links; files that look like they hold credentials; a text that is not found, or that appears more than once (it must name the place exactly);
+files over 512 KiB; more than 20,000 characters a side. `tools/nested/mobius-edit-test.sh` runs review, apply, undo, decline and a path
+outside the folder.
+
+Still to do for the full Changes panel: one list of everything a turn changed (a command can change files too, so a snapshot of the folder
+before and after a command, shown as a diff), per-file accept and reject across a whole turn, and restore to the state before a turn.

@@ -1480,3 +1480,8 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .eph-field > span { color: var(--label-2); }
 .eph-toggle { flex-direction: row; align-items: center; justify-content: space-between; }
 .eph-actions { display: flex; justify-content: flex-end; }
+.diff { white-space: pre-wrap; overflow-x: auto; }
+.diff span { display: block; }
+.diff .diff-head { font-weight: 650; color: var(--label); }
+.diff .diff-add { display: block; background: color-mix(in srgb, #2fb344 18%, transparent); color: var(--label); }
+.diff .diff-del { display: block; background: color-mix(in srgb, #e03131 18%, transparent); color: var(--label); }
