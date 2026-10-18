@@ -123,3 +123,14 @@ Directions that follow from "Mobius reshapes itself for the task", roughly in th
 5. **Voice mode** as a layout: a quiet full-window surface for talking with the model on this computer (dictation exists; read-aloud and a conversation loop come first).
 6. **The conversation as a map**: forks, side chats and the documents each made, drawn as a tree the person can walk, instead of one long scroll.
 7. **Summon from anywhere**: a key that raises Mobius over whatever window is focused and hands it that window's title and selection (the Agent Surface already knows the focused window), with the same approvals.
+
+## Ask on the selection (built), and what other applications taught
+
+Researched (documentation and reviews, not used hands-on): **Notion AI** (select text, "Ask AI": improve, fix grammar, shorter, longer, change tone, simplify; then replace or insert below), **Apple Writing Tools** (rewrite, proofread, summarize as key points, list or table, in any text field system-wide), **Cursor / Zed / GitHub Copilot** (Cmd/Ctrl+K or +I: a small prompt bar on the selection, the answer as a diff, Enter or Cmd+Y accepts, Esc rejects), **Photoshop's Contextual Task Bar** (a bar that follows the selection with the next sensible actions, can be pinned or hidden), **Canva** (a contextual toolbar for the selected object), **Figma** (Ctrl+K actions that depend on the selection), and the **AI browsers** Dia, Comet and Neon (the assistant reads the page or the tabs, and in the newest acts with permission).
+
+What Mobius took:
+
+* **A bar on the selection in a document**: select three or more characters and a bar offers Improve, Shorter, Longer, Simplify and Fix grammar, plus a free instruction (Ctrl+I, as in Copilot and Zed). The answer is a **proposed change shown old and new** that nothing writes until **Enter** accepts it; **Esc** rejects it. It is accepted as the person's own edit (a new version), and refused if the text changed while the model worked. It uses the model on this computer only (a selection is private text), and takes off the quotes, fences and thinking small models wrap around an answer. `inline.rs` (unit tested), `workpanel.tsx`, `tools/nested/mobius-inline-test.sh`.
+* Found on the way: the document box could not select text at all (the window turns `user-select` off for everything and the textarea had not turned it back on).
+
+Next, from the same research: the same bar for **Code** (select lines, "Edit with Mobius", the diff on the stage, as Cursor does) and for the **Image** (the Contextual Task Bar idea: a selection shows the actions that fit it, Crop, Rectangle, Blur, "Describe this", beside it instead of in a toolbar far away), Apple's output shapes (summarize as key points, a list or a table), and the AI browsers' pattern for a **Browse stage**: the assistant reads the page beside it, and acts only with approval.
