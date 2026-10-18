@@ -1,0 +1,17 @@
+[package]
+name = "helix-knowledge"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "A local SQLite knowledge store: pages, links, chunks with vectors, hybrid search (full text plus similarity), and provenance."
+
+[dependencies]
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+[dev-dependencies]
+helix-embed = { path = "../helix-embed" }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
