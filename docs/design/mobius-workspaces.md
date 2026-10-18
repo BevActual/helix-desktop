@@ -89,3 +89,13 @@ A place in the sidebar for prompts that run by themselves (ChatGPT and Claude bo
 * The sheet: add (name, prompt, every day, certain days or once, a time), switch on or off, **Run now**, delete, the last run and a link to its answer, up to 12 tasks. `scheduled.rs` (unit tested), `scheduled.tsx`, `tools/nested/mobius-scheduled-test.sh`.
 
 Not done: a real timer firing (the nested test writes the units and runs the same command without starting systemd), editing a task, a task that continues in an existing chat, and the shell's notification opening the answer.
+
+## Projects (built)
+
+A place in the sidebar (ChatGPT and Claude both list "Projects"). A project was a name on a chat plus optional instructions behind a dialog; now it is one page with what its chats share:
+
+* **Instructions** every chat in the project follows (the existing project instructions, edited here), **a folder** the project's chats work in (new chats joining the project get it as their Tools and Code-stage folder; Tools mode itself stays as it was), the project's **chats** (open one) and the **documents** they made (open one on the Write stage).
+* **New chat in this project** starts a chat that joins the project with its first message (an empty chat is not saved, so it cannot join earlier). Projects can be added on the page before any chat is in them.
+* `projects_overview`, `project_create`, `project_set_folder` in `main.rs`; `Lab.project_folders` and `declared_projects` in `mobius_lab.rs` (unit tested); `projects.tsx`; `tools/nested/mobius-projects-test.sh` (add a project, instructions and folder saved, a new chat joins it and gets the folder, the page lists it).
+
+Not done: moving a chat to a project from the page (the chat header still does it), a per-project memory, and project files indexed for questions (the embedder in `decision-model.md` is the piece for that).

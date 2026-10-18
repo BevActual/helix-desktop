@@ -1096,6 +1096,7 @@ listen("chat-view", (event) => {
   const key = `${view.id}|${view.route_backend || ""}|${view.route_model || ""}`;
   if (key !== routeKey) { routeKey = key; refreshRoute(); }
   drawChat();
+  if (pendingProject && view.id && view.messages.length && !view.temporary) { const joined = pendingProject; pendingProject = ""; invoke("chat_set_project", { project: joined }).catch(report); }
   if (sideOf && !view.temporary) sideOf = null;
   drawSideChip();
   if (workspaceChat !== view.id) { if (workspaceChat) { setWorkspace("chat"); } workspaceChat = view.id; }
@@ -2578,6 +2579,18 @@ const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
 const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
 const reactScheduled = window.HelixMobiusReact?.scheduled($("scheduled-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-scheduled").onclick = () => reactScheduled?.open();
+// A chat begun from the Projects page joins its project once it has its first message (an empty chat is not kept, so it cannot be moved yet).
+let pendingProject = "";
+const reactProjects = window.HelixMobiusReact?.projects($("projects-host"), {
+  report: (error) => report(error),
+  openChat: (id, doc) => {
+    if (doc) openArtifactRow({ chat_id: id, title: doc });
+    else invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report);
+  },
+  newChatIn: (project) => invoke("chat_new").then(() => { pendingProject = project; clearAttachments(); input.placeholder = `Message Mobius — new chat in ${project}`; input.focus(); }).catch(report),
+});
+$("mode-projects").onclick = () => reactProjects?.open();
+
 // The command palette (Ctrl+K): chats, commands, modes and models in one box.
 function paletteItems(query) {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -2600,6 +2613,7 @@ function paletteItems(query) {
   act("side", "Side chat", "Ask something that reads this chat without touching it", "/side", () => startSideChat().catch(report));
   act("artifacts", "Artifacts", "Every document your chats made", "", () => showArtifacts(true));
   act("scheduled", "Scheduled prompts", "Run a prompt by itself at a time", "", () => reactScheduled?.open());
+  act("projects", "Projects", "Instructions, folder, chats and documents together", "", () => reactProjects?.open());
   act("memory", "Memory", "What Mobius remembers", "", () => reactMemory?.open());
   act("find", "Find in this chat", "", "Ctrl+F", () => openFindBar());
   act("export", "Export this chat", "Markdown", "Ctrl+Shift+C", () => $("export-chat").click());

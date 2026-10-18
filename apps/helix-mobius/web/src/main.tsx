@@ -12,6 +12,7 @@ import { Welcome, type WelcomeHandle, type WelcomeHooks } from "./welcome";
 import { ChatContext, type ContextHandle, type ContextInfo } from "./context";
 import { CodeStage, type CodeHandle, type CodeHooks } from "./codestage";
 import { Stage, type StageHandle, type StageHooks } from "./workpanel";
+import { Projects, type ProjectsHandle, type ProjectsHooks } from "./projects";
 import { Scheduled, type ScheduledHandle } from "./scheduled";
 import { Palette, type PaletteHandle, type PaletteHooks } from "./palette";
 import { Memory, type MemoryHandle } from "./memory";
@@ -64,6 +65,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   palette: (host: HTMLElement, hooks: PaletteHooks) => {
     const run = handled<PaletteHandle>(host, (register) => <Palette register={register} hooks={hooks} />);
+    return { open: () => run((h) => h.open()) };
+  },
+  projects: (host: HTMLElement, hooks: ProjectsHooks) => {
+    const run = handled<ProjectsHandle>(host, (register) => <Projects register={register} hooks={hooks} />);
     return { open: () => run((h) => h.open()) };
   },
   scheduled: (host: HTMLElement, onOpenChat: (id: string) => void) => {
