@@ -168,3 +168,9 @@ The library and the model menu now say what a person choosing between local mode
 * **Speed**: every reply of 20 tokens or more updates that model's running figure (smoothed 70/30), kept in `speeds.json`, shown as "41 tok/s here" in the library and the model menu once a model has answered on this computer.
 
 Not yet: adding a model by name or Hugging Face link from the library's first screen, and a "Fast / Best quality" line per model.
+
+### OpenRouter in the model menu (done)
+
+The menu above the composer listed only models on this computer; cloud models were behind "Other backends and custom ids…". With OpenRouter set up (its backend and a key), the menu now has a second section, **OpenRouter · leaves this computer**: six well-known models (the catalog's suggestion list, so nothing is fetched when the menu opens), one click puts this chat on one, saved with the chat like a local choice, and the routing file is not written. Without a key the section is one row, "Set up OpenRouter…", which opens Models & routing. The full list (the service's catalog, any id) is still in "Other backends and custom ids…". `tools/nested/mobius-cloud-test.sh`.
+
+Still to do: a search box in the menu for the full OpenRouter catalog (and per-model price), and a visible mark on the chat's chip while it is on a cloud model (it shows the backend's label today).
