@@ -35,6 +35,18 @@ click_id "code-file-src/main.rs"; sleep 1
 wait_id code-text && echo "ok: a file is shown" || fail "no viewer"
 wait_id stage-chip && echo "ok: the file in view is attached as a chip" || fail "no chip"
 shot code-view; sleep 1; shot code-view
+echo "--- edit with Mobius on a line"
+MAIN=$SCRATCH/home/project/src/main.rs
+click_id code-line-2 0.05; sleep 1
+wait_id code-selbar && echo "ok: selecting a line shows the edit bar" || fail "no edit bar"
+click_id code-instruction; wtype "say hello"; wtype -k Return
+wait_id code-proposal 60 && echo "ok: the answer is a proposed change" || fail "no proposal"
+shot code-proposal; sleep 1; shot code-proposal
+[ "$(cat "$MAIN")" = "$(printf 'fn main() {\n    println!("hi");\n}')" ] && echo "ok: the file is untouched until accepted" || fail "changed early: $(cat "$MAIN")"
+click_id code-accept; sleep 2
+[ "$(cat "$MAIN")" = "$(printf 'fn main() {\nDone.\n}')" ] && echo "ok: accepting replaced just that line" || fail "after accept: $(cat "$MAIN")"
+wait_id code-undo && click_id code-undo; sleep 2
+[ "$(cat "$MAIN")" = "$(printf 'fn main() {\n    println!("hi");\n}')" ] && echo "ok: Undo put it back" || fail "after undo: $(cat "$MAIN")"
 echo "--- a change made by a turn is marked and shows its diff"
 printf '[{"tool":"edit_file","path":"notes.txt","old":"beta","new":"gamma"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
 paste_id input 'Change beta to gamma in notes.txt'

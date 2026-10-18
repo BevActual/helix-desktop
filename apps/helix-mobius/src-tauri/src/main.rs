@@ -3304,6 +3304,8 @@ fn main() {
             tools_undo_edit,
             artifacts::stage_get,
             inline::stage_transform,
+            inline::code_transform,
+            inline::code_apply,
             scheduled::scheduled_list,
             scheduled::scheduled_save,
             scheduled::scheduled_set_enabled,

@@ -1632,3 +1632,6 @@ body.chat.stage-open.layout-stage .stage-host { grid-column: 2; }
 .proposal-actions { display: flex; gap: 8px; justify-content: flex-end; } .proposal-actions kbd { margin-left: 6px; font-size: 10.5px; opacity: .7; }
 textarea, .stage textarea { user-select: text; -webkit-user-select: text; }
 .stage-proposal > div:not(.proposal-actions) { max-height: 22vh; overflow: auto; }
+.code-text .code-line.picked { background: color-mix(in srgb, var(--accent) 20%, transparent); } .code-text .code-line i { cursor: pointer; }
+.code-view .stage-selbar, .code-view .stage-proposal { margin: 6px 0 0; }
+.code-proposal .diff { margin: 0; padding: 6px 0; max-height: 26vh; overflow: auto; font-size: 12px; }
