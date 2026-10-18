@@ -3149,10 +3149,7 @@ async fn chat_generate_image(
     if !model_catalog::safe_file_name(&model)
         || !library::models_dir().join("image").join(&model).is_file()
     {
-        return Err(
-            "Get SD-Turbo in Settings → Models before generating pictures."
-                .into(),
-        );
+        return Err("Get SD-Turbo in Settings → Models before generating pictures.".into());
     }
     let turn = {
         let shared = shared(&app);
