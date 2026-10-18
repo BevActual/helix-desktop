@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
 
 /** The Code stage: the chat's project folder beside the conversation. A file list (the files the last turn changed are marked), a viewer, and,
@@ -24,6 +24,17 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
   const [text, setText] = useState("");
   const [truncated, setTruncated] = useState(false);
   const [tick, setTick] = useState(0);
+  // Edit with Mobius on lines: a range chosen by dragging over the line numbers (or a click, shift-click to extend), the bar for an
+  // instruction, and the proposal for those lines to accept (Enter) or reject (Esc).
+  const [range, setRange] = useState<{ a: number; b: number } | null>(null);
+  const selecting = useRef(false);
+  const [instruction, setInstruction] = useState("");
+  const [working, setWorking] = useState(false);
+  const [proposal, setProposal] = useState<{ start: number; end: number; old: string; text: string } | null>(null);
+  const [applied, setApplied] = useState<string>("");
+  const [problem, setProblem] = useState("");
+  const accept = useRef<HTMLButtonElement>(null);
+  useEffect(() => { const end = () => { selecting.current = false; }; window.addEventListener("mouseup", end); return () => window.removeEventListener("mouseup", end); }, []);
 
   const loadTree = useCallback(async () => {
     setError("");
@@ -34,8 +45,38 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
 
   const changes = hooks.changes();
   const changed = useMemo(() => new Map((changes?.files ?? []).map((f, i) => [f.path, { file: f, index: i }])), [changes, tick]);
+  const lo = range ? Math.min(range.a, range.b) : 0;
+  const hi = range ? Math.max(range.a, range.b) : 0;
+  const ask = async (what: string) => {
+    if (!range || working || !selected) return;
+    setWorking(true); setProblem(""); setApplied("");
+    try {
+      const out = await invoke<{ old: string; text: string }>("code_transform", { path: selected, start: lo, end: hi, instruction: what });
+      setProposal({ start: lo, end: hi, ...out });
+      setInstruction("");
+      setTimeout(() => accept.current?.focus(), 0);
+    } catch (reason) { setProblem(String(reason)); } finally { setWorking(false); }
+  };
+  const applyProposal = async () => {
+    if (!proposal) return;
+    try {
+      const id = await invoke<string>("code_apply", { path: selected, start: proposal.start, end: proposal.end, old: proposal.old, text: proposal.text });
+      setApplied(id); setProposal(null); setRange(null);
+      const file = await invoke<{ text: string; truncated: boolean }>("code_read", { path: selected });
+      setText(file.text); hooks.shown({ title: selected, text: file.text });
+      loadTree();
+    } catch (reason) { setProblem(String(reason)); setProposal(null); }
+  };
+  const undoApplied = async () => {
+    try {
+      await invoke("tools_undo_edit", { activityId: applied });
+      setApplied("");
+      const file = await invoke<{ text: string; truncated: boolean }>("code_read", { path: selected });
+      setText(file.text); hooks.shown({ title: selected, text: file.text });
+    } catch (reason) { setProblem(String(reason)); }
+  };
   const show = async (path: string) => {
-    setSelected(path);
+    setSelected(path); setRange(null); setProposal(null); setApplied(""); setProblem("");
     const hit = changed.get(path);
     if (hit) { setText(hit.file.diff); setTruncated(false); hooks.shown({ title: `${path} (changed in the last turn)`, text: hit.file.diff }); return; }
     try {
@@ -76,8 +117,20 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
           </div>
           <pre className={`code-text${isDiff ? " diff" : ""}`} data-test="code-text">{isDiff
             ? text.split("\n").map((line, i) => <span key={i} className={line.startsWith("@@") ? "diff-head" : line.startsWith("+") ? "diff-add" : line.startsWith("-") ? "diff-del" : ""}>{line || " "}</span>)
-            : text.split("\n").map((line, i) => <span key={i} className="code-line"><i>{i + 1}</i>{line || " "}</span>)}</pre>
+            : text.split("\n").map((line, i) => <span key={i} className={`code-line${range && i + 1 >= lo && i + 1 <= hi ? " picked" : ""}`} data-test={`code-line-${i + 1}`}
+              onMouseDown={(e) => { if (e.button !== 0 || (e.target as HTMLElement).tagName !== "I") return; e.preventDefault(); selecting.current = true; setProposal(null); setApplied(""); setRange(e.shiftKey && range ? { a: range.a, b: i + 1 } : { a: i + 1, b: i + 1 }); }}
+              onMouseEnter={() => { if (selecting.current) setRange((r) => (r ? { a: r.a, b: i + 1 } : r)); }}><i title="Click or drag to select lines">{i + 1}</i>{line || " "}</span>)}</pre>
           {truncated && <p className="sheet-note">Only the first 3,000 lines are shown.</p>}
+          {problem && <p className="stage-notice" role="alert" data-test="code-problem">{problem}</p>}
+          {applied && <p className="stage-notice" role="status" data-test="code-applied">Applied. <button type="button" className="link" data-test="code-undo" onClick={undoApplied}>Undo</button></p>}
+          {proposal ? <div className="stage-proposal code-proposal" data-test="code-proposal" role="group" aria-label="Suggested change" onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setProposal(null); } }}>
+            <pre className="diff">{[...proposal.old.split("\n").map((l, i) => <span key={`o${i}`} className="diff-del">{`- ${l}`}</span>), ...proposal.text.split("\n").map((l, i) => <span key={`n${i}`} className="diff-add">{`+ ${l}`}</span>)]}</pre>
+            <div className="proposal-actions"><button type="button" ref={accept} className="primary" data-test="code-accept" onClick={applyProposal}>Accept <kbd>Enter</kbd></button><button type="button" data-test="code-reject" onClick={() => setProposal(null)}>Reject <kbd>Esc</kbd></button></div>
+          </div> : range && !isDiff && <div className="stage-selbar" data-test="code-selbar" role="toolbar" aria-label="Edit the selected lines with Mobius">
+            <span className="stage-state">Lines {lo}{hi > lo ? `–${hi}` : ""}</span>
+            {[["Simplify", "Simplify this code without changing what it does."], ["Add comments", "Add short, useful comments."], ["Fix bug", "Find and fix the bug in this code."], ["Make it idiomatic", "Rewrite in the idiomatic style of this language, same behaviour."]].map(([label, what]) => <button key={label} type="button" disabled={working} onClick={() => ask(what)}>{label}</button>)}
+            <input data-test="code-instruction" value={instruction} disabled={working} placeholder={working ? "Working…" : "Edit these lines with Mobius…"} maxLength={300} onChange={(e) => setInstruction(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && instruction.trim()) { e.preventDefault(); ask(instruction); } }} />
+          </div>}
         </> : <p className="code-hint">Pick a file. The one in view goes to Mobius with your next message, so you can ask about it. Files the last turn changed are marked and show their diff.</p>}
       </div>
     </div>}
