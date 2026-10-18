@@ -20,4 +20,4 @@ wait_id composer; sleep 2; geometry
 shot start
 click_id meta-model; sleep 1.5; has_id menu-model-auto && echo 'menu: open' || echo 'menu: NOT open'; python3 -c "import json;d=json.load(open('$SCRATCH/state/layout.json'));print('menu at', {k:v for k,v in d['elements'].items() if k.startswith('menu-model') or k=='meta-model'}, d['width'], d['height'])"; shot picker; sleep 3; shot picker2; has_id menu-model-auto && echo 'menu: still open after the picture' || echo 'menu: CLOSED by the picture'
 wtype -k Escape; sleep 1
-click_id meta-route; sleep 2.5; shot routing
+click_id meta-more; click_id menu-more-route; sleep 2.5; shot routing

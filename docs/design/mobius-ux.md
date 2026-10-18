@@ -213,3 +213,19 @@ Like Cursor's rules and `AGENTS.md`: when the chat's project folder holds `AGENT
 Ctrl+K was "focus the search box in the side list". It is now a palette in the middle of the window (Raycast, Cursor and Linear all have one, because it is the fastest way to do anything once you know the app): one field that finds a **chat** (by title, and by what was said in it, from the saved chats), runs a **command** (new or temporary chat, the three modes, choose model, Models & routing, Memory, find in chat, export, fork, `/image`, `/web`, `/attach`, `/tools`, each with its shortcut shown), or, with whatever you typed, **asks Mobius in a new chat**. Up and down choose, Enter does it, Escape leaves, the mouse works. The side list's own search stays. `palette.tsx`, `tools/nested/mobius-palette-test.sh`.
 
 Next for it: models as rows (switch with a word), recent files for `@`, and actions on the chat under the cursor (rename, pin, move to project, delete) from the same box.
+
+
+## Chat taken to a high level: the first pass (2026-10-17)
+
+Looked at the screens in the nested compositor (`tools/nested/mobius-look-test.sh`, dark and light) against what Apple's apps do: one thing at a time, a calm hierarchy, motion that explains, details that do not need explaining. What was wrong, and what changed:
+
+| Found | Changed |
+|---|---|
+| **The start screen was a menu.** Eight task cards with descriptions filled the window; the composer, the one thing to do, sat under them at the bottom. | **A home.** A greeting for the time of day, and the composer in the middle of the window under it (a larger, softer box with a focus ring); four quiet ways to begin below (Research, Write, Create an image, Work on code), a **More ways to start** disclosure for the other tools, the writing starters as chips, and "Pick up where you left off" (the last three chats). The composer settles to the bottom with the first message. |
+| **Six chips of settings above the composer** (persona, style, model, where it runs, Tools, Context) in small grey text: cryptic, and different in each chat. | **Two chips and a menu.** The model, Tools when it is on, and a **⋯** that opens Persona, Style, Where it runs, Context and brief (each shown only when it applies). |
+| **The sidebar footer was three labelled rows** (Temporary chat, Models & routing, "Mobius") under the list. | A **row of three icons** (temporary chat, models, the Mobius menu) with tooltips; gone entirely while a stage is open. |
+| **Text a little small and tight for reading.** | Replies are set at 15.5 px on a 1.68 line height with calmer paragraph and heading spacing; code blocks rounder with a softer border. |
+
+Tests: `mobius-welcome` and `mobius-web` open the "More ways to start" disclosure first; `mobius-dialogs`, `mobius-lab`, `mobius-context` and `mobius-routing-look` go through the ⋯ menu (`menu-more-persona`, `-style`, `-route`, `-context`).
+
+Next for Chat: motion for the composer's move from the middle to the bottom, a quieter streaming state, message hover affordances that match Apple Messages' restraint, a light-theme pass over every screen, and the narrow window (the nested compositor cannot resize the page, so it is not yet reviewed).

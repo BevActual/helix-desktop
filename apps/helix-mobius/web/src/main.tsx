@@ -50,7 +50,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   welcome: (host: HTMLElement, hooks: WelcomeHooks) => {
     const run = handled<WelcomeHandle>(host, (register) => <Welcome register={register} hooks={hooks} />);
-    return { set: (starters: string[], listening: boolean, busy: string) => run((h) => h.set(starters, listening, busy)) };
+    return { set: (starters: string[], listening: boolean, busy: string) => run((h) => h.set(starters, listening, busy)), recents: (list: { id: string; title: string; project?: string }[]) => run((h) => h.recents(list)) };
   },
   context: (host: HTMLElement) => {
     const run = handled<ContextHandle>(host, (register) => <ChatContext register={register} />);
