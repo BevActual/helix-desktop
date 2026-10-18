@@ -1764,3 +1764,5 @@ body.chat .chat-title-input { justify-self: center; width: min(420px, 100%); tex
 .msg-edit { margin-left: auto; width: min(100%, 560px); animation: write-in .14s ease-out; }
 .msg-edit textarea { width: 100%; box-sizing: border-box; min-height: 64px; max-height: 320px; padding: 12px 14px; border-radius: 16px; resize: none; background: var(--fill-2); border: 0; outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); font-size: 15.5px; line-height: 1.5; user-select: text; }
 .msg-edit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; } .msg-edit-actions span { flex: 1; font-size: 12px; color: var(--label-3); }
+.regen { position: relative; display: inline-flex; } .regen .regen-more { padding-inline: 5px; margin-left: -4px; }
+.regen-menu { position: absolute !important; left: 0; top: calc(100% + 4px); bottom: auto !important; min-width: 280px; z-index: 40; max-height: 320px; overflow: auto; }
