@@ -18,6 +18,7 @@ mod imageops;
 mod images;
 mod imagestage;
 mod inline;
+mod knowledge;
 mod lan;
 mod library;
 mod output;
@@ -957,10 +958,43 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             }
         }
     }
+    // Passages from the person's own folders go to a model on this computer, never to a cloud one, and the reply remembers which.
+    let mut files: Vec<helix_chat::chat::FileRef> = Vec::new();
+    if is_local {
+        let question = turn
+            .messages
+            .iter()
+            .rev()
+            .find(|(role, _)| *role == "user")
+            .map(|(_, text)| text.clone());
+        if let Some(question) = question {
+            let found =
+                tauri::async_runtime::spawn_blocking(move || knowledge::relevant(&question))
+                    .await
+                    .unwrap_or_default();
+            if !found.is_empty() {
+                if let Some((_, system)) =
+                    turn.messages.iter_mut().find(|(role, _)| *role == "system")
+                {
+                    system.push_str(&knowledge::prompt_text(&found));
+                    eprintln!("MOBIUS knowledge-added {}", found.len());
+                }
+                files = found
+                    .iter()
+                    .map(|p| helix_chat::chat::FileRef {
+                        title: p.title.clone(),
+                        heading: p.heading.clone(),
+                        excerpt: p.text.chars().take(600).collect(),
+                    })
+                    .collect();
+            }
+        }
+    }
     {
         let shared = shared(&app);
         let mut state = shared.lock().expect("state");
         state.last_backend = label.clone();
+        state.chat.pending_files = files;
     }
     emit_view(&app);
 
@@ -2857,6 +2891,75 @@ async fn library_remove(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+fn emit_knowledge(app: &AppHandle) {
+    let _ = app.emit("knowledge-changed", knowledge::status());
+}
+
+/// The folders Mobius reads, what has been read from each, and whether it is reading one now.
+#[tauri::command]
+async fn knowledge_status() -> knowledge::Status {
+    tauri::async_runtime::spawn_blocking(knowledge::status)
+        .await
+        .unwrap_or_else(|_| knowledge::status())
+}
+
+/// Asks for a folder and starts reading it. `None` when the person cancels.
+#[tauri::command]
+async fn knowledge_add_folder(app: AppHandle) -> Result<Option<String>, String> {
+    let Some(chosen) = agent::pick_folder().await? else {
+        return Ok(None);
+    };
+    let real = knowledge::add_folder(std::path::Path::new(&chosen))?;
+    let handle = app.clone();
+    knowledge::start(real.clone(), move || emit_knowledge(&handle))?;
+    emit_knowledge(&app);
+    Ok(Some(real.to_string_lossy().to_string()))
+}
+
+/// Reads a folder again: new and changed files are added, deleted ones are dropped.
+#[tauri::command]
+async fn knowledge_reindex(app: AppHandle, path: String) -> Result<(), String> {
+    if !knowledge::folders().iter().any(|f| f.path == path) {
+        return Err("That folder is not in the list.".into());
+    }
+    let handle = app.clone();
+    knowledge::start(std::path::PathBuf::from(path), move || {
+        emit_knowledge(&handle)
+    })?;
+    emit_knowledge(&app);
+    Ok(())
+}
+
+#[tauri::command]
+async fn knowledge_remove_folder(app: AppHandle, path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || knowledge::remove_folder(&path))
+        .await
+        .map_err(|e| e.to_string())??;
+    emit_knowledge(&app);
+    Ok(())
+}
+
+/// Whether chats on this computer may be given passages from the folders.
+#[tauri::command]
+async fn knowledge_set_use(app: AppHandle, on: bool) -> Result<(), String> {
+    knowledge::set_use_in_chat(on)?;
+    emit_knowledge(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn knowledge_cancel() {
+    knowledge::cancel();
+}
+
+/// Passages from the folders that match what the person typed. Local only: nothing leaves this computer.
+#[tauri::command]
+async fn knowledge_search(query: String) -> Result<Vec<knowledge::Found>, String> {
+    tauri::async_runtime::spawn_blocking(move || knowledge::search(&query, 8))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Searches Hugging Face for GGUF models. Only the words typed are sent, and only because the person pressed Search.
 #[tauri::command]
 async fn hub_search(query: String) -> Result<Vec<hub::Repo>, String> {
@@ -3556,6 +3659,13 @@ fn main() {
             library_remove,
             library_import,
             hub_search,
+            knowledge_status,
+            knowledge_add_folder,
+            knowledge_reindex,
+            knowledge_remove_folder,
+            knowledge_cancel,
+            knowledge_set_use,
+            knowledge_search,
             hub_repo,
             hub_download,
             library_reveal,

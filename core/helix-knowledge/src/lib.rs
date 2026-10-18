@@ -485,6 +485,34 @@ impl Store {
         Ok(removed > 0)
     }
 
+    /// The keys of the pages a pack holds, so a re-index can drop the ones whose files are gone.
+    pub fn pack_keys(&self, pack: &str) -> Result<Vec<String>> {
+        let conn = self.lock()?;
+        let mut stmt = conn
+            .prepare("SELECT key FROM pages WHERE pack = ?1")
+            .map_err(sql)?;
+        let rows = stmt
+            .query_map([pack], |row| row.get::<_, String>(0))
+            .map_err(sql)?;
+        rows.collect::<rusqlite::Result<_>>().map_err(sql)
+    }
+
+    /// How many pages, passages and vectors a pack holds.
+    pub fn pack_stats(&self, pack: &str) -> Result<Stats> {
+        let conn = self.lock()?;
+        let count = |query: &str| -> Result<usize> {
+            conn.query_row(query, [pack], |row| row.get::<_, i64>(0))
+                .map(|n| n as usize)
+                .map_err(sql)
+        };
+        Ok(Stats {
+            pages: count("SELECT COUNT(*) FROM pages WHERE pack = ?1")?,
+            chunks: count("SELECT COUNT(*) FROM chunks c JOIN pages p ON p.id = c.page_id WHERE p.pack = ?1")?,
+            embedded: count("SELECT COUNT(*) FROM chunks c JOIN pages p ON p.id = c.page_id WHERE p.pack = ?1 AND c.embedding IS NOT NULL")?,
+            ..Stats::default()
+        })
+    }
+
     /// Removes everything that came with a pack: its pages, passages, vectors and links.
     pub fn delete_pack(&self, pack: &str) -> Result<usize> {
         let conn = self.lock()?;
@@ -1039,6 +1067,22 @@ mod tests {
         assert_eq!(hits[0].tier, Tier::Yours);
         let stats = store.stats().unwrap();
         assert_eq!((stats.pages, stats.chunks), (1, 1));
+    }
+
+    #[test]
+    fn a_pack_reports_its_pages_and_keys() {
+        let store = store();
+        for (key, pack) in [("a", "p1"), ("b", "p1"), ("c", "p2")] {
+            let mut page = NewPage::note(key, key, "some words here");
+            page.pack = Some(pack.to_string());
+            store.put_page(&page, Some(&Toy)).unwrap();
+        }
+        let mut keys = store.pack_keys("p1").unwrap();
+        keys.sort();
+        assert_eq!(keys, ["a", "b"]);
+        let stats = store.pack_stats("p1").unwrap();
+        assert_eq!((stats.pages, stats.chunks, stats.embedded), (2, 2, 2));
+        assert_eq!(store.pack_stats("none").unwrap().pages, 0);
     }
 
     #[test]

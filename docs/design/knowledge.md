@@ -1,6 +1,6 @@
 # Knowledge store
 
-Status: first slice built (2026-10-18): the store, hybrid search and a measurement. Nothing in Mobius uses it yet.
+Status (2026-10-18): the store, hybrid search and a measurement are built, and Mobius now reads folders into it (Settings → Knowledge) and can search them. Chats on this computer are now given close passages from the folders, and the reply lists them.
 
 ## Why a database
 
@@ -51,10 +51,32 @@ What this says:
 * **A plain scan is fast enough for now.** Vectors are read once and kept in memory; at 985 passages a scan is far below the time
   to embed the question. `sqlite-vec` is the option when a store passes some hundreds of thousands of passages.
 
-## Not built
+## In Mobius (Settings → Knowledge)
 
-* Mobius integration: a Rust `Embed` over `helix-embed`, the index living at `~/.local/share/helix/knowledge.db`, project folders
-  indexed on request, cited sources as chips under replies.
+`knowledge.rs` wraps the store. The index is `~/.local/share/helix/knowledge.db`; the folder list is `mobius/knowledge-folders.json`.
+
+* **Add a folder** (system folder picker): text and code files under 300 KB, up to 3000 per folder; hidden folders, `node_modules`, `target`, `dist` and the like, and symlinks are skipped; `/`, the home folder itself, `/tmp`, `/var` and system folders are refused. Reading runs in the background with progress and **Stop**.
+* A page is a file (title = its path inside the folder, pack = `folder:<path>`, tier = yours). Reading again costs only changed passages, and pages whose files are gone are dropped.
+* **Remove** a folder deletes its pack: pages, passages, vectors and links. The person's files are never touched.
+* The same embedding model as the Act hint reads passages and questions (`decide::embedder`); without it files are searchable by words and the page offers the Library download. The first read of a folder before the model exists is words only, and a later read adds the vectors.
+* **Try a search** shows what Mobius would find, marking results found by meaning. Everything is local.
+
+Tests: `knowledge::` unit tests (what is collected and skipped, a symlink loop, updating and forgetting, stopping, refused folders) and the nested `mobius-knowledge` (a fake picker, the real embedding model when present).
+
+## In chat
+
+When a message is sent to a model **on this computer**, `dispatch_turn` asks `knowledge::relevant` for passages and, if any come back, appends them to the system prompt (the same place and the same local-only rule as the memory) and writes them onto the reply's stats, so the reply shows **From your files · N**, which opens to the passages the model saw.
+
+* **Relevance cut-off 0.60** cosine similarity (`MIN_SIMILARITY`). Measured with the real model on this project's docs: questions the pages answer scored 0.62 to 0.77 against their best passage (median 0.70) and questions they cannot answer 0.46 to 0.58, so 0.60 separates them cleanly there. It is one corpus; if other folders disagree, this is the number to revisit. A hit found only by its words has no similarity and is never handed over: a shared word is too loose to give a model as evidence.
+* At most four passages of at most 900 characters, each from a different file.
+* **Needs the meaning model.** Without it chats get nothing from folders (words alone are not trusted) and the Knowledge page says so.
+* **Never to a cloud model.** The gate is the turn's route being local, as for the memory.
+* The passages are quoted material: the prompt says so and tells the model never to follow instructions written inside them.
+* A switch in Settings → Knowledge turns it off. Saved replies keep their sources (`stats.files`); older replies load without them.
+
+Tests: `knowledge::` (selection, the prompt text), `helix-chat` (a reply keeps the passages it was given, and only that reply; old chats load) and the nested `mobius-knowledge` (a tomato-sauce question gets the cooking note, opens to show it, the passages are saved with the reply, and an unrelated question gets none).
+
+## Not built
 * Markdown export and import.
 * Facts (a short statement with its source, a confidence and whether the person confirmed it) replacing the memory file.
 * An events table (what was retrieved, used and kept) to rank by use.

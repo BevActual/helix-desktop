@@ -91,6 +91,7 @@ pick mobius-settings && run mobius-settings mobius-settings-test.sh mobius-neste
 pick mobius-cloudmodels && run mobius-cloudmodels mobius-cloudmodels-test.sh mobius-cloud-nested.sh "$WIDE"
 pick mobius-import && run mobius-import mobius-import-test.sh mobius-import-nested.sh "$WIDE"
 pick mobius-hub && run mobius-hub mobius-hub-test.sh mobius-hub-nested.sh "$WIDE"
+pick mobius-knowledge && run mobius-knowledge mobius-knowledge-test.sh mobius-knowledge-nested.sh "$WIDE"
 if pick mobius-image-generation; then
   image_models=${HELIX_MODEL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/helix/models}
   if [ -f "$image_models/image/stable-diffusion-v2-1-turbo-Q4_0.gguf" ]; then

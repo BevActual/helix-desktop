@@ -68,6 +68,11 @@ pub struct Decision {
     margin: f32,
 }
 
+/// The loaded embedding model, if one is installed. The knowledge store reads passages and questions with the same one.
+pub fn embedder() -> Option<&'static Embedder> {
+    loaded().map(|l| &l.embedder)
+}
+
 /// The route the text most resembles, when that is clear; `None` when it is not, the text is too short to tell, or no model is installed.
 pub fn decide(text: &str) -> Option<Decision> {
     let text: String = text.trim().chars().take(300).collect();
