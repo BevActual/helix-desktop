@@ -446,11 +446,19 @@ pub fn import_name(path: &Path) -> Result<String, String> {
         .file_name()
         .and_then(|n| n.to_str())
         .ok_or("That file has no usable name.")?;
-    let stem = raw.strip_suffix(".gguf").or_else(|| raw.strip_suffix(".GGUF"));
+    let stem = raw
+        .strip_suffix(".gguf")
+        .or_else(|| raw.strip_suffix(".GGUF"));
     let stem = stem.ok_or("Only .gguf model files can be added.")?;
     let cleaned: String = stem
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') { c } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     let cleaned = cleaned.trim_start_matches('.').to_string();
     let name = format!("{cleaned}.gguf");
@@ -469,7 +477,8 @@ pub fn import(path: &Path) -> Result<String, String> {
 
 fn import_into(dir: &Path, path: &Path) -> Result<String, String> {
     let name = import_name(path)?;
-    let metadata = std::fs::metadata(path).map_err(|_| "Mobius cannot read that file.".to_string())?;
+    let metadata =
+        std::fs::metadata(path).map_err(|_| "Mobius cannot read that file.".to_string())?;
     if !metadata.is_file() || metadata.len() < 1024 {
         return Err("That is not a model file.".into());
     }
@@ -484,7 +493,9 @@ fn import_into(dir: &Path, path: &Path) -> Result<String, String> {
         .iter()
         .any(|m| m.files.iter().any(|f| f.name == name))
     {
-        return Err("The library already has a model with that file name. Rename the file first.".into());
+        return Err(
+            "The library already has a model with that file name. Rename the file first.".into(),
+        );
     }
     std::fs::create_dir_all(dir).map_err(|_| "Could not create the models folder.".to_string())?;
     let target = dir.join(&name);
@@ -506,15 +517,32 @@ fn import_into(dir: &Path, path: &Path) -> Result<String, String> {
 /// Asks for a `.gguf` file with the system's file picker. `None` when the person cancels.
 pub fn pick_model_file() -> Result<Option<PathBuf>, String> {
     for (command, args) in [
-        ("zenity", vec!["--file-selection", "--title=Add a model file", "--file-filter=Model files (GGUF) | *.gguf"]),
-        ("kdialog", vec!["--getopenfilename", ".", "*.gguf", "--title", "Add a model file"]),
+        (
+            "zenity",
+            vec![
+                "--file-selection",
+                "--title=Add a model file",
+                "--file-filter=Model files (GGUF) | *.gguf",
+            ],
+        ),
+        (
+            "kdialog",
+            vec![
+                "--getopenfilename",
+                ".",
+                "*.gguf",
+                "--title",
+                "Add a model file",
+            ],
+        ),
     ] {
         if let Ok(output) = std::process::Command::new(command).args(args).output() {
             if output.status.code() == Some(1) {
                 return Ok(None);
             }
             if output.status.success() {
-                let text = String::from_utf8(output.stdout).map_err(|_| "The chosen path is not text.".to_string())?;
+                let text = String::from_utf8(output.stdout)
+                    .map_err(|_| "The chosen path is not text.".to_string())?;
                 let text = text.trim_end_matches(['\r', '\n']);
                 return Ok((!text.is_empty()).then(|| PathBuf::from(text)));
             }
@@ -536,8 +564,14 @@ mod tests {
 
     #[test]
     fn import_names_are_cleaned_and_only_gguf_is_taken() {
-        assert_eq!(import_name(Path::new("/x/My Model (Q4).gguf")).unwrap(), "My-Model--Q4-.gguf");
-        assert_eq!(import_name(Path::new("/x/.hidden.gguf")).unwrap(), "hidden.gguf");
+        assert_eq!(
+            import_name(Path::new("/x/My Model (Q4).gguf")).unwrap(),
+            "My-Model--Q4-.gguf"
+        );
+        assert_eq!(
+            import_name(Path::new("/x/.hidden.gguf")).unwrap(),
+            "hidden.gguf"
+        );
         assert!(import_name(Path::new("/x/notes.txt")).is_err());
         assert!(import_name(Path::new("/x/.gguf")).is_err());
     }
@@ -551,18 +585,30 @@ mod tests {
         std::fs::write(from.join("my model.gguf"), &good).unwrap();
         std::fs::write(from.join("fake.gguf"), vec![b'x'; 4096]).unwrap();
         std::fs::write(from.join("tiny.gguf"), b"GGUF").unwrap();
-        assert_eq!(import_into(&into, &from.join("my model.gguf")).unwrap(), "my-model.gguf");
+        assert_eq!(
+            import_into(&into, &from.join("my model.gguf")).unwrap(),
+            "my-model.gguf"
+        );
         assert!(into.join("my-model.gguf").is_file());
-        assert!(import_into(&into, &from.join("my model.gguf")).unwrap_err().contains("already"));
-        assert!(import_into(&into, &from.join("fake.gguf")).unwrap_err().contains("GGUF"));
+        assert!(import_into(&into, &from.join("my model.gguf"))
+            .unwrap_err()
+            .contains("already"));
+        assert!(import_into(&into, &from.join("fake.gguf"))
+            .unwrap_err()
+            .contains("GGUF"));
         assert!(import_into(&into, &from.join("tiny.gguf")).is_err());
         // it is listed, as the person's own, and can be removed; a catalog file cannot be removed by its file name
-        assert!(unknown_models(&into).iter().any(|(name, _)| name == "my-model.gguf"));
+        assert!(unknown_models(&into)
+            .iter()
+            .any(|(name, _)| name == "my-model.gguf"));
         assert!(remove_in(&into, "../my-model.gguf").is_err());
         assert!(remove_in(&into, model_catalog::CATALOG[2].files[0].name).is_err());
         remove_in(&into, "my-model.gguf").unwrap();
         assert!(!into.join("my-model.gguf").exists());
-        assert!(from.join("my model.gguf").exists(), "the original is untouched");
+        assert!(
+            from.join("my model.gguf").exists(),
+            "the original is untouched"
+        );
     }
 
     #[test]

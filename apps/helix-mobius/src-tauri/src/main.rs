@@ -2859,11 +2859,9 @@ async fn library_remove(app: AppHandle, id: String) -> Result<(), String> {
 /// Asks for a `.gguf` file and adds it to the models folder. `None` when the person cancels; otherwise the name it was kept under.
 #[tauri::command]
 async fn library_import(app: AppHandle) -> Result<Option<String>, String> {
-    let added = tauri::async_runtime::spawn_blocking(|| {
-        match library::pick_model_file()? {
-            Some(path) => library::import(&path).map(Some),
-            None => Ok(None),
-        }
+    let added = tauri::async_runtime::spawn_blocking(|| match library::pick_model_file()? {
+        Some(path) => library::import(&path).map(Some),
+        None => Ok(None),
     })
     .await
     .map_err(|e| e.to_string())??;
