@@ -146,7 +146,12 @@ pub struct Message {
 
 impl Message {
     fn wire_text(&self) -> String {
-        let mut text = self.text.clone();
+        // A reasoning model's own thinking is not history: only its answer is sent back.
+        let mut text = if self.role == Role::Assistant {
+            markdown::strip_thinking(&self.text)
+        } else {
+            self.text.clone()
+        };
         if self.role == Role::Assistant && !self.activities.is_empty() {
             let mut observations = String::new();
             for activity in self
@@ -325,13 +330,16 @@ impl Conversation {
         if first.role != Role::User
             || reply.role != Role::Assistant
             || !self.analysis_job.is_empty()
-            || reply.text.trim().is_empty()
+            || markdown::strip_thinking(&reply.text).trim().is_empty()
             || self.title != title_of(&first.text)
         {
             return None;
         }
         let excerpt = |text: &str| text.chars().take(600).collect::<String>();
-        Some((excerpt(&first.text), excerpt(&reply.text)))
+        Some((
+            excerpt(&first.text),
+            excerpt(&markdown::strip_thinking(&reply.text)),
+        ))
     }
 
     /// The messages that ask for the title.
@@ -348,7 +356,7 @@ impl Conversation {
         if self.id != id || self.title != made_with {
             return false;
         }
-        match clean_title(raw) {
+        match clean_title(&markdown::strip_thinking(raw)) {
             Some(title) => {
                 self.title = title;
                 true
@@ -1046,7 +1054,7 @@ fn view_of(message: &Message) -> MessageView {
         role: message.role,
         text: message.text.clone(),
         blocks: if message.role == Role::Assistant {
-            markdown::parse(&message.text)
+            markdown::parse_reply(&message.text)
         } else {
             Vec::new()
         },
@@ -1641,7 +1649,7 @@ impl Chat {
             .messages
             .last()
             .filter(|m| m.role == Role::Assistant)
-            .map(|m| markdown::parse(&markdown::close_open_marks(&m.text)))
+            .map(|m| markdown::parse_reply(&markdown::close_open_marks(&m.text)))
             .unwrap_or_default()
     }
 
@@ -1709,7 +1717,14 @@ impl Chat {
             out.push_str("## ");
             out.push_str(role);
             out.push_str("\n\n");
-            out.push_str(message.text.trim());
+            out.push_str(
+                if message.role == Role::Assistant {
+                    markdown::strip_thinking(&message.text)
+                } else {
+                    message.text.clone()
+                }
+                .trim(),
+            );
             out.push_str("\n\n");
             for activity in &message.activities {
                 out.push_str(&format!(

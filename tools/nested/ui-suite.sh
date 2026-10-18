@@ -51,6 +51,7 @@ pick mobius-chart   && run mobius-chart mobius-chart-test.sh mobius-nested.sh "$
 pick mobius-ephemeral && run mobius-ephemeral mobius-ephemeral-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Which colour?\n\n```ui\n{"type":"stats","title":"Today","items":[{"label":"Steps","value":"8,412"},{"label":"Sleep","value":"7h 20m"}]}\n```\n\n```ui\n{"type":"form","title":"Your details","submit":"Send","fields":[{"name":"name","label":"Name","type":"text"},{"label":"Level","type":"select","options":["Beginner","Expert"]}]}\n```\n\n```ui\n{"type":"checklist","title":"Steps","items":["Open the app","Pick a file",{"label":"Save","done":true}]}\n```\n\n```ui\n{"type":"choices","question":"Pick one","options":["Red","Blue","Green"]}\n```\n'
 pick mobius-cloud   && run mobius-cloud mobius-cloud-test.sh mobius-cloud-nested.sh "$WIDE"
 pick mobius-memory  && run mobius-memory mobius-memory-test.sh mobius-nested.sh "$WIDE" HELIX_MOBIUS_LOG_PROMPT=1
+pick mobius-think   && run mobius-think mobius-think-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=<think>The person asks for a sum. 2 plus 2 is 4.</think>\n\nIt is **4**.'
 pick mobius-hint    && run mobius-hint mobius-hint-test.sh mobius-nested.sh "$WIDE" "HELIX_EMBED_DIR=${HELIX_EMBED_DIR:-$HOME/.cache/helix-experiments/embed/bge-small-en-v1.5}"
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

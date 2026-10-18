@@ -39,6 +39,11 @@ pub enum Block {
         rows: Vec<Vec<Vec<Span>>>,
         alignments: Vec<Alignment>,
     },
+    /// A reasoning model's `<think>` text, shown folded. `done` is false while it is still being written.
+    Thinking {
+        text: String,
+        done: bool,
+    },
     Rule,
 }
 
@@ -262,6 +267,40 @@ pub fn close_open_marks(text: &str) -> String {
     }
     out.push_str(&kept);
     out
+}
+
+/// Splits the `<think>…</think>` text a reasoning model writes before its answer: the thinking (and whether it has ended) and the answer.
+/// Only a tag at the very start counts, so a reply that merely mentions the tag is left alone.
+pub fn split_thinking(text: &str) -> (Option<(String, bool)>, &str) {
+    let trimmed = text.trim_start();
+    let Some(rest) = trimmed.strip_prefix("<think>") else {
+        return (None, text);
+    };
+    match rest.split_once("</think>") {
+        Some((thought, answer)) => (
+            Some((thought.trim().to_string(), true)),
+            answer.trim_start(),
+        ),
+        None => (Some((rest.trim().to_string(), false)), ""),
+    }
+}
+
+/// The answer without the thinking: what is shown as the reply and what is sent back to a model as history.
+pub fn strip_thinking(text: &str) -> String {
+    split_thinking(text).1.to_string()
+}
+
+/// A reply as blocks: a folded Thinking block first when the model thought aloud, then the answer.
+pub fn parse_reply(text: &str) -> Vec<Block> {
+    let (thinking, answer) = split_thinking(text);
+    let mut blocks = Vec::new();
+    if let Some((text, done)) = thinking {
+        if !text.is_empty() || !done {
+            blocks.push(Block::Thinking { text, done });
+        }
+    }
+    blocks.extend(parse(answer));
+    blocks
 }
 
 pub fn parse(input: &str) -> Vec<Block> {
@@ -705,5 +744,34 @@ mod tests {
         let whole = save_draft("# Title\n\nTwo blocks:\n\n```rs\na\n```\n\n```rs\nb\n```");
         assert!(whole.body.contains("Two blocks"));
         assert_eq!(whole.default_filename, "mobius-reply.md");
+    }
+}
+
+#[cfg(test)]
+mod thinking_tests {
+    use super::*;
+
+    #[test]
+    fn splits_the_prelude_from_the_answer() {
+        let (t, a) = split_thinking("<think>\nhmm, 2+2\n</think>\n\nIt is 4.");
+        assert_eq!(t, Some(("hmm, 2+2".to_string(), true)));
+        assert_eq!(a, "It is 4.");
+        let (t, a) = split_thinking("<think>still thinking");
+        assert_eq!(t, Some(("still thinking".to_string(), false)));
+        assert_eq!(a, "");
+        assert_eq!(split_thinking("Use the <think> tag like this").0, None);
+        assert_eq!(strip_thinking("<think>x</think>Hi"), "Hi");
+    }
+
+    #[test]
+    fn a_reply_has_a_folded_block_then_its_answer() {
+        let blocks = parse_reply("<think>why</think>Because.");
+        assert!(matches!(&blocks[0], Block::Thinking { text, done: true } if text == "why"));
+        assert!(matches!(blocks[1], Block::Paragraph { .. }));
+        assert!(matches!(
+            parse_reply("<think>x")[0],
+            Block::Thinking { done: false, .. }
+        ));
+        assert_eq!(parse_reply("plain"), parse("plain"));
     }
 }
