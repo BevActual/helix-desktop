@@ -1706,3 +1706,45 @@ textarea, .stage textarea { user-select: text; -webkit-user-select: text; }
 @keyframes stage-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
 body.chat .stage-host .stage { animation: stage-in .22s cubic-bezier(.2, .7, .2, 1); }
 @media (prefers-reduced-motion: reduce) { body.chat .stage-host .stage { animation: none; } }
+/* ---- Chat: the home, the composer in the middle of an empty chat ---------------------------------------------------------------------- */
+body.chat.is-home #chat-surface { justify-content: center; padding-bottom: 6vh; }
+body.chat.is-home #chat-surface > header { position: absolute; top: 0; left: 0; right: 0; }
+body.chat.is-home #scroller { flex: none; overflow: visible; padding: 0 24px; }
+body.chat.is-home #empty { margin: 0 auto 18px; text-align: center; max-width: 720px; animation: sheet-rise .3s var(--ease); }
+body.chat.is-home #empty .empty-title { font-size: clamp(30px, 5vw, 40px); font-weight: 700; letter-spacing: -.03em; }
+body.chat.is-home #empty .empty-note { margin: 8px 0 0; font-size: 16px; color: var(--label-2); }
+body.chat.is-home #jump-latest, body.chat.is-home #messages { display: none; }
+body.chat.is-home .composer-wrap { margin-bottom: 14px; }
+body.chat.is-home #composer { border-radius: 26px; padding: 14px 14px 14px 14px; box-shadow: inset 0 0 0 .5px var(--hairline), 0 14px 44px rgba(0,0,0,.18); transition: box-shadow .25s var(--ease); }
+body.chat.is-home #composer:focus-within { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, var(--hairline)), 0 16px 50px rgba(0,0,0,.24); }
+.home-below-host { display: none; }
+body.chat.is-home .home-below-host { display: block; max-width: 720px; width: calc(100% - 48px); margin: 0 auto; animation: sheet-rise .36s var(--ease); }
+.welcome-quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.welcome-quick .welcome-tool { padding: 12px 14px; align-items: center; } body.chat .welcome-quick .welcome-tool-text > span { display: none; }
+.welcome-quick .welcome-tool-text strong { font-size: 13.5px; }
+.welcome-morebar { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.home-below-host .welcome-tools { margin-top: 10px; }
+.welcome-recent { margin-top: 22px; } .welcome-recent h3 { margin: 0 0 6px; font-size: 12px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--label-3); }
+.welcome-recent button { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 9px 12px; border-radius: 10px; background: transparent; text-align: left; font-size: 14px; } .welcome-recent button:hover { background: var(--fill-2); } .welcome-recent em { font-style: normal; font-size: 12px; color: var(--label-3); }
+.home-below-host .welcome-starters { margin-top: 16px; } .home-below-host .suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Quiet chips: the model, Tools when on, and a menu for the rest. */
+body.chat #composer-meta .meta-chip:not(#meta-model):not(#meta-tools):not(#meta-more):not(#loading-chip):not(#analysis-evidence) { display: none; }
+body.chat #composer-meta #meta-more { font-weight: 700; letter-spacing: .08em; padding-inline: 10px; }
+/* The sidebar's footer is a row of three quiet icons (temporary chat, models, the Mobius menu): the places that matter are above it. */
+body.chat #side-footer { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; padding-top: 10px; }
+body.chat #side-footer .temp-chat, body.chat #side-footer .open-models, body.chat #side-footer .hub-toggle { width: 38px; height: 34px; padding: 0; justify-content: center; border-radius: 10px; background: transparent; box-shadow: none; color: var(--label-2); }
+body.chat #side-footer .temp-chat span, body.chat #side-footer .open-models span, body.chat #side-footer .hub-toggle span { display: none; }
+body.chat #side-footer .temp-chat:hover, body.chat #side-footer .open-models:hover, body.chat #side-footer .hub-toggle:hover { background: var(--fill-2); color: var(--label); }
+body.chat.stage-open #side-footer { display: none; }
+/* A conversation reads like a page: a measure that is comfortable, set a little larger and looser. */
+body.chat .msg.assistant .msg-body { font-size: 15.5px; line-height: 1.68; letter-spacing: -.003em; }
+body.chat .msg.assistant .msg-body p { margin: 0 0 .85em; } body.chat .msg.assistant .msg-body h3, body.chat .msg.assistant .msg-body h4 { margin: 1.2em 0 .4em; letter-spacing: -.015em; }
+body.chat .msg.user .msg-body { font-size: 15.5px; line-height: 1.5; }
+body.chat .msg-pending, body.chat .typing-dots { opacity: .9; }
+body.chat .code-block { border-radius: 12px; overflow: hidden; } body.chat .code-block pre { font-size: 13px; line-height: 1.55; }
+body.chat #side-footer .temp-chat, body.chat #side-footer .open-models, body.chat #side-footer .hub-toggle { flex: 1; width: auto; }
+/* Message actions are there when wanted and quiet otherwise. */
+body.chat .msg-actions button { color: var(--label-3); font-size: 12px; transition: color .15s, background .15s; }
+body.chat .msg:hover .msg-actions button, body.chat .msg-actions:focus-within button { color: var(--label-2); }
+body.chat .msg-actions button:hover { color: var(--label); background: var(--fill-2); }
+body.chat .msg-stats { color: var(--label-3); font-size: 11.5px; }

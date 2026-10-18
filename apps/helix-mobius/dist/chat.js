@@ -910,7 +910,8 @@ function drawSuggestions() {
 
 function openMeta(kind) {
   const anchor = $(kind === "persona" ? "meta-persona" : "meta-style");
-  const box = (!anchor.hidden ? anchor : $("composer")).getBoundingClientRect();
+  const shown = !anchor.hidden && anchor.getBoundingClientRect().width > 0;
+  const box = (shown ? anchor : $("meta-more")).getBoundingClientRect();
   if (reactDialogs) reactDialogs.openMenu(kind, { left: box.left, top: box.top, width: box.width });
 }
 
@@ -1046,6 +1047,22 @@ listen("image-progress", () => {
   drawComposerMeta();
 });
 
+// The composer moves between the middle of the window (an empty chat) and the bottom (a conversation) with a short, decelerating glide, so the
+// change of layout is something that happened rather than something that flickered. Skipped for people who ask for less motion.
+function setHome(on) {
+  if (document.body.classList.contains("is-home") === on) return;
+  const wrap = document.querySelector(".composer-wrap");
+  const before = wrap ? wrap.getBoundingClientRect() : null;
+  document.body.classList.toggle("is-home", on);
+  if (!wrap || !before || window.matchMedia("(prefers-reduced-motion: reduce)").matches || !wrap.animate) return;
+  const after = wrap.getBoundingClientRect();
+  const dy = before.top - after.top;
+  if (Math.abs(dy) < 4) return;
+  const glide = wrap.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 340, easing: "cubic-bezier(.2, .7, .2, 1)" });
+  // The layout report (the tests read it) must describe where the composer ended up, not where it was part-way.
+  glide.finished.then(() => queueReport(), () => undefined);
+}
+
 function drawChat() {
   $("analysis-evidence").hidden = !view.analysis_job;
   if (!view.streaming) $("loading-chip").hidden = true;
@@ -1058,7 +1075,10 @@ function drawChat() {
     host.replaceChildren();
     view.messages.forEach((message, index) => host.append(messageNode(message, index, index === view.messages.length - 1)));
   }
-  $("empty").hidden = view.messages.length > 0 || (view.tasks || []).length > 0;
+  const emptyChat = view.messages.length === 0 && (view.tasks || []).length === 0;
+  $("empty").hidden = !emptyChat;
+  // An empty chat is a home: the greeting and the composer sit in the middle of the window, and the composer settles to the bottom with the first message.
+  setHome(emptyChat && workspace === "chat");
   $("send").hidden = view.streaming;
   $("stop").hidden = !view.streaming;
   $("input").disabled = false;
@@ -1226,6 +1246,7 @@ function drawProjectFilter() {
 
 function drawList(items) {
   if (items) chatItems = items;
+  reactWelcome?.recents(chatItems.filter((c) => !c.temporary).slice(0, 3).map((c) => ({ id: c.id, title: c.title, project: c.project })));
   if (reactChats) { reactChats.set(chatItems, view.id); return; }
   const host = $("chats");
   host.replaceChildren();
@@ -1675,6 +1696,38 @@ $("find-input").addEventListener("keydown", (event) => {
 $("find-prev").onclick = () => focusFindMatch(findIndex - 1);
 $("find-next").onclick = () => focusFindMatch(findIndex + 1);
 $("find-close").onclick = () => { closeFindBar(); input.focus(); };
+
+// The chips beside the composer are quiet: the model, Tools when on, and a "⋯" that opens the rest (persona, style, where it runs, context).
+function openMoreMenu() {
+  document.querySelectorAll(".more-menu").forEach((m) => m.remove());
+  const box = $("meta-more").getBoundingClientRect();
+  const menu = el("div", "hx-menu more-menu");
+  menu.dataset.test = "menu-more";
+  menu.style.left = Math.max(8, Math.min(box.left, window.innerWidth - 300)) + "px";
+  menu.style.bottom = (window.innerHeight - box.top + 6) + "px";
+  menu.style.minWidth = "260px";
+  const add = (id, title, sub, chip) => {
+    const b = el("button", "hx-menu-item");
+    b.type = "button";
+    b.dataset.test = "menu-more-" + id;
+    const text = el("span", "mi-text");
+    text.append(el("span", "mi-title", title));
+    if (sub) text.append(el("span", "mi-sub", sub));
+    b.append(text);
+    b.onclick = () => { menu.remove(); chip.click(); };
+    menu.append(b);
+  };
+  if (!$("meta-persona").hidden) add("persona", "Persona", $("meta-persona").textContent, $("meta-persona"));
+  if (!$("meta-style").hidden) add("style", "Style", $("meta-style").textContent.replace(/^Style\s*·?\s*/, "") || "None", $("meta-style"));
+  add("route", "Where it runs", $("meta-route").textContent || "On this computer", $("meta-route"));
+  add("context", "Context and brief", "What this chat keeps in mind", $("meta-context"));
+  if (!$("meta-agent-desk").hidden) add("desk", "Agent desk", "", $("meta-agent-desk"));
+  document.body.append(menu);
+  const close = (event) => { if (!menu.contains(event.target)) { menu.remove(); window.removeEventListener("mousedown", close, true); window.removeEventListener("keydown", esc, true); } };
+  const esc = (event) => { if (event.key === "Escape") { menu.remove(); window.removeEventListener("mousedown", close, true); window.removeEventListener("keydown", esc, true); } };
+  setTimeout(() => { window.addEventListener("mousedown", close, true); window.addEventListener("keydown", esc, true); }, 0);
+}
+$("meta-more").onclick = () => openMoreMenu();
 $("meta-model").onclick = () => {
   // A small menu above the chip: one click switches. The full sheet (other backends, a custom id) is its last row.
   if (!reactDialogs) { openModelPicker().catch(report); return; }
@@ -2500,6 +2553,7 @@ $("route-probe-cloud").onclick = () => {
   if (window.HelixMobiusReact?.welcome) {
     reactWelcome = window.HelixMobiusReact.welcome(host, {
       starter: useStarter,
+      open: (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report),
       action: (action) => {
         if (action === "web") openWeb();
         else if (action === "files") pickAttachments();
@@ -2508,6 +2562,8 @@ $("route-probe-cloud").onclick = () => {
         else if (action === "voice") dictateButton.click();
         else if (action === "analysis") $("open-analysis").click();
         else if (action === "brief") openChatContext();
+        else if (action === "write") setWorkspace("write");
+        else if (action === "code") setWorkspace("code");
         else if (action === "tools") {
           reactTools?.open(view);
           useStarter("Research this with public sources. Cite pages in the answer.");
@@ -2552,7 +2608,7 @@ function sendReport() {
   invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, elements, errors: layoutErrors.slice(-10) } });
 }
 window.addEventListener("resize", queueReport);
-new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "hidden"] });
+new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "hidden", "class"] });
 
 invoke("layout_reporting").then((on) => { reporting = on; if (on) queueReport(); });
 invoke("chat_status").then((s) => { status = s; drawChat(); });

@@ -20,11 +20,11 @@ PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
 echo "--- 1. chips replace the rail"
-wait_id meta-persona && wait_id meta-style && echo "ok: persona and style chips are in the composer" || fail "chips missing"
+wait_id meta-more && click_id meta-more && wait_id menu-more-persona && wait_id menu-more-style && echo "ok: persona and style are in the settings menu" || fail "settings entries missing"; wtype -k Escape; sleep 0.5
 has_id persona-dot-0 && fail "the persona rail is still shown with the chip on" || echo "ok: the rail is hidden while the chip is on"
 shot lab-chips
 echo "--- 2. persona menu"
-click_id meta-persona; sleep 0.8
+click_id meta-more; click_id menu-more-persona; sleep 0.8
 wait_id menu-persona && echo "ok: the persona menu opened" || fail "no persona menu"
 wait_id menu-persona-new && echo "ok: it offers New persona" || fail "no new persona entry"
 shot lab-persona-menu
@@ -37,7 +37,7 @@ echo "--- 3. the persona's starters show on an empty chat"
 wait_id suggestion-0 && echo "ok: starters are on the empty chat" || fail "no suggestions"
 shot lab-starters
 echo "--- 4. style overlay reaches the prompt"
-click_id meta-style; sleep 0.8
+click_id meta-more; click_id menu-more-style; sleep 0.8
 wait_id menu-style-concise && echo "ok: the style menu lists styles" || fail "no style menu"
 click_id menu-style-concise; sleep 1
 click_id input; wtype "How does cron work?"; wtype -k Return
@@ -70,5 +70,5 @@ wait_id models-nav-advanced && click_id models-nav-advanced; sleep 0.8
 wait_id experiment-style_overlays && echo "ok: the experiments are listed" || fail "no experiments panel"
 click_id experiment-style_overlays; sleep 0.8
 click_id models-save; sleep 1.5
-has_id meta-style && fail "the style chip stayed after turning the experiment off" || echo "ok: turning style overlays off removes the chip"
+click_id meta-more; sleep 0.5; has_id menu-more-style && fail "the style entry stayed after turning the experiment off" || echo "ok: turning style overlays off removes the chip"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

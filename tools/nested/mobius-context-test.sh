@@ -31,7 +31,7 @@ paste_id() {
 }
 click_id chat-0
 has_id context-boundary || { echo 'FAIL: no recent-history boundary'; exit 1; }
-click_id meta-context
+click_id meta-more; click_id menu-more-context
 for _ in $(seq 1 40); do has_id context-panel && break; sleep 0.25; done
 has_id context-history-notice || { echo 'FAIL: omitted history is not explained'; exit 1; }
 paste_id context-brief 'Goal: keep Helix offline. Decision: retain GPU sandboxing.'
@@ -44,7 +44,7 @@ assert p.stat().st_mode & 0o777 == 0o600
 PY
 paste_id input 'What should we keep in mind?'
 click_id send
-click_id meta-context
+click_id meta-more; click_id menu-more-context
 has_id context-streaming-notice || { echo 'FAIL: brief editing is not locked during a reply'; exit 1; }
 click_id context-close
 click_id stop
@@ -52,7 +52,7 @@ for _ in $(seq 1 80); do ! has_id stop && break; sleep 0.25; done
 grep -q 'MOBIUS system-prompt .*Goal: keep Helix offline. Decision: retain GPU sandboxing.' "$SCRATCH/program.log" || { echo 'FAIL: brief was not sent to inference'; exit 1; }
 click_id new-chat
 click_id chat-0
-click_id meta-context
+click_id meta-more; click_id menu-more-context
 for _ in $(seq 1 40); do has_id context-panel && break; sleep 0.25; done
 has_id context-history-notice || { echo 'FAIL: saved history report missing'; exit 1; }
 click_id context-brief-clear
@@ -63,12 +63,12 @@ assert json.load(open(sys.argv[1]))['brief']==''
 PY
 # A brief-only draft is saved and remains accessible before its first message.
 click_id new-chat
-click_id meta-context
+click_id meta-more; click_id menu-more-context
 paste_id context-brief 'Draft goal: plan tomorrow.'
 click_id context-save
 click_id new-chat
 click_id chat-0
-click_id meta-context
+click_id meta-more; click_id menu-more-context
 has_id context-brief-clear || { echo 'FAIL: brief-only draft could not be reopened'; exit 1; }
 click_id context-brief-clear
 click_id context-save
@@ -78,7 +78,7 @@ assert not any('Draft goal: plan tomorrow.' in p.read_text() for p in pathlib.Pa
 PY
 # Temporary briefs never create a saved conversation.
 click_id temp-chat
-click_id meta-context
+click_id meta-more; click_id menu-more-context
 paste_id context-brief 'Temporary private goal.'
 click_id context-save
 python3 - "$SCRATCH/data/helix/mobius/chats" <<'PY'

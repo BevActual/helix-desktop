@@ -19,6 +19,9 @@ click_id() {
   "$PT" $pos click; sleep 0.8
 }
 wait_id() { for _ in $(seq 1 60); do has_id "$1" && return; sleep 0.25; done; echo "FAIL: missing $1"; exit 1; }
+more() { has_id welcome-files || click_id welcome-more; }
+wait_id welcome-more
+more
 wait_id welcome-files
 for id in tools web picture image voice analysis brief models; do has_id "welcome-$id" || { echo "FAIL: no $id task"; exit 1; }; done
 click_id welcome-tools
@@ -39,24 +42,24 @@ wait_id welcome-image
 click_id welcome-image
 wait_id create-image-panel
 click_id create-image-close
-click_id welcome-analysis
+more; click_id welcome-analysis
 wait_id analysis-panel
 click_id analysis-close
-click_id welcome-brief
+more; click_id welcome-brief
 wait_id context-panel
 click_id context-close
 click_id welcome-models
 wait_id models-back
 click_id models-back
-click_id welcome-files
+more; click_id welcome-files
 wait_id attach-chip-0
 click_id attach-remove-0
-click_id welcome-picture
+more; click_id welcome-picture
 wait_id picture-remove-0
 click_id picture-remove-0
-click_id welcome-voice
+more; click_id welcome-voice
 wait_id welcome-recording
-click_id welcome-voice
+more; click_id welcome-voice
 for _ in $(seq 1 80); do grep -q 'MOBIUS dictated 19 characters' "$SCRATCH/program.log" && break; sleep 0.25; done
 grep -q 'MOBIUS dictated 19 characters' "$SCRATCH/program.log" || { echo 'FAIL: welcome dictation did not transcribe'; exit 1; }
 has_id msg-0 && { echo 'FAIL: dictation sent without review'; exit 1; }

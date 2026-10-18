@@ -17,7 +17,7 @@ print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
-has_id meta-persona && echo "ok: the persona chip is beside the composer" || fail "no persona chip"
+has_id meta-more && echo "ok: the chat settings menu is beside the composer" || fail "no settings chip"
 click_id input; wtype "How does cron work?"; wtype -k Return
 for _ in $(seq 1 120); do grep -q "MOBIUS turn ended" "$LOG" && break; sleep 0.25; done; sleep 1
 echo "--- 1. rename"
@@ -36,12 +36,12 @@ grep -q "Homelab" "$F" && echo "ok: the project was saved" || fail "project not 
 for _ in $(seq 1 20); do has_id project-filter && break; sleep 0.25; done
 has_id project-filter && echo "ok: the project filter appeared" || fail "no project filter"
 echo "--- 3. a persona"
-click_id meta-persona; sleep 1
+click_id meta-more; click_id menu-more-persona; sleep 1
 click_id menu-persona-new; sleep 0.8
 has_id persona-edit-name && echo "ok: the persona sheet opened (from the persona menu)" || fail "no persona sheet"
 shot persona-sheet
 wtype " Two"; sleep 0.3; click_id persona-save; sleep 1.5
-click_id meta-persona; sleep 1
+click_id meta-more; click_id menu-more-persona; sleep 1
 has_id menu-persona-1 && echo "ok: the new persona is in the persona menu" || fail "persona missing"
 wtype -k Escape; sleep 0.5
 echo "--- 4. model picker"
