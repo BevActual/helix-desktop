@@ -1468,3 +1468,15 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .chart svg { width: 100%; height: auto; display: block; }
 .chart .chart-text { fill: var(--label-2); font-size: 11px; }
 .chart .chart-grid { stroke: var(--hairline); stroke-width: 1; }
+.eph { margin: 10px 0; padding: 12px; border: 1px solid var(--hairline); border-radius: 12px; background: var(--fill-1); max-width: 520px; }
+.eph h4 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
+.eph-question { margin: 0 0 8px; font-weight: 600; }
+.eph-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.eph-options button.chosen { background: var(--accent); color: var(--on-accent); }
+.eph-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.eph-card { padding: 8px 10px; border-radius: 10px; background: var(--fill-2); display: flex; flex-direction: column; gap: 2px; }
+.eph-card span { font-size: 11.5px; color: var(--label-2); } .eph-card strong { font-size: 18px; }
+.eph-field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; font-size: 12.5px; }
+.eph-field > span { color: var(--label-2); }
+.eph-toggle { flex-direction: row; align-items: center; justify-content: space-between; }
+.eph-actions { display: flex; justify-content: flex-end; }

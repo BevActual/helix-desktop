@@ -117,3 +117,21 @@ What each does that a local, private desktop assistant could use, and what we le
 ### Charts in replies (done)
 
 A reply can show numbers as a chart: a fenced block labelled `chart` holding JSON (`type` bar, line or pie; `labels` and `values`, or `series` of named values, or `data` pairs). Mobius draws it as an SVG from fixed shapes, with hover values, an accessible description and the theme's colours; the model only writes data and nothing it sends is run. Up to 60 points and 6 series; a block that does not parse stays an ordinary code block (so a small model's malformed JSON costs nothing). The system prompt says how in one sentence. `apps/helix-mobius/web/src/chart.tsx`, `tools/nested/mobius-chart-test.sh`. Next in the same family: diagrams from a few lines of text, and the side panel that keeps what was made.
+
+
+### Ephemeral UI (done: choices, form, figures)
+
+A piece of interface that exists for one moment, asked for by the reply and drawn by Mobius: a fenced block labelled `ui` holding JSON, one of
+`choices` (a question and 2 to 8 options), `form` (up to 8 fields: text, number, select, toggle), `stats` (up to 8 label and value cards).
+`chart` is the same idea for data. The rules that keep it safe and calm:
+
+* **The model describes, Mobius draws.** A fixed set of components; never markup, never script. Anything that does not parse stays a code
+  block, so a small model's malformed JSON costs nothing.
+* **What the person does goes back as an ordinary message** (the option, or "Your details / - Name: Ada / - Level: Beginner"), so the chat
+  is the record and nothing hidden changes state.
+* **Only the newest reply is live.** Older blocks stay as read-only records, a used one shows what was chosen, and a reply that is still being
+  written cannot be answered yet.
+
+`apps/helix-mobius/web/src/ephemeral.tsx`, `tools/nested/mobius-ephemeral-test.sh`. Next components, in order of use: a checklist and steps that
+the person ticks, a diff with accept and reject per hunk (the Changes panel), a diagram from a few lines of text, a confirm card for an Act or
+Tools step, and a date or file picker. The same renderer is what the side panel for what was made would host.

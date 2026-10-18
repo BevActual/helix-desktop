@@ -1,4 +1,5 @@
 import { Chart, parseChart } from "./chart";
+import { Ephemeral, parseUi } from "./ephemeral";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Icon, invoke, listen } from "@helix/ui";
@@ -68,6 +69,8 @@ export interface ThreadHooks {
   quote: (text: string) => void;
   fork: (index: number) => void;
   report: (error: unknown) => void;
+  /** Sends this text as the next message (what the person chose or filled in on a piece of ephemeral UI). */
+  send: (text: string) => void;
   /** Asks the shell to write this task's previous value back. */
   undo: (id: number) => void;
 }
@@ -121,7 +124,7 @@ function Spans({ spans, needle }: { spans: Span[]; needle: string }) {
   );
 }
 
-function Blocks({ blocks, needle, report, onSaveSnippet }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void }) {
+function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void }) {
   return (
     <>
       {blocks.map((block, index) => {
@@ -180,6 +183,8 @@ function Blocks({ blocks, needle, report, onSaveSnippet }: { blocks: Block[]; ne
           case "code": {
             const chart = block.language === "chart" ? parseChart(block.text) : null;
             if (chart) return <Chart key={index} spec={chart} />;
+            const ui = block.language === "ui" ? parseUi(block.text) : null;
+            if (ui) return <Ephemeral key={index} spec={ui} live={!!live && !!onSend} onSend={onSend ?? (() => undefined)} />;
             return (
               <div key={index} className="code-block">
                 <div className="code-bar">
@@ -306,7 +311,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
                 <div className="tool-heading"><strong>{({ planning: "Choosing next step", web_search: "Search the web", web_read: "Read a page", terminal: "Project command", answer: "Write answer" } as Record<string, string>)[activity.tool] || activity.tool}</strong><span>{activity.state === "waiting" ? "Needs your review" : activity.state}</span></div>
                 {activity.state === "waiting" ? <><pre data-test="tool-command">{activity.input}</pre><p className="sheet-note">{activity.output}</p><div className="tool-review"><button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : "Allow lookup"}</button><button data-test="tool-decline" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: false }).catch(hooks.report)}>Skip</button></div></> : (activity.input || activity.output) && <details open={activity.state === "running" && activity.tool === "terminal"}><summary>Details</summary>{activity.input && <pre>{activity.input}</pre>}{activity.output && <pre>{activity.output}</pre>}</details>}
               </div>)}</section>}
-              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} />
+              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} />
               {!!message.sources?.length && <section className="answer-web-sources" data-test="answer-web-sources" aria-label="Online sources provided to the model"><strong>Online sources</strong>{message.sources.map((source, i) => <div key={`${i}:${source.url}`}><button type="button" className="web-citation" data-test={`answer-source-${index}-${i}`} title={source.url} onClick={() => invoke("web_open_source", { url: source.url }).catch(hooks.report)}>[{i + 1}] {source.title || source.url}</button><span>{source.kind === "page" ? "Page excerpt" : `Search snippet${source.provider ? ` · ${source.provider}` : ""}`} · retrieved {new Date(source.fetched * 1000).toLocaleDateString()}</span></div>)}</section>}
               {last && streaming && messages[index - 1]?.text.startsWith("/image ") && !messages[index - 1]?.sources?.length && <div className="image-progress" data-test="image-generation-progress"><p>{progress.stage}</p><progress value={Number.isFinite(progress.fraction) ? Math.max(0, Math.min(1, progress.fraction)) : 0} max={1} /><p className="sheet-note">On this computer · use Stop to cancel</p></div>}
               {!blocks.length && !message.activities?.some((activity) => activity.state === "waiting" || activity.state === "running") ? (
