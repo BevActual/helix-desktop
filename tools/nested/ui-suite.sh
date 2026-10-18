@@ -87,6 +87,7 @@ pick mobius-pictures && run mobius-pictures mobius-pictures-test.sh mobius-neste
 pick mobius-dictate && run mobius-dictate mobius-dictate-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_SEED_AUDIO=1
 pick mobius-library && run mobius-library mobius-library-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-settings && run mobius-settings mobius-settings-test.sh mobius-nested.sh "$WIDE"
+pick mobius-cloudmodels && run mobius-cloudmodels mobius-cloudmodels-test.sh mobius-cloud-nested.sh "$WIDE"
 if pick mobius-image-generation; then
   image_models=${HELIX_MODEL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/helix/models}
   if [ -f "$image_models/image/stable-diffusion-v2-1-turbo-Q4_0.gguf" ]; then

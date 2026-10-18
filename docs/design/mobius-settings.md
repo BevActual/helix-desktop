@@ -10,6 +10,7 @@ A rail of sections beside one column of content, the way Cursor's Settings and s
 |---|---|
 | **Models** | One row per **job**: Chat, Code, Pictures, Summaries, Act, Dictation, Image creation. Each shows the model that does it (a menu of what is installed here, on the network, or in the cloud), where it runs and how it fits this computer. A job with nothing suitable installed offers the model to get, with the reason ("The most capable model that fits your graphics card") |
 | **Library** | Every model Mobius can run: search, filter (installed, chat, code, pictures, speech, images, fits this computer), sort (best for this computer, smallest, name), Get with progress, Remove |
+| **Cloud models** | OpenRouter's catalog (471 models when measured, 2026-10-18): search by name, maker or what it does; filter (in my menu, free, sees pictures, thinks first, uses tools, long documents); sort (newest, cheapest, longest documents). Each row shows price per million tokens, context size and abilities. **Add to my menu** puts a model in the chat's model menu; **Use for…** assigns it to Chat, Code, Pictures or Summaries; any `vendor/model` id can be added by hand. Chats on these leave the computer, and Act never uses one |
 | **Providers** | Another computer on the network, and OpenRouter with its key in the Secret Service |
 | **Generation** | Temperature, longest reply, provider timeout, battery-saver rule |
 | **Experiments** | The switches for things being tried, and the routing file's path |
@@ -30,9 +31,14 @@ Its sections are General, Appearance, Agents, Tab, Models, Voice, Rules/Skills/S
 * **Per-model parameters with "Restore default parameters"** and per-role overrides (a subagent can inherit, use a default, or be disabled). Mobius's analogue is Summaries and Act following Chat unless set.
 * **A Beta page** for experiments, which Experiments already is.
 
+## Cloud models
+
+`cloud.rs` reads OpenRouter's public `/models` list (price, context, input and output kinds, supported parameters such as tools and reasoning) and keeps it in `~/.local/share/helix/mobius/openrouter-models.json`, so the page opens at once and works offline. It is fetched only when the person presses **Refresh the list**, or once the first time after OpenRouter has a key; over https only, and **without the key** (the list is public). A price OpenRouter writes as -1 ("depends on the request") is shown as "Price varies", never as free. The pins live in `cloud-pins.json`; the chat's model menu shows the pins (or, until there are any, a short default list) and a "More cloud models…" link. A model menu taller than the room above its button now scrolls, opened at its bottom.
+
+What the other products do, from their own pages: Cursor lets you add and search models in Settings and picks one itself under **Auto**; ChatGPT shows three choices (Instant, Thinking, Pro) with automatic switching to deeper reasoning behind a Configure link; OpenRouter filters by input kind, context length and series. Mobius takes the curated switcher (Cursor) and the filters and price lines (OpenRouter), and leaves automatic switching to the decision lane in `decision-model.md`.
+
 ## Not built
 
-* The model-menu curation above.
 * Finding models that are not in the curated list: search, add by link, import a `.gguf` from disk. Anything fetched needs a pinned checksum or a clear "unverified" state, a fixed https host, a size limit, and the person's yes per download.
 * A Knowledge section (indexed folders, reference packs) once `knowledge.md` is wired in.
 * Rules and Memory as sections (they are dialogs today).

@@ -1,22 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
 import { eligible, listOrder, reason, recommend, type Job, type ModelCard } from "./recommend";
-
-declare function icon(name: string): SVGElement;
-function Icon({ name }: { name: string }) {
-  const host = useRef<HTMLSpanElement>(null);
-  useEffect(() => { host.current?.replaceChildren(icon(name)); }, [name]);
-  return <span ref={host} style={{ display: "contents" }} />;
-}
+import { CloudModels, type CloudView } from "./cloudmodels";
+import { Icon, Picker, type Option } from "./settingsui";
 
 type Source = "local" | "lan" | "openrouter";
-type Section = "models" | "library" | "providers" | "generation" | "experiments";
+type Section = "models" | "library" | "cloud" | "providers" | "generation" | "experiments";
 type Task = "chat" | "act" | "code" | "summarize" | "vision";
 
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: "models", label: "Models", icon: "sparkle" },
   { id: "library", label: "Library", icon: "grid" },
-  { id: "providers", label: "Providers", icon: "bolt" },
+  { id: "cloud", label: "Cloud models", icon: "bolt" },
+  { id: "providers", label: "Providers", icon: "wifi" },
   { id: "generation", label: "Generation", icon: "settings" },
   { id: "experiments", label: "Experiments", icon: "palette" },
 ];
@@ -118,49 +114,6 @@ function ensureBackends(routing: Routing, lanUrl: string, cloudUrl: string) {
   else Object.assign(cloud, { kind: "openai", base_url: cloudUrl, label: cloud.label || "OpenRouter", api_key_ref: cloud.api_key_ref || "openrouter" });
 }
 
-interface Option { key: string; group: string; title: string; detail: string; backend: string; model: string; test: string; }
-
-/** A button that shows the current choice and opens a short list to change it. */
-function Picker({ id, label, options, current, onPick }: {
-  id: string; label: string; options: Option[]; current: string; onPick: (option: Option) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const host = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const away = (event: MouseEvent) => { if (!host.current?.contains(event.target as Node)) setOpen(false); };
-    const key = (event: KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); setOpen(false); } };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", key, true);
-    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", key, true); };
-  }, [open]);
-  const groups = [...new Set(options.map((o) => o.group))];
-  return (
-    <div className="set-picker" ref={host}>
-      <button type="button" className="set-picker-btn" data-test={`job-pick-${id}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span>{label}</span><Icon name="chevron-down" />
-      </button>
-      {open ? (
-        <div className="set-picker-menu" role="menu" data-test={`job-menu-${id}`}>
-          {groups.map((group) => (
-            <div key={group} className="set-picker-group">
-              {group ? <div className="set-picker-head">{group}</div> : null}
-              {options.filter((o) => o.group === group).map((option) => (
-                <button key={option.key} type="button" role="menuitemradio" aria-checked={option.key === current} className={`set-picker-item${option.key === current ? " on" : ""}`}
-                  data-test={option.test} onClick={() => { setOpen(false); onPick(option); }}>
-                  <span className="set-picker-title">{option.title}</span>
-                  {option.detail ? <span className="set-picker-detail">{option.detail}</span> : null}
-                  {option.key === current ? <Icon name="check" /> : null}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function DownloadBar({ card, act }: { card: Card; act: (command: string, id: string) => void }) {
   const p = card.progress;
   if (!p || p.phase === "failed") return null;
@@ -175,9 +128,9 @@ function DownloadBar({ card, act }: { card: Card; act: (command: string, id: str
 }
 
 /** One job: what it is for, which model does it, and, when nothing suitable is installed or a better one exists, what to get. */
-function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, act }: {
-  job: JobInfo; draft: Draft; cards: Card[]; lan: string[]; cloud: string[]; hasKey: boolean | null;
-  onAssign: (task: Task, backend: string, model: string) => void; onBrowse: (job: Job) => void; act: (command: string, id: string) => void;
+function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, onMoreCloud, act }: {
+  job: JobInfo; draft: Draft; cards: Card[]; lan: string[]; cloud: { id: string; name: string }[]; hasKey: boolean | null;
+  onAssign: (task: Task, backend: string, model: string) => void; onBrowse: (job: Job) => void; onMoreCloud: () => void; act: (command: string, id: string) => void;
 }) {
   const suggestion = recommend(job.id, cards) as Card | null;
   const installed = cards.filter((c) => c.installed && eligible(job.id, c)).sort(listOrder);
@@ -194,7 +147,7 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, act
       label = profile.model ? (chosen?.title ?? profile.model) : "Auto";
       where = "On this computer";
     } else {
-      label = profile.model || "Provider default";
+      label = (profile.backend === "openrouter" ? cloud.find((m) => m.id === profile.model)?.name : "") || profile.model || "Provider default";
       where = profile.backend === "lan" ? "On your network" : "Leaves this computer";
     }
   }
@@ -204,7 +157,12 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, act
     installed.forEach((c) => options.push({ key: `local|${c.file}`, group: "On this computer", title: c.title, detail: [size(c.bytes), c.fit ? FIT_WORD[c.fit] : ""].filter(Boolean).join(" · "), backend: "local", model: c.file, test: `job-opt-${job.id}-${c.id}` }));
     if (!job.local) {
       lan.slice(0, 12).forEach((m) => options.push({ key: `lan|${m}`, group: "On your network", title: m, detail: "", backend: "lan", model: m, test: `job-opt-${job.id}-lan-${m}` }));
-      if (hasKey) cloud.slice(0, 12).forEach((m) => options.push({ key: `openrouter|${m}`, group: "Cloud · leaves this computer", title: m, detail: "", backend: "openrouter", model: m, test: `job-opt-${job.id}-cloud-${m}` }));
+      if (hasKey) {
+        // The pinned models, plus the one this job already uses if it is not pinned, then a way to the rest.
+        const listed = cloud.some((m) => m.id === profile?.model) || profile?.backend !== "openrouter" || !profile?.model ? cloud : [...cloud, { id: profile.model, name: profile.model }];
+        listed.forEach((m) => options.push({ key: `openrouter|${m.id}`, group: "Cloud · leaves this computer", title: m.name, detail: m.name === m.id ? "" : m.id, backend: "openrouter", model: m.id, test: `job-opt-${job.id}-cloud-${m.id}` }));
+        options.push({ key: "more", group: "Cloud · leaves this computer", title: "More cloud models…", detail: "Search the whole OpenRouter list", backend: "__more", model: "", test: `job-opt-${job.id}-more` });
+      }
     }
   }
 
@@ -224,7 +182,7 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, act
         <div className="set-row-control">
           {job.task ? (
             <>
-              <Picker id={job.id} label={label} options={options} current={current} onPick={(o) => onAssign(job.task as Task, o.backend, o.model)} />
+              <Picker id={job.id} label={label} options={options} current={current} onPick={(o) => (o.backend === "__more" ? onMoreCloud() : onAssign(job.task as Task, o.backend, o.model))} />
               <div className="set-row-where" data-test={`job-where-${job.id}`}>
                 {where}
                 {chosen?.fit ? ` · ${FIT_WORD[chosen.fit].toLowerCase()}` : ""}
@@ -380,6 +338,8 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   const [cloudProbe, setCloudProbe] = useState<Probe | null>(null);
   const [saved, setSaved] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [cloudView, setCloudView] = useState<CloudView | null>(null);
+  const [cloudBusy, setCloudBusy] = useState(false);
   const draftRef = useRef<Draft | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const hooksRef = useRef(hooks);
@@ -496,6 +456,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
           refreshLibrary();
           loadModels("lan");
           loadModels("openrouter");
+          invoke<CloudView>("cloud_catalog", { refresh: false }).then(setCloudView, () => setCloudView({ models: [], fetched: 0, error: "", pins: [] }));
         } catch (error) {
           report(error);
         }
@@ -531,13 +492,23 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
     patchRouting((routing) => {
       const existing = routing.profiles![task] ?? { backend: "local", model: "" };
       routing.profiles![task] = { ...existing, backend: place, model };
-      if (routing.profiles!.act) routing.profiles!.act.backend = "local";
+      // Act never leaves this computer, whatever else is saved.
+      routing.profiles!.act = { ...routing.profiles!.act, model: routing.profiles!.act?.model ?? "", backend: "local" };
     })
       .then(() => { if (task === "chat") hooksRef.current.saved(place || "local", model || ""); })
       .catch(report);
   };
 
   const act = (command: string, id: string) => invoke(command, { id }).catch(report);
+  const refreshCloud = () => {
+    setCloudBusy(true);
+    invoke<CloudView>("cloud_catalog", { refresh: true }).then(setCloudView, report).finally(() => setCloudBusy(false));
+  };
+  const pinCloud = (id: string, on: boolean) => {
+    invoke<string[]>("cloud_pin_set", { id, on })
+      .then((pins) => setCloudView((old) => (old ? { ...old, pins } : { models: [], fetched: 0, error: "", pins })))
+      .catch(report);
+  };
 
   const probe = async (which: "lan" | "cloud") => {
     if (!draft) return;
@@ -568,7 +539,10 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   };
 
   if (!open || !draft) return null;
-  const clouds = cache.openrouter;
+  const pins = cloudView?.pins ?? [];
+  const named = (id: string) => ({ id, name: cloudView?.models.find((m) => m.id === id)?.name ?? id });
+  // The jobs offer what the person pinned; until they pin any, a short list of well-known models.
+  const clouds = (pins.length ? pins : cache.openrouter.slice(0, 8)).map(named);
   const lans = cache.lan;
   return (
     <>
@@ -594,7 +568,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
             <p className="models-lead">Pick a model for each kind of work. Mobius suggests what runs well on this computer, and downloads only when you press Get. Only one model sits in memory at a time, so switching takes a few seconds.</p>
             <div className="set-list" data-test="jobs">
               {JOBS.map((job) => (
-                <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} onAssign={assign} onBrowse={browse} act={act} />
+                <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} onAssign={assign} onBrowse={browse} onMoreCloud={() => show("cloud")} act={act} />
               ))}
             </div>
             <button type="button" className="set-link set-gap-sm" data-test="models-see-library" onClick={() => { setFilter("all"); show("library"); }}>See every model in the Library</button>
@@ -604,6 +578,13 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
             <h3 className="models-h3">Library</h3>
             <p className="models-lead">Everything Mobius can run on this computer. Nothing downloads until you press Get, and each file is checked against a published checksum before it is used.</p>
             <Library cards={library} draft={draft} filter={filter} setFilter={setFilter} onAssign={assign} act={act} />
+          </section>
+
+          <section className="models-panel active set-panel" data-test="models-panel-cloud" hidden={section !== "cloud"}>
+            <h3 className="models-h3">Cloud models</h3>
+            <p className="models-lead">Hundreds of hosted models through OpenRouter. Add the ones you want to <strong>my menu</strong> and they appear in the chat's model menu and in the choices for each job. The menu holds only what you add.</p>
+            <CloudModels view={cloudView} loading={cloudBusy} hasKey={hasKey} profiles={draft.profiles} now={Math.floor(Date.now() / 1000)}
+              onRefresh={refreshCloud} onPin={pinCloud} onAssign={assign} onProviders={() => show("providers")} />
           </section>
 
           <section className="models-panel active set-panel" data-test="models-panel-providers" hidden={section !== "providers"}>

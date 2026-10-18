@@ -82,6 +82,8 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   const hooksRef = useRef(hooks);
   hooksRef.current = hooks;
   const report = (error: unknown) => hooksRef.current.report(error);
+  // A menu taller than the room above its button scrolls, opened at its bottom where the actions are.
+  const menuRef = useCallback((el: HTMLDivElement | null) => { if (el) el.scrollTop = el.scrollHeight; }, []);
 
   // personas
   const [store, setStore] = useState<PersonaStore>({ active: "helix", personas: [] });
@@ -293,7 +295,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
 
       {menu
         ? createPortal(
-            <div className={`hx-menu${menu.kind === "mode" ? " hx-menu-wide" : ""}`} data-test={`menu-${menu.kind}`} style={{ left: Math.max(8, Math.min(menu.left, window.innerWidth - (menu.kind === "mode" ? 320 : Math.max(280, menu.width)) - 8)), bottom: window.innerHeight - menu.top + 6, minWidth: Math.max(220, menu.width) }} role="menu">
+            <div ref={menuRef} className={`hx-menu${menu.kind === "mode" ? " hx-menu-wide" : ""}`} data-test={`menu-${menu.kind}`} style={{ left: Math.max(8, Math.min(menu.left, window.innerWidth - (menu.kind === "mode" ? 320 : Math.max(280, menu.width)) - 8)), bottom: window.innerHeight - menu.top + 6, minWidth: Math.max(220, menu.width), maxHeight: Math.max(160, Math.min(window.innerHeight * 0.6, menu.top - 18)) }} role="menu">
               {menu.kind === "mode" ? (
                 <>
                   <div className="hx-menu-label">Mode <span className="hx-menu-hint">Shift+Tab</span></div>
@@ -343,15 +345,22 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                     <>
                       <div className="hx-menu-sep" />
                       <div className="hx-menu-label">OpenRouter <span className="hx-menu-hint">leaves this computer</span></div>
-                      {picker.cloud.has_key ? picker.cloud.models.slice(0, 6).map((id) => {
-                        const on = picker.route?.backend === "openrouter" && picker.route.model === id;
-                        return (
-                          <button key={id} className={`hx-menu-item${on ? " current" : ""}`} role="menuitemradio" aria-checked={on} data-test={`menu-cloud-${id}`} onClick={() => useCloudModel(id)}>
-                            <span className="mi-text"><span className="mi-title">{id.split("/").pop()}</span><span className="mi-sub">{id.split("/")[0]} · cloud</span></span>
-                            {on ? <span className="mi-check">✓</span> : null}
+                      {picker.cloud.has_key ? (
+                        <>
+                          {picker.cloud.models.slice(0, 8).map((id) => {
+                            const on = picker.route?.backend === "openrouter" && picker.route.model === id;
+                            return (
+                              <button key={id} className={`hx-menu-item${on ? " current" : ""}`} role="menuitemradio" aria-checked={on} data-test={`menu-cloud-${id}`} onClick={() => useCloudModel(id)}>
+                                <span className="mi-text"><span className="mi-title">{id.split("/").pop()}</span><span className="mi-sub">{id.split("/")[0]} · cloud</span></span>
+                                {on ? <span className="mi-check">✓</span> : null}
+                              </button>
+                            );
+                          })}
+                          <button className="hx-menu-item" data-test="menu-cloud-more" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models", { detail: { section: "cloud" } })); }}>
+                            <span className="mi-text"><span className="mi-title">More cloud models…</span><span className="mi-sub">Search the list and choose what appears here</span></span>
                           </button>
-                        );
-                      }) : (
+                        </>
+                      ) : (
                         <button className="hx-menu-item" data-test="menu-cloud-setup" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models")); }}>
                           <span className="mi-text"><span className="mi-title">Set up OpenRouter…</span><span className="mi-sub">Add an API key to use cloud models, one click each</span></span>
                         </button>

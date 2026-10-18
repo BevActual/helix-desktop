@@ -7,6 +7,7 @@ mod alternates;
 mod analysis;
 mod artifacts;
 mod attach;
+mod cloud;
 mod decide;
 mod dictate;
 mod edits;
@@ -2934,13 +2935,62 @@ fn routing_cloud_menu() -> CloudMenu {
     let has_key = routing.backend("openrouter").is_some_and(|b| {
         !b.base_url.trim().is_empty() && secrets::for_backend(&b.id, &b.api_key_ref).is_some()
     });
+    // The models the person pinned in Settings, or, until they pin any, a few well-known ones.
+    let pinned = cloud::pins();
     CloudMenu {
         has_key,
-        models: inference_routing::openrouter_suggested_models()
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
+        models: if pinned.is_empty() {
+            inference_routing::openrouter_suggested_models()
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        } else {
+            pinned
+        },
     }
+}
+
+#[derive(Serialize)]
+struct CatalogView {
+    models: Vec<cloud::CloudModel>,
+    /// Unix seconds when the list was fetched; 0 when it never was.
+    fetched: u64,
+    /// Why a refresh failed, when it did. The saved list is still returned.
+    error: String,
+    pins: Vec<String>,
+}
+
+/// OpenRouter's catalog as last fetched. It is fetched when asked (`refresh`), or the first time when OpenRouter is already set up;
+/// otherwise nothing leaves this computer.
+#[tauri::command]
+async fn cloud_catalog(refresh: bool) -> CatalogView {
+    let routing = inference_routing::load();
+    let backend = routing.backend("openrouter");
+    let base = backend
+        .map(|b| b.base_url.trim().to_string())
+        .filter(|u| !u.is_empty())
+        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
+    let configured = backend.is_some_and(|b| secrets::for_backend(&b.id, &b.api_key_ref).is_some());
+    let mut catalog = cloud::load_catalog();
+    let mut error = String::new();
+    if refresh || (catalog.models.is_empty() && configured) {
+        match cloud::refresh(&base, now()).await {
+            Ok(fresh) => catalog = fresh,
+            Err(message) => error = message,
+        }
+    }
+    CatalogView {
+        models: catalog.models,
+        fetched: catalog.fetched,
+        error,
+        pins: cloud::pins(),
+    }
+}
+
+/// Puts a cloud model in the chat model menu, or takes it out. Returns the pins now.
+#[tauri::command]
+fn cloud_pin_set(id: String, on: bool) -> Result<Vec<String>, String> {
+    cloud::set_pin(&id, on)
 }
 
 #[derive(Clone, Serialize)]
@@ -3469,6 +3519,8 @@ fn main() {
             routing_clear_secret,
             routing_ensure_openrouter,
             routing_cloud_menu,
+            cloud_catalog,
+            cloud_pin_set,
             routing_list_models,
             routing_list_remote_models,
             routing_page_info,

@@ -771,6 +771,15 @@ body.chat .set-offer .lib-progress { flex: 1 1 220px; margin: 0; }
 body.chat .set-link { padding: 7px 4px; background: transparent; color: var(--accent); font-size: 12.5px; font-weight: 650; }
 body.chat .set-link:hover { text-decoration: underline; }
 body.chat .set-gap-sm { margin-top: 12px; }
+body.chat .cloud-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+body.chat .cloud-age { font-size: 12.5px; font-weight: 600; color: var(--label-3); }
+body.chat .cloud-bar button { padding: 6px 12px; border-radius: 9px; background: var(--fill-2); font-size: 12.5px; font-weight: 650; }
+body.chat .cloud-card .lib-sub { overflow-wrap: anywhere; }
+body.chat .cloud-card .lib-uses { align-items: center; }
+body.chat .cloud-add { display: flex; gap: 8px; max-width: 520px; }
+body.chat .cloud-add input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; background: var(--fill-2); color: var(--label); font: inherit; border: 0; }
+body.chat .cloud-add button { padding: 8px 14px; border-radius: 10px; background: var(--fill-2); font-weight: 650; font-size: 12.5px; }
+body.chat .cloud-add button:disabled { opacity: .45; }
 body.chat .lib-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 body.chat .lib-tools .route-search { flex: 1; }
 body.chat .lib-sort { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; color: var(--label-2); }
