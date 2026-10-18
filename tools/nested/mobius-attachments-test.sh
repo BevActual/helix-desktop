@@ -20,7 +20,7 @@ capture() {
   sleep 0.6
   niri msg action screenshot-window --path "$SCRATCH/$1.png" >/dev/null
 }
-click_id attach
+click_id plus; click_id menu-plus-files
 for _ in $(seq 1 40); do has_id attach-preview-0 && break; sleep 0.25; done
 has_id attach-excerpt-note && has_id attach-warnings || { echo 'FAIL: excerpts or rejected selections are not visible'; exit 1; }
 has_id attach-chip-3 && { echo 'FAIL: refused file was attached'; exit 1; }
@@ -43,7 +43,7 @@ assert 'SECRET_FIXTURE' not in text and 'binary.txt' not in text
 PY
 has_id attach-chip-0 && { echo 'FAIL: sent cards were not cleared'; exit 1; }
 has_id attach-warnings && { echo 'FAIL: sent warnings were not cleared'; exit 1; }
-click_id attach
+click_id plus; click_id menu-plus-files
 for _ in $(seq 1 40); do has_id attach-remove-0 && break; sleep 0.25; done
 click_id attach-remove-0
 has_id attach-excerpt-note && { echo 'FAIL: removing the large file did not restore full remaining files'; exit 1; }

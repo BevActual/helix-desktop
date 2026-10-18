@@ -15,7 +15,7 @@ print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
-has_id attach-picture && echo "ok: the composer has a picture button" || fail "no picture button"
+has_id plus && echo "ok: the composer has a + menu for pictures and files" || fail "no + button"
 click_id meta-model; sleep 1.2
 has_id menu-model-routing && echo "ok: the model menu links to Models & routing" || fail "no routing link in the model menu"
 click_id menu-model-routing; sleep 1.5
