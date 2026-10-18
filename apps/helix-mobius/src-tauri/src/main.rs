@@ -813,6 +813,50 @@ fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
     mobius_lab::compose_system(identity, &project_text, &style_text)
 }
 
+/// The routing and persona a turn uses once the chat's own model choice is taken into account: the chat's backend and model replace what the
+/// persona's task is routed to, and the persona's own override gives way to it. Nothing is written to the routing file.
+pub(crate) fn apply_chat_route(
+    routing: &Routing,
+    persona: &Persona,
+    backend: &str,
+    model: &str,
+) -> (Routing, Persona) {
+    let (mut routing, mut persona) = (routing.clone(), persona.clone());
+    if backend.is_empty() && model.is_empty() {
+        return (routing, persona);
+    }
+    let task = if persona.task.is_empty() {
+        "chat".to_string()
+    } else {
+        persona.task.clone()
+    };
+    let entry = routing.profiles.entry(task).or_insert_with(|| {
+        helix_config::inference_routing::ProfileRoute {
+            backend: "local".into(),
+            model: String::new(),
+        }
+    });
+    entry.backend = if backend.is_empty() {
+        "local".into()
+    } else {
+        backend.to_string()
+    };
+    entry.model = model.to_string();
+    persona.backend.clear();
+    persona.model.clear();
+    (routing, persona)
+}
+
+/// This chat's own model choice (empty: the default routing), as the open conversation holds it.
+pub(crate) fn chat_route_of(app: &AppHandle) -> (String, String) {
+    let shared = shared(app);
+    let state = shared.lock().expect("state");
+    (
+        state.chat.conversation.route_backend.clone(),
+        state.chat.conversation.route_model.clone(),
+    )
+}
+
 async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(), String> {
     shared(&app).lock().expect("state").turn_started = Some(std::time::Instant::now());
     if std::env::var_os("HELIX_MOBIUS_LOG_PROMPT").is_some() {
@@ -822,8 +866,13 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
         }
     }
     let store = personas::load();
-    let persona = store.active_persona().clone();
-    let routing = inference_routing::load();
+    let (chat_backend, chat_model) = chat_route_of(&app);
+    let (routing, persona) = apply_chat_route(
+        &inference_routing::load(),
+        store.active_persona(),
+        &chat_backend,
+        &chat_model,
+    );
     let (mut task, mut model, mut is_local, mut label) = resolve_route(&routing, &persona);
     let analysis_route = {
         let shared = shared(&app);
@@ -1620,40 +1669,60 @@ fn chat_set_route(
     backend: Option<String>,
     model: Option<String>,
 ) -> Result<(), String> {
-    let mut routing = inference_routing::load();
-    let resolved_backend = if let Some(backend) = backend {
-        let backend = backend.trim().chars().take(64).collect::<String>();
-        if backend.is_empty() || backend == "local" {
-            Some("local".to_string())
-        } else {
-            let Some(b) = routing.backend(&backend).cloned() else {
-                return Err(format!("Unknown backend “{backend}”."));
-            };
-            if b.kind != BackendKind::Openai && b.kind != BackendKind::Local {
-                return Err("Chat backend must be local or OpenAI-compatible.".into());
-            }
-            if b.kind == BackendKind::Openai && b.base_url.trim().is_empty() {
-                return Err("That backend has no URL yet. Set it in Models & routing.".into());
-            }
-            Some(b.id)
-        }
+    let routing = inference_routing::load();
+    let backend = backend.unwrap_or_default();
+    let backend = backend.trim().chars().take(64).collect::<String>();
+    let backend = if backend.is_empty() || backend == "local" {
+        "local".to_string()
     } else {
-        None
-    };
-    let entry = routing.profiles.entry("chat".into()).or_insert_with(|| {
-        helix_config::inference_routing::ProfileRoute {
-            backend: "local".into(),
-            model: String::new(),
+        let Some(b) = routing.backend(&backend).cloned() else {
+            return Err(format!("Unknown backend “{backend}”."));
+        };
+        if b.kind != BackendKind::Openai && b.kind != BackendKind::Local {
+            return Err("Chat backend must be local or OpenAI-compatible.".into());
         }
-    });
-    if let Some(backend) = resolved_backend {
-        entry.backend = backend;
+        if b.kind == BackendKind::Openai && b.base_url.trim().is_empty() {
+            return Err("That backend has no URL yet. Set it in Models & routing.".into());
+        }
+        b.id
+    };
+    let model = model
+        .unwrap_or_default()
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Stop or finish the current reply before changing its model.".into());
+        }
+        // This chat only: other chats keep following the default routing (Models & routing).
+        state.chat.set_route(&backend, &model);
+        if !state.chat.temporary {
+            save(&state.chat.conversation);
+        }
     }
-    if let Some(model) = model {
-        entry.model = model.trim().chars().take(120).collect::<String>();
+    emit_view(&app);
+    Ok(())
+}
+
+/// Returns this chat to the default routing.
+#[tauri::command]
+fn chat_use_default_route(app: AppHandle) -> Result<(), String> {
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Stop or finish the current reply before changing its model.".into());
+        }
+        state.chat.set_route("", "");
+        if !state.chat.temporary {
+            save(&state.chat.conversation);
+        }
     }
-    inference_routing::save(&routing)?;
-    emit_routing(&app);
+    emit_view(&app);
     Ok(())
 }
 
@@ -1662,6 +1731,8 @@ struct ChatRouteView {
     backend: String,
     model: String,
     label: String,
+    /// This chat has its own model choice (not the default routing).
+    own: bool,
 }
 
 #[tauri::command]
@@ -1670,9 +1741,22 @@ fn chat_current_model() -> String {
 }
 
 #[tauri::command]
-fn chat_current_route() -> ChatRouteView {
+fn chat_current_route(app: AppHandle) -> ChatRouteView {
     let routing = inference_routing::load();
-    let profile = routing.route("chat");
+    let (own_backend, own_model) = chat_route_of(&app);
+    let own = !(own_backend.is_empty() && own_model.is_empty());
+    let profile = if !own {
+        routing.route("chat")
+    } else {
+        helix_config::inference_routing::ProfileRoute {
+            backend: if own_backend.is_empty() {
+                "local".into()
+            } else {
+                own_backend
+            },
+            model: own_model,
+        }
+    };
     let label = routing
         .backend(&profile.backend)
         .map(|b| {
@@ -1697,6 +1781,7 @@ fn chat_current_route() -> ChatRouteView {
         },
         model: profile.model,
         label,
+        own,
     }
 }
 
@@ -2783,6 +2868,7 @@ fn main() {
             chat_set_project,
             chat_set_model,
             chat_set_route,
+            chat_use_default_route,
             chat_current_model,
             chat_current_route,
             chat_temporary,
@@ -2971,5 +3057,62 @@ mod picture_wire_tests {
         // Without pictures nothing changes: no images, string content.
         let plain = chat_args(&messages, &[], "chat", "").unwrap();
         assert!(!plain.contains_key("images"));
+    }
+}
+
+#[cfg(test)]
+mod chat_route_tests {
+    use super::*;
+
+    fn persona(task: &str, backend: &str, model: &str) -> Persona {
+        serde_json::from_value(serde_json::json!({
+            "id": "p", "name": "P", "task": task, "backend": backend, "model": model
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_chats_own_model_replaces_the_routing_for_its_task_and_the_persona_override() {
+        let routing = Routing::default();
+        // no choice: nothing changes
+        let (same, same_persona) = apply_chat_route(&routing, &persona("chat", "", ""), "", "");
+        assert_eq!(
+            resolve_route(&same, &same_persona),
+            resolve_route(&routing, &persona("chat", "", ""))
+        );
+        // a chat set to a model on this computer
+        let (r, p) = apply_chat_route(
+            &routing,
+            &persona("chat", "", ""),
+            "local",
+            "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        );
+        let (task, model, local, _) = resolve_route(&r, &p);
+        assert_eq!(
+            (task.as_str(), model.as_str(), local),
+            ("chat", "qwen2.5-1.5b-instruct-q4_k_m.gguf", true)
+        );
+        // a persona that names its own model gives way to the chat's choice
+        let (r, p) = apply_chat_route(
+            &routing,
+            &persona("chat", "local", "persona-model.gguf"),
+            "local",
+            "chat-model.gguf",
+        );
+        assert_eq!(resolve_route(&r, &p).1, "chat-model.gguf");
+        // the choice follows the persona's task (a Code persona's chat uses it for code)
+        let (r, p) = apply_chat_route(&routing, &persona("code", "", ""), "local", "coder.gguf");
+        let (task, model, ..) = resolve_route(&r, &p);
+        assert_eq!((task.as_str(), model.as_str()), ("code", "coder.gguf"));
+        assert_eq!(
+            r.route("chat").model,
+            routing.route("chat").model,
+            "other tasks keep their routing"
+        );
+        // Auto on this computer is a choice too: it clears the model but not the backend
+        let (r, p) = apply_chat_route(&routing, &persona("chat", "", ""), "local", "");
+        assert_eq!(resolve_route(&r, &p).1, "");
+        // the file the person edited is never what changes: the routing passed in is untouched
+        assert_eq!(routing, Routing::default());
     }
 }
