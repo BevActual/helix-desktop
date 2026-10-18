@@ -22,7 +22,7 @@ click_id chat-0; sleep 1.5
 for _ in $(seq 1 40); do has_id msg-picture && break; sleep 0.25; done
 has_id msg-picture && echo "ok: the saved picture is drawn in the chat" || fail "no picture in the message"
 click_id edit-0; sleep 0.8
-has_id edit-text && echo "ok: the edit sheet opened" || fail "no edit sheet"
+has_id edit-text && echo "ok: the message became an editable box in place" || fail "no inline edit box"
 click_id edit-save; sleep 1.5
 for _ in $(seq 1 80); do grep -q "I can see 1 image" "$CHATS"/00000000000000c1.json 2>/dev/null && break; sleep 0.25; done
 grep -q "I can see 1 image(s): 40x30" "$CHATS"/00000000000000c1.json && echo "ok: the service received the picture, decoded (40x30)" || fail "the picture did not reach the model"

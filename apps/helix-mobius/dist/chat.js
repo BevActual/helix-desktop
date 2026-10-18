@@ -1203,6 +1203,12 @@ const reactThread = window.HelixMobiusReact
       syncSendEnabled();
       input.focus();
     },
+    edited: (index, text) => {
+      stickToBottom = true;
+      invoke("chat_edit", { index, text })
+        .then(() => invoke("chat_status").then((s) => { status = s; drawComposerMeta(); }))
+        .catch(report);
+    },
     fork: (index) => forkChat(index),
     send: (text) => sendPlain(text),
     report: (error) => report(error),
@@ -1353,8 +1359,38 @@ $("project-form").addEventListener("submit", (event) => {
     .then(() => $("project-dialog").close())
     .catch(report);
 });
+// Renaming a chat happens in the header, where the title is: click it, type, Enter. Escape puts it back.
+function startInlineRename() {
+  const button = $("chat-title");
+  if (document.querySelector(".chat-title-input")) return;
+  const field = document.createElement("input");
+  field.className = "chat-title-input";
+  field.dataset.test = "chat-title-input";
+  field.value = view.title || "New chat";
+  field.maxLength = 80;
+  field.setAttribute("aria-label", "Chat title");
+  button.hidden = true;
+  button.after(field);
+  field.focus();
+  field.select();
+  let finished = false;
+  const finish = (commit) => {
+    if (finished) return;
+    finished = true;
+    const title = field.value.trim();
+    field.remove();
+    button.hidden = false;
+    if (commit && title && title !== view.title) invoke("chat_rename", { title }).catch(report);
+  };
+  field.onkeydown = (event) => {
+    if (event.key === "Enter") { event.preventDefault(); finish(true); input.focus(); }
+    else if (event.key === "Escape") { event.preventDefault(); finish(false); input.focus(); }
+  };
+  field.onblur = () => finish(true);
+}
 $("chat-title").onclick = () => {
   if (view.temporary) return;
+  if (view.id) { startInlineRename(); return; }
   if (reactDialogs) { reactDialogs.openRename(view.title || "New chat"); return; }
   $("rename-title").value = view.title || "New chat";
   $("rename-dialog").showModal();

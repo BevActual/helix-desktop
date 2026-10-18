@@ -22,12 +22,13 @@ click_id input; wtype "How does cron work?"; wtype -k Return
 for _ in $(seq 1 120); do grep -q "MOBIUS turn ended" "$LOG" && break; sleep 0.25; done; sleep 1
 echo "--- 1. rename"
 click_id chat-title; sleep 0.8
-shot rename-sheet
-has_id rename-title && echo "ok: the rename sheet opened" || fail "no rename sheet"
-wtype " renamed"; sleep 0.3; click_id rename-save; sleep 1.2
+shot rename-inline
+has_id chat-title-input && echo "ok: the title became a field in the header" || fail "no inline title field"
+has_id rename-title && fail "a sheet opened for a rename" || true
+wtype " renamed"; sleep 0.3; wtype -k Return; sleep 1.2
 F=$(ls "$CHATS"/*.json 2>/dev/null | head -1)
 grep -q "renamed" "$F" && echo "ok: the new title was saved" || fail "title not saved"
-has_id rename-title && fail "the sheet stayed open" || echo "ok: the sheet closed"
+has_id chat-title-input && fail "the field stayed open" || echo "ok: the field closed on Enter"
 echo "--- 2. project"
 click_id project-chat; sleep 0.8
 has_id project-name && echo "ok: the project sheet opened" || fail "no project sheet"
@@ -63,7 +64,8 @@ click_id find-close; sleep 0.6
 has_id find-hit && fail "highlights stayed after closing find" || echo "ok: highlights cleared"
 echo "--- 6. edit a message"
 click_id edit-0; sleep 0.8
-has_id edit-text && echo "ok: the edit sheet opened" || fail "no edit sheet"
+shot edit-inline; sleep 1; shot edit-inline
+has_id edit-text && echo "ok: the message became an editable box in place" || fail "no inline edit box"
 wtype " please"; sleep 0.3; click_id edit-save; sleep 1.5
 for _ in $(seq 1 60); do grep -c "MOBIUS turn ended" "$LOG" | grep -q "^[2-9]" && break; sleep 0.25; done
 G=$(grep -l "please" "$CHATS"/*.json 2>/dev/null | head -1)

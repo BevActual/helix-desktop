@@ -70,6 +70,8 @@ function GeneratedPicture({ id, streaming, hooks }: { id: string; streaming: boo
 }
 
 export interface ThreadHooks {
+  /** An edited message was sent: later replies are replaced and a new answer written. */
+  edited: (index: number, text: string) => void;
   edit: (index: number, text: string) => void;
   act: (text: string) => void;
   quote: (text: string) => void;
@@ -134,6 +136,21 @@ function Spans({ spans, needle }: { spans: Span[]; needle: string }) {
       })}
     </>
   );
+}
+
+/** Editing a message where it is: the bubble becomes a box with the text in it. Enter sends, Shift+Enter breaks the line, Escape puts it back. */
+function InlineEdit({ initial, onSend, onCancel }: { initial: string; onSend: (text: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(initial);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const grow = () => { const el = box.current; if (el) { el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 320)}px`; } };
+  useEffect(() => { const el = box.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); grow(); } }, []);
+  const send = () => { if (value.trim()) onSend(value.trim()); };
+  return <div className="msg-edit" data-test="msg-edit">
+    <textarea ref={box} data-test="edit-text" aria-label="Edit your message" maxLength={4000} value={value}
+      onChange={(e) => { setValue(e.target.value); grow(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape") { e.preventDefault(); onCancel(); } }} />
+    <div className="msg-edit-actions"><span>Replies after this message are replaced.</span><button type="button" data-test="edit-cancel" onClick={onCancel}>Cancel</button><button type="button" className="primary" data-test="edit-save" disabled={!value.trim()} onClick={send}>Send</button></div>
+  </div>;
 }
 
 /** The diff of a proposed or applied file edit: the path, then removed lines in red and added lines in green. */
@@ -274,6 +291,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
   const [tasks, setTasks] = useState<DesktopTask[]>([]);
   const [undoOf, setUndoOf] = useState(0);
   const [live, setLive] = useState<Block[] | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
   const [needle, setNeedle] = useState("");
   const [progress, setProgress] = useState({ fraction: 0, stage: "Queued for local image generation" });
   useEffect(() => { const stop = listen<{ fraction: number; stage: string }>("image-progress", setProgress); return () => { stop.then((fn) => fn()); }; }, []);
@@ -349,13 +367,13 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               {message.images && message.images.length ? (
                 <div className="msg-pictures">{message.images.map((id) => <Picture key={id} id={id} onEdit={hooks.editPicture} />)}</div>
               ) : null}
-              <div className="msg-body">{message.sources?.length ? <><p>{highlight(message.text.split("\n\n--- Online sources")[0], needle)}</p><details className="web-request-evidence"><summary>Question and source excerpts</summary><pre>{highlight(message.text, needle)}</pre></details></> : highlight(message.text, needle)}</div>
-              <div className="msg-actions">
-                {!message.text.startsWith("/image ") && !message.sources?.length && !messages[index + 1]?.activities?.length && <button className="mini" data-test={`edit-${index}`} onClick={() => hooks.edit(index, message.text)}>Edit</button>}
-                <button className="mini" data-test={`act-${index}`} title="Have Mobius change the desktop using this" onClick={() => hooks.act(message.text)}>Act</button>
-                <button className="mini" data-test={`quote-${index}`} title="Insert into the composer" onClick={() => hooks.quote(message.text)}>Quote</button>
-                {!streaming ? <button className="mini" data-test={`fork-user-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
-              </div>
+              {editing === index ? <InlineEdit initial={message.text} onCancel={() => setEditing(null)} onSend={(text) => { setEditing(null); hooks.edited(index, text); }} /> : <div className="msg-body">{message.sources?.length ? <><p>{highlight(message.text.split("\n\n--- Online sources")[0], needle)}</p><details className="web-request-evidence"><summary>Question and source excerpts</summary><pre>{highlight(message.text, needle)}</pre></details></> : highlight(message.text, needle)}</div>}
+              {editing !== index && <div className="msg-actions">
+                  {!message.text.startsWith("/image ") && !message.sources?.length && !messages[index + 1]?.activities?.length && <button className="mini" data-test={`edit-${index}`} onClick={() => setEditing(index)}>Edit</button>}
+                  <button className="mini" data-test={`act-${index}`} title="Have Mobius change the desktop using this" onClick={() => hooks.act(message.text)}>Act</button>
+                  <button className="mini" data-test={`quote-${index}`} title="Insert into the composer" onClick={() => hooks.quote(message.text)}>Quote</button>
+                  {!streaming ? <button className="mini" data-test={`fork-user-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
+                </div>}
             </div></Fragment>
           );
         }
