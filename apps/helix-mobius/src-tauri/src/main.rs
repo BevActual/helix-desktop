@@ -870,6 +870,7 @@ pub(crate) fn chat_route_of(app: &AppHandle) -> (String, String) {
 }
 
 async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(), String> {
+    let mut turn = turn;
     shared(&app).lock().expect("state").turn_started = Some(std::time::Instant::now());
     if std::env::var_os("HELIX_MOBIUS_LOG_PROMPT").is_some() {
         // Tests read the composed system prompt from the program log (never set in normal use).
@@ -933,6 +934,16 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
         );
         emit_view(&app);
         return Ok(());
+    }
+    // What the person asked Mobius to remember goes to a model on this computer, never to a cloud one.
+    if is_local {
+        if let Some(text) = helix_chat::memory::Memory::load(&memory_file()).prompt_text() {
+            if let Some((_, system)) = turn.messages.iter_mut().find(|(role, _)| *role == "system")
+            {
+                system.push_str(&text);
+                eprintln!("MOBIUS memory-added {}", text.len());
+            }
+        }
     }
     {
         let shared = shared(&app);
@@ -1403,6 +1414,32 @@ fn tools_revert_change(app: AppHandle, activity_id: String, index: usize) -> Res
     persist(&app);
     emit_view(&app);
     Ok(())
+}
+
+fn memory_file() -> PathBuf {
+    data_home().join("helix/mobius/memory.json")
+}
+
+#[tauri::command]
+fn memory_list() -> Vec<helix_chat::memory::Item> {
+    helix_chat::memory::Memory::load(&memory_file()).items
+}
+
+#[tauri::command]
+fn memory_add(text: String) -> Result<Vec<helix_chat::memory::Item>, String> {
+    let mut memory = helix_chat::memory::Memory::load(&memory_file());
+    memory.add(&text, now())?;
+    memory.save(&memory_file())?;
+    Ok(memory.items)
+}
+
+#[tauri::command]
+fn memory_remove(id: u64) -> Vec<helix_chat::memory::Item> {
+    let mut memory = helix_chat::memory::Memory::load(&memory_file());
+    if memory.remove(id) {
+        let _ = memory.save(&memory_file());
+    }
+    memory.items
 }
 
 /// One row of the composer's `@` picker: a file in the chat's project folder, or another chat.
@@ -3069,6 +3106,9 @@ fn main() {
             tools_open_desk_terminal,
             tools_review,
             tools_undo_edit,
+            memory_list,
+            memory_add,
+            memory_remove,
             tools_revert_change,
             web_lookup,
             web_cancel,

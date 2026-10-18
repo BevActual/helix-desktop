@@ -78,6 +78,17 @@ const SLASH_COMMANDS = [
   { cmd: "/route", desc: "Models & routing page", run: () => openRouting() },
   { cmd: "/attach", desc: "Attach text / source files", run: () => pickAttachments() },
   { cmd: "/web", desc: "Pick online sources yourself", run: (text) => { openWeb(text.replace(/^\/web\s*/i, "")); return Promise.resolve(); } },
+  { cmd: "/remember", desc: "Remember something in every chat (local models only)", run: (typed) => {
+    const fact = (typed || "").replace(/^\/remember\b/i, "").trim();
+    if (!fact) { reactMemory?.open(); return Promise.resolve(); }
+    return invoke("memory_add", { text: fact }).then(() => {
+      const banner = $("banner");
+      banner.textContent = "Remembered. /memory shows everything Mobius remembers.";
+      banner.hidden = false;
+      setTimeout(() => { if (banner.textContent.startsWith("Remembered")) banner.hidden = true; }, 4000);
+    });
+  } },
+  { cmd: "/memory", desc: "See and edit what Mobius remembers", run: () => { reactMemory?.open(); return Promise.resolve(); } },
   { cmd: "/tools", desc: "Configure Tools mode (research + project commands)", run: () => { reactTools?.open(view); return Promise.resolve(); } },
   { cmd: "/desk", desc: "Show the Helix agent desk workspace", run: () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report) },
   { cmd: "/context", desc: "Review recent history and chat brief", run: () => { openChatContext(); return Promise.resolve(); } },
@@ -2555,5 +2566,6 @@ setInterval(refreshAgentDeskGlance, 5000);
 window.addEventListener("focus", refreshAgentDeskGlance);
 
 const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
+const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
 $("meta-tools").onclick = () => reactTools?.open(view);
 $("meta-agent-desk").onclick = () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report);

@@ -174,3 +174,28 @@ Not yet: adding a model by name or Hugging Face link from the library's first sc
 The menu above the composer listed only models on this computer; cloud models were behind "Other backends and custom ids…". With OpenRouter set up (its backend and a key), the menu now has a second section, **OpenRouter · leaves this computer**: six well-known models (the catalog's suggestion list, so nothing is fetched when the menu opens), one click puts this chat on one, saved with the chat like a local choice, and the routing file is not written. Without a key the section is one row, "Set up OpenRouter…", which opens Models & routing. The full list (the service's catalog, any id) is still in "Other backends and custom ids…". `tools/nested/mobius-cloud-test.sh`.
 
 Still to do: a search box in the menu for the full OpenRouter catalog (and per-model price), and a visible mark on the chat's chip while it is on a cloud model (it shows the backend's label today).
+
+
+## Gemini, Claude, ChatGPT, Cursor: what each has, and where Mobius stands (2026-10-17, from their documentation and reviews)
+
+| Capability | Who has it | Mobius today | Take |
+|---|---|---|---|
+| **Memory**: durable facts reused in every chat | ChatGPT, Claude, Cursor (memories, rules) | Per-chat brief; project instructions (experiment) | **Done**: `/remember`, `/memory`; below. Theirs is automatic and opaque; Mobius's is only what the person adds, always visible, local models only. |
+| **Projects**: chats, files and instructions in one place | ChatGPT, Claude | A project is a name and optional instructions | Files in a project (the `@` picker and the embedder make "ask about this project's files" possible); project instructions on by default. |
+| **Rules for a codebase** | Cursor (`.cursor/rules`) | Tools mode has a folder, no rules | Read `AGENTS.md` or `.helix/rules.md` in the project folder into Tools mode's prompt, shown in the Tools sheet. Small, and what makes an agent behave in a repo. |
+| **Skills**: teach it a task once | Claude | Personas, styles, `/` commands | User-written saved prompts with a name and slots (`/review {file}`), listed in the `/` menu. |
+| **Extended thinking**, shown collapsed | Claude, ChatGPT, Gemini | Reasoning models' `<think>` text would print raw | Fold it into a "Thought for 12 s" row (next). |
+| **Canvas / Artifacts**: a side panel for what was made, editable and versioned | Claude, ChatGPT, Gemini | Charts, diagrams, forms in the thread; Save as file | The side panel (planned): charts, diffs, documents, images, versions. |
+| **Deep research**: a plan, many sources, a cited report | ChatGPT, Gemini, Claude | Tools mode searches and reads one step at a time | A Research mode that plans sub-questions, reads several pages with approval, and writes a report with numbered sources into the panel. |
+| **Scheduled tasks** | ChatGPT | None | Fits Helix well: a systemd user timer that starts a Mobius prompt or an Act task ("every morning summarise my unread notifications"), with the same approvals. |
+| **Agent mode**: a browser and a to-do list | ChatGPT | Act (desktop) and Tools (project) | Their checklist-as-it-works is the Changes card plus the checklist component; a plan shown and ticked as steps finish. |
+| **Voice**: hands-free conversation, interrupt mid-reply | ChatGPT, Gemini Live | Dictation in, no speech out | Read-aloud (TTS) first, then a conversation loop with local speech models. |
+| **Audio overview**: documents as a spoken summary | Gemini (NotebookLM) | None | After read-aloud. |
+| **Study mode**: questions instead of answers | ChatGPT | None | A style ("Tutor") that asks first: a few lines in `mobius_lab` styles. |
+| **Connectors** to Drive, Slack, mail | Claude, ChatGPT, Gemini | None | MCP servers, local only, behind the grants (see "Tools worth researching"). |
+| **Background agents, PR review** | Cursor | None | Not for a personal desktop. |
+| **Gems / custom assistants** | Gemini | Personas | Same thing; add model and tools to a persona (preset). |
+
+### Memory (done)
+
+`/remember <fact>` keeps a fact; `/memory` opens the list (add, forget). At most 40 facts of 300 characters in one file (`memory.json`), the newest 1,500 characters of them added to the system prompt, and **only when the model runs on this computer**: a cloud route never receives them. The model cannot write to it; only the person does. `core/helix-chat/src/memory.rs` (unit tested), `tools/nested/mobius-memory-test.sh`.
