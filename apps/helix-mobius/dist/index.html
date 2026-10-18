@@ -7,6 +7,11 @@
       <span id="brand">Mobius</span>
       <button id="new-chat" class="compose" data-test="new-chat" title="New chat" aria-label="New chat"><i data-icon="plus"></i><span>New chat</span></button>
     </div>
+    <nav id="modes" class="modes" data-test="modes" aria-label="Workspaces">
+      <button type="button" id="mode-chat" class="mode-row active" data-test="mode-chat" title="Chat: just the conversation"><i data-icon="chat"></i><span>Chat</span></button>
+      <button type="button" id="mode-write" class="mode-row" data-test="mode-write" title="Write: a document beside the chat"><i data-icon="doc"></i><span>Write</span></button>
+      <button type="button" id="mode-code" class="mode-row" data-test="mode-code" title="Code: your project beside the chat"><i data-icon="code"></i><span>Code</span></button>
+    </nav>
     <div id="chat-list-host" style="display: contents">
     <label class="chat-search" for="chat-search">
       <i data-icon="search"></i>
@@ -49,6 +54,7 @@
         <div class="header-actions">
           <button id="pin-chat" class="icon-btn" data-test="pin-chat" type="button" title="Pin chat" aria-label="Pin chat" hidden><i data-icon="pin"></i></button>
           <button id="project-chat" class="icon-btn" data-test="project-chat" type="button" title="Move to project" aria-label="Move to project" hidden><i data-icon="folder"></i></button>
+          <button id="workspace-btn" class="route-chip workspace-btn" data-test="workspace" type="button" title="Workspace: how this window is laid out for the work">Chat ▾</button>
           <button id="route-chip" class="route-chip" data-test="route-chip" type="button" hidden title="Models and routing"></button>
         </div>
       </header>
@@ -214,7 +220,7 @@
       <input id="route-model-search" type="hidden">
     </section>
   </main>
-  <section id="stage-host" class="stage-host" data-test="stage-host"></section>
+  <section id="stage-host" class="stage-host" data-test="stage-host"><div id="stage-doc" style="display: contents"></div><div id="stage-code" style="display: contents"></div></section>
 </div>
 
 <div id="dialogs-host" style="display: contents">

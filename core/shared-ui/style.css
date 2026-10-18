@@ -1547,3 +1547,31 @@ body.chat.stage-open .stage-host { display: flex; border-left: .5px solid var(--
 @media (max-width: 899px) { body.chat.stage-open #app { grid-template-columns: 0 0 1fr; } body.chat.stage-open #main { display: none; } }
 /* With the stage open the chat list gives way on windows that are not wide, so the chat and the work both have room. */
 @media (max-width: 1399px) and (min-width: 900px) { body.chat.stage-open #app { grid-template-columns: 0 minmax(0, 1fr) minmax(340px, 46%); } body.chat.stage-open #side { visibility: hidden; overflow: hidden; padding: 0; border: 0; } }
+.workspace-btn { font-weight: 600; }
+.code-body { display: flex; flex: 1; min-height: 0; padding: 0 14px 12px; gap: 10px; }
+.code-files { width: 36%; min-width: 150px; display: flex; flex-direction: column; min-height: 0; }
+.code-files input { margin-bottom: 6px; }
+.code-files ul { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
+.code-files li button { display: flex; align-items: baseline; gap: 6px; width: 100%; padding: 4px 6px; border-radius: 6px; background: transparent; text-align: left; font-size: 12.5px; }
+.code-files li button.active { background: var(--accent); color: var(--on-accent); }
+.code-files li button.changed .code-name { font-weight: 650; }
+.code-dir { color: var(--label-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.code-files li button i { font-style: normal; margin-left: auto; color: #f08c00; } .code-files li button.added i { color: #2fb344; } .code-files li button.deleted i { color: #e03131; }
+.code-view { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.code-view-head { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; } .code-view-head strong { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.code-text { flex: 1; min-height: 0; margin: 0; overflow: auto; padding: 8px 0; border-radius: 10px; background: var(--fill-1); border: .5px solid var(--hairline); font-size: 12px; line-height: 1.5; }
+.code-text .code-line { display: block; white-space: pre; padding: 0 10px; } .code-text .code-line i { display: inline-block; width: 38px; color: var(--label-3); font-style: normal; text-align: right; margin-right: 12px; user-select: none; }
+.code-hint, .code-empty { padding: 14px; color: var(--label-2); font-size: 13px; } .code-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+/* Workspaces as destinations at the top of the sidebar (ChatGPT, Claude and others do this); a rail of icons when the stage needs the room. */
+body.chat .modes { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; }
+body.chat .mode-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; background: transparent; color: var(--label-2); font-weight: 600; text-align: left; }
+body.chat .mode-row svg { width: 17px; height: 17px; flex: none; }
+body.chat .mode-row:hover { background: var(--fill-2); color: var(--label); }
+body.chat .mode-row.active { background: var(--fill-2); color: var(--label); }
+@media (max-width: 1399px) and (min-width: 900px) {
+  body.chat.stage-open #app { grid-template-columns: 56px minmax(0, 1fr) minmax(340px, 46%); }
+  body.chat.stage-open #side { visibility: visible; overflow: hidden; padding: 0 8px 12px; }
+  body.chat.stage-open #side > :not(#modes):not(#titlebar) { display: none !important; }
+  body.chat.stage-open #titlebar #brand, body.chat.stage-open #titlebar #new-chat { display: none; }
+  body.chat.stage-open .mode-row { justify-content: center; padding: 9px 0; } body.chat.stage-open .mode-row span { display: none; }
+}

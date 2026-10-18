@@ -10,6 +10,7 @@ import { Analysis, type AnalysisHandle } from "./analysis";
 import { OnlineResearch, type WebHandle } from "./web";
 import { Welcome, type WelcomeHandle, type WelcomeHooks } from "./welcome";
 import { ChatContext, type ContextHandle, type ContextInfo } from "./context";
+import { CodeStage, type CodeHandle, type CodeHooks } from "./codestage";
 import { Stage, type StageHandle, type StageHooks } from "./workpanel";
 import { Palette, type PaletteHandle, type PaletteHooks } from "./palette";
 import { Memory, type MemoryHandle } from "./memory";
@@ -51,6 +52,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   context: (host: HTMLElement) => {
     const run = handled<ContextHandle>(host, (register) => <ChatContext register={register} />);
     return { open: (view: Parameters<ContextHandle["open"]>[0]) => run((h) => h.open(view)) };
+  },
+  codeStage: (host: HTMLElement, hooks: CodeHooks) => {
+    const run = handled<CodeHandle>(host, (register) => <CodeStage register={register} hooks={hooks} />);
+    return { open: () => run((h) => h.open()), refresh: () => run((h) => h.refresh()), close: () => run((h) => h.close()) };
   },
   stage: (host: HTMLElement, hooks: StageHooks) => {
     const run = handled<StageHandle>(host, (register) => <Stage register={register} hooks={hooks} />);
