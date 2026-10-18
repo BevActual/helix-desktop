@@ -1,0 +1,29 @@
+{
+  "note": "Questions are written in the asker's words, not copied from headings. `expect` lists the doc files (under docs/) a good answer must come from; a question counts as found if any one is in the top k pages.",
+  "questions": [
+    {"q": "Can the assistant reverse a change it made to my settings?", "expect": ["design/act-undo.md"]},
+    {"q": "Why not run a separate small model in front of the chat model to decide what to do?", "expect": ["design/decision-model.md"]},
+    {"q": "How do we avoid swapping the loaded model when classifying a message?", "expect": ["design/decision-model.md"]},
+    {"q": "Which embedding classifier was chosen and how fast is it on CPU?", "expect": ["design/decision-model.md"]},
+    {"q": "How can the agent click a button without aiming at pixels?", "expect": ["design/synthetic-input-threat-model.md"]},
+    {"q": "What stops a malicious app from imitating the approval prompt?", "expect": ["design/trusted-surface.md"]},
+    {"q": "Does removing an app from the store also remove things that depend on it?", "expect": ["design/software-tauri.md"]},
+    {"q": "Who is allowed to start timers in the process viewer page?", "expect": ["design/system-monitor-tauri.md"]},
+    {"q": "How does the login screen pick up my theme and wallpaper?", "expect": ["design/greeter-tauri.md"]},
+    {"q": "Which C++ libraries are left to replace with Rust?", "expect": ["design/cpp-to-rust.md"]},
+    {"q": "How do I restart just the top bar without losing the reserved screen edge?", "expect": ["design/session-shell.md"]},
+    {"q": "Which crates may depend on which, and where are the exceptions?", "expect": ["design/layering.md"]},
+    {"q": "How did the small and large Qwen models compare on my laptop GPU?", "expect": ["design/mobius-bench.md"]},
+    {"q": "What are the colour, shape and type rules apps must follow?", "expect": ["design/helix-hig.md"]},
+    {"q": "Which settings pages exist but do nothing yet?", "expect": ["design/settings-audit.md"]},
+    {"q": "What is still missing before I can live in the desktop day to day?", "expect": ["design/roadmap.md"]},
+    {"q": "What rules keep chat data private when a cloud model is used?", "expect": ["design/inference-fabric.md", "design/mobius-product.md"]},
+    {"q": "How are the three ways of invoking the assistant related?", "expect": ["design/inference-fabric.md"]},
+    {"q": "Where does a stage document keep its earlier versions?", "expect": ["design/mobius-workspaces.md"]},
+    {"q": "How does a scheduled prompt run when the app is closed?", "expect": ["design/mobius-workspaces.md"]},
+    {"q": "How does the picture editor undo a step without touching the original file?", "expect": ["design/mobius-workspaces.md"]},
+    {"q": "What did we learn from other apps about how chat should feel?", "expect": ["design/mobius-ux.md"]},
+    {"q": "How is the wallpaper picker fed from the online source?", "expect": ["design/desktop-service.md"]},
+    {"q": "What is the plan for custom extensions now that Lua plugins are gone?", "expect": ["design/roadmap.md", "design/session-shell.md"]}
+  ]
+}
