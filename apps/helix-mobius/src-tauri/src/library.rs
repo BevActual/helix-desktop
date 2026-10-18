@@ -70,6 +70,10 @@ pub struct Card {
     pub loaded: bool,
     pub in_catalog: bool,
     pub progress: Option<Progress>,
+    /// `gpu`, `tight`, `cpu` or `no`: how it sits on this computer (see `hardware`).
+    pub fit: String,
+    /// Tokens a second measured on this computer's own replies, once it has answered.
+    pub speed: Option<f32>,
 }
 
 fn installed_size(dir: &Path, file: &str) -> Option<u64> {
@@ -116,6 +120,8 @@ fn unknown_models(dir: &Path) -> Vec<(String, u64)> {
 pub fn list(downloads: &Downloads, loaded: &[String]) -> Vec<Card> {
     let dir = models_dir();
     let jobs = downloads.jobs.lock().expect("downloads");
+    let memory = crate::hardware::memory();
+    let speeds = crate::hardware::speeds();
     let mut cards: Vec<Card> = model_catalog::CATALOG
         .iter()
         .map(|m| Card {
@@ -133,10 +139,17 @@ pub fn list(downloads: &Downloads, loaded: &[String]) -> Vec<Card> {
             loaded: loaded.iter().any(|l| l == m.model_file()),
             in_catalog: true,
             progress: jobs.get(m.id).map(|j| j.progress.clone()),
+            fit: crate::hardware::fit(crate::hardware::needed_gb(m.memory_gb, m.bytes()), memory)
+                .word()
+                .into(),
+            speed: speeds
+                .get(m.model_file().trim_end_matches(".gguf"))
+                .copied(),
         })
         .collect();
     for (name, bytes) in unknown_models(&dir) {
         let stem = name.trim_end_matches(".gguf").to_string();
+        let stem_for_speed = stem.clone();
         cards.push(Card {
             id: name.clone(),
             file: name.clone(),
@@ -152,6 +165,10 @@ pub fn list(downloads: &Downloads, loaded: &[String]) -> Vec<Card> {
             loaded: loaded.contains(&name),
             in_catalog: false,
             progress: None,
+            fit: crate::hardware::fit(crate::hardware::needed_gb(0.0, bytes), memory)
+                .word()
+                .into(),
+            speed: speeds.get(&stem_for_speed).copied(),
         });
     }
     cards

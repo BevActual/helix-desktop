@@ -9,6 +9,7 @@ mod decide;
 mod dictate;
 mod edits;
 mod generation;
+mod hardware;
 mod images;
 mod lan;
 mod library;
@@ -549,6 +550,15 @@ fn ended(app: &AppHandle, outcome: Outcome) {
         let mut state = shared.lock().expect("state");
         let model = state.turn_model.clone();
         state.chat.note_reply(&model, ms);
+        if let Some(stats) = state
+            .chat
+            .conversation
+            .messages
+            .last()
+            .and_then(|m| m.stats.as_ref())
+        {
+            hardware::note_speed(&stats.model, stats.tokens, ms);
+        }
     }
     persist(app);
     emit_view(app);
