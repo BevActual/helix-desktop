@@ -115,6 +115,8 @@ pub struct Remote {
     pub url: String,
     pub installation: String,
     pub enabled: bool,
+    /// `flatpak` or `rpm`.
+    pub kind: String,
 }
 
 /// `flatpak remotes --columns=name,title,url,options`; options is a comma list that includes `user` or `system`.
@@ -144,6 +146,7 @@ pub fn parse_remotes(text: &str) -> Vec<Remote> {
                 url: url.to_string(),
                 installation: installation.to_string(),
                 enabled: !options.split(',').any(|o| o.trim() == "disabled"),
+                kind: "flatpak".to_string(),
             })
         })
         .collect()

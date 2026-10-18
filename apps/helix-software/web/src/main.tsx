@@ -228,7 +228,7 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
             {page === "sources" ? (
               <Group title="Where software comes from">
                 {(view?.sources ?? []).map((remote) => (
-                  <HxRow key={`${remote.installation}:${remote.name}`} test={`source:${remote.name}`} title={remote.title} sub={remote.url}
+                  <HxRow key={`${remote.installation}:${remote.name}`} test={`source:${remote.name}`} title={remote.title} sub={remote.kind === "rpm" ? "Fedora repository" : remote.url}
                     trailing={<Chip>{remote.installation === "user" ? "This user" : "System"}</Chip>} />
                 ))}
               </Group>
