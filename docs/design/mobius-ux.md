@@ -207,3 +207,9 @@ A reasoning model (Qwen3, DeepSeek-R1 and the like) writes `<think>…</think>` 
 ### Project rules for Tools mode (done)
 
 Like Cursor's rules and `AGENTS.md`: when the chat's project folder holds `AGENTS.md`, `.helix/rules.md` or `.cursorrules` (first found; a regular file, not a link, under 64 KiB), Tools mode gives its first 4,000 characters to the planner and to the answer. The Tools sheet shows the file, its size and its text, so nothing is hidden. It is framed as guidance from the project, lower priority than the person's request, and it never removes the review of commands and edits (a cloned repository's rules file is text someone else wrote). `rules.rs` (unit tested), `mobius-edit-test.sh` checks the sheet shows it.
+
+### The command palette (done)
+
+Ctrl+K was "focus the search box in the side list". It is now a palette in the middle of the window (Raycast, Cursor and Linear all have one, because it is the fastest way to do anything once you know the app): one field that finds a **chat** (by title, and by what was said in it, from the saved chats), runs a **command** (new or temporary chat, the three modes, choose model, Models & routing, Memory, find in chat, export, fork, `/image`, `/web`, `/attach`, `/tools`, each with its shortcut shown), or, with whatever you typed, **asks Mobius in a new chat**. Up and down choose, Enter does it, Escape leaves, the mouse works. The side list's own search stays. `palette.tsx`, `tools/nested/mobius-palette-test.sh`.
+
+Next for it: models as rows (switch with a word), recent files for `@`, and actions on the chat under the cursor (rename, pin, move to project, delete) from the same box.

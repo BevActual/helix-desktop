@@ -10,6 +10,7 @@ import { Analysis, type AnalysisHandle } from "./analysis";
 import { OnlineResearch, type WebHandle } from "./web";
 import { Welcome, type WelcomeHandle, type WelcomeHooks } from "./welcome";
 import { ChatContext, type ContextHandle, type ContextInfo } from "./context";
+import { Palette, type PaletteHandle, type PaletteHooks } from "./palette";
 import { Memory, type MemoryHandle } from "./memory";
 import { CreateImage, type CreateImageHandle } from "./create-image";
 
@@ -49,6 +50,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   context: (host: HTMLElement) => {
     const run = handled<ContextHandle>(host, (register) => <ChatContext register={register} />);
     return { open: (view: Parameters<ContextHandle["open"]>[0]) => run((h) => h.open(view)) };
+  },
+  palette: (host: HTMLElement, hooks: PaletteHooks) => {
+    const run = handled<PaletteHandle>(host, (register) => <Palette register={register} hooks={hooks} />);
+    return { open: () => run((h) => h.open()) };
   },
   memory: (host: HTMLElement) => {
     const run = handled<MemoryHandle>(host, (register) => <Memory register={register} />);

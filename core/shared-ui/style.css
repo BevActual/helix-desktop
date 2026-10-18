@@ -1517,3 +1517,14 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .thinking summary { cursor: pointer; font-weight: 600; list-style: none; } .thinking summary::before { content: "◦ "; }
 .thinking p { margin: 6px 0 0 14px; padding-left: 10px; border-left: 2px solid var(--hairline); white-space: pre-wrap; }
 .tools-rules { margin: 8px 0; } .tools-rules summary { cursor: pointer; } .tools-rules pre { max-height: 140px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+.palette { width: min(620px, calc(100vw - 32px)); margin: 12vh auto auto; padding: 0; border: 1px solid var(--hairline); border-radius: 14px; background: var(--glass-solid); color: var(--label); box-shadow: 0 18px 60px rgba(0,0,0,.45); overflow: hidden; }
+.palette::backdrop { background: rgba(0,0,0,.35); }
+.palette > input { width: 100%; box-sizing: border-box; padding: 14px 16px; font-size: 15px; border: 0; border-bottom: 1px solid var(--hairline); background: transparent; border-radius: 0; outline: none; }
+.palette-rows { max-height: 52vh; overflow: auto; padding: 6px; }
+.palette-section { padding: 8px 10px 3px; font-size: 11px; font-weight: 650; color: var(--label-3); text-transform: uppercase; letter-spacing: .05em; }
+.palette-row { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 7px 10px; border-radius: 8px; background: transparent; text-align: left; }
+.palette-row.active { background: var(--accent); color: var(--on-accent); }
+.palette-title { white-space: nowrap; } .palette-sub { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--label-2); }
+.palette-row.active .palette-sub { color: rgba(255,255,255,.8); }
+.palette-row kbd { margin-left: auto; font-size: 11px; opacity: .7; }
+.palette-empty { padding: 14px; color: var(--label-2); }
