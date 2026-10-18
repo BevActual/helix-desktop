@@ -26,7 +26,7 @@ print("|".join(m["text"].replace("\n", "/") for m in json.load(open(f[0]))["mess
 PY
 }
 click_id input; wtype "Help me decide"; wtype -k Return; idle
-wait_id eph-choices && wait_id eph-form && wait_id eph-stats && echo "ok: choices, form and figures are drawn" || fail "missing: choices/form/stats"
+wait_id eph-choices && wait_id eph-form && wait_id eph-stats && wait_id eph-checklist && echo "ok: choices, form and figures are drawn" || fail "missing: choices/form/stats"
 shot ephemeral; sleep 1; shot ephemeral
 echo "--- picking an option sends it as a message"
 click_id eph-option-1; idle
@@ -34,4 +34,7 @@ click_id eph-option-1; idle
 echo "--- filling the form sends the values"
 click_id eph-field-0; wtype "Ada"; click_id eph-submit; idle
 case "$(users)" in *"Your details/- Name: Ada/- Level: Beginner"*) echo "ok: the form went back as a message";; *) fail "messages: $(users)";; esac
+echo "--- a checklist ticks, and can report where the person is"
+click_id eph-tick-0; sleep 1; click_id eph-progress-send; idle
+case "$(users)" in *"Steps/Done: Open the app; Save/Left: Pick a file"*) echo "ok: the progress went back as a message";; *) fail "messages: $(users)";; esac
 [ "$FAILED" = 0 ] && echo "PASS: mobius ephemeral" || exit 1

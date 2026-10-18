@@ -132,8 +132,7 @@ A piece of interface that exists for one moment, asked for by the reply and draw
 * **Only the newest reply is live.** Older blocks stay as read-only records, a used one shows what was chosen, and a reply that is still being
   written cannot be answered yet.
 
-`apps/helix-mobius/web/src/ephemeral.tsx`, `tools/nested/mobius-ephemeral-test.sh`. Next components, in order of use: a checklist and steps that
-the person ticks, a diff with accept and reject per hunk (the Changes panel), a diagram from a few lines of text, a confirm card for an Act or
+`apps/helix-mobius/web/src/ephemeral.tsx`, `tools/nested/mobius-ephemeral-test.sh`. Next components, in order of use: a diff with accept and reject per hunk (the Changes panel), a diagram from a few lines of text, a confirm card for an Act or
 Tools step, and a date or file picker. The same renderer is what the side panel for what was made would host.
 
 
@@ -155,3 +154,5 @@ command did it: each file as added, modified or deleted, with its unified diff (
 file back only if it still holds what the turn left. `tools/nested/mobius-edit-test.sh` runs a command that adds and changes a file and reverts
 each. Still to do: accept or reject before a command runs (a command cannot be previewed, so this stays review-before-run plus revert-after), a
 restore of the whole turn in one click, and files the snapshot does not cover (binaries, large files, ignored folders).
+
+**Checklist (done).** `{"type":"checklist","title":"…","items":["a",{"label":"b","done":true}]}`: up to 20 items with a progress bar and an "n of m" count. Ticks are the person's own and stay in this browser (keyed by the list's text, so they survive a reload and are lost harmlessly); "Tell Mobius where I am" sends "Done: …  Left: …" as a message when the person wants the model to know.
