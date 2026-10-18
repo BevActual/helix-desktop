@@ -13,6 +13,7 @@ mod dictate;
 mod edits;
 mod generation;
 mod hardware;
+mod hub;
 mod imageops;
 mod images;
 mod imagestage;
@@ -2856,14 +2857,48 @@ async fn library_remove(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Searches Hugging Face for GGUF models. Only the words typed are sent, and only because the person pressed Search.
+#[tauri::command]
+async fn hub_search(query: String) -> Result<Vec<hub::Repo>, String> {
+    hub::search(&query).await
+}
+
+/// A Hugging Face repository (a pasted link or `owner/name`) and the ways to get it, each with how it would sit on this computer.
+#[tauri::command]
+async fn hub_repo(input: String) -> Result<hub::RepoView, String> {
+    let id = hub::parse_input(&input)
+        .ok_or("Paste a huggingface.co link, or a name like owner/model.")?;
+    let memory = tauri::async_runtime::spawn_blocking(hardware::memory)
+        .await
+        .map_err(|e| e.to_string())?;
+    hub::repo(&id, memory).await
+}
+
+/// Downloads one variant of a Hugging Face model. The checksums are read from Hugging Face's listing now, never taken from the page.
+#[tauri::command]
+async fn hub_download(app: AppHandle, repo: String, key: String) -> Result<(), String> {
+    let free = tauri::async_runtime::spawn_blocking(library::free_bytes)
+        .await
+        .map_err(|e| e.to_string())?;
+    let spec = hub::spec_for(&repo, &key, free).await?;
+    if library::spec_installed(&spec) {
+        return Err("That model is already in the models folder.".into());
+    }
+    let handle = app.clone();
+    library::start_spec(&downloads(&app), spec, move || {
+        let handle = handle.clone();
+        tauri::async_runtime::spawn(async move { emit_library(&handle).await });
+    })?;
+    emit_library(&app).await;
+    Ok(())
+}
+
 /// Asks for a `.gguf` file and adds it to the models folder. `None` when the person cancels; otherwise the name it was kept under.
 #[tauri::command]
 async fn library_import(app: AppHandle) -> Result<Option<String>, String> {
-    let added = tauri::async_runtime::spawn_blocking(|| {
-        match library::pick_model_file()? {
-            Some(path) => library::import(&path).map(Some),
-            None => Ok(None),
-        }
+    let added = tauri::async_runtime::spawn_blocking(|| match library::pick_model_file()? {
+        Some(path) => library::import(&path).map(Some),
+        None => Ok(None),
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -3176,10 +3211,7 @@ async fn chat_generate_image(
     if !model_catalog::safe_file_name(&model)
         || !library::models_dir().join("image").join(&model).is_file()
     {
-        return Err(
-            "Get SD-Turbo in Settings → Models before generating pictures."
-                .into(),
-        );
+        return Err("Get SD-Turbo in Settings → Models before generating pictures.".into());
     }
     let turn = {
         let shared = shared(&app);
@@ -3523,6 +3555,9 @@ fn main() {
             library_cancel,
             library_remove,
             library_import,
+            hub_search,
+            hub_repo,
+            hub_download,
             library_reveal,
             image_stage,
             image_pick,

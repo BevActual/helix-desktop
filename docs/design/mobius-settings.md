@@ -59,8 +59,22 @@ What the other products do, from their own pages: Cursor lets you add and search
 
 Library → **Add a model file…** takes a `.gguf` from this computer. It must start with the GGUF marker (a renamed document is refused) and be at least 1 KiB; its name is cleaned to letters, digits and `. - _`; a catalog file name or one already in the folder is refused. It is **hard-linked** when it is on the same disk (instant, no second copy, the original untouched), else copied under a `.part` name and renamed when whole. It is listed as **Added by you**, with the plain statement that Mobius has not checked it against a published list. It can be used for Chat, Code or Summaries and removed again (only a plain file directly in the models folder, never one the catalog owns). **Open the models folder** is there for people who prefer to drop files in. `mobius-import` tests it with a fake picker.
 
+## Finding models on Hugging Face
+
+Library → **Find more models on Hugging Face**: type words to search, or paste a `huggingface.co` link or `owner/name`. Safeguards (approved 2026-10-18):
+
+* **Only `https://huggingface.co` is asked**, from `hub.rs`, and a search sends the typed words and nothing else (said on the panel). A pasted link must be that host over https, or a bare `owner/name`.
+* **A file is offered only if Hugging Face's listing gives its SHA-256**, which the download is checked against; the checksum is read from the listing again when the download starts and never taken from the page. A `.gguf` without one, a gated repository (needs a login), a name that is not a plain `.gguf` name, and picture projectors (`mmproj`) are not offered. Numbered parts (`-00001-of-00003`) are one choice and only when every part is listed.
+* **Limits**: 40 GB per download, and enough free disk (the size plus 5% plus 0.5 GB) or it refuses with the numbers. API replies over 8 MB are not read.
+* **Redirects** are followed only to Hugging Face's own hosts (`huggingface.co`, `hf.co` and their subdomains) over https, for these downloads and the catalog's.
+* **Each download is confirmed** with the repository, maker, licence and the checksum statement; a maker outside a short list of widely used ones is called out. It is only ever started from a button.
+* After a download the model is noted in `sources.json` beside it, so its card says "From huggingface.co/owner/repo. Checked against the checksum Hugging Face publishes for it."
+
+Tested by `hub::` unit tests (names, links, checksums, parts, redirects, a download built from fixtures), the nested `mobius-hub` (answered from files, no network) and, by hand, `cargo test -p helix-mobius real_download -- --ignored`, which searched Hugging Face and downloaded a 1.2 MB model through the real path.
+
+Not built: picture support for a Hugging Face model (its `mmproj` file must be named to match the model), and a quantisation recommendation per computer.
+
 ## Not built
 
-* Finding models that are not in the curated list: search and add by link. Anything fetched needs a pinned checksum or a clear "unverified" state, a fixed https host, a size limit, and the person's yes per download.
 * A Knowledge section (indexed folders, reference packs) once `knowledge.md` is wired in.
 * Rules and Memory as sections (they are dialogs today).
