@@ -1047,6 +1047,22 @@ listen("image-progress", () => {
   drawComposerMeta();
 });
 
+// The composer moves between the middle of the window (an empty chat) and the bottom (a conversation) with a short, decelerating glide, so the
+// change of layout is something that happened rather than something that flickered. Skipped for people who ask for less motion.
+function setHome(on) {
+  if (document.body.classList.contains("is-home") === on) return;
+  const wrap = document.querySelector(".composer-wrap");
+  const before = wrap ? wrap.getBoundingClientRect() : null;
+  document.body.classList.toggle("is-home", on);
+  if (!wrap || !before || window.matchMedia("(prefers-reduced-motion: reduce)").matches || !wrap.animate) return;
+  const after = wrap.getBoundingClientRect();
+  const dy = before.top - after.top;
+  if (Math.abs(dy) < 4) return;
+  const glide = wrap.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 340, easing: "cubic-bezier(.2, .7, .2, 1)" });
+  // The layout report (the tests read it) must describe where the composer ended up, not where it was part-way.
+  glide.finished.then(() => queueReport(), () => undefined);
+}
+
 function drawChat() {
   $("analysis-evidence").hidden = !view.analysis_job;
   if (!view.streaming) $("loading-chip").hidden = true;
@@ -1062,7 +1078,7 @@ function drawChat() {
   const emptyChat = view.messages.length === 0 && (view.tasks || []).length === 0;
   $("empty").hidden = !emptyChat;
   // An empty chat is a home: the greeting and the composer sit in the middle of the window, and the composer settles to the bottom with the first message.
-  document.body.classList.toggle("is-home", emptyChat && workspace === "chat");
+  setHome(emptyChat && workspace === "chat");
   $("send").hidden = view.streaming;
   $("stop").hidden = !view.streaming;
   $("input").disabled = false;
@@ -2592,7 +2608,7 @@ function sendReport() {
   invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, elements, errors: layoutErrors.slice(-10) } });
 }
 window.addEventListener("resize", queueReport);
-new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "hidden"] });
+new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "hidden", "class"] });
 
 invoke("layout_reporting").then((on) => { reporting = on; if (on) queueReport(); });
 invoke("chat_status").then((s) => { status = s; drawChat(); });

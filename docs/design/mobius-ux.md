@@ -228,4 +228,6 @@ Looked at the screens in the nested compositor (`tools/nested/mobius-look-test.s
 
 Tests: `mobius-welcome` and `mobius-web` open the "More ways to start" disclosure first; `mobius-dialogs`, `mobius-lab`, `mobius-context` and `mobius-routing-look` go through the ⋯ menu (`menu-more-persona`, `-style`, `-route`, `-context`).
 
-Next for Chat: motion for the composer's move from the middle to the bottom, a quieter streaming state, message hover affordances that match Apple Messages' restraint, a light-theme pass over every screen, and the narrow window (the nested compositor cannot resize the page, so it is not yet reviewed).
+Second pass: the composer **glides** between the middle of the window and the bottom (a short decelerating move, skipped for people who ask for less motion), the message actions are quiet until the pointer is near, and the home, conversation and composer were reviewed in the **light theme** (they hold up). Found by the tests: the layout log did not describe the composer after the glide (it reported part-way), so it now reports once the move ends; and the layout log reports class changes too.
+
+Next for Chat: a quieter streaming state, the narrow window (the nested compositor cannot resize the page, so it is not yet reviewed).
