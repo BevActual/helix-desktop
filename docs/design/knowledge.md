@@ -1,6 +1,6 @@
 # Knowledge store
 
-Status: first slice built (2026-10-18): the store, hybrid search and a measurement. Nothing in Mobius uses it yet.
+Status (2026-10-18): the store, hybrid search and a measurement are built, and Mobius now reads folders into it (Settings → Knowledge) and can search them. Using it in chat answers, with cited sources, is next.
 
 ## Why a database
 
@@ -51,10 +51,21 @@ What this says:
 * **A plain scan is fast enough for now.** Vectors are read once and kept in memory; at 985 passages a scan is far below the time
   to embed the question. `sqlite-vec` is the option when a store passes some hundreds of thousands of passages.
 
+## In Mobius (Settings → Knowledge)
+
+`knowledge.rs` wraps the store. The index is `~/.local/share/helix/knowledge.db`; the folder list is `mobius/knowledge-folders.json`.
+
+* **Add a folder** (system folder picker): text and code files under 300 KB, up to 3000 per folder; hidden folders, `node_modules`, `target`, `dist` and the like, and symlinks are skipped; `/`, the home folder itself, `/tmp`, `/var` and system folders are refused. Reading runs in the background with progress and **Stop**.
+* A page is a file (title = its path inside the folder, pack = `folder:<path>`, tier = yours). Reading again costs only changed passages, and pages whose files are gone are dropped.
+* **Remove** a folder deletes its pack: pages, passages, vectors and links. The person's files are never touched.
+* The same embedding model as the Act hint reads passages and questions (`decide::embedder`); without it files are searchable by words and the page offers the Library download. The first read of a folder before the model exists is words only, and a later read adds the vectors.
+* **Try a search** shows what Mobius would find, marking results found by meaning. Everything is local.
+
+Tests: `knowledge::` unit tests (what is collected and skipped, a symlink loop, updating and forgetting, stopping, refused folders) and the nested `mobius-knowledge` (a fake picker, the real embedding model when present).
+
 ## Not built
 
-* Mobius integration: a Rust `Embed` over `helix-embed`, the index living at `~/.local/share/helix/knowledge.db`, project folders
-  indexed on request, cited sources as chips under replies.
+* Using it in chat: retrieved passages given to a local model, and cited-source chips under the reply (next).
 * Markdown export and import.
 * Facts (a short statement with its source, a confidence and whether the person confirmed it) replacing the memory file.
 * An events table (what was retrieved, used and kept) to rank by use.

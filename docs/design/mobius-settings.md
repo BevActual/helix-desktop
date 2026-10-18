@@ -11,6 +11,7 @@ A rail of sections beside one column of content, the way Cursor's Settings and s
 | **Models** | One row per **job**: Chat, Code, Pictures, Summaries, Act, Dictation, Image creation. Each shows the model that does it (a menu of what is installed here, on the network, or in the cloud), where it runs and how it fits this computer. A job with nothing suitable installed offers the model to get, with the reason ("The most capable model that fits your graphics card") |
 | **Library** | Every model Mobius can run: search, filter (installed, chat, code, pictures, speech, images, fits this computer), sort (best for this computer, smallest, name), Get with progress, Remove |
 | **Cloud models** | OpenRouter's catalog (471 models when measured, 2026-10-18): search by name, maker or what it does; filter (in my menu, free, sees pictures, thinks first, uses tools, long documents); sort (newest, cheapest, longest documents). Each row shows price per million tokens, context size and abilities. **Add to my menu** puts a model in the chat's model menu; **Use for…** assigns it to Chat, Code, Pictures or Summaries; any `vendor/model` id can be added by hand. Chats on these leave the computer, and Act never uses one |
+| **Knowledge** | Folders Mobius reads into a local search index (see `knowledge.md`): add, read again, remove, and try a search that shows what would be found, by words and by meaning. Nothing leaves the computer |
 | **Providers** | Another computer on the network, and OpenRouter with its key in the Secret Service |
 | **Generation** | Temperature, longest reply, provider timeout, battery-saver rule |
 | **Experiments** | The switches for things being tried, and the routing file's path |
@@ -76,5 +77,5 @@ Not built: picture support for a Hugging Face model (its `mmproj` file must be n
 
 ## Not built
 
-* A Knowledge section (indexed folders, reference packs) once `knowledge.md` is wired in.
+* Knowledge: reference packs and fetched pages (each a download the person approves), and using the index in chat.
 * Rules and Memory as sections (they are dialogs today).

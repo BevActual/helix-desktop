@@ -3054,6 +3054,7 @@ dependencies = [
  "helix-config",
  "helix-desktop-api",
  "helix-embed",
+ "helix-knowledge",
  "image",
  "keyring",
  "libc",
