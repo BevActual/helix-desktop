@@ -42,7 +42,6 @@ Measured with the real models, switching in one chat (the 5.5 GB vision model, t
 * **The chat settings row is still cryptic.** "Helix" is the persona, "On this computer" is where the model runs. A single model control (icon, name, location) that opens one popover would
   say it better, with persona and style inside it.
 * **Three attachment icons beside the composer** (file, picture, microphone) could be one "+" menu, the pattern people know; the composer would then have room for a longer line.
-* **"Act" is an unexplained word** on a button next to Send. Its tooltip says what it does; the label could say it ("Do on desktop") or the control could become a mode of the composer.
 * **The start screen is task-first, not conversation-first.** The composer is the most likely first action; the eight cards could fold into one row of four with "More" and the composer centred above them.
 * **Light theme** has not been looked at since the apps began to follow the system theme (`settings-audit.md`). Take the same pictures with the light theme and read them.
 * **Reordering the queue** (Cursor lets you drag queued messages).
@@ -56,3 +55,60 @@ Measured with the real models, switching in one chat (the 5.5 GB vision model, t
 
 The Mobius suites were run on `main` and failed the same way there, so these failures did not come from the changes above. Most were one cause, fixed in the suite: the nested window is 640 px wide, below the 720 px at which the chat list becomes a button and the sheets scroll, so tests that click the list or fill a sheet missed. They now run in a 1100 px window (the KDL for that has to be on several lines: one line with a nested block does not parse, and niri then starts with no spawned program). Now passing: `mobius`, `mobius-search`, `mobius-context`, `mobius-pictures`, `mobius-tools`, `mobius-lab`, `models`, and `mobius-dialogs` (its persona step looked for a rail that is hidden while the persona chip is on, and its model step for the old sheet; both updated, and the slash-menu check counts instead of assuming a number). Nothing in the Mobius suites fails now.
 
+
+## Cursor, studied (2026-10-17)
+
+From Cursor's documentation and reviews of Cursor 2.0 (I could not run Cursor here, so this is what it documents, not a hands-on session). What it does, and what Mobius should take from it, kept to what suits a local, private assistant.
+
+| Cursor | Mobius today | Take |
+|---|---|---|
+| **Mode picker in the composer** (Agent, Ask, Plan, Debug), switched with Shift+Tab | "Tools" is a sheet; "Act" is an unexplained button beside Send | **One mode control** in the composer: Ask (chat only), Tools (research with approval), Act (desktop), Plan (a reviewable plan before anything runs). Shift+Tab cycles. Replaces the Act button and the Tools sheet's switch. |
+| **One model control** and Auto with a stated policy (Cost, Balance, Intelligence) | A model menu with Auto as a row | Done in part. Add what Auto picked on the reply ("Auto → Qwen2.5 1.5B"), and the decision lane ([decision-model.md](decision-model.md)) behind Auto. |
+| **`@` mentions**: files, folders, terminals, past chats, git diffs, browser | `/` commands, drag and drop, Context chip | **`@` in the composer** with a picker: files in the agent desk, other chats, the open window's title, the clipboard. Chosen items are pills above the text, each removable, so what the model sees is visible. |
+| **Context ring**: a small ring by the input; click for a breakdown (system, tools, rules, history) | A "Context" chip in the settings row | A ring that fills as the chat approaches the loaded model's window, with the breakdown on click, and a "summarise earlier turns" action at the limit. Matters more locally, where windows are 4 to 32k. |
+| **Checkpoints**: before significant edits the agent saves a restore point; restore returns the state without removing the chat | Act has Undo for one action; the agent desk has no restore | A checkpoint per Tools or Act turn that changed anything, shown on the message ("Restore"), built on `act-undo.md` for desktop actions and a snapshot of the agent desk folder for files. |
+| **Review of changes**: a diff while it runs, Stop (Cmd+Shift+Backspace), Accept or Reject per file, a Review pass | Tools mode shows steps for approval; saved files show a preview | A **Changes** panel for a turn: files touched, a diff for each, Accept or Reject each, Stop in the composer while it runs. |
+| **Queue**: Enter queues, Cmd+Enter sends now, drag to reorder | Queue list with Send now and Remove | Done. Add Cmd+Enter and drag to reorder. |
+| **Several agents** side by side, each with status, in a list | One chat at a time; the list shows titles | A running indicator in the chat list for a chat still writing or waiting for approval, so leaving a chat does not hide it. |
+| **Side chats** (`/side`) for a question that must not touch the main thread | None | `/side`: a one-off question in a small panel that sees the chat but does not join it. |
+| **Plan mode**: researches, asks clarifying questions, produces a plan you edit, then builds | None | Plan in the mode control, with an editable checklist before Tools or Act runs it. |
+| **Many models, one click**; per-model pricing | Menu shows size and abilities | Add a one-line reason per model ("Fast", "Sees pictures", "Best for code") and, for local ones, memory and measured tokens per second from the reply stats. |
+
+### Order
+
+1. **Mode control**: done. A chip beside Send (Ask, Tools, Act) opens a menu; Shift+Tab cycles. Tools is the chat's own setting; Act is for the next message only, then the composer returns to what it was. The folder chip shows only while Tools are on; "Project folder…" is in the menu. `tools/nested/mobius-mode-test.sh`; the act and tools suites now switch mode first. Menus now stay inside the window (the mode menu ran off the right edge).
+2. **`@` pills**: done. Typing `@` before a word offers files from the chat's project folder (a bounded walk: text extensions only, no hidden or build folders, kept inside the folder, secrets refused as for any attachment) and other chats; choosing one adds a chip, the same chip as a picked file, which previews and removes. `tools/nested/mobius-mention-test.sh`. **The context ring** is still to do: it needs the loaded model's window from the inference service.
+3. **Checkpoints and the Changes panel** (trust in Tools and Act; needs the agent-desk snapshot).
+4. **Running indicators, `/side`, Plan**.
+5. **Auto with the decision lane**, which needs the `Embed` call.
+
+Not taken: cloud-first model pricing and usage pools; many cloud agents in worktrees (Mobius is one person's assistant on one computer); anything that sends text off the computer by default.
+
+
+## Other platforms, and tools (2026-10-17, from their documentation and reviews)
+
+What each does that a local, private desktop assistant could use, and what we leave.
+
+| Source | What it does | For Helix |
+|---|---|---|
+| **LM Studio** | A built-in model browser that says whether a model fits the GPU's memory | The library lists size already; add **"fits / tight / too big"** against the free VRAM and RAM, and the tokens per second measured on this machine once a model has run. Easy switching between local models starts with knowing what will run. |
+| **Jan** | Conversations in a sidebar, model switching, project files indexed for questions, no telemetry | Matches Mobius (projects, per-chat model). Its indexing of a project folder is the retrieval row in `mobius-product.md`; do it with measured recall first. |
+| **Open WebUI / Ollama** | A server with a UI on top; models pulled by name; many connections | Helix has the service and the library. Not a model to follow; the lesson is that "add a model by name or URL" belongs in the library's first screen. |
+| **Raycast AI** | **Presets** (model, instructions, creativity and tools in one named thing, with a shared directory); **tools as `@` mentions** inside a message; **Quick AI** for a one-off question that continues in the chat | Mobius personas are close to presets: add the model and Tools mode to a persona so one click gives "Code reviewer on the 7B with the project folder". Tools as `@` mentions (`@web`, `@desktop`) would unify `@` with Tools and Act. A quick answer in the launcher that **opens in Mobius to continue** is a small bridge between the two. |
+| **Zed** | The agent panel next to the editor; **changes reviewed in one view with accept or reject per hunk**; an open protocol (ACP) so any agent can use its UI | The Changes panel (next on the list) should accept or reject per file and per hunk. The protocol idea matters: an agent from another program using Mobius's surface is the shape of Agent Surface already. |
+| **Warp** | Notifies you, in the app and on the desktop, when an agent needs approval, review or help | The shell's notifications already exist: an approval waiting for an agent task that is not on screen should raise one, with the action in it. |
+| **GNOME HIG, libadwaita** | Adaptive layouts (one design from phone to desktop width), patterns shown in a demo app rather than rules | Mobius's chat list already collapses below 720 px; every app should be looked at at that width (the nested harness cannot yet set it, see "Seen, not changed") and at the light theme. |
+
+### Tools worth researching (what an assistant could call)
+
+* **MCP (Model Context Protocol) servers**: the common way to give an assistant tools (files, git, browser, calendars). Helix has its own tool tiers, grants and confirmer; MCP would be one more source of tools behind the same grants, local servers only, each shown by name in the Tools sheet. The risk to design first: a tool's description is text the model reads, so a server can steer it (the synthetic-input threat model's lesson).
+* **ACP (Agent Client Protocol)**: an agent in its own process, the UI as a client. Worth reading whether Mobius could host Claude Code or another agent in a chat, with Helix's approvals in front.
+* **Whisper-class dictation and local TTS** (Mobius has dictation; read-aloud is open in `mobius-product.md`).
+* **Local retrieval** (embedding search over a project folder or all chats): the nomic embedder in `decision-model.md` is the same piece, so one `Embed` call serves routing, `@` search by meaning and project knowledge.
+
+### Order of the next work
+
+1. `Embed` in the inference service (routing, `@` by meaning, retrieval share it).
+2. Context ring, Changes panel with per-hunk accept, checkpoints.
+3. Model library: fits-on-this-machine, measured speed, add by name.
+4. Persona as preset (model plus Tools plus folder).

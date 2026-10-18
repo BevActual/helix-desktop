@@ -74,7 +74,7 @@
           <button id="meta-model" class="meta-chip" data-test="meta-model" type="button" title="Chat model">Model</button>
           <button id="analysis-evidence" class="meta-chip" data-test="analysis-evidence" type="button" hidden>Local analysis · evidence</button>
           <button id="meta-route" class="meta-chip" data-test="meta-route" type="button" title="Models and routing"></button>
-          <button id="meta-tools" class="meta-chip" data-test="meta-tools" type="button" title="Configure chat tools">Tools · off</button>
+          <button id="meta-tools" class="meta-chip" data-test="meta-tools" type="button" title="Project folder for Tools mode" hidden>Tools · off</button>
           <button id="meta-agent-desk" class="meta-chip" data-test="meta-agent-desk" type="button" title="Show the Helix agent desk" hidden>Agent desk</button>
           <button id="meta-context" class="meta-chip" data-test="meta-context" type="button" title="Chat context and brief">Context</button>
           <span id="loading-chip" class="queue-chip" data-test="loading-chip" hidden></span>
@@ -89,7 +89,7 @@
           <button id="dictate" type="button" data-test="dictate" title="Dictate" aria-label="Dictate" aria-pressed="false"><i data-icon="mic"></i></button>
           <textarea id="input" data-test="input" rows="1" placeholder="Ask anything — / for commands" autocomplete="off" spellcheck="true"></textarea>
           <div class="composer-actions">
-            <button id="act" type="button" data-test="act" title="Have Mobius act on the desktop" aria-label="Have Mobius act on the desktop">Act</button>
+            <button id="mode" class="mode-chip" type="button" data-test="mode" title="Mode: Ask, Tools or Act (Shift+Tab)" aria-haspopup="menu">Ask</button>
             <button id="send" type="submit" data-test="send" title="Send" aria-label="Send" disabled><i data-icon="arrow-up"></i></button>
             <button id="stop" type="button" data-test="stop" title="Stop" aria-label="Stop" hidden><i data-icon="stop"></i></button>
           </div>

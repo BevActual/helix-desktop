@@ -1455,3 +1455,9 @@ body.chat .queue-list[hidden] { display: none; }
 body.chat .queue-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border-radius: 12px; background: var(--fill-1); font-size: 13px; }
 body.chat .queue-mark { flex: none; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
 body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--label-2); }
+.hx-menu-wide { width: 320px; } .hx-menu-wide .hx-menu-item .mi-sub { white-space: normal; }
+.hx-menu-label .hx-menu-hint { float: right; font-weight: 500; }
+.mode-chip { padding: 4px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: var(--fill-2, rgba(128,128,128,.16)); color: var(--label-1, inherit); }
+.mode-chip::after { content: " ▾"; font-size: 10px; opacity: .6; }
+.mode-chip.mode-tools { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.mode-chip.mode-act { background: var(--accent); color: var(--on-accent); }

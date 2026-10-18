@@ -33,6 +33,8 @@ export interface DialogHooks {
   /** Close the hub menu when a dialog opens from it. */
   closeMenu: () => void;
 }
+/** What the mode menu needs to know: the current mode and whether it can be changed now. */
+export interface ModeState { mode: "ask" | "tools" | "act"; folder: string; busy: boolean }
 export interface DialogHandle {
   openRename: (title: string) => void;
   openProject: (current: string, suggestions: string[]) => void;
@@ -40,7 +42,7 @@ export interface DialogHandle {
   openPersona: (create?: boolean) => void;
   openEdit: (index: number, text: string) => void;
   /** A small menu above an anchor: the persona list or the style list. */
-  openMenu: (kind: "persona" | "style" | "model", anchor: { left: number; top: number; width: number }) => void;
+  openMenu: (kind: "persona" | "style" | "model" | "mode", anchor: { left: number; top: number; width: number }, mode?: ModeState) => void;
 }
 
 function initials(name: string): string {
@@ -99,7 +101,8 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
     readLab();
     return () => { stops.forEach((stop) => stop.then((fn) => fn())); };
   }, [readLab]);
-  const [menu, setMenu] = useState<{ kind: "persona" | "style" | "model"; left: number; top: number; width: number } | null>(null);
+  const [menu, setMenu] = useState<{ kind: "persona" | "style" | "model" | "mode"; left: number; top: number; width: number } | null>(null);
+  const [modeState, setModeState] = useState<ModeState>({ mode: "ask", folder: "", busy: false });
   // What the model menu lists: the installed models with their friendly names, and where the chat is routed now.
   const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[] }>; route: Route | null } | null>(null);
   useEffect(() => {
@@ -199,7 +202,8 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         invoke<LabView>("lab_get").then((view) => setProjectText(view.project_instructions || ""), () => setProjectText(""));
         setSheet("project");
       },
-      openMenu: (kind, anchor) => {
+      openMenu: (kind, anchor, mode) => {
+        if (kind === "mode" && mode) setModeState(mode);
         if (kind !== "model") { setMenu({ kind, ...anchor }); return; }
         Promise.all([
           invoke<string[]>("routing_list_models").catch(() => [] as string[]),
@@ -279,8 +283,27 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
 
       {menu
         ? createPortal(
-            <div className="hx-menu" data-test={`menu-${menu.kind}`} style={{ left: menu.left, bottom: window.innerHeight - menu.top + 6, minWidth: Math.max(220, menu.width) }} role="menu">
-              {menu.kind === "model" ? (
+            <div className={`hx-menu${menu.kind === "mode" ? " hx-menu-wide" : ""}`} data-test={`menu-${menu.kind}`} style={{ left: Math.max(8, Math.min(menu.left, window.innerWidth - (menu.kind === "mode" ? 320 : Math.max(280, menu.width)) - 8)), bottom: window.innerHeight - menu.top + 6, minWidth: Math.max(220, menu.width) }} role="menu">
+              {menu.kind === "mode" ? (
+                <>
+                  <div className="hx-menu-label">Mode <span className="hx-menu-hint">Shift+Tab</span></div>
+                  {([
+                    ["ask", "Ask", "Chat only. No tools."],
+                    ["tools", "Tools", "Search the web, read pages and run commands in a project folder. Each step asks first."],
+                    ["act", "Act", "Do it on the desktop. The next message goes to the desktop assistant, which asks before changing anything."],
+                  ] as const).map(([id, title, sub]) => (
+                    <button key={id} className={`hx-menu-item${modeState.mode === id ? " current" : ""}`} role="menuitemradio" aria-checked={modeState.mode === id} data-test={`menu-mode-${id}`} disabled={modeState.busy && id !== "act" && modeState.mode !== "act"}
+                      onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-set-mode", { detail: id })); }}>
+                      <span className="mi-text"><span className="mi-title">{title}</span><span className="mi-sub">{sub}</span></span>
+                      {modeState.mode === id ? <span className="mi-check">✓</span> : null}
+                    </button>
+                  ))}
+                  <div className="hx-menu-sep" />
+                  <button className="hx-menu-item" data-test="menu-mode-folder" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-set-mode", { detail: "folder" })); }}>
+                    <span className="mi-text"><span className="mi-title">Project folder…</span><span className="mi-sub">{modeState.folder || "None: web only"}</span></span>
+                  </button>
+                </>
+              ) : menu.kind === "model" ? (
                 <>
                   <div className="hx-menu-label">Model</div>
                   {picker?.route && picker.route.backend !== "local" ? (
