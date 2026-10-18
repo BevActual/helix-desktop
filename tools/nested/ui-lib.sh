@@ -3,7 +3,8 @@
 LAYOUT=${LAYOUT:-$SCRATCH/state/layout.json}
 PT="$ROOT/tools/nested/wl-pointer/wl-pointer"
 # Scrolls the page (Page Down) until a named control is inside the window: a page that has grown past the window's height would otherwise be
-# clicked outside it. Does nothing for a control that is already visible.
+# clicked outside it. Does nothing for a control that is already visible. UI_REVEAL="x y" names an empty spot inside the scrolling area when
+# it is not at the top of the window (default 520 60).
 reveal_id() {
   local _ below
   for _ in 1 2 3 4 5 6 7 8; do
@@ -22,7 +23,8 @@ PY
 import json, os
 ox, oy = (float(v) for v in os.environ.get("UI_ORIGIN", "0 0").split())
 w, h = (float(v) for v in os.environ.get("UI_SCREEN", "1280 720").split())
-print(f"{(ox + 520) / w:.4f} {(oy + 60) / h:.4f}")
+rx, ry = (float(v) for v in os.environ.get("UI_REVEAL", "520 60").split())
+print(f"{(ox + rx) / w:.4f} {(oy + ry) / h:.4f}")
 PY
 ) click
     wtype -k Next; sleep 1.2   # the page reports its layout every 0.5 s

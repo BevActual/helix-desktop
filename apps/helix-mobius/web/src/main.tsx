@@ -5,7 +5,7 @@ import { ChatList, type ChatItem, type ChatListHandle, type ChatListHooks } from
 import { AttachChips, SlashMenu, type Attachment, type ChipsHandle, type SlashHandle, type SlashItem } from "./composer";
 import { Dialogs, type DialogHandle, type DialogHooks, type ModeState } from "./dialogs";
 import { Thread, type Block, type DesktopTask, type Message, type ThreadHandle, type ThreadHooks } from "./thread";
-import { ModelsPage, type ModelsHandle, type ModelsHooks } from "./models";
+import { SettingsPage, type SettingsHandle, type SettingsHooks } from "./settings";
 import { Analysis, type AnalysisHandle } from "./analysis";
 import { OnlineResearch, type WebHandle } from "./web";
 import { Welcome, type WelcomeHandle, type WelcomeHooks } from "./welcome";
@@ -124,8 +124,8 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
     const run = handled<ChatListHandle>(host, (register) => <ChatList register={register} hooks={hooks} />);
     return { set: (items: ChatItem[], currentId: string) => run((h) => h.set(items, currentId)) };
   },
-  models: (host: HTMLElement, hooks: ModelsHooks) => {
-    const run = handled<ModelsHandle>(host, (register) => <ModelsPage register={register} hooks={hooks} />);
-    return { open: () => run((h) => h.open()) };
+  models: (host: HTMLElement, hooks: SettingsHooks) => {
+    const run = handled<SettingsHandle>(host, (register) => <SettingsPage register={register} hooks={hooks} />);
+    return { open: (section?: string) => run((h) => h.open(section)) };
   },
 };

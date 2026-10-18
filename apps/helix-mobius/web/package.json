@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc --noEmit -p ../../../tsconfig.json && vite build",
     "typecheck": "tsc --noEmit -p ../../../tsconfig.json",
-    "test": "node --experimental-strip-types --no-warnings --test tests/markdownEdit.test.ts"
+    "test": "node --experimental-strip-types --no-warnings --test tests/markdownEdit.test.ts tests/recommend.test.ts"
   },
   "dependencies": {
     "@helix/ui": "*"

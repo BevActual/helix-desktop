@@ -17,10 +17,10 @@ PY
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
 has_id plus && echo "ok: the composer has a + menu for pictures and files" || fail "no + button"
 click_id meta-model; sleep 1.2
-has_id menu-model-routing && echo "ok: the model menu links to Models & routing" || fail "no routing link in the model menu"
+has_id menu-model-routing && echo "ok: the model menu links to Settings" || fail "no routing link in the model menu"
 click_id menu-model-routing; sleep 1.5
-has_id models-nav-local && echo "ok: the library opened from the picker" || fail "the library did not open"
-click_id models-nav-local; sleep 1.5
+has_id models-nav-models && echo "ok: Settings opened from the picker" || fail "the library did not open"
+click_id models-nav-library; sleep 1.5
 shot library
 has_id lib-get-qwen2.5-3b && echo "ok: downloadable models are offered" || fail "no downloadable model card"
 has_id lib-get-qwen2.5-vl-7b && echo "ok: a vision model is offered" || fail "no vision model card"
