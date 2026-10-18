@@ -82,7 +82,11 @@ pub fn parse(reply: &Value) -> Vec<CloudModel> {
             let strings = |value: Option<&Value>| -> Vec<String> {
                 value
                     .and_then(Value::as_array)
-                    .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(str::to_string))
+                            .collect()
+                    })
                     .unwrap_or_default()
             };
             let architecture = entry.get("architecture");
@@ -99,8 +103,16 @@ pub fn parse(reply: &Value) -> Vec<CloudModel> {
                 .to_string();
             Some(CloudModel {
                 free: prompt == Some(0.0) && completion == Some(0.0),
-                blurb: blurb(entry.get("description").and_then(Value::as_str).unwrap_or("")),
-                context: entry.get("context_length").and_then(Value::as_u64).unwrap_or(0),
+                blurb: blurb(
+                    entry
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                ),
+                context: entry
+                    .get("context_length")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0),
                 vision: inputs.iter().any(|m| m == "image"),
                 makes_images: outputs.iter().any(|m| m == "image"),
                 tools: params.iter().any(|p| p == "tools"),
@@ -179,7 +191,10 @@ pub async fn refresh(base_url: &str, now: u64) -> Result<Catalog, String> {
     if models.is_empty() {
         return Err("The catalog had no models.".into());
     }
-    let catalog = Catalog { fetched: now, models };
+    let catalog = Catalog {
+        fetched: now,
+        models,
+    };
     let text = serde_json::to_string(&catalog).map_err(|e| e.to_string())?;
     write_atomic(&catalog_path(), &text)?;
     Ok(catalog)
@@ -246,7 +261,10 @@ mod tests {
     #[test]
     fn reads_prices_abilities_and_orders_newest_first() {
         let models = parse(&sample());
-        assert_eq!(models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["acme/vision-pro", "router/auto", "acme/small:free"]);
+        assert_eq!(
+            models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            ["acme/vision-pro", "router/auto", "acme/small:free"]
+        );
         let pro = &models[0];
         assert_eq!(pro.prompt_per_m, Some(2.5));
         assert_eq!(pro.completion_per_m, Some(10.0));
@@ -278,10 +296,22 @@ mod tests {
 
     #[test]
     fn only_vendor_slash_name_ids_are_stored() {
-        for good in ["openai/gpt-4o", "meta-llama/llama-3.3-70b-instruct:free", "a/b.c_d-e"] {
+        for good in [
+            "openai/gpt-4o",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "a/b.c_d-e",
+        ] {
             assert!(valid_id(good), "{good}");
         }
-        for bad in ["", "gpt-4o", "/x", "x/", "a b/c", "a/b\"; drop", "../../etc/passwd"] {
+        for bad in [
+            "",
+            "gpt-4o",
+            "/x",
+            "x/",
+            "a b/c",
+            "a/b\"; drop",
+            "../../etc/passwd",
+        ] {
             assert!(!valid_id(bad), "{bad}");
         }
     }
