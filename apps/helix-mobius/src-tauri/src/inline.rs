@@ -21,6 +21,7 @@ pub fn instruction_for(kind: &str, custom: &str) -> Option<String> {
             "shorter" => "Make it shorter, keeping the important points.",
             "longer" => "Make it longer by adding useful detail, without inventing facts.",
             "simplify" => "Rewrite it in simpler language that a non-expert can follow.",
+            "continue" => "Continue the text naturally from where it stops, in the same voice and tense, with one or two short paragraphs. Reply with the continuation only, not the text so far.",
             "fix" => {
                 "Fix spelling, grammar and punctuation only. Do not change the wording otherwise."
             }

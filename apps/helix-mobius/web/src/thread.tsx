@@ -166,7 +166,7 @@ function ChangesCard({ activity, streaming, hooks }: { activity: { id: string; i
   </section>;
 }
 
-function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, onStage, onEdits, writing }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void; onStage?: (title: string, body: string) => void; onEdits?: (ops: Record<string, unknown>[]) => void; writing?: boolean }) {
+export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, onStage, onEdits, writing }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void; onStage?: (title: string, body: string) => void; onEdits?: (ops: Record<string, unknown>[]) => void; writing?: boolean }) {
   return (
     <>
       {blocks.map((block, index) => {
