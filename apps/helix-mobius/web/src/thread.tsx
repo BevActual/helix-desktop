@@ -44,13 +44,20 @@ function FileSources({ files, index }: { files: FileRef[]; index: number }) {
     </section>
   );
 }
-interface ReplyStats { model: string; tokens: number; ms: number; files?: FileRef[] }
+interface ReplyStats { model: string; tokens: number; ms: number; files?: FileRef[]; cost_micro?: number | null }
 export interface Message { activities?: Activity[]; sources?: Source[]; role: string; text: string; blocks: Block[]; images?: string[]; stats?: ReplyStats | null; }
 /** What a reply cost, in a few words: the model, its tokens, and how fast they came. */
+/** What a cloud reply cost, in plain words: "about $0.0012", "free", or nothing when it was not reported. */
+function costWords(micro: number | null | undefined): string {
+  if (micro === null || micro === undefined) return "";
+  if (micro === 0) return "no charge";
+  const dollars = micro / 1e6;
+  return `about $${dollars >= 0.1 ? dollars.toFixed(2) : dollars.toFixed(4)}`;
+}
 function replyDetails(stats: ReplyStats | null | undefined): string {
   if (!stats || !stats.tokens) return "";
   const rate = stats.ms >= 500 ? ` · ${Math.round(stats.tokens / (stats.ms / 1000))} tok/s` : "";
-  return [stats.model, `${stats.tokens} tokens${rate}`].filter(Boolean).join(" · ");
+  return [stats.model, `${stats.tokens} tokens${rate}`, costWords(stats.cost_micro)].filter(Boolean).join(" · ");
 }
 
 const pictureUrls = new Map<string, Promise<string>>();

@@ -143,6 +143,9 @@ pub struct ReplyStats {
     pub ms: u64,
     /// Passages from the person's folders the model was given for this reply.
     pub files: Vec<FileRef>,
+    /// What a cloud provider charged for this reply, in millionths of a dollar, when it said (0 is a free model). `None` for a model on this
+    /// computer or a provider that did not report it.
+    pub cost_micro: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -855,6 +858,7 @@ impl Conversation {
                                 .collect()
                         })
                         .unwrap_or_default(),
+                    cost_micro: v.get("cost_micro").and_then(Value::as_u64),
                 })
                 .filter(|_| role == Role::Assistant);
             messages.push(Message {
@@ -1037,6 +1041,8 @@ pub struct Chat {
     last_tokens: u32,
     /// Passages from the person's folders given to the model for the turn now running; written onto the reply when it ends.
     pub pending_files: Vec<FileRef>,
+    /// What the cloud charged for the turn now running, written onto the reply when it ends.
+    pub pending_cost: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1112,6 +1118,7 @@ impl Chat {
             temporary: false,
             last_tokens: 0,
             pending_files: Vec::new(),
+            pending_cost: None,
         }
     }
 
@@ -1129,6 +1136,7 @@ impl Chat {
                 tokens,
                 ms,
                 files: std::mem::take(&mut self.pending_files),
+                cost_micro: self.pending_cost.take(),
             });
         }
     }
@@ -2091,6 +2099,76 @@ mod tests {
             .to_json()
             .replace("\"route_model\":\"\"", "\"x\":1");
         assert_eq!(Conversation::from_json(&old).unwrap().route_model, "");
+    }
+
+    #[test]
+    fn a_reply_remembers_what_the_cloud_charged_and_only_for_that_reply() {
+        let mut chat = chat();
+        let turn = chat.send("hello", 5).unwrap();
+        chat.started(turn.generation, 1);
+        chat.pending_cost = Some(1_200);
+        chat.delta(1, "Hi.");
+        chat.complete(1, true, r#"{"ok":true,"completion_tokens":3}"#);
+        chat.note_reply("vendor/model", 100);
+        assert_eq!(
+            chat.conversation
+                .messages
+                .last()
+                .unwrap()
+                .stats
+                .as_ref()
+                .unwrap()
+                .cost_micro,
+            Some(1_200)
+        );
+        assert_eq!(chat.pending_cost, None, "taken by the reply");
+        let again = Conversation::from_json(&chat.conversation.to_json()).unwrap();
+        assert_eq!(
+            again
+                .messages
+                .last()
+                .unwrap()
+                .stats
+                .as_ref()
+                .unwrap()
+                .cost_micro,
+            Some(1_200)
+        );
+        // a free model reports zero, which is not the same as not knowing
+        let turn = chat.send("again", 6).unwrap();
+        chat.started(turn.generation, 2);
+        chat.pending_cost = Some(0);
+        chat.delta(2, "Yes.");
+        chat.complete(2, true, r#"{"ok":true}"#);
+        chat.note_reply("vendor/free", 100);
+        assert_eq!(
+            chat.conversation
+                .messages
+                .last()
+                .unwrap()
+                .stats
+                .as_ref()
+                .unwrap()
+                .cost_micro,
+            Some(0)
+        );
+        chat.note_reply("local.gguf", 1);
+        let old = chat
+            .conversation
+            .to_json()
+            .replace("\"cost_micro\":", "\"other\":");
+        assert_eq!(
+            Conversation::from_json(&old)
+                .unwrap()
+                .messages
+                .last()
+                .unwrap()
+                .stats
+                .as_ref()
+                .unwrap()
+                .cost_micro,
+            None
+        );
     }
 
     #[test]

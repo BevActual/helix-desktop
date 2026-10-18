@@ -224,6 +224,90 @@ pub fn set_pin(id: &str, on: bool) -> Result<Vec<String>, String> {
     Ok(list)
 }
 
+fn yes() -> bool {
+    true
+}
+
+/// How a job's cloud requests are routed by OpenRouter. Kept in a Mobius file of its own (`cloud-routes.json`), not in the routing file the
+/// inference service reads, so that file stays as simple as that service expects.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteOptions {
+    /// `price` or `speed`, or empty to let OpenRouter balance them.
+    #[serde(default)]
+    pub prefer: String,
+    /// Up to three models to try, in order, when the main one fails.
+    #[serde(default)]
+    pub fallbacks: Vec<String>,
+    /// Only providers that promise not to keep or train on the prompt. On unless the person turns it off.
+    #[serde(default = "yes")]
+    pub private_only: bool,
+}
+
+impl Default for RouteOptions {
+    fn default() -> Self {
+        RouteOptions {
+            prefer: String::new(),
+            fallbacks: Vec::new(),
+            private_only: true,
+        }
+    }
+}
+
+/// Jobs whose cloud route can be set. Act never uses the cloud.
+pub const ROUTED_TASKS: &[&str] = &["chat", "code", "vision", "summarize"];
+
+impl RouteOptions {
+    /// Keeps only what is valid: a known preference, at most three distinct well-formed model ids.
+    pub fn cleaned(mut self) -> RouteOptions {
+        if !matches!(self.prefer.as_str(), "price" | "speed") {
+            self.prefer.clear();
+        }
+        let mut kept: Vec<String> = Vec::new();
+        for id in self.fallbacks.drain(..) {
+            let id = id.trim().to_string();
+            if valid_id(&id) && !kept.contains(&id) && kept.len() < 3 {
+                kept.push(id);
+            }
+        }
+        self.fallbacks = kept;
+        self
+    }
+}
+
+fn routes_path() -> PathBuf {
+    data_home().join("cloud-routes.json")
+}
+
+pub fn all_route_options() -> std::collections::BTreeMap<String, RouteOptions> {
+    let mut map: std::collections::BTreeMap<String, RouteOptions> =
+        std::fs::read_to_string(routes_path())
+            .ok()
+            .and_then(|text| serde_json::from_str(&text).ok())
+            .unwrap_or_default();
+    for task in ROUTED_TASKS {
+        let options = map.remove(*task).unwrap_or_default().cleaned();
+        map.insert((*task).to_string(), options);
+    }
+    map.retain(|task, _| ROUTED_TASKS.contains(&task.as_str()));
+    map
+}
+
+pub fn route_options(task: &str) -> RouteOptions {
+    all_route_options().remove(task).unwrap_or_default()
+}
+
+pub fn set_route_options(task: &str, options: RouteOptions) -> Result<RouteOptions, String> {
+    if !ROUTED_TASKS.contains(&task) {
+        return Err("That job does not use the cloud.".into());
+    }
+    let mut all = all_route_options();
+    let cleaned = options.cleaned();
+    all.insert(task.to_string(), cleaned.clone());
+    let text = serde_json::to_string(&all).map_err(|e| e.to_string())?;
+    write_atomic(&routes_path(), &text)?;
+    Ok(cleaned)
+}
+
 /// Letters, digits and `/ . : _ -`, at most 120 of them, with a vendor before a slash.
 pub fn valid_id(id: &str) -> bool {
     !id.is_empty()
@@ -287,6 +371,44 @@ mod tests {
         assert!(text.starts_with("A small model. It is quick. "), "{text}");
         assert!(text.ends_with("at all."), "{text}");
         assert!(blurb(&"word ".repeat(200)).chars().count() <= 220);
+    }
+
+    #[test]
+    fn route_options_keep_only_what_is_valid_and_default_to_private() {
+        let default = RouteOptions::default();
+        assert!(default.private_only && default.prefer.is_empty() && default.fallbacks.is_empty());
+        let cleaned = RouteOptions {
+            prefer: "cheapest".into(),
+            fallbacks: vec![
+                "a/b".into(),
+                "bad".into(),
+                "a/b".into(),
+                " c/d ".into(),
+                "e/f".into(),
+                "g/h".into(),
+            ],
+            private_only: false,
+        }
+        .cleaned();
+        assert_eq!(cleaned.prefer, "");
+        assert_eq!(
+            cleaned.fallbacks,
+            ["a/b", "c/d", "e/f"],
+            "valid, distinct, at most three"
+        );
+        assert!(!cleaned.private_only);
+        assert_eq!(
+            RouteOptions {
+                prefer: "speed".into(),
+                ..RouteOptions::default()
+            }
+            .cleaned()
+            .prefer,
+            "speed"
+        );
+        // an older file without the privacy field is private
+        let old: RouteOptions = serde_json::from_str(r#"{"prefer":"price"}"#).unwrap();
+        assert!(old.private_only);
     }
 
     #[test]
