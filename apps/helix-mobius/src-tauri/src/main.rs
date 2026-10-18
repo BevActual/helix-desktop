@@ -3176,6 +3176,7 @@ fn main() {
             tools_review,
             tools_undo_edit,
             artifacts::stage_get,
+            artifacts::stage_all,
             artifacts::stage_record,
             tools_rules,
             code_tree,
