@@ -56,6 +56,7 @@ pick mobius-palette && run mobius-palette mobius-palette-test.sh mobius-nested.s
 pick mobius-stage   && run mobius-stage mobius-stage-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n'
 pick mobius-code   && run mobius-code mobius-code-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-side    && run mobius-side mobius-side-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n```\n'
+pick mobius-scheduled && run mobius-scheduled mobius-scheduled-test.sh mobius-nested.sh "$WIDE" HELIX_SCHEDULED_NO_SYSTEMD=1
 pick mobius-hint    && run mobius-hint mobius-hint-test.sh mobius-nested.sh "$WIDE" "HELIX_EMBED_DIR=${HELIX_EMBED_DIR:-$HOME/.cache/helix-experiments/embed/bge-small-en-v1.5}"
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

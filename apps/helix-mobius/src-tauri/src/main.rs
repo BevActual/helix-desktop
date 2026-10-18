@@ -16,6 +16,7 @@ mod lan;
 mod library;
 mod output;
 mod rules;
+mod scheduled;
 mod secrets;
 mod terminal;
 mod web;
@@ -3143,6 +3144,18 @@ fn follow_appearance(app: tauri::AppHandle) {
 
 fn main() {
     helix_embed::limit_threads();
+    // `helix-mobius --run-scheduled <id>`: what a scheduled task's timer runs. No window; the answer is saved as a chat.
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--run-scheduled") {
+        let Some(id) = args
+            .get(2)
+            .filter(|id| id.chars().all(|c| c.is_ascii_alphanumeric()))
+        else {
+            std::process::exit(2)
+        };
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        std::process::exit(runtime.block_on(scheduled::run(id)));
+    }
     gtk::glib::set_prgname(Some("org.helix.Mobius"));
     if std::env::var_os("JSC_useJIT").is_none() {
         std::env::set_var("JSC_useJIT", "false");
@@ -3176,6 +3189,11 @@ fn main() {
             tools_review,
             tools_undo_edit,
             artifacts::stage_get,
+            scheduled::scheduled_list,
+            scheduled::scheduled_save,
+            scheduled::scheduled_set_enabled,
+            scheduled::scheduled_delete,
+            scheduled::scheduled_run_now,
             artifacts::stage_all,
             artifacts::stage_record,
             tools_rules,

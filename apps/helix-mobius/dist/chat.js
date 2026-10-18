@@ -2576,6 +2576,8 @@ window.addEventListener("focus", refreshAgentDeskGlance);
 
 const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
 const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
+const reactScheduled = window.HelixMobiusReact?.scheduled($("scheduled-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
+$("mode-scheduled").onclick = () => reactScheduled?.open();
 // The command palette (Ctrl+K): chats, commands, modes and models in one box.
 function paletteItems(query) {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -2597,6 +2599,7 @@ function paletteItems(query) {
   act("ws-code", "Workspace: Code", "Project files and changes beside the chat", "", () => setWorkspace("code"));
   act("side", "Side chat", "Ask something that reads this chat without touching it", "/side", () => startSideChat().catch(report));
   act("artifacts", "Artifacts", "Every document your chats made", "", () => showArtifacts(true));
+  act("scheduled", "Scheduled prompts", "Run a prompt by itself at a time", "", () => reactScheduled?.open());
   act("memory", "Memory", "What Mobius remembers", "", () => reactMemory?.open());
   act("find", "Find in this chat", "", "Ctrl+F", () => openFindBar());
   act("export", "Export this chat", "Markdown", "Ctrl+Shift+C", () => $("export-chat").click());

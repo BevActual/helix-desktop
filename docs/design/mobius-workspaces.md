@@ -78,3 +78,14 @@ What the three apps have that Mobius should add next, as places of their own: **
 
 * **Artifacts**: a fourth row in the sidebar. It swaps the chat list for every document the chats have made (title, the chat it came from, words, versions), newest first; choosing one opens that chat and the document on the Write stage. `stage_all` in `artifacts.rs`.
 * **Side chats** (`/side`, or "Side chat" in the palette): a temporary chat that has been given the main chat as an attachment to read, with a chip, "Side chat · reads "Plan" · back to it", that returns to the main chat. The main chat is untouched and the side chat is not saved, so a question that would clutter the thread has somewhere to go. It is built on the temporary chat and the attachment path rather than on a second conversation inside one, which keeps the main chat's history exactly what the person made it. `tools/nested/mobius-side-test.sh`.
+
+## Scheduled (built)
+
+A place in the sidebar for prompts that run by themselves (ChatGPT and Claude both list "Scheduled"). It is where a desktop assistant is stronger than a website, because the operating system already has a scheduler:
+
+* **The timing is systemd's.** Each task is a user timer and a oneshot service, `~/.config/systemd/user/helix-mobius-task-<id>.{timer,service}`, that run `helix-mobius --run-scheduled <id>`. It fires whether or not Mobius is open, and `Persistent=true` catches up a run missed while the computer was off. Only the task's id is in the unit (never the prompt or the name beyond the description); times and dates are validated before a unit is written (`on_calendar`), and `systemd-analyze` accepts the calendars and units it writes.
+* **The run is headless**: no window. It asks the model on this computer (with Memory), saves the answer as a new chat named after the task, records the run and tells the person with a desktop notification ("Morning brief is ready").
+* **It only chats.** No tools, no desktop actions, and a cloud route is refused ("only a model on this computer"), so nothing unattended can change the computer or send text away. Tools and Act would need an approval nobody is there to give.
+* The sheet: add (name, prompt, every day, certain days or once, a time), switch on or off, **Run now**, delete, the last run and a link to its answer, up to 12 tasks. `scheduled.rs` (unit tested), `scheduled.tsx`, `tools/nested/mobius-scheduled-test.sh`.
+
+Not done: a real timer firing (the nested test writes the units and runs the same command without starting systemd), editing a task, a task that continues in an existing chat, and the shell's notification opening the answer.
