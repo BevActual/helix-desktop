@@ -93,7 +93,12 @@ mod tests {
         let choice = decider.decide(&[0.9, 0.1]).unwrap();
         assert_eq!(choice.route, "left");
         assert!((choice.margin - 0.8).abs() < 1e-6);
-        let unsure = decider.decide(&[0.7071, 0.7071]).unwrap();
+        let unsure = decider
+            .decide(&[
+                std::f32::consts::FRAC_1_SQRT_2,
+                std::f32::consts::FRAC_1_SQRT_2,
+            ])
+            .unwrap();
         assert!(unsure.margin < 0.01);
     }
 

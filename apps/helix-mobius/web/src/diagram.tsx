@@ -15,7 +15,7 @@ export function parseDiagram(source: string): Diagram | null {
   const index = new Map<string, number>();
   const labels: string[] = [];
   const node = (raw: string): number | null => {
-    const m = /^([^\[\]]+?)\s*\[(.+)\]$/.exec(raw.trim());
+    const m = /^([^[\]]+?)\s*\[(.+)\]$/.exec(raw.trim());
     const id = (m ? m[1] : raw).trim();
     const label = (m ? m[2] : raw).trim().slice(0, 40);
     if (!id || id.length > 60) return null;
@@ -25,7 +25,7 @@ export function parseDiagram(source: string): Diagram | null {
   const edges: { from: number; to: number; label: string }[] = [];
   for (const line of lines) {
     const m = /^(.+?)\s*(?:-+>|→)\s*(.+?)(?:\s*:\s*(.+))?$/.exec(line);
-    if (!m) { if (/^[^\[\]]+\[.+\]$/.test(line)) node(line); else return null; continue; }
+    if (!m) { if (/^[^[\]]+\[.+\]$/.test(line)) node(line); else return null; continue; }
     const a = node(m[1]), b = node(m[2]);
     if (a === null || b === null) return null;
     edges.push({ from: a, to: b, label: (m[3] ?? "").trim().slice(0, 30) });

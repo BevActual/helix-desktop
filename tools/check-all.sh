@@ -15,6 +15,8 @@ if [ -d node_modules ]; then
   step "frontend typecheck and lint"
   npm run typecheck --silent
   npm run lint --silent
+  step "Mobius editor unit tests"
+  npm --prefix apps/helix-mobius/web test --silent
 fi
 step "cargo clippy (warnings are errors)"
 # niri-visual-tests is left out only because it needs GTK 4 and libadwaita installed.
