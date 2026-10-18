@@ -3009,6 +3009,7 @@ dependencies = [
  "helix-config",
  "helix-desktop-api",
  "helix-embed",
+ "image",
  "keyring",
  "libc",
  "reqwest 0.12.28",

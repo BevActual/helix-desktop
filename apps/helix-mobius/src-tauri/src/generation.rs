@@ -109,13 +109,17 @@ pub fn copy(dir: &Path, id: &str) -> Result<(), String> {
 
 pub fn save(dir: &Path, id: &str) -> Result<Option<String>, String> {
     let bytes = crate::images::load(dir, id)?;
+    save_bytes(&bytes, "mobius-image.png")
+}
+
+/// Asks where to save `bytes` (default name `name`) and writes them there, never over an existing file. `None` when cancelled.
+pub fn save_bytes(bytes: &[u8], name: &str) -> Result<Option<String>, String> {
     let output = std::process::Command::new("zenity")
         .args([
             "--file-selection",
             "--save",
-            "--title=Save generated image",
-            "--filename=mobius-image.png",
-            "--file-filter=PNG image | *.png",
+            "--title=Save picture",
+            &format!("--filename={name}"),
         ])
         .output()
         .map_err(|_| "Saving pictures requires zenity.")?;
@@ -133,6 +137,6 @@ pub fn save(dir: &Path, id: &str) -> Result<Option<String>, String> {
         .mode(0o600)
         .open(path)
         .map_err(|e| format!("Could not save the picture (choose a new file name): {e}"))?;
-    file.write_all(&bytes).map_err(|e| e.to_string())?;
+    file.write_all(bytes).map_err(|e| e.to_string())?;
     Ok(Some(path.to_string()))
 }

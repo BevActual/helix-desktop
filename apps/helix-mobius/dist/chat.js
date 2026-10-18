@@ -1103,6 +1103,8 @@ listen("chat-view", (event) => {
   if (wasStreaming && !view.streaming) { recordArtifacts(); reactCode?.refresh(); flushQueue(); }
 });
 listen("chat-stream", (event) => {
+  // A streamed update that arrives after the reply finished is stale; showing it would replace the finished reply with an earlier cut of it.
+  if (!view.streaming) return;
   if (reactThread) {
     reactThread.stream(event.payload.blocks);
     if (stickToBottom) scrollDown();
@@ -1172,6 +1174,8 @@ const reactThread = window.HelixMobiusReact
     edit: (index, text) => editUserMessage(index, text),
     act: (text) => actOnDesktop(text),
     stage: (title, body) => reactStage?.open(title, body),
+    editPicture: (id) => setWorkspace("image", id),
+    applyEdits: (ops) => { if (workspace !== "image") report("Open the picture on the Image stage first (Edit on a picture, or the Image place)."); else reactImage?.apply(ops); },
     quote: (text) => {
       const prefix = input.value && !input.value.endsWith("\n") ? "\n\n" : "";
       input.value = input.value + prefix + text;
@@ -2609,6 +2613,7 @@ function paletteItems(query) {
   act("routing", "Models & routing", "", "Ctrl+M", () => openRouting().catch(report));
   act("ws-chat", "Workspace: Chat", "Just the conversation", "", () => setWorkspace("chat"));
   act("ws-write", "Workspace: Write", "A document beside the chat", "", () => setWorkspace("write"));
+  act("ws-image", "Workspace: Image", "Edit a picture beside the chat", "", () => setWorkspace("image"));
   act("ws-code", "Workspace: Code", "Project files and changes beside the chat", "", () => setWorkspace("code"));
   act("side", "Side chat", "Ask something that reads this chat without touching it", "/side", () => startSideChat().catch(report));
   act("artifacts", "Artifacts", "Every document your chats made", "", () => showArtifacts(true));
@@ -2630,9 +2635,9 @@ let workspaceChat = "";
 function drawStageChip() {
   const chip = $("stage-chip");
   chip.hidden = !stageOpen;
-  for (const id of ["chat", "write", "code"]) $("mode-" + id).classList.toggle("active", workspace === id);
-  $("workspace-btn").textContent = ({ chat: "Chat", write: "Write", code: "Code" })[workspace] + " ▾";
-  document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code");
+  for (const id of ["chat", "write", "image", "code"]) $("mode-" + id).classList.toggle("active", workspace === id);
+  $("workspace-btn").textContent = ({ chat: "Chat", write: "Write", image: "Image", code: "Code" })[workspace] + " ▾";
+  document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code" || workspace === "image");
   if (!stageOpen) return;
   chip.textContent = stageAttach ? `${stageOpen.title} · sent with your message ×` : `${stageOpen.title} · not sent (click to send)`;
   chip.classList.toggle("off", !stageAttach);
@@ -2658,14 +2663,23 @@ const reactCode = window.HelixMobiusReact?.codeStage($("stage-code"), {
   },
   shown: (open) => { stageOpen = open; stageAttach = true; drawStageChip(); },
 });
+const reactImage = window.HelixMobiusReact?.imageStage($("stage-image"), {
+  chatId: () => view.id,
+  report: (error) => report(error),
+  ask: (id) => addPictures([id]),
+  active: () => {},
+});
 function setWorkspace(next, doc) {
-  if (next === workspace && !(doc && next === "write")) return;
+  if (next === workspace && !(doc && (next === "write" || next === "image"))) return;
+  if (next === workspace && next === "image") { reactImage?.open(doc, "Picture"); return; }
   if (next === workspace) { reactStage?.open(doc); return; }
   if (workspace === "write") reactStage?.close();
   if (workspace === "code") reactCode?.close();
+  if (workspace === "image") reactImage?.close();
   workspace = next;
   stageOpen = null;
   if (next === "code") reactCode?.open();
+  if (next === "image") reactImage?.open(doc, "Picture");
   if (next === "write") { if (doc) reactStage?.open(doc); else reactStage?.open("Untitled", ""); }
   drawStageChip();
 }
@@ -2692,6 +2706,7 @@ function openWorkspaceMenu() {
   };
   row("chat", "Chat", "Just the conversation", true);
   row("write", "Write", "A document beside the chat; Mobius drafts, you edit", true);
+  row("image", "Image", "Edit a picture: crop, rotate, adjust, annotate", true);
   row("code", "Code", "Your project's files and what changed, beside the chat", true);
   const soon = el("div", "hx-menu-label", "Planned: Image · Design · Browse");
   menu.append(soon);
@@ -2700,7 +2715,7 @@ function openWorkspaceMenu() {
   setTimeout(() => window.addEventListener("mousedown", close, true), 0);
 }
 $("workspace-btn").onclick = () => openWorkspaceMenu();
-for (const id of ["chat", "write", "code"]) $("mode-" + id).onclick = () => setWorkspace(id);
+for (const id of ["chat", "write", "image", "code"]) $("mode-" + id).onclick = () => setWorkspace(id);
 
 // Artifacts: every document the chats made, as a list in place of the chat list.
 let artifactsView = false;

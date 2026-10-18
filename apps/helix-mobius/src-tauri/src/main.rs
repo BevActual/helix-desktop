@@ -11,7 +11,9 @@ mod dictate;
 mod edits;
 mod generation;
 mod hardware;
+mod imageops;
 mod images;
+mod imagestage;
 mod lan;
 mod library;
 mod output;
@@ -1186,6 +1188,13 @@ fn image_pick() -> Result<Vec<String>, String> {
 #[tauri::command]
 fn image_data(id: String) -> Result<tauri::ipc::Response, String> {
     images::load(&images_dir(), &id).map(tauri::ipc::Response::new)
+}
+
+/// A copy of a stored picture under a new id (so a picture can be sent with a message without the sent copy being the working file).
+#[tauri::command]
+fn image_clone(id: String) -> Result<String, String> {
+    let bytes = images::load(&images_dir(), &id)?;
+    images::store(&images_dir(), &bytes)
 }
 
 /// Drop a staged picture the person removed before sending.
@@ -3301,6 +3310,12 @@ fn main() {
             artifacts::stage_all,
             artifacts::stage_record,
             tools_rules,
+            imagestage::imgstage_list,
+            imagestage::imgstage_open,
+            imagestage::imgstage_apply,
+            imagestage::imgstage_move,
+            imagestage::imgstage_close,
+            imagestage::imgstage_export,
             projects_overview,
             project_create,
             project_set_folder,
@@ -3352,6 +3367,7 @@ fn main() {
             image_pick,
             image_data,
             image_discard,
+            image_clone,
             chat_copy,
             layout_reporting,
             report_layout,

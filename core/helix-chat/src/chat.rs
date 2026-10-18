@@ -1469,6 +1469,21 @@ impl Chat {
             .get("cancelled")
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        // The completion and the streamed pieces travel as separate signals, so the last pieces can arrive after the completion and be dropped.
+        // The completion carries the whole reply: when it begins with what was gathered and is longer, the missing end is restored.
+        if ok && !cancelled {
+            if let (Some(full), Some(message)) = (
+                value.get("text").and_then(Value::as_str),
+                self.conversation.messages.last_mut(),
+            ) {
+                if message.role == Role::Assistant
+                    && full.len() > message.text.len()
+                    && full.starts_with(message.text.as_str())
+                {
+                    message.text = full.to_string();
+                }
+            }
+        }
         let has_tools = self
             .conversation
             .messages
@@ -2377,6 +2392,30 @@ mod tests {
         assert_eq!(ctx[0].0, "system");
         assert_eq!(ctx[1].0, "user");
         assert!(ctx.last().unwrap().1.starts_with("answer 39"));
+    }
+
+    #[test]
+    fn the_completion_restores_pieces_that_arrived_after_it() {
+        let mut c = chat();
+        let turn = c.send("hi", 5).unwrap();
+        assert_eq!(c.started(turn.generation, 7), None);
+        assert!(c.delta(7, "A cron "));
+        // The last piece was still in flight when the completion arrived; the completion carries the whole reply.
+        assert_eq!(
+            c.complete(7, true, "{\"ok\":true,\"text\":\"A cron job.\"}"),
+            Some(Outcome::Finished)
+        );
+        assert_eq!(c.conversation.messages[1].text, "A cron job.");
+        // A completion whose text does not begin with what was gathered never rewrites the reply.
+        let turn = c.send("again", 6).unwrap();
+        assert_eq!(c.started(turn.generation, 8), None);
+        assert!(c.delta(8, "Own words"));
+        c.complete(
+            8,
+            true,
+            "{\"ok\":true,\"text\":\"Something else entirely\"}",
+        );
+        assert_eq!(c.conversation.messages[3].text, "Own words");
     }
 
     #[test]

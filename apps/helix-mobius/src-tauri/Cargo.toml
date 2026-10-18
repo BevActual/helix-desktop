@@ -33,6 +33,7 @@ base64 = { workspace = true }
 scraper = "0.27"
 roxmltree = "0.21"
 url = "2"
+image = { workspace = true, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 similar = "2"
 
 [[bin]]

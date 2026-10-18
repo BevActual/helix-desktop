@@ -1599,3 +1599,16 @@ body.chat dialog.projects-sheet { width: min(780px, calc(100vw - 32px)); max-wid
 .projects-label { font-size: 12px; font-weight: 650; color: var(--label-2); margin-top: 8px; } .projects-label span { font-weight: 400; color: var(--label-3); }
 .projects-row { display: flex; align-items: center; gap: 8px; } .projects-row code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .projects-items { list-style: none; margin: 0; padding: 0; } .link-row { background: none; padding: 4px 0; text-align: left; color: var(--accent); } .link-row span { color: var(--label-3); }
+/* The Image stage. */
+.img-toolbar { display: flex; flex-direction: column; gap: 6px; padding: 0 14px 8px; }
+.img-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.img-group button { padding: 4px 9px; border-radius: 8px; background: var(--fill-2); font-size: 12px; } .img-group button.on { background: var(--accent); color: var(--on-accent); } .img-group button.primary { background: var(--accent); color: var(--on-accent); }
+.img-group label { display: flex; align-items: center; gap: 6px; color: var(--label-2); } .img-resize input { width: 56px; }
+.img-canvas { flex: 1; min-height: 0; margin: 0 14px; display: grid; place-items: center; overflow: auto; border-radius: 10px; background: repeating-conic-gradient(var(--fill-1) 0% 25%, var(--fill-2) 0% 50%) 50% / 16px 16px; border: .5px solid var(--hairline); }
+.img-wrap { position: relative; display: inline-block; line-height: 0; cursor: crosshair; touch-action: none; } .img-wrap img { max-width: 100%; max-height: 100%; user-select: none; -webkit-user-drag: none; }
+.img-selection { position: absolute; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); pointer-events: none; }
+.img-history { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 14px 0; } .img-history button { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; background: var(--fill-2); } .img-history button.now { background: var(--accent); color: var(--on-accent); } .img-history button.undone { opacity: .45; }
+.img-footer { display: flex; align-items: center; gap: 8px; padding: 8px 14px 12px; }
+.msg-picture-wrap { position: relative; display: inline-block; } .pic-edit { position: absolute; right: 8px; top: 8px; opacity: 0; transition: opacity .15s; } .msg-picture-wrap:hover .pic-edit, .pic-edit:focus-visible { opacity: 1; }
+.img-group input[type=range] { width: 110px; height: 18px; padding: 0; accent-color: var(--accent); }
+.img-resize input { width: 76px; }
