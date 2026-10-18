@@ -2515,7 +2515,7 @@ $("open-routing").onclick = () => openRouting().catch(report);
 $("open-models").onclick = () => openRouting().catch(report);
 $("route-chip").onclick = () => openRouting().catch(report);
 $("meta-route").onclick = () => openRouting().catch(report);
-window.addEventListener("mobius-open-models", () => openRouting().catch(report));
+window.addEventListener("mobius-open-models", (event) => openRouting(event.detail?.section).catch(report));
 $("models-back").onclick = () => {
   if (modelsDirty && !window.confirm("Discard unsaved model changes?")) return;
   closeModelsPage();
