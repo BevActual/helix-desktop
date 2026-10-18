@@ -77,6 +77,36 @@ pub const CATALOG: &[CatalogModel] = &[
         }],
     },
     CatalogModel {
+        id: "bge-small-en",
+        title: "BGE small (meaning search)",
+        maker: "BAAI",
+        blurb: "Reads a sentence and says what it means, in about 10 milliseconds on the processor. Mobius uses it to suggest the right mode for a message, and it is the model that will search your notes and project files by meaning.",
+        tasks: &["embedding"],
+        vision: false,
+        license: "MIT",
+        memory_gb: 0.3,
+        files: &[
+            CatalogFile {
+                name: "embed/bge-small-en-v1.5/model.safetensors",
+                url: "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/model.safetensors",
+                sha256: "3c9f31665447c8911517620762200d2245a2518d6e7208acc78cd9db317e21ad",
+                bytes: 133_466_304,
+            },
+            CatalogFile {
+                name: "embed/bge-small-en-v1.5/config.json",
+                url: "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/config.json",
+                sha256: "094f8e891b932f2000c92cfc663bac4c62069f5d8af5b5278c4306aef3084750",
+                bytes: 743,
+            },
+            CatalogFile {
+                name: "embed/bge-small-en-v1.5/tokenizer.json",
+                url: "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/tokenizer.json",
+                sha256: "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+                bytes: 711_396,
+            },
+        ],
+    },
+    CatalogModel {
         id: "qwen2.5-1.5b",
         title: "Qwen2.5 1.5B",
         maker: "Alibaba Qwen",
@@ -223,8 +253,25 @@ pub fn by_file(file: &str) -> Option<&'static CatalogModel> {
     CATALOG.iter().find(|m| m.model_file() == file)
 }
 
-/// A file name that is safe to create inside the models folder: plain, a `.gguf`; or a speech model (`.bin`) under `speech/`.
+/// The three files an embedding model needs, which sit together in `embed/<model>/`.
+const EMBED_FILES: &[&str] = &["model.safetensors", "config.json", "tokenizer.json"];
+
+/// A file name that is safe to create inside the models folder: plain, a `.gguf`; a speech model (`.bin`) under `speech/`; an image
+/// model (`.gguf`) under `image/`; or one of an embedding model's three files under `embed/<model>/`.
 pub fn safe_file_name(name: &str) -> bool {
+    let plain_chars = |text: &str| {
+        !text.is_empty()
+            && !text.starts_with('.')
+            && text
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
+    };
+    if let Some(rest) = name.strip_prefix("embed/") {
+        return name.len() <= 200
+            && rest
+                .split_once('/')
+                .is_some_and(|(model, file)| plain_chars(model) && EMBED_FILES.contains(&file));
+    }
     let (speech, plain) = match name.strip_prefix("speech/") {
         Some(rest) => (true, rest),
         None => (false, name.strip_prefix("image/").unwrap_or(name)),
@@ -234,18 +281,40 @@ pub fn safe_file_name(name: &str) -> bool {
     } else {
         plain.ends_with(".gguf")
     };
-    !plain.is_empty()
-        && name.len() <= 200
-        && extension_ok
-        && !plain.starts_with('.')
-        && plain
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
+    name.len() <= 200 && extension_ok && plain_chars(plain)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_expected_names_are_safe() {
+        for good in [
+            "a-b_c.1.gguf",
+            "speech/ggml-small-q5_1.bin",
+            "image/x.gguf",
+            "embed/bge-small-en-v1.5/model.safetensors",
+            "embed/m/config.json",
+        ] {
+            assert!(safe_file_name(good), "{good}");
+        }
+        for bad in [
+            "",
+            ".hidden.gguf",
+            "../x.gguf",
+            "a/b.gguf",
+            "speech/x.gguf",
+            "embed/m/evil.json",
+            "embed/m/n/config.json",
+            "embed//config.json",
+            "embed/../config.json",
+            "embed/m/model.safetensors/",
+            "a b.gguf",
+        ] {
+            assert!(!safe_file_name(bad), "{bad}");
+        }
+    }
 
     #[test]
     fn every_entry_is_pinned_and_safe() {
@@ -265,7 +334,8 @@ mod tests {
                     .sha256
                     .bytes()
                     .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
-                assert!(file.bytes > 1_000_000);
+                // a model's small companion files (its configuration) are the only ones under a megabyte
+                assert!(file.bytes > 1_000_000 || file.name.ends_with(".json"));
             }
             if model.vision {
                 // The service pairs a projector with the model whose base name follows `mmproj-`.

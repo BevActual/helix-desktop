@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
-import { eligible, listOrder, reason, recommend, type Job, type ModelCard } from "./recommend";
+import { eligible, listOrder, reason, recommend, specialist, type Job, type ModelCard } from "./recommend";
 import { CloudModels, type CloudView } from "./cloudmodels";
 import { Icon, Picker, type Option } from "./settingsui";
 
@@ -28,6 +28,7 @@ const JOBS: JobInfo[] = [
   { id: "act", title: "Act", note: "Controls your desktop. Always runs on this computer", task: "act", local: true },
   { id: "speech", title: "Dictation", note: "Turns your voice into text with the microphone button" },
   { id: "image", title: "Image creation", note: "Makes pictures from a description" },
+  { id: "embedding", title: "Meaning search", note: "Reads what a message means: suggests the right mode now, and will search your notes and files" },
 ];
 
 interface Profile { backend: string; model: string; }
@@ -73,7 +74,7 @@ export interface SettingsHooks {
 export interface SettingsHandle { open: (section?: string) => void; }
 
 const FIT_WORD: Record<string, string> = { gpu: "Fits your graphics card", tight: "Tight on your graphics card", cpu: "Runs on the processor (slower)", no: "Too big for this computer" };
-const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation" };
+const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation", embedding: "Meaning search" };
 
 function size(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
@@ -81,6 +82,8 @@ function size(bytes: number): string {
 }
 
 function FitTag({ card }: { card: Card }) {
+  // Speech and meaning models run on the processor whatever the graphics card is, so how they fit a graphics card means nothing.
+  if (card.tasks.includes("speech") || card.tasks.includes("embedding")) return <span className="lib-tag" data-test={`lib-fit-${card.id}`}>Runs on the processor</span>;
   if (!card.fit) return null;
   return <span className={`lib-tag fit-${card.fit}`} data-test={`lib-fit-${card.id}`} title="Worked out from this computer's graphics and system memory">{FIT_WORD[card.fit]}{card.speed ? ` · ${Math.round(card.speed)} tok/s here` : ""}</span>;
 }
@@ -219,7 +222,7 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, onM
   );
 }
 
-type Filter = "all" | "installed" | "chat" | "code" | "vision" | "speech" | "image" | "fits";
+type Filter = "all" | "installed" | "chat" | "code" | "vision" | "speech" | "image" | "embedding" | "fits";
 type Sort = "best" | "smallest" | "name";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
@@ -229,6 +232,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "vision", label: "Pictures" },
   { id: "speech", label: "Speech" },
   { id: "image", label: "Images" },
+  { id: "embedding", label: "Meaning" },
   { id: "fits", label: "Fits this computer" },
 ];
 
@@ -274,7 +278,7 @@ function Library({ cards, draft, filter, setFilter, onAssign, act }: {
       <div className="lib-grid" data-test="library-list">
         {shown.map((card) => {
           const uses = usedFor(card);
-          const fixed = card.tasks.includes("speech") || card.tasks.includes("image");
+          const fixed = specialist(card);
           const assignable = fixed ? [] : JOBS.filter((j) => j.task && !j.local && eligible(j.id, card));
           return (
             <article key={card.id} className={`lib-card${uses.length ? " in-use" : ""}${card.installed ? " is-installed" : ""}`} data-test={`lib-card-${card.id}`}>
@@ -293,6 +297,7 @@ function Library({ cards, draft, filter, setFilter, onAssign, act }: {
               {card.progress && card.progress.phase !== "failed" ? <DownloadBar card={card} act={act} /> : (
                 <div className="lib-uses">
                   {card.progress?.phase === "failed" ? <span className="lib-error" data-test={`lib-error-${card.id}`}>{card.progress.error}</span> : null}
+                  {card.installed && fixed ? <span className="lib-sub" data-test={`lib-role-${card.id}`}>{card.tasks.includes("speech") ? "Used by the microphone button in the composer." : card.tasks.includes("image") ? "Used by Create image in the Mobius menu." : "Used to read what a message means."}</span> : null}
                   {card.installed ? assignable.map((j) => {
                     const active = uses.some((u) => u.id === j.id);
                     return (

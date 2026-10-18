@@ -413,6 +413,12 @@ pub fn remove(id: &str) -> Result<(), String> {
     for file in model.files {
         let _ = std::fs::remove_file(dir.join(file.name));
         let _ = std::fs::remove_file(dir.join(format!("{}.part", file.name)));
+        // A model kept in its own folder (the embedding model) leaves no empty folder behind; a folder with anything else in it stays.
+        if file.name.starts_with("embed/") {
+            if let Some(folder) = dir.join(file.name).parent() {
+                let _ = std::fs::remove_dir(folder);
+            }
+        }
     }
     Ok(())
 }

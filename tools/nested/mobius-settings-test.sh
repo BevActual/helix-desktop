@@ -24,12 +24,13 @@ truncate -s 2104932768 "$MODELS/qwen2.5-3b-instruct-q4_k_m.gguf"
 echo "--- 1. the jobs"
 click_id open-models; sleep 1
 wait_id job-chat && echo "ok: Settings opens on Models with a row per job" || { fail "no job rows"; shot settings-noopen; }
-for job in chat code vision summarize act speech image; do has_id "job-$job" || fail "no row for $job"; done
+for job in chat code vision summarize act speech image embedding; do has_id "job-$job" || fail "no row for $job"; done
 has_id models-save && fail "there is still a Save button" || echo "ok: there is no Save button"
 shot settings-models
 echo "--- 2. a job with nothing suitable offers one to get"
 has_id job-get-vision && echo "ok: Pictures offers a model that can see" || fail "no offer for Pictures"
 has_id job-get-speech && echo "ok: Dictation offers the speech model" || fail "no offer for Dictation"
+has_id job-get-embedding && echo "ok: Meaning search offers its model" || fail "no offer for Meaning search"
 has_id job-get-chat && fail "Chat offers a download though models are installed" || echo "ok: Chat does not, a model is installed"
 echo "--- 3. choosing a model is saved at once"
 click_id job-pick-chat; sleep 0.8
@@ -51,6 +52,8 @@ shot settings-filter; shot settings-filter
 has_id lib-card-qwen2.5-3b && ! has_id lib-card-llama-3.2-3b && echo "ok: Installed shows only installed models" || fail "the Installed filter did not narrow"
 click_id lib-filter-speech; sleep 0.6
 has_id lib-card-whisper-small && ! has_id lib-card-qwen2.5-3b && echo "ok: Speech shows the speech model" || fail "the Speech filter did not narrow"
+click_id lib-filter-embedding; sleep 0.6
+has_id lib-card-bge-small-en && ! has_id lib-card-whisper-small && echo "ok: Meaning shows the meaning-search model" || fail "the Meaning filter did not narrow"
 click_id lib-filter-all; sleep 0.4
 has_id lib-get-llama-3.2-3b && echo "ok: the library offers a model to get" || fail "no Get button in the library"
 shot settings-library

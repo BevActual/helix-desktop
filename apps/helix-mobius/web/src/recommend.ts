@@ -1,6 +1,6 @@
 // Which model should do which job on this computer. Pure, so it is tested without the page (npm test).
 
-export type Job = "chat" | "code" | "vision" | "summarize" | "act" | "speech" | "image";
+export type Job = "chat" | "code" | "vision" | "summarize" | "act" | "speech" | "image" | "embedding";
 
 export interface ModelCard {
   id: string;
@@ -18,13 +18,17 @@ export interface ModelCard {
 
 const FIT_RANK: Record<string, number> = { gpu: 0, tight: 1, cpu: 2, "": 2, no: 3 };
 
-/** Can this model do the job at all? Speech and image models do only theirs. */
+/** Models that do one specific job and cannot chat: speech to text, pictures from a description, and reading meaning. */
+export function specialist(card: ModelCard): boolean {
+  return card.tasks.some((t) => t === "speech" || t === "image" || t === "embedding");
+}
+
+/** Can this model do the job at all? A specialist does only its own. */
 export function eligible(job: Job, card: ModelCard): boolean {
-  const speech = card.tasks.includes("speech");
-  const image = card.tasks.includes("image");
-  if (job === "speech") return speech;
-  if (job === "image") return image;
-  if (speech || image) return false;
+  if (job === "speech") return card.tasks.includes("speech");
+  if (job === "image") return card.tasks.includes("image");
+  if (job === "embedding") return card.tasks.includes("embedding");
+  if (specialist(card)) return false;
   if (job === "vision") return card.vision;
   return card.tasks.includes("chat") || card.tasks.includes("code");
 }
@@ -43,6 +47,7 @@ export function reason(job: Job, card: ModelCard): string {
   if (job === "code" && card.tasks.includes("code")) return card.fit === "gpu" ? "Built for code, and it fits your graphics card" : "Built for code";
   if (job === "vision") return card.fit === "gpu" ? "Reads pictures, and fits your graphics card" : "Reads pictures";
   if (job === "speech") return "Recognises speech on this computer, in about 99 languages";
+  if (job === "embedding") return "Small enough to run beside everything else, on the processor";
   if (job === "image") return "Draws on your graphics card, so nothing is uploaded";
   if (card.fit === "gpu") return "The most capable model that fits your graphics card";
   if (card.fit === "tight") return "The most capable model that will run here, a tight fit";
@@ -55,7 +60,7 @@ export function recommend(job: Job, cards: ModelCard[]): ModelCard | null {
   if (!pool.length) return null;
   const fits = pool.filter((c) => c.fit === "gpu");
   const usable = fits.length ? fits : pool.filter((c) => c.fit === "tight").length ? pool.filter((c) => c.fit === "tight") : pool;
-  if (job === "speech" || job === "image") return usable[0];
+  if (job === "speech" || job === "image" || job === "embedding") return usable[0];
   // A summary wants speed, so the smallest. Anything else wants the most capable that fits; code prefers a code model.
   const ranked = [...usable].sort((a, b) => {
     if (job === "summarize") return a.memory_gb - b.memory_gb || a.title.localeCompare(b.title);
