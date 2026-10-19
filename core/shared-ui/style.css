@@ -1740,18 +1740,12 @@ body.chat dialog.projects-sheet { width: min(780px, calc(100vw - 32px)); max-wid
 .projects-row { display: flex; align-items: center; gap: 8px; } .projects-row code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .projects-items { list-style: none; margin: 0; padding: 0; } .link-row { background: none; padding: 4px 0; text-align: left; color: var(--accent); } .link-row span { color: var(--label-3); }
 /* The Image stage. */
-.img-toolbar { display: flex; flex-direction: column; gap: 6px; padding: 0 14px 8px; }
-.img-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
-.img-group button { padding: 4px 9px; border-radius: 8px; background: var(--fill-2); font-size: 12px; } .img-group button.on { background: var(--accent); color: var(--on-accent); } .img-group button.primary { background: var(--accent); color: var(--on-accent); }
-.img-group label { display: flex; align-items: center; gap: 6px; color: var(--label-2); } .img-resize input { width: 56px; }
-.img-canvas { flex: 1; min-height: 0; margin: 0 14px; display: grid; place-items: center; overflow: auto; border-radius: 10px; background: repeating-conic-gradient(var(--fill-1) 0% 25%, var(--fill-2) 0% 50%) 50% / 16px 16px; border: .5px solid var(--hairline); }
+.img-canvas { flex: 1; min-height: 0; margin: 0; display: grid; place-items: center; overflow: auto; border-radius: 10px; background: repeating-conic-gradient(var(--fill-1) 0% 25%, var(--fill-2) 0% 50%) 50% / 16px 16px; border: .5px solid var(--hairline); }
 .img-wrap { position: relative; display: inline-block; line-height: 0; cursor: crosshair; touch-action: none; } .img-wrap img { max-width: 100%; max-height: 100%; user-select: none; -webkit-user-drag: none; }
 .img-selection { position: absolute; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); pointer-events: none; }
-.img-history { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 14px 0; } .img-history button { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; background: var(--fill-2); } .img-history button.now { background: var(--accent); color: var(--on-accent); } .img-history button.undone { opacity: .45; }
+.img-history { display: flex; gap: 4px; flex-wrap: wrap; } .img-history button { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; background: var(--fill-2); } .img-history button.now { background: var(--accent); color: var(--on-accent); } .img-history button.undone { opacity: .45; }
 .img-footer { display: flex; align-items: center; gap: 8px; padding: 8px 14px 12px; }
 .msg-picture-wrap { position: relative; display: inline-block; } .pic-edit { position: absolute; right: 8px; top: 8px; opacity: 0; transition: opacity .15s; } .msg-picture-wrap:hover .pic-edit, .pic-edit:focus-visible { opacity: 1; }
-.img-group input[type=range] { width: 110px; height: 18px; padding: 0; accent-color: var(--accent); }
-.img-resize input { width: 76px; }
 /* Focus layout: the stage fills the window; the chat is a small window over it. */
 body.chat.stage-open.layout-stage #app { grid-template-columns: 56px minmax(0, 1fr); }
 body.chat.stage-open.layout-stage #side { visibility: visible; overflow: hidden; padding: 0 8px 12px; }
@@ -1927,3 +1921,29 @@ body.chat .stage-empty-actions button { padding: 8px 15px; border-radius: 10px; 
 body.chat .stage-empty-actions button.primary { background: var(--accent); color: var(--on-accent); }
 body.chat .img-history .img-by { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10.5px; font-weight: 650; }
 body.chat .docedits-list { margin: 6px 0 2px; padding-left: 20px; font-size: 13px; color: var(--label-2); }
+/* Image stage: a tool rail, the canvas with its options bar, and a tabbed panel below. */
+.img-body { flex: 1; min-height: 0; display: flex; gap: 8px; padding: 0 14px; }
+.img-rail { width: 54px; flex: none; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; border-radius: 12px; background: var(--fill-1); border: .5px solid var(--hairline); align-self: flex-start; }
+.img-rail button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 0 4px; border-radius: 9px; font-size: 10.5px; color: var(--label-2); background: transparent; }
+.img-rail button:hover:not(:disabled) { background: var(--fill-2); color: var(--label-1); }
+.img-rail button.on { background: var(--accent); color: var(--on-accent); }
+.img-rail .rail-glyph { font-size: 18px; line-height: 1.1; }
+.img-rail .rail-colour { width: 100%; height: 22px; padding: 0; border: .5px solid var(--hairline); border-radius: 7px; background: none; cursor: pointer; }
+.img-rail .rail-sep { height: .5px; margin: 3px 4px; background: var(--hairline); }
+.img-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.img-options { display: flex; align-items: center; gap: 8px; min-height: 28px; font-size: 12px; color: var(--label-2); }
+.img-options .hint { color: var(--label-3, var(--label-2)); }
+.img-zoom, .img-tabs { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--fill-1); gap: 2px; }
+.img-zoom button, .img-tabs button { padding: 3px 10px; border-radius: 7px; font-size: 12px; background: transparent; color: var(--label-2); }
+.img-zoom button.on, .img-tabs button.on { background: var(--fill-3, var(--fill-2)); color: var(--label-1); font-weight: 650; }
+.img-panel { flex: none; margin: 8px 14px 0; display: flex; flex-direction: column; gap: 8px; }
+.img-tabs { align-self: flex-start; }
+.img-adjust { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; font-size: 12px; align-items: center; }
+.img-adjust label { display: flex; align-items: center; gap: 8px; color: var(--label-2); }
+.img-adjust output { min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; color: var(--label-3, var(--label-2)); }
+.img-adjust input[type=range] { flex: 1; min-width: 60px; height: 4px; appearance: none; border-radius: 2px; background: var(--fill-3, var(--fill-2)); accent-color: var(--accent); }
+.img-adjust input[type=range]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--label-1); border: 2px solid var(--accent); }
+.img-adjust input[type=number] { width: 64px; }
+.img-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.img-chips button, .img-resize button { padding: 4px 10px; border-radius: 8px; background: var(--fill-2); font-size: 12px; }
+.img-history { padding: 0; max-height: 84px; overflow: auto; }

@@ -45,6 +45,10 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
   const [format, setFormat] = useState("png");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [panel, setPanel] = useState<"adjust" | "size" | "history">("adjust");
+  const [zoom, setZoom] = useState<"fit" | "actual">("fit");
+  const [room, setRoom] = useState({ w: 0, h: 0 });
+  const canvas = useRef<HTMLDivElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const current = useRef<ImgDoc | null>(null);
@@ -61,6 +65,13 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
     if (!picture) { const existing = await invoke<ImgDoc[]>("imgstage_list", { chatId: key.current }).catch(() => []); if (existing.length) show(existing[existing.length - 1]); return; }
     try { show(await invoke<ImgDoc>("imgstage_open", { chatId: key.current, picture, title: title ?? "Picture" })); } catch (reason) { hooks.report(reason); }
   }, [hooks, show]);
+
+  useEffect(() => {
+    const el = canvas.current; if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => setRoom({ w: el.clientWidth - 24, h: el.clientHeight - 24 }));
+    watch.observe(el); setRoom({ w: el.clientWidth - 24, h: el.clientHeight - 24 });
+    return () => watch.disconnect();
+  }, [doc?.id, panel]);
 
   const run = useCallback(async (ops: Op[], by: "you" | "mobius" = "you") => {
     const d = current.current;
@@ -112,39 +123,59 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
         <button type="button" data-test="img-create" onClick={() => window.dispatchEvent(new CustomEvent("mobius-create-image"))}>Create one instead</button>
       </div>
     </div> : <>
-      <div className="img-toolbar" role="toolbar" aria-label="Edit">
-        <div className="img-group" role="group" aria-label="Select">
-          <button type="button" className={tool === "crop" ? "on" : ""} data-test="img-tool-crop" onClick={() => setTool("crop")}>Crop</button>
-          <button type="button" className={tool === "rect" ? "on" : ""} data-test="img-tool-rect" onClick={() => setTool("rect")}>Rectangle</button>
-          {tool === "rect" && <input type="color" aria-label="Rectangle colour" value={colour} onChange={(e) => setColour(e.target.value)} />}
-          {box && <button type="button" className="primary" data-test="img-apply-selection" disabled={busy} onClick={() => run([tool === "crop" ? { op: "crop", ...box } : { op: "rect", ...box, color: colour, thickness: Math.max(2, Math.round(Math.min(doc.width, doc.height) / 150)) }])}>{tool === "crop" ? "Crop to selection" : "Draw it"}</button>}
+      <div className="img-body">
+        <div className="img-rail" role="toolbar" aria-label="Tools" aria-orientation="vertical">
+          <button type="button" className={tool === "crop" ? "on" : ""} aria-pressed={tool === "crop"} title="Crop: drag on the picture" data-test="img-tool-crop" onClick={() => setTool("crop")}><span className="rail-glyph">⌗</span>Crop</button>
+          <button type="button" className={tool === "rect" ? "on" : ""} aria-pressed={tool === "rect"} title="Rectangle: drag on the picture" data-test="img-tool-rect" onClick={() => setTool("rect")}><span className="rail-glyph">▭</span>Box</button>
+          <input type="color" className="rail-colour" aria-label="Rectangle colour" value={colour} onChange={(e) => setColour(e.target.value)} />
+          <span className="rail-sep" />
+          <button type="button" title="Rotate left" data-test="img-rotate-left" disabled={busy} onClick={() => run([{ op: "rotate", degrees: 270 }])}><span className="rail-glyph">↺</span>Left</button>
+          <button type="button" title="Rotate right" data-test="img-rotate-right" disabled={busy} onClick={() => run([{ op: "rotate", degrees: 90 }])}><span className="rail-glyph">↻</span>Right</button>
+          <button type="button" title="Flip left to right" disabled={busy} onClick={() => run([{ op: "flip", axis: "horizontal" }])}><span className="rail-glyph">⇋</span>Flip</button>
+          <button type="button" title="Flip top to bottom" disabled={busy} onClick={() => run([{ op: "flip", axis: "vertical" }])}><span className="rail-glyph">⇅</span>Flop</button>
         </div>
-        <div className="img-group" role="group" aria-label="Transform">
-          <button type="button" data-test="img-rotate-left" disabled={busy} onClick={() => run([{ op: "rotate", degrees: 270 }])}>↺</button>
-          <button type="button" data-test="img-rotate-right" disabled={busy} onClick={() => run([{ op: "rotate", degrees: 90 }])}>↻</button>
-          <button type="button" disabled={busy} onClick={() => run([{ op: "flip", axis: "horizontal" }])}>Flip ↔</button>
-          <button type="button" disabled={busy} onClick={() => run([{ op: "flip", axis: "vertical" }])}>Flip ↕</button>
-          <label className="img-resize">Size <input type="number" min={1} max={800} value={percent} data-test="img-percent" onChange={(e) => setPercent(Number(e.target.value))} />%</label>
-          <button type="button" data-test="img-resize" disabled={busy || percent === 100} onClick={() => run([{ op: "resize", percent }]).then(() => setPercent(100))}>Resize</button>
-        </div>
-        <div className="img-group" role="group" aria-label="Adjust">
-          <label>Brightness <input type="range" min={-100} max={100} value={brightness} data-test="img-brightness" onChange={(e) => setBrightness(Number(e.target.value))} onPointerUp={() => brightness !== 0 && run([{ op: "brightness", amount: brightness }])} onKeyUp={() => brightness !== 0 && run([{ op: "brightness", amount: brightness }])} /></label>
-          <label>Contrast <input type="range" min={-100} max={100} value={contrast} data-test="img-contrast" onChange={(e) => setContrast(Number(e.target.value))} onPointerUp={() => contrast !== 0 && run([{ op: "contrast", amount: contrast }])} onKeyUp={() => contrast !== 0 && run([{ op: "contrast", amount: contrast }])} /></label>
-          <button type="button" data-test="img-grayscale" disabled={busy} onClick={() => run([{ op: "grayscale" }])}>Black and white</button>
-          <button type="button" disabled={busy} onClick={() => run([{ op: "invert" }])}>Invert</button>
-          <button type="button" disabled={busy} onClick={() => run([{ op: "blur", sigma: 3 }])}>Blur</button>
-          <button type="button" disabled={busy} onClick={() => run([{ op: "sharpen", amount: 2 }])}>Sharpen</button>
+        <div className="img-main">
+          <div className="img-options" data-test="img-options">
+            {box
+              ? <><span>{tool === "crop" ? "Crop" : "Box"} {box.w}×{box.h}</span><span className="stage-spacer" /><button type="button" className="mini" onClick={() => setBox(null)}>Clear</button><button type="button" className="mini primary" data-test="img-apply-selection" disabled={busy} onClick={() => run([tool === "crop" ? { op: "crop", ...box } : { op: "rect", ...box, color: colour, thickness: Math.max(2, Math.round(Math.min(doc.width, doc.height) / 150)) }])}>{tool === "crop" ? "Crop to selection" : "Draw it"}</button></>
+              : <><span className="hint">{tool === "crop" ? "Drag on the picture to choose what to keep." : "Drag on the picture to draw a box."}</span><span className="stage-spacer" /></>}
+            <span className="img-zoom" role="group" aria-label="Zoom">
+              <button type="button" className={zoom === "fit" ? "on" : ""} aria-pressed={zoom === "fit"} onClick={() => setZoom("fit")}>Fit</button>
+              <button type="button" className={zoom === "actual" ? "on" : ""} aria-pressed={zoom === "actual"} onClick={() => setZoom("actual")}>100%</button>
+            </span>
+          </div>
+          <div className="img-canvas" data-test="img-canvas" ref={canvas}>
+            {src && <div className="img-wrap" onPointerDown={down} onPointerMove={moveDrag} onPointerUp={up}>
+              <img ref={img} src={src} alt={doc.title} draggable={false} data-test="img-picture" onLoad={() => setBox((b) => b)}
+                style={(() => { const k = zoom === "actual" ? 1 : Math.max(0.05, Math.min(room.w / doc.width, room.h / doc.height, 8)); return room.w > 0 || zoom === "actual" ? { width: Math.round(doc.width * k), height: Math.round(doc.height * k), maxWidth: "none", maxHeight: "none", imageRendering: k > 2 ? "pixelated" : "auto" } : undefined; })()} />
+              {overlay && <div className={`img-selection ${tool}`} style={overlay} />}
+            </div>}
+          </div>
         </div>
       </div>
-      <div className="img-canvas" data-test="img-canvas">
-        {src && <div className="img-wrap" onPointerDown={down} onPointerMove={moveDrag} onPointerUp={up}>
-          <img ref={img} src={src} alt={doc.title} draggable={false} data-test="img-picture" onLoad={() => setBox((b) => b)} />
-          {overlay && <div className={`img-selection ${tool}`} style={overlay} />}
-        </div>}
-      </div>
-      <div className="img-history" data-test="img-history">
-        <button type="button" className={doc.cursor === 0 ? "now" : ""} onClick={() => jump(0)}>Original</button>
-        {doc.steps.map((s, i) => <button type="button" key={i} className={doc.cursor === i + 1 ? "now" : i + 1 > doc.cursor ? "undone" : ""} data-test={`img-step-${i}`} title={s.by === "mobius" ? "Suggested by Mobius, applied by you" : "Made by you"} onClick={() => jump(i + 1)}>{s.label}{s.by === "mobius" ? <span className="img-by">Mobius</span> : null}</button>)}
+      <div className="img-panel">
+        <div className="img-tabs" role="tablist" aria-label="Picture panels">
+          {([["adjust", "Adjust"], ["size", "Size"], ["history", `History · ${doc.steps.length}`]] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={panel === id} className={panel === id ? "on" : ""} data-test={`img-tab-${id}`} onClick={() => setPanel(id)}>{label}</button>)}
+        </div>
+        {panel === "adjust" ? <div className="img-adjust">
+          <label>Brightness <input type="range" min={-100} max={100} value={brightness} data-test="img-brightness" onChange={(e) => setBrightness(Number(e.target.value))} onPointerUp={() => { if (brightness !== 0) run([{ op: "brightness", amount: brightness }]).then(() => setBrightness(0)); }} onKeyUp={() => { if (brightness !== 0) run([{ op: "brightness", amount: brightness }]).then(() => setBrightness(0)); }} /><output>{brightness}</output></label>
+          <label>Contrast <input type="range" min={-100} max={100} value={contrast} data-test="img-contrast" onChange={(e) => setContrast(Number(e.target.value))} onPointerUp={() => { if (contrast !== 0) run([{ op: "contrast", amount: contrast }]).then(() => setContrast(0)); }} onKeyUp={() => { if (contrast !== 0) run([{ op: "contrast", amount: contrast }]).then(() => setContrast(0)); }} /><output>{contrast}</output></label>
+          <div className="img-chips">
+            <button type="button" data-test="img-grayscale" disabled={busy} onClick={() => run([{ op: "grayscale" }])}>Black and white</button>
+            <button type="button" disabled={busy} onClick={() => run([{ op: "invert" }])}>Invert</button>
+            <button type="button" disabled={busy} onClick={() => run([{ op: "blur", sigma: 3 }])}>Blur</button>
+            <button type="button" disabled={busy} onClick={() => run([{ op: "sharpen", amount: 2 }])}>Sharpen</button>
+          </div>
+        </div> : null}
+        {panel === "size" ? <div className="img-adjust">
+          <div className="img-chips"><span className="stage-state">Now {doc.width}×{doc.height}</span></div>
+          <label className="img-resize">Scale to <input type="number" min={1} max={800} value={percent} data-test="img-percent" onChange={(e) => setPercent(Number(e.target.value))} /> %
+            <button type="button" data-test="img-resize" disabled={busy || percent === 100} onClick={() => run([{ op: "resize", percent }]).then(() => setPercent(100))}>Resize</button></label>
+        </div> : null}
+        {panel === "history" ? <div className="img-history" data-test="img-history">
+          <button type="button" className={doc.cursor === 0 ? "now" : ""} onClick={() => jump(0)}>Original</button>
+          {doc.steps.map((s, i) => <button type="button" key={i} className={doc.cursor === i + 1 ? "now" : i + 1 > doc.cursor ? "undone" : ""} data-test={`img-step-${i}`} title={s.by === "mobius" ? "Suggested by Mobius, applied by you" : "Made by you"} onClick={() => jump(i + 1)}>{s.label}{s.by === "mobius" ? <span className="img-by">Mobius</span> : null}</button>)}
+        </div> : null}
       </div>
       <footer className="img-footer">
         <button type="button" className="mini" data-test="img-ask" onClick={() => invoke<string>("image_clone", { id: doc.current }).then(hooks.ask, hooks.report)}>Ask Mobius about this</button>
