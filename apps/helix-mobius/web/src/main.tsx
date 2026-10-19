@@ -62,7 +62,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   stage: (host: HTMLElement, hooks: StageHooks) => {
     const run = handled<StageHandle>(host, (register) => <Stage register={register} hooks={hooks} />);
-    return { open: (title: string, body?: string) => run((h) => h.open(title, body)), refresh: () => run((h) => h.refresh()), close: () => run((h) => h.close()) };
+    return { open: (title: string, body?: string) => run((h) => h.open(title, body)), refresh: () => run((h) => h.refresh()), propose: (ops: Record<string, unknown>[]) => run((h) => h.propose(ops)), close: () => run((h) => h.close()) };
   },
   palette: (host: HTMLElement, hooks: PaletteHooks) => {
     const run = handled<PaletteHandle>(host, (register) => <Palette register={register} hooks={hooks} />);

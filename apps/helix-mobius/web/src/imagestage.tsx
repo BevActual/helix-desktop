@@ -214,7 +214,7 @@ export function describeDocOp(o: Record<string, unknown>): string {
 export function DocEditsCard({ ops, onApply }: { ops: Record<string, unknown>[]; onApply: () => void }) {
   return <div className="artifact-card" data-test="docedits-card">
     <div className="artifact-head"><strong>Suggested document edits</strong><span>{ops.length} edit{ops.length === 1 ? "" : "s"}</span>
-      <button type="button" className="mini primary" data-test="docedits-apply" onClick={onApply}>Apply to the open document</button></div>
+      <button type="button" className="mini primary" data-test="docedits-apply" onClick={onApply}>Review in the document</button></div>
     <ul className="docedits-list">{ops.map((o, i) => <li key={i}>{describeDocOp(o)}</li>)}</ul>
   </div>;
 }

@@ -3849,6 +3849,7 @@ fn main() {
             artifacts::stage_all,
             artifacts::stage_record,
             artifacts::stage_apply,
+            artifacts::stage_preview,
             tools_rules,
             imagestage::imgstage_list,
             imagestage::imgstage_open,

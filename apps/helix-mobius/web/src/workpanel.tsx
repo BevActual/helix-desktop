@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
 import { Blocks, type Block } from "./thread";
+import { describeDocOp } from "./imagestage";
 import { continueList, findAll, indent, makeLink, outline, readingMinutes, setHeading, toggleLines, toggleWrap, type Edit } from "./markdownEdit";
 
 /** The stage: the panel beside the chat where the work lives. Today it holds documents: the model drafts them (an `artifact:Title` block in a
@@ -20,6 +21,8 @@ export interface StageHandle {
   open: (title: string, body?: string) => void;
   /** A reply finished: the page recorded its documents; show the newest text of the open one. */
   refresh: () => void;
+  /** The model proposed document edits: show them as a diff on the page, to accept (all or some) or reject. */
+  propose: (ops: Record<string, unknown>[]) => void;
   close: () => void;
 }
 
@@ -93,6 +96,8 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
   const [working, setWorking] = useState(false);
   const [proposal, setProposal] = useState<{ start: number; end: number; old: string; text: string } | null>(null);
   const [problem, setProblem] = useState("");
+  // Edits the model proposed, held until the person accepts them: each can be left out, and the diff is what the rest would do.
+  const [pending, setPending] = useState<{ ops: Record<string, unknown>[]; on: boolean[]; diff: string; error: string } | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [focus, setFocus] = useState(false);
   // The block menu: typing "/" at the start of a line offers headings, lists, a quote, code, a divider, and "Continue writing".
@@ -152,9 +157,29 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
           }
         }, () => undefined);
       },
-      close: () => { setTitle(""); setText(""); hooks.changed(null); },
+      propose: (ops) => { setPending({ ops, on: ops.map(() => true), diff: "", error: "" }); setProblem(""); },
+      close: () => { setTitle(""); setText(""); setPending(null); hooks.changed(null); },
     });
   }, [register, load, hooks]);
+
+  const pendingKey = pending ? JSON.stringify([pending.ops, pending.on, title]) : "";
+  useEffect(() => {
+    if (!pending) return;
+    let live = true;
+    const chosen = pending.ops.filter((_, i) => pending.on[i]);
+    if (chosen.length === 0) { setPending((p) => p && { ...p, diff: "", error: "" }); return; }
+    invoke<string>("stage_preview", { chatId: hooks.chatId(), title, ops: chosen })
+      .then((next) => invoke<string>("text_diff", { old: current.current.text, new: next }).then((diff) => live && setPending((p) => p && { ...p, diff, error: "" })))
+      .catch((reason) => live && setPending((p) => p && { ...p, diff: "", error: String(reason) }));
+    return () => { live = false; };
+  }, [pendingKey]);
+  const acceptPending = async () => {
+    if (!pending) return;
+    const chosen = pending.ops.filter((_, i) => pending.on[i]);
+    if (chosen.length === 0) { setPending(null); return; }
+    try { adopt(await invoke<Store>("stage_apply", { chatId: hooks.chatId(), title, ops: chosen, by: "model" }), title); setPending(null); setNotice("Applied Mobius's edits. Every earlier version is in History."); }
+    catch (reason) { setPending((p) => p && { ...p, error: String(reason) }); }
+  };
 
   // The Read view is the same Markdown the thread draws, so a document looks the same in both places.
   useEffect(() => {
@@ -387,6 +412,13 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
         {headings.map((h, i) => <button key={i} type="button" style={{ paddingLeft: 8 + (h.level - 1) * 12 }} data-test={`outline-${i}`} onClick={() => jumpTo(h.offset)}>{h.title}</button>)}
       </nav>}
       <div className="write-page" ref={page}>
+        {pending && <div className="stage-pending" data-test="stage-pending" role="group" aria-label="Suggested edits" onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setPending(null); } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); acceptPending(); } }}>
+          <strong>Mobius suggests {pending.ops.length} edit{pending.ops.length === 1 ? "" : "s"}</strong>
+          <ul>{pending.ops.map((o, i) => <li key={i}><label><input type="checkbox" checked={pending.on[i]} data-test={`pending-edit-${i}`} onChange={(e) => setPending((p) => p && { ...p, on: p.on.map((v, j) => (j === i ? e.target.checked : v)) })} /> {describeDocOp(o)}</label></li>)}</ul>
+          {pending.error ? <p className="lib-error" role="alert" data-test="pending-error">{pending.error}</p>
+            : pending.diff ? <pre className="diff" data-test="pending-diff">{pending.diff.split("\n").filter((l) => !l.startsWith("\\")).map((l, i) => <span key={i} className={l.startsWith("@@") ? "diff-head" : l.startsWith("+") ? "diff-add" : l.startsWith("-") ? "diff-del" : ""}>{l || " "}</span>)}</pre> : null}
+          <div className="proposal-actions"><button type="button" className="primary" data-test="pending-accept" disabled={!!pending.error || !pending.on.some(Boolean)} onClick={acceptPending}>Accept {pending.on.every(Boolean) ? "all" : `${pending.on.filter(Boolean).length}`} <kbd>Ctrl+Enter</kbd></button><button type="button" data-test="pending-reject" onClick={() => setPending(null)}>Reject <kbd>Esc</kbd></button></div>
+        </div>}
         {proposal ? <div className="stage-proposal" data-test="stage-proposal" role="group" aria-label="Suggested change" onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); rejectProposal(); } }}>
           <div className="proposal-old" data-test="proposal-old"><span>Now</span>{proposal.old}</div>
           <div className="proposal-new" data-test="proposal-new"><span>Suggested</span>{proposal.text}</div>

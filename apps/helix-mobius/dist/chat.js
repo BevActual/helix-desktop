@@ -1259,7 +1259,7 @@ const reactThread = window.HelixMobiusReact
     editPicture: (id) => setWorkspace("image", id),
     applyDocEdits: (ops) => {
       if (!stageOpen) { report("Open the document on the Write stage first."); return; }
-      invoke("stage_apply", { chatId: view.id, title: stageOpen.title, ops, by: "model" }).then(() => reactStage?.refresh(), report);
+      reactStage?.propose(ops);
     },
     applyEdits: (ops) => { if (workspace !== "image") report("Open the picture on the Image stage first (Edit on a picture, or the Image place)."); else reactImage?.apply(ops); },
     quote: (text) => {

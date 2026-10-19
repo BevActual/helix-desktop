@@ -27,14 +27,17 @@ click_id artifact-open; wait_id stage-text || fail "no stage"
 STAGE=$(ls "$SCRATCH"/data/helix/mobius/stage/*.json | head -1)
 versions() { python3 -c "import json;d=json.load(open('$STAGE'))['documents'][0];print(len(d['versions']),d['versions'][-1]['by'])"; }
 [ "$(versions)" = "1 model" ] && echo "ok: nothing changed before Apply" || fail "changed early: $(versions)"
-click_id docedits-apply; sleep 2
-python3 - "$STAGE" <<'PY' && echo "ok: Apply made a new version with the edits" || fail "edits not applied"
+click_id docedits-apply; wait_id pending-accept 20 && echo "ok: the edits open as a review on the page" || fail "no review"
+[ "$(versions)" = "1 model" ] && echo "ok: still nothing changed" || fail "changed before Accept: $(versions)"
+click_id pending-edit-1; sleep 1.5   # leave the append out
+shot docops; sleep 1.5; shot docops
+click_id pending-accept; sleep 2
+python3 - "$STAGE" <<'PY' && echo "ok: Accept applied only the edit that was left on" || fail "edits not applied"
 import json, sys
 d = json.load(open(sys.argv[1]))["documents"][0]
 assert [v["by"] for v in d["versions"]] == ["model", "model"], d
 b = d["versions"][-1]["body"]
-assert "collect the evidence" in b and "gather the facts" not in b and b.rstrip().endswith("Step three: review."), b
+assert "collect the evidence" in b and "gather the facts" not in b and "Step three" not in b, b
 assert "gather the facts" in d["versions"][0]["body"], "the earlier version is kept"
 PY
-shot docops; sleep 1; shot docops
 [ "$FAILED" = 0 ] && echo "PASS: mobius docops" || exit 1
