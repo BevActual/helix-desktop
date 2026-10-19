@@ -377,7 +377,8 @@ function attachmentPayload() {
   const files = pendingAttachments.map((a) => ({ name: a.name, content: a.content, original_chars: a.original_chars }));
   if (stageOpen && stageAttach && stageOpen.text.trim()) {
     const text = stageOpen.text;
-    files.unshift({ name: `${stageOpen.title} (the open document)`, content: Array.from(text).slice(0, 6000).join(""), original_chars: Array.from(text).length });
+    const how = "\n\n[To change this document, reply with a ```docops block holding a JSON list (at most 10) of edits, each one of: {\"op\":\"replace\",\"find\":\"exact old text\",\"with\":\"new text\"}, {\"op\":\"delete\",\"find\":\"...\"}, {\"op\":\"insert_after\",\"anchor\":\"exact text on a line\",\"text\":\"...\"}, {\"op\":\"replace_section\",\"heading\":\"Heading text\",\"text\":\"...\"}, {\"op\":\"append\",\"text\":\"...\"}. Use this for small changes; for a full rewrite use an artifact block.]";
+    files.unshift({ name: `${stageOpen.title} (the open document)`, content: Array.from(text).slice(0, 6000).join("") + how, original_chars: Array.from(text).length });
   }
   return files;
 }
@@ -1196,6 +1197,10 @@ const reactThread = window.HelixMobiusReact
     act: (text) => actOnDesktop(text),
     stage: (title, body) => reactStage?.open(title, body),
     editPicture: (id) => setWorkspace("image", id),
+    applyDocEdits: (ops) => {
+      if (!stageOpen) { report("Open the document on the Write stage first."); return; }
+      invoke("stage_apply", { chatId: view.id, title: stageOpen.title, ops, by: "model" }).then(() => reactStage?.refresh(), report);
+    },
     applyEdits: (ops) => { if (workspace !== "image") report("Open the picture on the Image stage first (Edit on a picture, or the Image place)."); else reactImage?.apply(ops); },
     quote: (text) => {
       const prefix = input.value && !input.value.endsWith("\n") ? "\n\n" : "";

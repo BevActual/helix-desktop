@@ -2,7 +2,7 @@ import { Chart, parseChart } from "./chart";
 import { ArtifactCard } from "./workpanel";
 import { Regenerate } from "./regenerate";
 import { CompareBar } from "./compare";
-import { EditsCard } from "./imagestage";
+import { DocEditsCard, EditsCard } from "./imagestage";
 import { FlowDiagram, parseDiagram } from "./diagram";
 import { Ephemeral, parseUi } from "./ephemeral";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -107,6 +107,7 @@ export interface ThreadHooks {
   report: (error: unknown) => void;
   /** Applies edits a reply suggested to the picture open on the Image stage. */
   applyEdits: (ops: Record<string, unknown>[]) => void;
+  applyDocEdits: (ops: Record<string, unknown>[]) => void;
   /** Opens a picture from the thread on the Image stage. */
   editPicture: (id: string) => void;
   /** Puts a document the reply wrote on the stage. */
@@ -305,7 +306,7 @@ function ChangesCard({ activity, streaming, hooks }: { activity: { id: string; i
   </section>;
 }
 
-export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, onStage, onEdits, writing }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void; onStage?: (title: string, body: string) => void; onEdits?: (ops: Record<string, unknown>[]) => void; writing?: boolean }) {
+export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, onStage, onEdits, onDocEdits, writing }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void; onStage?: (title: string, body: string) => void; onEdits?: (ops: Record<string, unknown>[]) => void; onDocEdits?: (ops: Record<string, unknown>[]) => void; writing?: boolean }) {
   return (
     <>
       {blocks.map((block, index) => {
@@ -375,6 +376,12 @@ export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, on
               try {
                 const ops = JSON.parse(block.text);
                 if (Array.isArray(ops) && ops.length > 0 && ops.length <= 10 && ops.every((o) => o && typeof o === "object" && typeof o.op === "string")) return <EditsCard key={index} ops={ops} onApply={() => onEdits?.(ops)} />;
+              } catch { /* an ordinary code block */ }
+            }
+            if (block.language === "docops") {
+              try {
+                const ops = JSON.parse(block.text);
+                if (Array.isArray(ops) && ops.length > 0 && ops.length <= 10 && ops.every((o) => o && typeof o === "object" && typeof o.op === "string")) return <DocEditsCard key={index} ops={ops} onApply={() => onDocEdits?.(ops)} />;
               } catch { /* an ordinary code block */ }
             }
             const flow = block.language === "diagram" ? parseDiagram(block.text) : null;
@@ -505,7 +512,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
             <div className="msg-body">
               {message.images?.map((id) => <GeneratedPicture key={id} id={id} streaming={streaming} hooks={hooks} />)}
               {!!message.activities?.length && <Timeline activities={message.activities} streaming={streaming} live={last && streaming} hooks={hooks} />}
-              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} onStage={hooks.stage} onEdits={hooks.applyEdits} writing={last && streaming} />
+              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} onStage={hooks.stage} onEdits={hooks.applyEdits} onDocEdits={hooks.applyDocEdits} writing={last && streaming} />
               {last && !streaming && message.stats ? <CompareBar index={index} current={{ text: message.text, model: message.stats.model, tokens: message.stats.tokens, ms: message.stats.ms }} streaming={streaming} report={hooks.report} /> : null}
               {!!message.sources?.length && <section className="answer-web-sources" data-test="answer-web-sources" aria-label="Online sources provided to the model"><strong>Online sources</strong>{message.sources.map((source, i) => <div key={`${i}:${source.url}`}><button type="button" className="web-citation" data-test={`answer-source-${index}-${i}`} title={source.url} onClick={() => invoke("web_open_source", { url: source.url }).catch(hooks.report)}>[{i + 1}] {source.title || source.url}</button><span>{source.kind === "page" ? "Page excerpt" : `Search snippet${source.provider ? ` · ${source.provider}` : ""}`} · retrieved {new Date(source.fetched * 1000).toLocaleDateString()}</span></div>)}</section>}
               {!streaming && message.stats?.files?.length ? <FileSources files={message.stats.files} index={index} /> : null}

@@ -12,6 +12,7 @@ mod chatgpt;
 mod cloud;
 mod decide;
 mod dictate;
+mod docops;
 mod edits;
 mod generation;
 mod hardware;
@@ -3847,6 +3848,7 @@ fn main() {
             scheduled::scheduled_run_now,
             artifacts::stage_all,
             artifacts::stage_record,
+            artifacts::stage_apply,
             tools_rules,
             imagestage::imgstage_list,
             imagestage::imgstage_open,

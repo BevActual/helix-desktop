@@ -1926,3 +1926,4 @@ body.chat .stage-empty-actions { display: flex; flex-wrap: wrap; justify-content
 body.chat .stage-empty-actions button { padding: 8px 15px; border-radius: 10px; background: var(--fill-2); font-weight: 650; font-size: 13px; }
 body.chat .stage-empty-actions button.primary { background: var(--accent); color: var(--on-accent); }
 body.chat .img-history .img-by { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10.5px; font-weight: 650; }
+body.chat .docedits-list { margin: 6px 0 2px; padding-left: 20px; font-size: 13px; color: var(--label-2); }

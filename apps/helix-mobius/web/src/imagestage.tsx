@@ -166,3 +166,24 @@ export function EditsCard({ ops, onApply }: { ops: Op[]; onApply: () => void }) 
     <pre>{JSON.stringify(ops, null, 1)}</pre>
   </div>;
 }
+
+/** The document operations the model may propose, said in words for the card. */
+export function describeDocOp(o: Record<string, unknown>): string {
+  const q = (t: unknown) => { const s = String(t ?? "").replace(/\s+/g, " ").trim(); return `“${s.length > 40 ? s.slice(0, 40) + "…" : s}”`; };
+  switch (o.op) {
+    case "replace": return `Change ${q(o.find)} to ${q(o.with)}${o.all ? " everywhere" : ""}`;
+    case "delete": return `Remove ${q(o.find)}`;
+    case "insert_after": return `Add a paragraph after ${q(o.anchor)}`;
+    case "replace_section": return `Rewrite the section ${q(o.heading)}`;
+    case "append": return "Add to the end";
+    default: return String(o.op);
+  }
+}
+
+export function DocEditsCard({ ops, onApply }: { ops: Record<string, unknown>[]; onApply: () => void }) {
+  return <div className="artifact-card" data-test="docedits-card">
+    <div className="artifact-head"><strong>Suggested document edits</strong><span>{ops.length} edit{ops.length === 1 ? "" : "s"}</span>
+      <button type="button" className="mini primary" data-test="docedits-apply" onClick={onApply}>Apply to the open document</button></div>
+    <ul className="docedits-list">{ops.map((o, i) => <li key={i}>{describeDocOp(o)}</li>)}</ul>
+  </div>;
+}

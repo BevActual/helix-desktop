@@ -331,6 +331,40 @@ pub fn stage_record(
     Ok(store)
 }
 
+/// Applies the model's (or a person's) document operations to the newest version of a document, as a new version. Empty `title`: the newest document.
+#[tauri::command]
+pub fn stage_apply(
+    chat_id: String,
+    title: String,
+    ops: Vec<crate::docops::DocOp>,
+    by: String,
+) -> Result<Store, String> {
+    if chat_id.is_empty() {
+        return Err("Send a message first so this chat has somewhere to keep documents.".into());
+    }
+    let by = if by == "person" { "person" } else { "model" };
+    let mut store = Store::load(&chat_id);
+    let doc = if title.trim().is_empty() {
+        store.documents.last()
+    } else {
+        store
+            .documents
+            .iter()
+            .find(|d| d.title.eq_ignore_ascii_case(title.trim()))
+    }
+    .ok_or("Open the document on the Write stage first.")?;
+    let name = doc.title.clone();
+    let body = doc
+        .versions
+        .last()
+        .map(|v| v.body.clone())
+        .unwrap_or_default();
+    let next = crate::docops::apply(&body, &ops)?;
+    store.record(&name, &next, by, crate::now())?;
+    store.save(&chat_id)?;
+    Ok(store)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
