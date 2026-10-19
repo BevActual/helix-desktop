@@ -941,6 +941,63 @@ function toolsChipLabel() {
   return `Tools · ${name}`;
 }
 
+// What each workspace asks of the chat (docs/design/mobius-workspaces.md, "The chat shapes itself to the mode"): the composer's wording and the
+// starters shown while the conversation is empty. The model is told the stage's edit format in the starter itself, so a small change comes back as
+// edits the person applies, not a rewrite.
+const IMAGE_FORMAT = " If it needs edits, reply with one ```imageops block: a JSON list (at most 10) of {\"op\":\"crop\",\"x\":0,\"y\":0,\"w\":100,\"h\":100}, {\"op\":\"resize\",\"percent\":50}, {\"op\":\"rotate\",\"degrees\":90}, {\"op\":\"flip\",\"axis\":\"horizontal\"}, {\"op\":\"brightness\",\"amount\":20}, {\"op\":\"contrast\",\"amount\":20}, {\"op\":\"grayscale\"}, {\"op\":\"invert\"}, {\"op\":\"blur\",\"sigma\":3}, {\"op\":\"sharpen\",\"amount\":2}.";
+const WORKSPACE_UI = {
+  write: {
+    placeholder: "Ask, or say what to change",
+    title: "Write with Mobius",
+    note: "Mobius reads the open document. Small changes come back as edits you apply.",
+    starters: [
+      ["Make it shorter", "Make the document shorter and keep its meaning."],
+      ["Fix spelling and grammar", "Fix spelling and grammar. Change as little else as you can."],
+      ["Continue writing", "Continue the document with the next section."],
+      ["Suggest an outline", "Suggest an outline for this document."],
+    ],
+  },
+  image: {
+    placeholder: "Describe a change to this picture",
+    title: "Edit a picture with Mobius",
+    note: "Open a picture, then ask. Suggested edits wait for you to apply them.",
+    starters: [
+      ["Describe this picture", "Describe this picture."],
+      ["Brighter, more contrast", "Make the picture a little brighter with more contrast." + IMAGE_FORMAT],
+      ["Black and white", "Make the picture black and white." + IMAGE_FORMAT],
+      ["Crop to a square", "Crop the picture to a centred square." + IMAGE_FORMAT],
+    ],
+  },
+  code: {
+    placeholder: "Ask about the project, or give a task",
+    title: "Work on code with Mobius",
+    note: "Each step is shown, and every change waits for your review.",
+    starters: [
+      ["Explain this project", "Explain what this project is and how it is organised."],
+      ["Find likely bugs", "Read the main files and point out likely bugs."],
+      ["Add tests", "Suggest tests this project is missing, and write the first one."],
+      ["Summarise recent changes", "Summarise what changed recently in this project."],
+    ],
+  },
+};
+function drawModeStarters() {
+  const host = $("mode-starters"), ui = WORKSPACE_UI[workspace];
+  const empty = view.messages.length === 0 && (view.tasks || []).length === 0;
+  $("empty").hidden = !empty || !!ui;
+  host.hidden = !(empty && ui);
+  host.replaceChildren();
+  if (host.hidden) return;
+  host.append(el("h3", "", ui.title), el("p", "", ui.note));
+  const row = el("div", "mode-starter-row");
+  for (const [label, prompt] of ui.starters) {
+    const b = el("button", "mode-starter", label);
+    b.type = "button"; b.dataset.test = "starter-" + label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-$/, "");
+    b.onclick = () => sendPlain(prompt);
+    row.append(b);
+  }
+  host.append(row);
+}
+
 function composerPlaceholder() {
   if (listening || dictationBusy === "transcribing") return;
   if (view.analysis_job) {
@@ -949,6 +1006,8 @@ function composerPlaceholder() {
   }
   input.placeholder = composerAct
     ? "Say what to do on the desktop"
+    : WORKSPACE_UI[workspace] && !view.tools_enabled
+    ? WORKSPACE_UI[workspace].placeholder
     : view.tools_enabled
     ? "Ask a task — each step is shown for your approval"
     : "Message Mobius — / for commands";
@@ -1079,6 +1138,7 @@ function drawChat() {
   }
   const emptyChat = view.messages.length === 0 && (view.tasks || []).length === 0;
   $("empty").hidden = !emptyChat;
+  drawModeStarters();
   // An empty chat is a home: the greeting and the composer sit in the middle of the window, and the composer settles to the bottom with the first message.
   setHome(emptyChat && workspace === "chat");
   $("send").hidden = view.streaming;
@@ -2762,6 +2822,7 @@ function paletteItems(query) {
 }
 
 // The stage (docs/design/mobius-workspaces.md): the open document goes to the model with the next message, as a chip that can be dropped.
+var stageReady = false, stageWidthFor = "";
 let stageOpen = null;      // { title, text } while a document is open
 let stageAttach = true;    // whether it is sent with the next message
 let workspace = "chat";    // chat | write | code: how the window is laid out (docs/design/mobius-workspaces.md)
@@ -2771,8 +2832,11 @@ function drawStageChip() {
   chip.hidden = !stageOpen;
   for (const id of ["chat", "write", "image", "code"]) $("mode-" + id).classList.toggle("active", workspace === id);
   $("workspace-btn").textContent = ({ chat: "Chat", write: "Write", image: "Image", code: "Code" })[workspace] + " ▾";
+  document.body.dataset.workspace = workspace;
   document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code" || workspace === "image");
   drawLayout();
+  if (typeof view !== "undefined" && view && view.messages) { drawModeStarters(); composerPlaceholder(); }
+  if (stageReady) { if (stageWidthFor !== workspace) { stageWidthFor = workspace; loadStageWidth(); } drawStageSide(); }
   if (!stageOpen) return;
   chip.textContent = stageAttach ? `${stageOpen.title} · sent with your message ×` : `${stageOpen.title} · not sent (click to send)`;
   chip.classList.toggle("off", !stageAttach);
@@ -2797,6 +2861,65 @@ function toggleLayout() {
   drawLayout();
 }
 $("layout-btn").onclick = () => toggleLayout();
+
+// The work area is the person's to shape: drag the divider (or use the arrow keys on it) to set its width, double-click to reset it; the width is
+// remembered per workspace. The ⇄ button puts it on the other side of the chat.
+const STAGE_MIN = 300;
+let stageLeft = false;
+try { stageLeft = localStorage.getItem("mobius-stage-side") === "left"; } catch { /* not remembered */ }
+function stageWidthKey() { return "mobius-stage-w-" + workspace; }
+function setStageWidth(px, remember) {
+  const app = $("app");
+  if (!px) { app.style.removeProperty("--stage-w"); } else { app.style.setProperty("--stage-w", Math.round(px) + "px"); }
+  if (remember) { try { px ? localStorage.setItem(stageWidthKey(), String(Math.round(px))) : localStorage.removeItem(stageWidthKey()); } catch { /* not remembered */ } }
+}
+function loadStageWidth() {
+  let saved = 0;
+  try { saved = Number(localStorage.getItem(stageWidthKey())) || 0; } catch { /* not remembered */ }
+  setStageWidth(saved >= STAGE_MIN ? saved : 0, false);
+}
+function stageMax() { return Math.max(STAGE_MIN, Math.min(window.innerWidth * 0.78, window.innerWidth - 56 - 340)); }
+function clampStage(px) { return Math.max(STAGE_MIN, Math.min(stageMax(), px)); }
+function drawStageSide() {
+  document.body.classList.toggle("stage-left", stageLeft);
+  $("stage-side-btn").hidden = !document.body.classList.contains("stage-open");
+}
+(() => {
+  const bar = $("stage-resizer"), host = $("stage-host");
+  const current = () => host.getBoundingClientRect().width;
+  bar.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    bar.setPointerCapture(event.pointerId);
+    bar.classList.add("dragging"); document.body.classList.add("stage-dragging");
+  });
+  bar.addEventListener("pointermove", (event) => {
+    if (!bar.hasPointerCapture(event.pointerId)) return;
+    const rect = host.getBoundingClientRect();
+    setStageWidth(clampStage(stageLeft ? event.clientX - rect.left : rect.right - event.clientX), false);
+  });
+  const done = (event) => {
+    if (!bar.hasPointerCapture(event.pointerId)) return;
+    bar.releasePointerCapture(event.pointerId);
+    bar.classList.remove("dragging"); document.body.classList.remove("stage-dragging");
+    setStageWidth(clampStage(current()), true);
+  };
+  bar.addEventListener("pointerup", done); bar.addEventListener("pointercancel", done);
+  bar.addEventListener("dblclick", () => setStageWidth(0, true));
+  bar.addEventListener("keydown", (event) => {
+    const grow = stageLeft ? "ArrowRight" : "ArrowLeft", shrink = stageLeft ? "ArrowLeft" : "ArrowRight";
+    if (event.key !== grow && event.key !== shrink && event.key !== "Home" && event.key !== "Enter") return;
+    event.preventDefault();
+    if (event.key === "Home" || event.key === "Enter") { setStageWidth(0, true); return; }
+    setStageWidth(clampStage(current() + (event.key === grow ? 32 : -32) * (event.shiftKey ? 4 : 1)), true);
+  });
+  $("stage-side-btn").onclick = () => {
+    stageLeft = !stageLeft;
+    try { localStorage.setItem("mobius-stage-side", stageLeft ? "left" : "right"); } catch { /* not remembered */ }
+    drawStageSide();
+  };
+  stageReady = true; stageWidthFor = workspace; loadStageWidth(); drawStageSide();
+  window.addEventListener("resize", () => { if (getComputedStyle($("app")).getPropertyValue("--stage-w")) setStageWidth(clampStage(current()), false); });
+})();
 const reactStage = window.HelixMobiusReact?.stage($("stage-doc"), {
   chatId: () => view.id,
   report: (error) => report(error),

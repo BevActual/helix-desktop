@@ -211,3 +211,14 @@ The direction from the person: the chat window should transform to fit the forma
 5. The same descriptor is what a **bot** is given: its allowed stages, composer-less, with its output going to the stage and the board.
 
 Open questions, to decide by trying them: whether the Margin should be anchored (needs the document to keep stable ranges for comments) or a simple column; whether the dock should ever hide completely in a stage (the focus layout already floats it); and how a single chat shows when two stages are open (Write and Image for a document with pictures).
+
+### Panes the person can shape, and the first dock presentation (built)
+
+From the person's note after looking at Cursor: the panes should be **resizable and movable**.
+
+* **Resize.** A divider on the edge of the work area: drag it, or focus it and use the arrow keys (Shift for bigger steps), double-click or Home to go back to the default. The width is remembered **per workspace** (Write, Image and Code each keep their own), clamped between 300 px and about 78 % of the window. It is a separate `role="separator"` element with a label, so it works from the keyboard and with a screen reader.
+* **Move.** A ⇄ button in the chat header puts the work area on the other side of the chat (remembered). Under 900 px wide the stage already takes the whole window, so neither control shows there. The focus layout (chat floating over the work) is unchanged and hides both.
+* **Starters per mode.** While a work mode's chat is empty, the general welcome cards give way to what fits: Write offers *Make it shorter, Fix spelling and grammar, Continue writing, Suggest an outline*; Image offers *Describe this picture, Brighter, Black and white, Crop to a square* (these carry the `imageops` format so a small model answers in edits the person can apply); Code offers *Explain this project, Find likely bugs, Add tests, Summarise recent changes*. The composer's wording follows the mode too ("Ask, or say what to change"). One descriptor object, `WORKSPACE_UI` in `chat.js`, holds this; the rest of the descriptor (dock presentation, default context, stage-bound blocks) is still to come.
+* Tests: `tools/nested/mobius-panes-test.sh` (drag widens the stage, per-workspace memory, reset, the other side and back, the starters change with the mode and one sends its prompt).
+
+Next: drag a pane by its header to dock it elsewhere (above or below, not only left or right), then the Margin and Task bar presentations.

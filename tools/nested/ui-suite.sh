@@ -56,6 +56,7 @@ pick mobius-palette && run mobius-palette mobius-palette-test.sh mobius-nested.s
 pick mobius-composer && run mobius-composer mobius-composer-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=2
 pick mobius-regen && run mobius-regen mobius-regen-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=2
 pick mobius-stage   && run mobius-stage mobius-stage-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n'
+pick mobius-panes  && run mobius-panes mobius-panes-test.sh mobius-nested.sh "$WIDE" "HELIX_FAKE_REPLY=Hi."
 pick mobius-docops  && run mobius-docops mobius-docops-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n\n```docops\n[{"op":"replace","find":"gather the facts","with":"collect the evidence"},{"op":"append","text":"Step three: review."}]\n```\n'
 pick mobius-code   && run mobius-code mobius-code-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-side    && run mobius-side mobius-side-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n```\n'

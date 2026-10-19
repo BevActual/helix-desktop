@@ -1670,7 +1670,7 @@ body.chat .queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: 
 .palette-empty { padding: 14px; color: var(--label-2); }
 /* The stage: the panel beside the chat where the work lives (docs/design/mobius-workspaces.md). */
 body.chat .stage-host { display: none; min-width: 0; min-height: 0; }
-body.chat.stage-open #app { grid-template-columns: 268px minmax(0, 1fr) minmax(340px, 44%); }
+body.chat.stage-open #app { grid-template-columns: 268px minmax(0, 1fr) minmax(300px, var(--stage-w, 44%)); }
 body.chat.stage-open .stage-host { display: flex; border-left: .5px solid var(--sep); background: color-mix(in srgb, var(--fill-1) 60%, transparent); }
 .stage { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .stage header { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; }
@@ -1686,7 +1686,7 @@ body.chat.stage-open .stage-host { display: flex; border-left: .5px solid var(--
 .stage-chip.off { opacity: .6; }
 @media (max-width: 899px) { body.chat.stage-open #app { grid-template-columns: 0 0 1fr; } body.chat.stage-open #main { display: none; } }
 /* With the stage open the chat list gives way on windows that are not wide, so the chat and the work both have room. */
-@media (max-width: 1399px) and (min-width: 900px) { body.chat.stage-open #app { grid-template-columns: 0 minmax(0, 1fr) minmax(340px, 46%); } body.chat.stage-open #side { visibility: hidden; overflow: hidden; padding: 0; border: 0; } }
+@media (max-width: 1399px) and (min-width: 900px) { body.chat.stage-open #app { grid-template-columns: 0 minmax(0, 1fr) minmax(300px, var(--stage-w, 46%)); } body.chat.stage-open #side { visibility: hidden; overflow: hidden; padding: 0; border: 0; } }
 .workspace-btn { font-weight: 600; }
 .code-body { display: flex; flex: 1; min-height: 0; padding: 0 14px 12px; gap: 10px; }
 .code-files { width: 36%; min-width: 150px; display: flex; flex-direction: column; min-height: 0; }
@@ -1709,7 +1709,7 @@ body.chat .mode-row svg { width: 17px; height: 17px; flex: none; }
 body.chat .mode-row:hover { background: var(--fill-2); color: var(--label); }
 body.chat .mode-row.active { background: var(--fill-2); color: var(--label); }
 @media (max-width: 1399px) and (min-width: 900px) {
-  body.chat.stage-open #app { grid-template-columns: 56px minmax(0, 1fr) minmax(340px, 46%); }
+  body.chat.stage-open #app { grid-template-columns: 56px minmax(0, 1fr) minmax(300px, var(--stage-w, 46%)); }
   body.chat.stage-open #side { visibility: visible; overflow: hidden; padding: 0 8px 12px; }
   body.chat.stage-open #side > :not(#modes):not(#titlebar) { display: none !important; }
   body.chat.stage-open #titlebar #brand, body.chat.stage-open #titlebar #new-chat { display: none; }
@@ -1947,3 +1947,30 @@ body.chat .docedits-list { margin: 6px 0 2px; padding-left: 20px; font-size: 13p
 .img-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .img-chips button, .img-resize button { padding: 4px 10px; border-radius: 8px; background: var(--fill-2); font-size: 12px; }
 .img-history { padding: 0; max-height: 84px; overflow: auto; }
+/* The stage's width is the person's to set (drag the divider, arrows when it has focus, double-click to reset), and it can sit on either side of the chat. */
+body.chat .stage-host { position: relative; }
+.stage-resizer { position: absolute; top: 0; bottom: 0; left: -5px; width: 10px; z-index: 8; cursor: col-resize; touch-action: none; display: none; }
+.stage-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; border-radius: 1px; background: transparent; transition: background .12s; }
+.stage-resizer:hover::after, .stage-resizer:focus-visible::after, .stage-resizer.dragging::after { background: var(--accent); }
+body.chat.stage-open .stage-resizer { display: block; }
+body.chat.stage-open.layout-stage .stage-resizer, body.chat.stage-open.layout-stage #stage-side-btn { display: none; }
+body.chat.stage-open.stage-dragging { cursor: col-resize; user-select: none; }
+body.chat.stage-open.stage-dragging iframe, body.chat.stage-open.stage-dragging webview { pointer-events: none; }
+@media (min-width: 900px) {
+  body.chat.stage-open.stage-left #side { order: 0; } body.chat.stage-open.stage-left .stage-host { order: 1; border-left: 0; border-right: .5px solid var(--sep); } body.chat.stage-open.stage-left #main { order: 2; }
+  body.chat.stage-open.stage-left:not(.layout-stage) #app { grid-template-columns: 268px minmax(300px, var(--stage-w, 44%)) minmax(0, 1fr); }
+  body.chat.stage-open.stage-left .stage-resizer { left: auto; right: -5px; }
+}
+@media (min-width: 900px) and (max-width: 1399px) {
+  body.chat.stage-open.stage-left:not(.layout-stage) #app { grid-template-columns: 56px minmax(300px, var(--stage-w, 46%)) minmax(0, 1fr); }
+}
+@media (max-width: 899px) { .stage-resizer, #stage-side-btn { display: none !important; } }
+/* What the chat offers while empty inside a work mode, instead of the general welcome. */
+body.chat .mode-starters { padding: 40px 24px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+body.chat .mode-starters[hidden] { display: none; }
+body.chat .mode-starters h3 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
+body.chat .mode-starters p { margin: 0 0 12px; max-width: 36ch; color: var(--label-2); font-size: 13.5px; line-height: 1.45; }
+body.chat .mode-starter-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+body.chat .mode-starter { padding: 8px 14px; border-radius: 999px; background: var(--fill-2); color: var(--label); font-size: 13px; font-weight: 600; }
+body.chat .mode-starter:hover { background: color-mix(in srgb, var(--accent) 18%, var(--fill-2)); }
+body.chat[data-workspace="write"] .home-below-host, body.chat[data-workspace="image"] .home-below-host, body.chat[data-workspace="code"] .home-below-host { display: none; }
