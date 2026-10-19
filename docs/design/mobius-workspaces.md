@@ -175,3 +175,39 @@ The direction from the person: each mode should grow into the kind of environmen
 The Document stage now has its operation list, `docops.rs`: `replace` (one passage, or `all`), `delete`, `insert_after` (after the line holding an anchor), `replace_section` (everything under a heading up to the next one of the same or higher level; headings inside code fences do not count) and `append`. Each is checked against the text (the passage must exist and be the only one unless `all` is said; unknown operations and fields are refused; at most 10 edits of 20,000 characters), applied all or nothing, and recorded as a new version, so Undo is History. A reply's fenced `docops` block (a JSON list) is drawn as a card, "Suggested document edits", listing each edit in words; **nothing changes until Apply**. The open document is sent to the model with a short note on this format, so small changes come back as edits instead of a whole rewrite. `stage_apply` takes the same list from any caller, which is what the toolbar and, later, outside agents will use. Tests: six unit tests (`cargo test docops`) and `tools/nested/mobius-docops-test.sh`.
 
 Not done: the toolbar and the selection bar going through `stage_apply` (they still write whole text through the editor), margin comments and suggestions as operations, and attributing versions to a named bot.
+
+## The chat shapes itself to the mode (research, 2026-10-18)
+
+The direction from the person: the chat window should transform to fit the format of the mode, not stay a conversation column beside every stage. Researched from documentation and write-ups (not used hands-on): Zed's agent panel docs, the Cursor 2.0 Agents view and forum threads about it, Adobe's March 2026 announcement of the Photoshop and Firefly AI Assistant, and comparisons of Claude Artifacts, ChatGPT Canvas and Perplexity Spaces; plus the Cursor study already in `mobius-research-2026-10.md`.
+
+**What the others do**
+
+| Tool | What the assistant looks like | What to take |
+|---|---|---|
+| Cursor 2.0 | Two layouts: the editor (files left, chat on the side) and an **Agents view** where the *agents are the sidebar* (each with status, progress, a log) and the work is what they produced; parallel agents on one task, results compared | In Code the chat becomes a list of **tasks with state**, not one long thread |
+| Zed | Agent panel with **threads** (several at once, a sidebar of them), **terminal threads** beside agent threads, a **Review Changes** view with per-hunk accept or reject, **Restore Checkpoint**, a **follow the agent** switch that jumps the editor to each file it touches, `@` mentions for files, symbols, diagnostics, selection | Review is on the work, per hunk; following is a switch; threads are cheap |
+| Photoshop / Firefly | A chat assistant that either applies edits or **walks through them step by step**; a **Contextual Task Bar** that follows the selection; **AI Markup**: draw on the picture and write a prompt for *that* area; voice | In Image the prompt belongs **on the picture**, next to the selection; and a choice between "do it" and "show me how" |
+| ChatGPT Canvas | Document beside chat; select text and ask; suggestions applied in one click; versions kept automatically; opens by itself when the task fits | Already matched (Write); the self-opening should stay a suggestion |
+| Claude Artifacts | Document beside chat, mostly viewed (edited by the model); runs code to preview | The *preview* is part of the stage (run what was made) |
+| Perplexity Spaces | A shared project space with uploaded sources; answers with citations | Projects and the knowledge store, not a stage |
+
+**The idea they share.** The conversation is one *surface* of the assistant, not the assistant. In each tool the assistant has several: a prompt where the person is looking (the task bar, the selection), results as *pending changes on the work* (hunks, tracked suggestions, a preview) and not as text to copy, a status view for things running, and the full conversation behind a click for when talk is the point.
+
+**Design for Mobius: a dock with four presentations.** The chat (the "dock") keeps one conversation and one history, but each workspace chooses how it is drawn:
+
+1. **Conversation** (Chat): the thread as today.
+2. **Margin** (Write): the thread collapses to a quiet column of cards anchored to the document: a suggestion beside the paragraph it concerns, accept or reject in place; the composer is a single line under the page ("Ask about this document", with Shorter, Continue, Outline as chips). The full thread opens from a button.
+3. **Task bar** (Image): the prompt is a bar that follows the selection on the canvas ("Describe", "Remove", "Make it warmer" for this area); the model's suggested edits show as chips in the options bar with a ghost preview on hover, applied on click; a switch picks *Apply* or *Show me step by step*; the conversation is the History tab (each prompt next to the steps it made).
+4. **Tasks** (Code, and later Bots): the thread becomes a list of tasks, each with a state (running, needs you, done), its step timeline (already built) and its changed files; a task opens to its full thread; several can run; a *follow* switch makes the Code stage open each file as the agent touches it; terminal output is a task of its own.
+
+**How it is built without five chats.** A workspace declares, in one object: its **dock presentation**, the **composer** (placeholder, quick-action chips, what `@` offers), the **default context chips** (open document, selection, folder), the **shortcuts**, and which **reply blocks are stage-bound**. A stage-bound block (`artifact`, `docops`, `imageops`, `edit_file`) is not drawn in the dock as a card to press; it becomes a *pending change on the stage* (ghost text or hunk, ghost preview, diff) with accept and reject there, and the dock keeps a one-line summary ("3 edits proposed"). This is the same rule as the shared tools: the model's output and the person's are the same operations, so they appear in the same place, differing only in the attribution tag.
+
+**Order of work**
+
+1. The **workspace descriptor** and the dock presentations: composer text and quick-action chips per workspace (cheap, visible at once), then the Margin and the Task bar presentations.
+2. **Stage-bound pending changes**: `docops` as a diff on the page with per-edit accept or reject; `imageops` as a ghost preview with Apply; both keep the dock summary.
+3. **Tasks** for Code: the list, states and the follow switch (the timeline and permission cards exist).
+4. **Voice** on the Task bar (dictation exists) and **Show me step by step** on Image.
+5. The same descriptor is what a **bot** is given: its allowed stages, composer-less, with its output going to the stage and the board.
+
+Open questions, to decide by trying them: whether the Margin should be anchored (needs the document to keep stable ranges for comments) or a simple column; whether the dock should ever hide completely in a stage (the focus layout already floats it); and how a single chat shows when two stages are open (Write and Image for a document with pictures).
