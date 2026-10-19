@@ -106,7 +106,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   const [menu, setMenu] = useState<{ kind: "persona" | "style" | "model" | "mode"; left: number; top: number; width: number } | null>(null);
   const [modeState, setModeState] = useState<ModeState>({ mode: "ask", folder: "", busy: false });
   // What the model menu lists: the installed models with their friendly names, and where the chat is routed now.
-  const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }>; route: Route | null; cloud: { has_key: boolean; models: string[] } } | null>(null);
+  const [picker, setPicker] = useState<{ models: string[]; cards: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }>; route: Route | null; cloud: { has_key: boolean; models: string[]; chatgpt?: boolean; chatgpt_models?: string[] } } | null>(null);
   useEffect(() => {
     if (!menu) return;
     const close = (event: Event) => {
@@ -211,7 +211,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
           invoke<string[]>("routing_list_models").catch(() => [] as string[]),
           invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[]; fit: string; speed: number | null }[]>("library_list").catch(() => []),
           invoke<Route>("chat_current_route").catch(() => null),
-          invoke<{ has_key: boolean; models: string[] }>("routing_cloud_menu").catch(() => ({ has_key: false, models: [] as string[] })),
+          invoke<{ has_key: boolean; models: string[]; chatgpt?: boolean; chatgpt_models?: string[] }>("routing_cloud_menu").catch(() => ({ has_key: false, models: [] as string[], chatgpt: false, chatgpt_models: [] as string[] })),
         ]).then(([models, cards, route, cloud]) => {
           const byFile: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }> = {};
           cards.filter((card) => card.installed).forEach((card) => { byFile[card.file] = card; });
@@ -235,11 +235,11 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
       report(error);
     }
   };
-  const useCloudModel = async (model: string) => {
+  const useCloudModel = async (model: string, backend = "openrouter") => {
     setMenu(null);
     try {
-      await invoke("chat_set_route", { backend: "openrouter", model });
-      hooksRef.current.routeChanged("openrouter", model);
+      await invoke("chat_set_route", { backend, model });
+      hooksRef.current.routeChanged(backend, model);
     } catch (error) {
       report(error);
     }
@@ -341,6 +341,21 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                       </button>
                     );
                   })}
+                  {picker?.cloud?.chatgpt && picker.cloud.chatgpt_models?.length ? (
+                    <>
+                      <div className="hx-menu-sep" />
+                      <div className="hx-menu-label">ChatGPT plan <span className="hx-menu-hint">uses your plan · leaves this computer</span></div>
+                      {picker.cloud.chatgpt_models.slice(0, 6).map((id) => {
+                        const on = picker.route?.backend === "chatgpt" && picker.route.model === id;
+                        return (
+                          <button key={id} className={`hx-menu-item${on ? " current" : ""}`} role="menuitemradio" aria-checked={on} data-test={`menu-chatgpt-${id}`} onClick={() => useCloudModel(id, "chatgpt")}>
+                            <span className="mi-text"><span className="mi-title">{id}</span><span className="mi-sub">ChatGPT plan</span></span>
+                            {on ? <span className="mi-check">✓</span> : null}
+                          </button>
+                        );
+                      })}
+                    </>
+                  ) : null}
                   {picker?.cloud ? (
                     <>
                       <div className="hx-menu-sep" />

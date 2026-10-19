@@ -7,6 +7,7 @@ mod alternates;
 mod analysis;
 mod artifacts;
 mod attach;
+mod chatgpt;
 mod cloud;
 mod decide;
 mod dictate;
@@ -1050,15 +1051,24 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
                 private_only: wanted.private_only,
             }
         });
-        let result = lan::chat_completions_routed(
-            &base,
-            &model,
-            &messages,
-            api_key.as_deref(),
-            options,
-            route.as_ref(),
-        )
-        .await;
+        let result = if backend.id == chatgpt::BACKEND_ID {
+            // The person's ChatGPT plan: OpenAI's own API with the token they signed in with, never an API key.
+            if model.trim().is_empty() {
+                Err("Choose a ChatGPT model in Settings → Models.".to_string())
+            } else {
+                chatgpt::respond(&model, &messages, options.max_tokens, options.timeout_secs).await
+            }
+        } else {
+            lan::chat_completions_routed(
+                &base,
+                &model,
+                &messages,
+                api_key.as_deref(),
+                options,
+                route.as_ref(),
+            )
+            .await
+        };
         let fake_op = generation.saturating_mul(1_000_003).saturating_add(7);
         {
             let shared = shared(&app);
@@ -3111,6 +3121,9 @@ async fn routing_list_remote_models(backend_id: String) -> Vec<String> {
 struct CloudMenu {
     has_key: bool,
     models: Vec<String>,
+    /// Signed in with a ChatGPT plan, and the models it offered when last asked.
+    chatgpt: bool,
+    chatgpt_models: Vec<String>,
 }
 
 #[tauri::command]
@@ -3121,8 +3134,15 @@ fn routing_cloud_menu() -> CloudMenu {
     });
     // The models the person pinned in Settings, or, until they pin any, a few well-known ones.
     let pinned = cloud::pins();
+    let status = chatgpt::status();
     CloudMenu {
         has_key,
+        chatgpt: status.connected,
+        chatgpt_models: if status.connected {
+            chatgpt::cached_models()
+        } else {
+            Vec::new()
+        },
         models: if pinned.is_empty() {
             inference_routing::openrouter_suggested_models()
                 .iter()
@@ -3132,6 +3152,95 @@ fn routing_cloud_menu() -> CloudMenu {
             pinned
         },
     }
+}
+
+/// Opens an address in the person's browser. Only https (and this computer, for tests) is ever opened.
+fn open_in_browser(url: &str) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://127.0.0.1:")) {
+        return Err("Only secure addresses are opened.".into());
+    }
+    std::process::Command::new("xdg-open")
+        .arg(url)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|_| {
+            "The browser could not be opened. Check your default browser and try again.".to_string()
+        })
+}
+
+fn emit_chatgpt(app: &AppHandle) {
+    let _ = app.emit("chatgpt-changed", chatgpt::status());
+}
+
+/// Whether a ChatGPT plan is connected, and as whom.
+#[tauri::command]
+fn chatgpt_status() -> chatgpt::Status {
+    chatgpt::status()
+}
+
+/// Signs in with ChatGPT: the browser opens OpenAI's page and the person finishes there. Resolves when they have, or have given up.
+#[tauri::command]
+async fn chatgpt_sign_in(app: AppHandle) -> Result<chatgpt::Status, String> {
+    if let Err(error) = chatgpt::sign_in(open_in_browser).await {
+        eprintln!("MOBIUS chatgpt sign-in ended: {error}");
+        return Err(error);
+    }
+    // The backend jobs and chats route to exists once there is a sign-in to use.
+    let mut routing = inference_routing::load();
+    if routing.backend(chatgpt::BACKEND_ID).is_none() {
+        routing
+            .backends
+            .push(helix_config::inference_routing::Backend {
+                id: chatgpt::BACKEND_ID.to_string(),
+                kind: BackendKind::Openai,
+                base_url: "https://api.openai.com/v1".to_string(),
+                label: "ChatGPT plan".to_string(),
+                api_key_ref: String::new(),
+            });
+        inference_routing::save(&routing)?;
+        emit_routing(&app);
+    }
+    let _ = chatgpt::models().await;
+    emit_chatgpt(&app);
+    Ok(chatgpt::status())
+}
+
+#[tauri::command]
+fn chatgpt_cancel() {
+    chatgpt::cancel_sign_in();
+}
+
+/// Signs out, and puts any job that used the ChatGPT plan back on a model on this computer.
+#[tauri::command]
+async fn chatgpt_disconnect(app: AppHandle) -> Result<(), String> {
+    chatgpt::disconnect().await?;
+    let mut routing = inference_routing::load();
+    for route in routing.profiles.values_mut() {
+        if route.backend == chatgpt::BACKEND_ID {
+            route.backend = "local".to_string();
+            route.model = String::new();
+        }
+    }
+    routing.backends.retain(|b| b.id != chatgpt::BACKEND_ID);
+    inference_routing::save(&routing)?;
+    emit_routing(&app);
+    emit_chatgpt(&app);
+    Ok(())
+}
+
+/// The chat models the plan offers.
+#[tauri::command]
+async fn chatgpt_models() -> Result<Vec<String>, String> {
+    chatgpt::models().await
+}
+
+/// Opens ChatGPT's own page for managing plan usage.
+#[tauri::command]
+fn chatgpt_open_usage() -> Result<(), String> {
+    open_in_browser(chatgpt::USAGE_URL)
 }
 
 /// How each job's cloud requests are routed: a price or speed preference, fallback models, and the privacy rule.
@@ -3728,6 +3837,12 @@ fn main() {
             routing_cloud_menu,
             cloud_catalog,
             cloud_pin_set,
+            chatgpt_status,
+            chatgpt_sign_in,
+            chatgpt_cancel,
+            chatgpt_disconnect,
+            chatgpt_models,
+            chatgpt_open_usage,
             cloud_routes,
             cloud_route_set,
             routing_list_models,

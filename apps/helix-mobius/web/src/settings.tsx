@@ -6,6 +6,7 @@ import { type RouteOptions, RouteEditor } from "./cloudroute";
 import { Icon, Picker, type Option } from "./settingsui";
 import { HubFind } from "./hubfind";
 import { KnowledgePanel } from "./knowledge";
+import { ChatGPTPlan, type ChatGPTStatus } from "./chatgptplan";
 
 type Source = "local" | "lan" | "openrouter";
 type Section = "models" | "library" | "cloud" | "knowledge" | "providers" | "generation" | "experiments";
@@ -98,7 +99,7 @@ function cleanProfiles(routing: Routing): Record<Task, Profile> {
     const task = job.task as Task;
     const p = routing.profiles?.[task] ?? { backend: "local", model: "" };
     out[task] = {
-      backend: job.local ? "local" : (["local", "lan", "openrouter"].includes(p.backend) ? p.backend : "local"),
+      backend: job.local ? "local" : (["local", "lan", "openrouter", "chatgpt"].includes(p.backend) ? p.backend : "local"),
       model: p.model || "",
     };
   });
@@ -135,8 +136,8 @@ function DownloadBar({ card, act }: { card: Card; act: (command: string, id: str
 }
 
 /** One job: what it is for, which model does it, and, when nothing suitable is installed or a better one exists, what to get. */
-function JobRow({ job, draft, cards, lan, cloud, hasKey, route, onRoute, onAssign, onBrowse, onMoreCloud, act }: {
-  job: JobInfo; draft: Draft; cards: Card[]; lan: string[]; cloud: { id: string; name: string }[]; hasKey: boolean | null;
+function JobRow({ job, draft, cards, lan, cloud, hasKey, chatgpt, route, onRoute, onAssign, onBrowse, onMoreCloud, act }: {
+  job: JobInfo; draft: Draft; cards: Card[]; lan: string[]; cloud: { id: string; name: string }[]; hasKey: boolean | null; chatgpt: string[];
   route: RouteOptions | undefined; onRoute: (task: Task, options: RouteOptions) => void;
   onAssign: (task: Task, backend: string, model: string) => void; onBrowse: (job: Job) => void; onMoreCloud: () => void; act: (command: string, id: string) => void;
 }) {
@@ -156,7 +157,7 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, route, onRoute, onAssig
       where = "On this computer";
     } else {
       label = (profile.backend === "openrouter" ? cloud.find((m) => m.id === profile.model)?.name : "") || profile.model || "Provider default";
-      where = profile.backend === "lan" ? "On your network" : "Leaves this computer";
+      where = profile.backend === "lan" ? "On your network" : profile.backend === "chatgpt" ? "Uses your ChatGPT plan · leaves this computer" : "Leaves this computer";
     }
   }
   const options: Option[] = [];
@@ -165,6 +166,10 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, route, onRoute, onAssig
     installed.forEach((c) => options.push({ key: `local|${c.file}`, group: "On this computer", title: c.title, detail: [size(c.bytes), c.fit ? FIT_WORD[c.fit] : ""].filter(Boolean).join(" · "), backend: "local", model: c.file, test: `job-opt-${job.id}-${c.id}` }));
     if (!job.local) {
       lan.slice(0, 12).forEach((m) => options.push({ key: `lan|${m}`, group: "On your network", title: m, detail: "", backend: "lan", model: m, test: `job-opt-${job.id}-lan-${m}` }));
+      if (chatgpt.length || profile?.backend === "chatgpt") {
+        const listed = chatgpt.includes(profile?.model ?? "") || profile?.backend !== "chatgpt" || !profile?.model ? chatgpt : [...chatgpt, profile.model];
+        listed.slice(0, 14).forEach((m) => options.push({ key: `chatgpt|${m}`, group: "ChatGPT plan · leaves this computer", title: m, detail: "Uses your plan", backend: "chatgpt", model: m, test: `job-opt-${job.id}-chatgpt-${m}` }));
+      }
       if (hasKey) {
         // The pinned models, plus the one this job already uses if it is not pinned, then a way to the rest.
         const listed = cloud.some((m) => m.id === profile?.model) || profile?.backend !== "openrouter" || !profile?.model ? cloud : [...cloud, { id: profile.model, name: profile.model }];
@@ -372,6 +377,8 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   const [cloudView, setCloudView] = useState<CloudView | null>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [routes, setRoutes] = useState<Record<string, RouteOptions>>({});
+  const [chatgpt, setChatgpt] = useState<ChatGPTStatus | null>(null);
+  const [chatgptModels, setChatgptModels] = useState<string[]>([]);
   const draftRef = useRef<Draft | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const hooksRef = useRef(hooks);
@@ -490,6 +497,10 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
           loadModels("openrouter");
           invoke<CloudView>("cloud_catalog", { refresh: false }).then(setCloudView, () => setCloudView({ models: [], fetched: 0, error: "", pins: [] }));
           invoke<Record<string, RouteOptions>>("cloud_routes").then(setRoutes, () => undefined);
+          invoke<ChatGPTStatus>("chatgpt_status").then((st) => {
+            setChatgpt(st);
+            if (st.connected) invoke<string[]>("chatgpt_models").then(setChatgptModels, () => undefined);
+          }, () => undefined);
         } catch (error) {
           report(error);
         }
@@ -537,6 +548,16 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
     setCloudBusy(true);
     invoke<CloudView>("cloud_catalog", { refresh: true }).then(setCloudView, report).finally(() => setCloudBusy(false));
   };
+  const chatgptChanged = useCallback((st: ChatGPTStatus) => {
+    setChatgpt(st);
+    if (st.connected) invoke<string[]>("chatgpt_models").then(setChatgptModels, () => undefined);
+    else setChatgptModels([]);
+    // a job may have been put back on this computer
+    invoke<Routing>("routing_get").then((routing) => {
+      const next = cleanProfiles(routing);
+      setDraft((old) => (old ? { ...old, profiles: next } : old));
+    }, () => undefined);
+  }, []);
   const setRoute = (task: Task, options: RouteOptions) => {
     setRoutes((old) => ({ ...old, [task]: options }));
     invoke<RouteOptions>("cloud_route_set", { task, options }).then((kept) => setRoutes((old) => ({ ...old, [task]: kept })), report);
@@ -605,7 +626,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
             <p className="models-lead">Pick a model for each kind of work. Mobius suggests what runs well on this computer, and downloads only when you press Get. Only one model sits in memory at a time, so switching takes a few seconds.</p>
             <div className="set-list" data-test="jobs">
               {JOBS.map((job) => (
-                <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} route={job.task ? routes[job.task] : undefined} onRoute={setRoute} onAssign={assign} onBrowse={browse} onMoreCloud={() => show("cloud")} act={act} />
+                <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} chatgpt={chatgptModels} route={job.task ? routes[job.task] : undefined} onRoute={setRoute} onAssign={assign} onBrowse={browse} onMoreCloud={() => show("cloud")} act={act} />
               ))}
             </div>
             <button type="button" className="set-link set-gap-sm" data-test="models-see-library" onClick={() => { setFilter("all"); show("library"); }}>See every model in the Library</button>
@@ -629,7 +650,10 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
           </section>
 
           <section className="models-panel active set-panel" data-test="models-panel-providers" hidden={section !== "providers"}>
-            <h3 className="models-h3">Another computer on your network</h3>
+            <h3 className="models-h3">ChatGPT plan</h3>
+            <p className="models-lead">Use the plan you already pay for. This is OpenAI's own sign-in for apps that run on your computer, and it is what Helix uses because it is open source.</p>
+            <ChatGPTPlan status={chatgpt} onStatus={chatgptChanged} report={report} />
+            <h3 className="models-h3 set-gap">Another computer on your network</h3>
             <p className="models-lead">Point Mobius at Ollama, LM Studio, vLLM, or any <code>/v1</code> chat endpoint on your network. Replies come from that computer, so it appears under each job's choices.</p>
             <div className="models-form-card">
               <label className="sheet-field">Base URL
