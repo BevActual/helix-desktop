@@ -190,6 +190,100 @@ function Diff({ text, testId, unified }: { text: string; testId?: string; unifie
   return <pre className="diff" data-test={testId}>{lines.map((line, i) => <span key={i} className={kind(line, i)}>{line || " "}</span>)}</pre>;
 }
 
+const GLYPH: Record<string, string> = { completed: "✓", failed: "✕", declined: "⊘", undone: "↺", waiting: "●", running: "" };
+
+/** A step's one line: what it did, in words, from what the task recorded. */
+function stepTitle(a: Activity): string {
+  const first = (a.input || "").split("\n")[0].trim();
+  const done = a.state === "completed";
+  switch (a.tool) {
+    case "terminal": return `${done ? "Ran" : "Run"} ${first}`;
+    case "edit_file": return `${done ? "Edited" : "Edit"} ${first.replace(/^new file /, "")}`;
+    case "web_search": return `Searched the web: ${first}`;
+    case "web_read": return `Read a page: ${first}`;
+    case "agent_permission": return `The agent asks: ${first}`;
+    case "planning": return "Plan";
+    default: return first || ({ read: "Read", edit: "Edit", delete: "Delete", move: "Move", search: "Search", execute: "Run", think: "Think", fetch: "Fetch", switch_mode: "Switch mode", agent_step: "Agent step" } as Record<string, string>)[a.tool] || a.tool;
+  }
+}
+
+const STATE_WORD: Record<string, string> = { waiting: "needs your review", running: "running", failed: "failed", declined: "skipped", undone: "undone", interrupted: "stopped" };
+
+/** One step of a task: a line that opens to its details. A step waiting for the person opens by itself and holds the buttons. */
+function Step({ activity, streaming, hooks }: { activity: Activity; streaming: boolean; hooks: ThreadHooks }) {
+  const waiting = activity.state === "waiting";
+  const [open, setOpen] = useState(false);
+  const expanded = waiting || open || (activity.state === "running" && activity.tool === "terminal");
+  const detail = activity.input || activity.output;
+  return (
+    <div className={`tool-activity ${activity.state}`} data-test={`tool-${activity.tool}`}>
+      <button type="button" className="act-head" aria-expanded={expanded} disabled={waiting} onClick={() => setOpen(!open)} title={stepTitle(activity)}>
+        <span className={`act-icon ${activity.state}`} aria-hidden="true">{GLYPH[activity.state] ?? "•"}</span>
+        <span className="act-title">{stepTitle(activity)}</span>
+        {STATE_WORD[activity.state] ? <span className="act-state">{STATE_WORD[activity.state]}</span> : null}
+        {detail && !waiting ? <span className="act-chevron" aria-hidden="true">{expanded ? "▾" : "▸"}</span> : null}
+      </button>
+      {waiting ? (
+        <div className="act-body">
+          {activity.tool === "edit_file" ? <Diff text={activity.input} testId="tool-command" /> : <pre data-test="tool-command">{activity.input}</pre>}
+          <p className="sheet-note">{activity.output}</p>
+          <div className="tool-review">
+            <button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : activity.tool === "agent_permission" ? "Allow once" : "Allow lookup"}</button>
+            <button data-test="tool-decline" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: false }).catch(hooks.report)}>Skip</button>
+          </div>
+        </div>
+      ) : expanded && detail ? (
+        <div className="act-body">
+          {activity.input && (activity.tool === "edit_file" ? <Diff text={activity.input} /> : <pre>{activity.input}</pre>)}
+          {activity.output && <pre>{activity.output}</pre>}
+        </div>
+      ) : null}
+      {activity.tool === "edit_file" && activity.state === "completed" ? <button type="button" className="mini act-undo" data-test="tool-undo-edit" disabled={streaming} onClick={() => invoke("tools_undo_edit", { activityId: activity.id }).catch(hooks.report)}>Undo edit</button> : null}
+    </div>
+  );
+}
+
+/** What a finished task did, in a line: "Read 2 files · Edited 1 file · Ran 1 command". */
+function summary(steps: Activity[]): string {
+  const count = (tools: string[]) => steps.filter((a) => tools.includes(a.tool)).length;
+  const parts: string[] = [];
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const reads = count(["read", "web_read", "search", "web_search", "fetch"]);
+  const edits = count(["edit", "delete", "move"]);
+  const runs = count(["terminal", "execute"]);
+  if (reads) parts.push(`Looked at ${plural(reads, "thing", "things")}`);
+  if (edits) parts.push(`Changed ${plural(edits, "file", "files")}`);
+  if (runs) parts.push(`Ran ${plural(runs, "command", "commands")}`);
+  const failed = steps.filter((a) => a.state === "failed").length;
+  if (failed) parts.push(`${failed} failed`);
+  return parts.join(" · ") || plural(steps.length, "step", "steps");
+}
+
+/** The steps of a task. While it runs, or when one needs the person, every step shows as a line. Once it is done they fold into one line that says what happened. */
+function Timeline({ activities, streaming, live, hooks }: { activities: Activity[]; streaming: boolean; live: boolean; hooks: ThreadHooks }) {
+  const [all, setAll] = useState(false);
+  const changes = activities.filter((a) => a.tool === "changes");
+  // the model's own bookkeeping is not a step the person needs; the agent's plan is
+  const steps = activities.filter((a) => a.tool !== "changes" && a.tool !== "answer" && !(a.tool === "planning" && !a.id.startsWith("acp-")));
+  const busy = live || steps.some((a) => a.state === "waiting" || a.state === "running");
+  // a change to a file is what the person may want to undo, so it stays a line of its own; the looking and running fold away
+  const edits = steps.filter((a) => a.tool === "edit_file");
+  const rest = steps.filter((a) => a.tool !== "edit_file");
+  const fold = !busy && rest.length > 2;
+  return (
+    <section className="tool-activities" aria-label="Task steps">
+      {fold ? (
+        <button type="button" className="act-summary" data-test="steps-summary" aria-expanded={all} onClick={() => setAll(!all)}>
+          <span className="act-chevron" aria-hidden="true">{all ? "▾" : "▸"}</span><span className="act-title">{summary(rest)}</span><span className="act-state">{rest.length} steps</span>
+        </button>
+      ) : null}
+      {fold ? (all ? rest.map((a) => <Step key={a.id} activity={a} streaming={streaming} hooks={hooks} />) : null) : null}
+      {(fold ? edits : steps).map((a) => <Step key={a.id} activity={a} streaming={streaming} hooks={hooks} />)}
+      {changes.map((a) => <ChangesCard key={a.id} activity={a} streaming={streaming} hooks={hooks} />)}
+    </section>
+  );
+}
+
 interface FileChange { path: string; kind: string; diff: string; added: number; removed: number; reverted: boolean }
 
 /** Everything a Tools turn changed in the project folder, file by file with its diff, and a way to put each file back. */
@@ -410,10 +504,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
           <Fragment key={index}>{boundary}<div className={`msg ${message.role}${last && streaming ? " live" : ""}`} data-test={`msg-${index}`}>
             <div className="msg-body">
               {message.images?.map((id) => <GeneratedPicture key={id} id={id} streaming={streaming} hooks={hooks} />)}
-              {!!message.activities?.length && <section className="tool-activities" aria-label="Task steps">{message.activities.map((activity) => activity.tool === "changes" ? <ChangesCard key={activity.id} activity={activity} streaming={streaming} hooks={hooks} /> : <div className={`tool-activity ${activity.state}`} key={activity.id} data-test={`tool-${activity.tool}`}>
-                <div className="tool-heading"><strong>{({ planning: "Choosing next step", web_search: "Search the web", web_read: "Read a page", terminal: "Project command", answer: "Write answer", edit_file: "Edit a file", agent_permission: "The agent asks", agent_step: "Agent step", read: "Read", edit: "Edit", delete: "Delete", move: "Move", search: "Search", execute: "Run", think: "Think", fetch: "Fetch", switch_mode: "Switch mode" } as Record<string, string>)[activity.tool] || activity.tool}</strong><span>{activity.state === "waiting" ? "Needs your review" : activity.state}</span></div>
-                {activity.state === "waiting" ? <>{activity.tool === "edit_file" ? <Diff text={activity.input} testId="tool-command" /> : <pre data-test="tool-command">{activity.input}</pre>}<p className="sheet-note">{activity.output}</p><div className="tool-review"><button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : activity.tool === "agent_permission" ? "Allow once" : "Allow lookup"}</button><button data-test="tool-decline" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: false }).catch(hooks.report)}>Skip</button></div></> : (activity.input || activity.output) && <><details open={activity.tool === "edit_file" || (activity.state === "running" && activity.tool === "terminal")}><summary>Details</summary>{activity.input && (activity.tool === "edit_file" ? <Diff text={activity.input} /> : <pre>{activity.input}</pre>)}{activity.output && <pre>{activity.output}</pre>}</details>{activity.tool === "edit_file" && activity.state === "completed" && <button type="button" className="mini" data-test="tool-undo-edit" disabled={streaming} onClick={() => invoke("tools_undo_edit", { activityId: activity.id }).catch(hooks.report)}>Undo edit</button>}</>}
-              </div>)}</section>}
+              {!!message.activities?.length && <Timeline activities={message.activities} streaming={streaming} live={last && streaming} hooks={hooks} />}
               <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} onStage={hooks.stage} onEdits={hooks.applyEdits} writing={last && streaming} />
               {last && !streaming && message.stats ? <CompareBar index={index} current={{ text: message.text, model: message.stats.model, tokens: message.stats.tokens, ms: message.stats.ms }} streaming={streaming} report={hooks.report} /> : null}
               {!!message.sources?.length && <section className="answer-web-sources" data-test="answer-web-sources" aria-label="Online sources provided to the model"><strong>Online sources</strong>{message.sources.map((source, i) => <div key={`${i}:${source.url}`}><button type="button" className="web-citation" data-test={`answer-source-${index}-${i}`} title={source.url} onClick={() => invoke("web_open_source", { url: source.url }).catch(hooks.report)}>[{i + 1}] {source.title || source.url}</button><span>{source.kind === "page" ? "Page excerpt" : `Search snippet${source.provider ? ` · ${source.provider}` : ""}`} · retrieved {new Date(source.fetched * 1000).toLocaleDateString()}</span></div>)}</section>}
