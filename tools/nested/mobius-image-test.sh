@@ -49,5 +49,7 @@ wait_id edits-card 40 && echo "ok: the suggestion is a card" || { shot image-fai
 [ "$(steps)" = "Black and white|Rotate 90°;2" ] && echo "ok: nothing was applied by itself" || fail "applied early: $(steps)"
 click_id edits-apply; sleep 3
 [ "$(steps)" = "Black and white|Rotate 90°|Brightness +20|Crop to 10×10;4" ] && echo "ok: Apply made the two edits" || fail "after apply: $(steps)"
+by=$(python3 -c "import json;d=json.load(open('$STAGE'))['docs'][0];print(','.join(s.get('by','?') for s in d['steps']))" 2>/dev/null)
+echo "$by" | grep -q mobius && echo "ok: edits from a suggestion are marked as Mobius's ($by)" || fail "no attribution: $by"
 shot image-done; sleep 1; shot image-done
 echo "PASS: mobius image"

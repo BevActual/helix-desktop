@@ -7,12 +7,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::imageops::{self, Op};
 
+fn you() -> String {
+    "you".into()
+}
+
 pub const MAX_STEPS: usize = 30;
 pub const MAX_DOCS: usize = 20;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Step {
     pub label: String,
+    /// Who made the edit: "you", or "mobius" for one the model suggested and the person applied.
+    #[serde(default = "you")]
+    pub by: String,
     pub op: Op,
     pub picture: String,
     pub width: u32,
@@ -154,7 +161,17 @@ pub fn imgstage_open(chat_id: String, picture: String, title: String) -> Result<
 
 /// Applies operations in order to the picture as it stands; anything undone and not redone is dropped first.
 #[tauri::command]
-pub fn imgstage_apply(chat_id: String, doc_id: String, ops: Vec<Op>) -> Result<View, String> {
+pub fn imgstage_apply(
+    chat_id: String,
+    doc_id: String,
+    ops: Vec<Op>,
+    by: Option<String>,
+) -> Result<View, String> {
+    let by = if by.as_deref() == Some("mobius") {
+        "mobius"
+    } else {
+        "you"
+    };
     if ops.is_empty() || ops.len() > 10 {
         return Err("Apply between one and ten edits at a time.".into());
     }
@@ -176,6 +193,7 @@ pub fn imgstage_apply(chat_id: String, doc_id: String, ops: Vec<Op>) -> Result<V
         })?;
         doc.steps.push(Step {
             label: op.label(),
+            by: by.into(),
             op,
             picture: picture.clone(),
             width,

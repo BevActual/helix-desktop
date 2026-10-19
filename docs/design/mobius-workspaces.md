@@ -150,3 +150,22 @@ The Document stage is now a writing tool, not a text box. (Direction from the pe
 * **Export**: Markdown file, a self-contained HTML page (escaped, no scripts, nothing fetched, light and dark), and **Print or save as PDF** (the Read view with a print stylesheet), plus **Focus mode** (the chrome fades away; the document is all there is).
 
 Next for Write: smart punctuation, spelling suggestions through Mobius, a "make a table" block, and drag to reorder sections from the outline.
+
+## One set of tools for people and machines, and a Bots mode (direction, 2026-10-18)
+
+The direction from the person: each mode should grow into the kind of environment its work needs (Word for writing, Photoshop for pictures, an IDE for code), and **what a person can do there, a machine can do too**, through the same tools. Then **a Bots mode**, where several bots use those tools together to get a task done.
+
+**Principle.** A stage owns one list of *named, typed operations* (the image `Op` set is the model: crop, resize, rotate...). The buttons a person presses, the suggestions the model makes, and the calls an agent sends are all that same list, checked by the same code, written to the same history, undone by the same Undo. There is no second, privileged path for machines and no hidden one for people.
+
+* **Attribution.** Every history step says who made it. Built for the Image stage (`by`: you, or Mobius when the person applied its suggestion, shown as a tag in the history); Write versions already record who made them; Code edits come with the agent's name. Bots will each have their own name.
+* **Same undo.** A bot's change is a step like any other, so one Undo reverses it; nothing a bot does is outside the history.
+* **Reachable from outside.** The same operation lists can be offered to an external agent (through ACP today for files and terminals, and an MCP server for stage operations next), with the same approvals.
+
+**Environments, per mode.** Write gains what a word processor has (styles, page view, comments and suggestions in the margin, tables, find across documents); Image gains a tool rail, an options bar, layers and a history panel (the Contextual Task Bar idea from the research above); Code gains a real file tree, tabs, search, a terminal and test output on the stage, and diagnostics. The layout is the mode's, not shared: panels dock where that kind of work expects them.
+
+**Bots mode.** A place where the person gives a goal and a small team of bots works on it:
+
+* A **bot** is a role (Researcher, Writer, Editor, Coder, Reviewer, Illustrator) with a model, instructions, and a **tool allowance**: which stages' operations it may use. Nothing is granted by default; a Writer cannot run a terminal because the allowance says so, not because the prompt asks.
+* They work **in tandem on the shared stages**: one drafts a document, another proposes edits to it, a third makes the picture. Handing over is a visible message between bots, kept in the transcript.
+* The person sees a **board**: each bot, what it is doing, what it changed (attributed steps), what waits for approval. **Stop all** is always one click; each bot has a step and time budget; anything that changes files outside the stages, runs a command or leaves the computer needs approval exactly as for a single agent. Bots use models on this computer unless the person allows a cloud route, and Act never uses one.
+* It needs, in order: the shared operation registry per stage (Write and Code first, Image has it), attribution everywhere, a scheduler that gives each bot turns and enforces budgets, then the board.

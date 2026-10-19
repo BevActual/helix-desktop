@@ -26,6 +26,8 @@ click_id open-models; sleep 1.5
 n=05; for sec in models library cloud knowledge agents providers generation experiments; do
   wait_id "models-nav-$sec" 8 && click_id "models-nav-$sec"; sleep 1.2; shot "$n-settings-$sec"; n=$((n+1)); done
 click_id models-back; sleep 1.2
+for w in write image; do click_id workspace; wait_id workspace-$w 8 && click_id workspace-$w; sleep 1.5; shot "12a-$w"; done
+click_id workspace; wait_id workspace-chat 8 && click_id workspace-chat; sleep 1
 click_id mode; wait_id menu-mode-folder && click_id menu-mode-folder; wait_id tools-panel 8 && { click_id tools-enabled; click_id tools-choose; click_id tools-save; sleep 1; }
 click_id workspace; wait_id workspace-code 8 && click_id workspace-code; sleep 1.5; shot 13-code-stage
 wait_id code-agent-custom-fake-agent 8 && click_id code-agent-custom-fake-agent; sleep 1

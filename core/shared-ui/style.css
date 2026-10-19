@@ -1917,3 +1917,12 @@ dialog.compare-dialog::backdrop { background: rgba(0,0,0,.4); }
 .compare-close { position: absolute; top: 10px; right: 12px; width: 28px; height: 28px; border-radius: 50%; background: var(--fill-2); } .compare-arrows { margin-left: auto; display: inline-flex; gap: 4px; } .compare-arrows button { width: 26px; height: 24px; border-radius: 7px; background: var(--fill-2); }
 body.chat .set-row-title .lib-tag { margin-left: 8px; vertical-align: 1px; }
 body.chat .set-offer + .set-list { margin-top: 14px; }
+body.chat .stage-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px 28px 64px; text-align: center; }
+body.chat .stage-empty h3 { margin: 6px 0 0; font-size: 16px; }
+body.chat .stage-empty p { margin: 0; max-width: 34ch; color: var(--label-2); font-size: 13px; line-height: 1.45; }
+body.chat .stage-empty-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--fill-2, var(--fill-1)); color: var(--label-2); }
+body.chat .stage-empty-icon svg { width: 24px; height: 24px; }
+body.chat .stage-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+body.chat .stage-empty-actions button { padding: 8px 15px; border-radius: 10px; background: var(--fill-2); font-weight: 650; font-size: 13px; }
+body.chat .stage-empty-actions button.primary { background: var(--accent); color: var(--on-accent); }
+body.chat .img-history .img-by { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10.5px; font-weight: 650; }

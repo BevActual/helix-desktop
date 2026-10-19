@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
+import { Icon } from "./settingsui";
 
 /** The Image stage: a picture beside the chat with a small fixed set of edits. Every edit is a description (crop, rotate, brightness, a
  * rectangle...) applied by Mobius to a copy, so the original is one undo away and a model's suggestion is the same kind of description the
  * buttons make, readable before it is applied. See docs/design/mobius-workspaces.md. */
-interface Step { label: string }
+interface Step { label: string; by?: string }
 export interface ImgDoc { id: string; title: string; steps: Step[]; cursor: number; current: string; width: number; height: number; can_undo: boolean; can_redo: boolean }
 export type Op = Record<string, unknown> & { op: string };
 export interface ImageHooks {
@@ -61,14 +62,14 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
     try { show(await invoke<ImgDoc>("imgstage_open", { chatId: key.current, picture, title: title ?? "Picture" })); } catch (reason) { hooks.report(reason); }
   }, [hooks, show]);
 
-  const run = useCallback(async (ops: Op[]) => {
+  const run = useCallback(async (ops: Op[], by: "you" | "mobius" = "you") => {
     const d = current.current;
     if (!d) { hooks.report("Open a picture on the Image stage first."); return; }
     setBusy(true);
-    try { show(await invoke<ImgDoc>("imgstage_apply", { chatId: key.current, docId: d.id, ops })); } catch (reason) { hooks.report(reason); } finally { setBusy(false); }
+    try { show(await invoke<ImgDoc>("imgstage_apply", { chatId: key.current, docId: d.id, ops, by })); } catch (reason) { hooks.report(reason); } finally { setBusy(false); }
   }, [hooks, show]);
 
-  useEffect(() => { register({ open, apply: run, close: () => { setActive(false); setDoc(null); hooks.active(false); } }); }, [register, open, run, hooks]);
+  useEffect(() => { register({ open, apply: (ops: Op[]) => run(ops, "mobius"), close: () => { setActive(false); setDoc(null); hooks.active(false); } }); }, [register, open, run, hooks]);
 
   const move = async (delta: number) => { if (!doc) return; try { show(await invoke<ImgDoc>("imgstage_move", { chatId: key.current, docId: doc.id, delta })); } catch (reason) { hooks.report(reason); } };
   const jump = (cursor: number) => doc && move(cursor - doc.cursor);
@@ -102,7 +103,15 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
       <button type="button" className="mini" data-test="img-redo" disabled={!doc?.can_redo || busy} onClick={() => move(1)}>Redo</button>
       <button type="button" className="icon-btn" aria-label="Close the picture" data-test="img-close" onClick={close}>×</button>
     </header>
-    {!doc ? <div className="code-empty"><p>Open a picture to edit it. Edits are made on a copy; the original stays one Undo away.</p><button type="button" className="primary" data-test="img-open" onClick={pick}>Open a picture…</button></div> : <>
+    {!doc ? <div className="stage-empty" data-test="img-empty">
+      <span className="stage-empty-icon"><Icon name="image" /></span>
+      <h3>Edit a picture</h3>
+      <p>Crop, rotate, resize or mark it up. Edits are made on a copy, and the original stays one Undo away.</p>
+      <div className="stage-empty-actions">
+        <button type="button" className="primary" data-test="img-open" onClick={pick}>Open a picture…</button>
+        <button type="button" data-test="img-create" onClick={() => window.dispatchEvent(new CustomEvent("mobius-create-image"))}>Create one instead</button>
+      </div>
+    </div> : <>
       <div className="img-toolbar" role="toolbar" aria-label="Edit">
         <div className="img-group" role="group" aria-label="Select">
           <button type="button" className={tool === "crop" ? "on" : ""} data-test="img-tool-crop" onClick={() => setTool("crop")}>Crop</button>
@@ -135,7 +144,7 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
       </div>
       <div className="img-history" data-test="img-history">
         <button type="button" className={doc.cursor === 0 ? "now" : ""} onClick={() => jump(0)}>Original</button>
-        {doc.steps.map((s, i) => <button type="button" key={i} className={doc.cursor === i + 1 ? "now" : i + 1 > doc.cursor ? "undone" : ""} data-test={`img-step-${i}`} onClick={() => jump(i + 1)}>{s.label}</button>)}
+        {doc.steps.map((s, i) => <button type="button" key={i} className={doc.cursor === i + 1 ? "now" : i + 1 > doc.cursor ? "undone" : ""} data-test={`img-step-${i}`} title={s.by === "mobius" ? "Suggested by Mobius, applied by you" : "Made by you"} onClick={() => jump(i + 1)}>{s.label}{s.by === "mobius" ? <span className="img-by">Mobius</span> : null}</button>)}
       </div>
       <footer className="img-footer">
         <button type="button" className="mini" data-test="img-ask" onClick={() => invoke<string>("image_clone", { id: doc.current }).then(hooks.ask, hooks.report)}>Ask Mobius about this</button>
