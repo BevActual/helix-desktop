@@ -1960,10 +1960,27 @@ body.chat.stage-open.stage-dragging iframe, body.chat.stage-open.stage-dragging 
   body.chat.stage-open.stage-left #side { order: 0; } body.chat.stage-open.stage-left .stage-host { order: 1; border-left: 0; border-right: .5px solid var(--sep); } body.chat.stage-open.stage-left #main { order: 2; }
   body.chat.stage-open.stage-left:not(.layout-stage) #app { grid-template-columns: 268px minmax(300px, var(--stage-w, 44%)) minmax(0, 1fr); }
   body.chat.stage-open.stage-left .stage-resizer { left: auto; right: -5px; }
+  /* Above or below the chat: the chat list spans both rows, the chat and the work stack in the other column. */
+  body.chat.stage-open.stage-bottom:not(.layout-stage) #app, body.chat.stage-open.stage-top:not(.layout-stage) #app { grid-template-columns: 268px minmax(0, 1fr); }
+  body.chat.stage-open.stage-bottom:not(.layout-stage) #app { grid-template-rows: minmax(220px, 1fr) minmax(160px, var(--stage-h, 46%)); }
+  body.chat.stage-open.stage-top:not(.layout-stage) #app { grid-template-rows: minmax(160px, var(--stage-h, 46%)) minmax(220px, 1fr); }
+  body.chat.stage-open.stage-bottom:not(.layout-stage) #side, body.chat.stage-open.stage-top:not(.layout-stage) #side { grid-column: 1; grid-row: 1 / span 2; }
+  body.chat.stage-open.stage-bottom:not(.layout-stage) #main { grid-column: 2; grid-row: 1; }
+  body.chat.stage-open.stage-bottom:not(.layout-stage) .stage-host { grid-column: 2; grid-row: 2; border-left: 0; border-top: .5px solid var(--sep); }
+  body.chat.stage-open.stage-top:not(.layout-stage) #main { grid-column: 2; grid-row: 2; }
+  body.chat.stage-open.stage-top:not(.layout-stage) .stage-host { grid-column: 2; grid-row: 1; border-left: 0; border-bottom: .5px solid var(--sep); }
+  body.chat.stage-open.stage-bottom .stage-resizer, body.chat.stage-open.stage-top .stage-resizer { left: 0; right: 0; width: auto; height: 10px; cursor: row-resize; }
+  body.chat.stage-open.stage-bottom .stage-resizer { top: -5px; bottom: auto; } body.chat.stage-open.stage-top .stage-resizer { top: auto; bottom: -5px; }
+  body.chat.stage-open.stage-bottom .stage-resizer::after, body.chat.stage-open.stage-top .stage-resizer::after { top: 4px; bottom: auto; left: 0; right: 0; width: auto; height: 2px; }
 }
 @media (min-width: 900px) and (max-width: 1399px) {
   body.chat.stage-open.stage-left:not(.layout-stage) #app { grid-template-columns: 56px minmax(300px, var(--stage-w, 46%)) minmax(0, 1fr); }
+  body.chat.stage-open.stage-bottom:not(.layout-stage) #app, body.chat.stage-open.stage-top:not(.layout-stage) #app { grid-template-columns: 56px minmax(0, 1fr); }
 }
+/* The preview while the work area is dragged to an edge. */
+.dock-preview { position: fixed; z-index: 60; pointer-events: none; border-radius: 12px; background: color-mix(in srgb, var(--accent) 22%, transparent); border: 2px solid var(--accent); transition: all .12s ease-out; }
+.dock-preview[data-dock="left"] { left: 8px; top: 8px; bottom: 8px; width: 42%; } .dock-preview[data-dock="right"] { right: 8px; top: 8px; bottom: 8px; width: 42%; }
+.dock-preview[data-dock="top"] { left: 8px; right: 8px; top: 8px; height: 44%; } .dock-preview[data-dock="bottom"] { left: 8px; right: 8px; bottom: 8px; height: 44%; }
 @media (max-width: 899px) { .stage-resizer, #stage-side-btn { display: none !important; } }
 /* What the chat offers while empty inside a work mode, instead of the general welcome. */
 body.chat .mode-starters { padding: 40px 24px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }

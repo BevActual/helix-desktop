@@ -2864,29 +2864,69 @@ $("layout-btn").onclick = () => toggleLayout();
 
 // The work area is the person's to shape: drag the divider (or use the arrow keys on it) to set its width, double-click to reset it; the width is
 // remembered per workspace. The ⇄ button puts it on the other side of the chat.
-const STAGE_MIN = 300;
-let stageLeft = false;
-try { stageLeft = localStorage.getItem("mobius-stage-side") === "left"; } catch { /* not remembered */ }
-function stageWidthKey() { return "mobius-stage-w-" + workspace; }
+const STAGE_MIN = 300, STAGE_MIN_H = 160;
+const DOCKS = [["right", "Right of the chat"], ["left", "Left of the chat"], ["bottom", "Below the chat"], ["top", "Above the chat"]];
+let stageDock = "right";
+try {
+  const saved = localStorage.getItem("mobius-stage-dock") || localStorage.getItem("mobius-stage-side");
+  if (["right", "left", "bottom", "top"].includes(saved)) stageDock = saved;
+} catch { /* not remembered */ }
+const stageVertical = () => stageDock === "bottom" || stageDock === "top";
+function stageSizeKey() { return (stageVertical() ? "mobius-stage-h-" : "mobius-stage-w-") + workspace; }
 function setStageWidth(px, remember) {
-  const app = $("app");
-  if (!px) { app.style.removeProperty("--stage-w"); } else { app.style.setProperty("--stage-w", Math.round(px) + "px"); }
-  if (remember) { try { px ? localStorage.setItem(stageWidthKey(), String(Math.round(px))) : localStorage.removeItem(stageWidthKey()); } catch { /* not remembered */ } }
+  const app = $("app"), name = stageVertical() ? "--stage-h" : "--stage-w";
+  app.style.removeProperty("--stage-w"); app.style.removeProperty("--stage-h");
+  if (px) app.style.setProperty(name, Math.round(px) + "px");
+  if (remember) { try { px ? localStorage.setItem(stageSizeKey(), String(Math.round(px))) : localStorage.removeItem(stageSizeKey()); } catch { /* not remembered */ } }
 }
 function loadStageWidth() {
   let saved = 0;
-  try { saved = Number(localStorage.getItem(stageWidthKey())) || 0; } catch { /* not remembered */ }
-  setStageWidth(saved >= STAGE_MIN ? saved : 0, false);
+  try { saved = Number(localStorage.getItem(stageSizeKey())) || 0; } catch { /* not remembered */ }
+  setStageWidth(saved >= (stageVertical() ? STAGE_MIN_H : STAGE_MIN) ? saved : 0, false);
 }
-function stageMax() { return Math.max(STAGE_MIN, Math.min(window.innerWidth * 0.78, window.innerWidth - 56 - 340)); }
-function clampStage(px) { return Math.max(STAGE_MIN, Math.min(stageMax(), px)); }
+function stageMax() { return stageVertical() ? Math.max(STAGE_MIN_H, window.innerHeight * 0.7) : Math.max(STAGE_MIN, Math.min(window.innerWidth * 0.78, window.innerWidth - 56 - 340)); }
+function clampStage(px) { return Math.max(stageVertical() ? STAGE_MIN_H : STAGE_MIN, Math.min(stageMax(), px)); }
 function drawStageSide() {
-  document.body.classList.toggle("stage-left", stageLeft);
+  for (const [id] of DOCKS) document.body.classList.toggle("stage-" + id, stageDock === id && id !== "right");
+  $("stage-resizer").setAttribute("aria-orientation", stageVertical() ? "horizontal" : "vertical");
   $("stage-side-btn").hidden = !document.body.classList.contains("stage-open");
 }
+function setDock(next) {
+  if (!DOCKS.some(([id]) => id === next) || next === stageDock) return;
+  stageDock = next;
+  try { localStorage.setItem("mobius-stage-dock", next); } catch { /* not remembered */ }
+  drawStageSide(); loadStageWidth();
+}
+// Moving the work area: drag the ⇄ handle to an edge of the window (a preview shows where it will sit), or click it for a menu.
+function dockAt(x, y) {
+  const fx = x / window.innerWidth, fy = y / window.innerHeight;
+  if (fx < 0.22) return "left";
+  if (fx > 0.78) return "right";
+  if (fy < 0.3) return "top";
+  if (fy > 0.7) return "bottom";
+  return stageDock;
+}
+function openDockMenu() {
+  document.querySelectorAll(".dock-menu").forEach((m) => m.remove());
+  const box = $("stage-side-btn").getBoundingClientRect();
+  const menu = el("div", "hx-menu dock-menu"); menu.dataset.test = "dock-menu"; menu.setAttribute("role", "menu");
+  menu.style.right = (window.innerWidth - box.right) + "px"; menu.style.top = (box.bottom + 6) + "px"; menu.style.bottom = "auto"; menu.style.minWidth = "200px";
+  for (const [id, label] of DOCKS) {
+    const b = el("button", "hx-menu-item" + (id === stageDock ? " current" : ""));
+    b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(id === stageDock)); b.dataset.test = "dock-" + id;
+    b.append(el("span", "mi-text", label));
+    b.onclick = () => { menu.remove(); setDock(id); };
+    menu.append(b);
+  }
+  document.body.append(menu);
+  const close = (event) => { if (!menu.contains(event.target)) { menu.remove(); document.removeEventListener("pointerdown", close, true); } };
+  setTimeout(() => document.addEventListener("pointerdown", close, true), 0);
+  menu.addEventListener("keydown", (event) => { if (event.key === "Escape") { menu.remove(); $("stage-side-btn").focus(); } });
+  menu.querySelector(".current, button")?.focus();
+}
 (() => {
-  const bar = $("stage-resizer"), host = $("stage-host");
-  const current = () => host.getBoundingClientRect().width;
+  const bar = $("stage-resizer"), host = $("stage-host"), handle = $("stage-side-btn");
+  const current = () => { const r = host.getBoundingClientRect(); return stageVertical() ? r.height : r.width; };
   bar.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     bar.setPointerCapture(event.pointerId);
@@ -2894,8 +2934,9 @@ function drawStageSide() {
   });
   bar.addEventListener("pointermove", (event) => {
     if (!bar.hasPointerCapture(event.pointerId)) return;
-    const rect = host.getBoundingClientRect();
-    setStageWidth(clampStage(stageLeft ? event.clientX - rect.left : rect.right - event.clientX), false);
+    const r = host.getBoundingClientRect();
+    const px = stageDock === "left" ? event.clientX - r.left : stageDock === "right" ? r.right - event.clientX : stageDock === "top" ? event.clientY - r.top : r.bottom - event.clientY;
+    setStageWidth(clampStage(px), false);
   });
   const done = (event) => {
     if (!bar.hasPointerCapture(event.pointerId)) return;
@@ -2906,19 +2947,37 @@ function drawStageSide() {
   bar.addEventListener("pointerup", done); bar.addEventListener("pointercancel", done);
   bar.addEventListener("dblclick", () => setStageWidth(0, true));
   bar.addEventListener("keydown", (event) => {
-    const grow = stageLeft ? "ArrowRight" : "ArrowLeft", shrink = stageLeft ? "ArrowLeft" : "ArrowRight";
-    if (event.key !== grow && event.key !== shrink && event.key !== "Home" && event.key !== "Enter") return;
+    const [more, less] = stageDock === "left" ? ["ArrowRight", "ArrowLeft"] : stageDock === "right" ? ["ArrowLeft", "ArrowRight"] : stageDock === "top" ? ["ArrowDown", "ArrowUp"] : ["ArrowUp", "ArrowDown"];
+    if (event.key !== more && event.key !== less && event.key !== "Home" && event.key !== "Enter") return;
     event.preventDefault();
     if (event.key === "Home" || event.key === "Enter") { setStageWidth(0, true); return; }
-    setStageWidth(clampStage(current() + (event.key === grow ? 32 : -32) * (event.shiftKey ? 4 : 1)), true);
+    setStageWidth(clampStage(current() + (event.key === more ? 32 : -32) * (event.shiftKey ? 4 : 1)), true);
   });
-  $("stage-side-btn").onclick = () => {
-    stageLeft = !stageLeft;
-    try { localStorage.setItem("mobius-stage-side", stageLeft ? "left" : "right"); } catch { /* not remembered */ }
-    drawStageSide();
+  // The handle: a press that moves is a drag to an edge, a press that does not is a click for the menu.
+  let press = null, preview = null;
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    press = { x: event.clientX, y: event.clientY, moved: false }; handle.setPointerCapture(event.pointerId);
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (!press) return;
+    if (!press.moved && Math.hypot(event.clientX - press.x, event.clientY - press.y) < 8) return;
+    press.moved = true;
+    if (!preview) { preview = el("div", "dock-preview"); preview.dataset.test = "dock-preview"; document.body.append(preview); document.body.classList.add("stage-dragging"); }
+    const target = dockAt(event.clientX, event.clientY);
+    preview.dataset.dock = target;
+  });
+  const release = (event) => {
+    if (!press) return;
+    const was = press; press = null;
+    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    if (preview) { const target = preview.dataset.dock; preview.remove(); preview = null; document.body.classList.remove("stage-dragging"); if (target) setDock(target); }
+    else if (!was.moved && event.type === "pointerup") openDockMenu();
   };
+  handle.addEventListener("pointerup", release); handle.addEventListener("pointercancel", release);
+  handle.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDockMenu(); } });
   stageReady = true; stageWidthFor = workspace; loadStageWidth(); drawStageSide();
-  window.addEventListener("resize", () => { if (getComputedStyle($("app")).getPropertyValue("--stage-w")) setStageWidth(clampStage(current()), false); });
+  window.addEventListener("resize", () => { const app = $("app"); if (getComputedStyle(app).getPropertyValue(stageVertical() ? "--stage-h" : "--stage-w")) setStageWidth(clampStage(current()), false); });
 })();
 const reactStage = window.HelixMobiusReact?.stage($("stage-doc"), {
   chatId: () => view.id,
