@@ -33,4 +33,5 @@ helix-wallpaper-model = []
 helix-theme = []
 helix-desktop-api = ["helix-theme"]
 helix-embed = []
+helix-acp = []
 helix-knowledge = ["helix-embed"] # dev-dependency: the measure example
