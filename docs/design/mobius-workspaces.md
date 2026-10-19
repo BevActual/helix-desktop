@@ -228,3 +228,9 @@ Not done: splitting the work area itself (two stages side by side, for a documen
 The Code stage's side column has two tabs, **Files** and **Tasks**. Every request in the chat is a task (`codeTasks()` in `chat.js`, from the messages and their activities): newest first, with a state (**Running**, **Needs you** with a ringed row while the agent waits for an approval, **Failed**, **Done**), the request's first line, and "3 steps · 1 file changed". Clicking one scrolls the conversation to that request. A pulsing dot on the tab shows something is running. **Follow** (header, remembered, off by default as in Zed) opens in the viewer each file the agent touches while it works, taken from the newest step that names a file of the project. `tools/nested/mobius-tasks-test.sh` runs the fake agent and checks Needs you, Done and Follow.
 
 Not done: tasks that run in parallel (one chat is still one turn at a time), a task opening to its own thread, and terminal output as a task of its own.
+
+### Image: a prompt bar that follows the selection (built)
+
+Drag a rectangle on the picture (Crop or Box tool) and a small bar appears beside it: **Describe**, **Read the text**, and a field, "Ask about this area…" (Enter sends, Esc clears the selection). The area is copied as a picture of its own (`imgstage_region`; the document is untouched) and goes to the vision model with the question as a normal message, so the answer lands in the chat. The idea is Photoshop's Contextual Task Bar and AI Markup: the prompt is where the person is looking. It asks *about* an area; edits still come from the toolbar or the model's previewed suggestions, because the edit operations apply to the whole picture except crop and box. Tests: `tools/nested/mobius-image-test.sh`.
+
+Not done: editing *within* an area (blur this part, brighten that), which needs region-aware operations in `imageops.rs`; then the same bar can offer them and the model can suggest them with coordinates.

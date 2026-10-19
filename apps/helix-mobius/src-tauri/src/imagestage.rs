@@ -207,6 +207,26 @@ pub fn imgstage_apply(
     Ok(out)
 }
 
+/// A copy of one area of the picture as it stands, stored as a picture of its own (to ask about that part). Nothing in the document changes.
+#[tauri::command]
+pub fn imgstage_region(
+    chat_id: String,
+    doc_id: String,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+) -> Result<String, String> {
+    let mut store = load(&chat_id);
+    let doc = find(&mut store, &doc_id)?.clone();
+    let current = view(doc).current;
+    let image = imageops::decode(&crate::images::load(&crate::images_dir(), &current)?)?;
+    let part = imageops::apply(&image, &Op::Crop { x, y, w, h })?;
+    let bytes = imageops::encode(&part, image::ImageFormat::Png)?;
+    crate::images::store(&crate::images_dir(), &bytes)
+        .map_err(|_| "That area is larger than Mobius keeps (8 MB).".to_string())
+}
+
 /// What the operations would make of the picture as it stands, as PNG bytes, without storing or changing anything: the stage shows it on the canvas
 /// for the person to accept or reject.
 #[tauri::command]

@@ -3024,6 +3024,15 @@ const reactImage = window.HelixMobiusReact?.imageStage($("stage-image"), {
   chatId: () => view.id,
   report: (error) => report(error),
   ask: (id) => addPictures([id]),
+  askAbout: (id, text) => {
+    addPictures([id]);
+    let tries = 0;
+    const go = () => {
+      if (pendingPictures.some((p) => p.id === id)) { input.value = text; grow(); $("composer").requestSubmit(); }
+      else if (++tries < 40) setTimeout(go, 50);
+    };
+    go();
+  },
   active: () => {},
 });
 function setWorkspace(next, doc) {

@@ -13,6 +13,8 @@ export interface ImageHooks {
   report: (error: unknown) => void;
   /** Send the picture as it stands with the next message (a copy, so removing it there cannot touch the edit). */
   ask: (picture: string) => void;
+  /** Send a picture with a question straight away (the area chosen on the canvas). */
+  askAbout: (picture: string, text: string) => void;
   active: (open: boolean) => void;
 }
 export interface ImageHandle {
@@ -51,6 +53,8 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
   const [zoom, setZoom] = useState<"fit" | "actual">("fit");
   const [room, setRoom] = useState({ w: 0, h: 0 });
   const canvas = useRef<HTMLDivElement>(null);
+  const [areaText, setAreaText] = useState("");
+  const [dragging, setDragging] = useState(false);
   const img = useRef<HTMLImageElement>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const current = useRef<ImgDoc | null>(null);
@@ -87,6 +91,12 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
   const move = async (delta: number) => { if (!doc) return; try { show(await invoke<ImgDoc>("imgstage_move", { chatId: key.current, docId: doc.id, delta })); } catch (reason) { hooks.report(reason); } };
   const jump = (cursor: number) => doc && move(cursor - doc.cursor);
   const pick = async () => { try { const ids = await invoke<string[]>("image_pick"); if (ids[0]) await open(ids[0], "Picture"); } catch (reason) { hooks.report(reason); } };
+  // The prompt bar that follows the selection: ask about that area, which goes to the vision model as a picture of its own.
+  const askArea = async (text: string) => {
+    if (!doc || !box || !text.trim()) return;
+    try { const id = await invoke<string>("imgstage_region", { chatId: key.current, docId: doc.id, x: box.x, y: box.y, w: box.w, h: box.h }); hooks.askAbout(id, text.trim()); setAreaText(""); setBox(null); }
+    catch (reason) { hooks.report(reason); }
+  };
   const exportPicture = async () => { if (!doc) return; try { const path = await invoke<string | null>("imgstage_export", { chatId: key.current, docId: doc.id, format }); if (path) setNote(`Saved ${path}`); } catch (reason) { hooks.report(reason); } };
   const close = () => { setActive(false); setDoc(null); hooks.active(false); };
 
@@ -97,9 +107,9 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
     const sx = doc.width / r.width, sy = doc.height / r.height;
     return { x: Math.max(0, Math.min(doc.width, Math.round((event.clientX - r.left) * sx))), y: Math.max(0, Math.min(doc.height, Math.round((event.clientY - r.top) * sy))) };
   };
-  const down = (event: React.PointerEvent) => { const p = toPicture(event); if (!p) return; drag.current = p; setBox({ x: p.x, y: p.y, w: 0, h: 0 }); (event.target as Element).setPointerCapture?.(event.pointerId); };
+  const down = (event: React.PointerEvent) => { const p = toPicture(event); if (!p) return; drag.current = p; setDragging(true); setBox({ x: p.x, y: p.y, w: 0, h: 0 }); (event.target as Element).setPointerCapture?.(event.pointerId); };
   const moveDrag = (event: React.PointerEvent) => { const start = drag.current, p = toPicture(event); if (!start || !p) return; setBox({ x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) }); };
-  const up = () => { drag.current = null; setBox((b) => (b && b.w >= 2 && b.h >= 2 ? b : null)); };
+  const up = () => { drag.current = null; setDragging(false); setBox((b) => (b && b.w >= 2 && b.h >= 2 ? b : null)); };
   const overlay = (() => {
     const el = img.current; if (!box || !el || !doc) return null;
     const k = el.getBoundingClientRect().width / doc.width;
@@ -175,6 +185,15 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
               <img ref={img} src={pending?.url || src} alt={doc.title} draggable={false} data-test="img-picture" onLoad={() => setBox((b) => b)}
                 style={(() => { const k = zoom === "actual" ? 1 : Math.max(0.05, Math.min(room.w / doc.width, room.h / doc.height, 8)); return room.w > 0 || zoom === "actual" ? { width: Math.round(doc.width * k), height: Math.round(doc.height * k), maxWidth: "none", maxHeight: "none", imageRendering: k > 2 ? "pixelated" : "auto" } : undefined; })()} />
               {overlay && <div className={`img-selection ${tool}`} style={overlay} />}
+              {overlay && box && box.w >= 8 && box.h >= 8 && !dragging && <div className="img-ask" data-test="img-ask-bar" role="group" aria-label="Ask about the selected area"
+                style={{ left: Math.max(0, Math.min(overlay.left, (img.current?.offsetLeft ?? 0) + (img.current?.offsetWidth ?? 0) - 268)), top: overlay.top + overlay.height + 8 + 76 > (img.current?.offsetTop ?? 0) + (img.current?.offsetHeight ?? 0) + 40 ? Math.max(4, overlay.top - 76) : overlay.top + overlay.height + 8 }}
+                onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setBox(null); } }}>
+                <div className="img-ask-chips">
+                  <button type="button" data-test="img-ask-describe" onClick={() => askArea("Describe this part of the picture.")}>Describe</button>
+                  <button type="button" data-test="img-ask-text" onClick={() => askArea("Read any text in this part of the picture.")}>Read the text</button>
+                </div>
+                <input data-test="img-ask-input" value={areaText} placeholder="Ask about this area…" maxLength={300} onChange={(e) => setAreaText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && areaText.trim()) { e.preventDefault(); askArea(areaText); } }} />
+              </div>}
             </div>}
           </div>
         </div>
