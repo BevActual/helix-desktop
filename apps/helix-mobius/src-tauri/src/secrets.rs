@@ -81,16 +81,26 @@ pub fn set(api_key_ref: &str, secret: &str) -> Result<(), String> {
     if secret.is_empty() {
         return clear(&id);
     }
-    if secret.len() > 512 {
-        return Err("API key is too long.".into());
+    // A key is short; a sign-in (the ChatGPT plan's tokens) is a few kilobytes.
+    if secret.len() > 16_384 {
+        return Err("That secret is too long.".into());
     }
     match keyring_entry(&id) {
         Ok(entry) => {
             if let Err(error) = entry.set_password(secret) {
                 eprintln!("MOBIUS keyring set failed ({error}); using file fallback");
                 write_file_secret(&id, secret)?;
-            } else {
+            } else if keyring_entry(&id)
+                .and_then(|fresh| fresh.get_password().map_err(|e| e.to_string()))
+                .is_ok_and(|read| read.trim() == secret)
+            {
+                // A real keyring has it: a later lookup, even after a restart, finds it, so the private file is not needed.
                 delete_file_secret(&id);
+            } else {
+                // Without a real keyring behind the library, "saved" only means "held in memory for this one lookup". It is kept in the
+                // private file instead, so it is still there next time.
+                eprintln!("MOBIUS keyring did not keep the secret; using file fallback");
+                write_file_secret(&id, secret)?;
             }
         }
         Err(error) => {
@@ -154,4 +164,26 @@ pub fn for_backend(backend_id: &str, api_key_ref: &str) -> Option<String> {
         return None;
     }
     get(id)
+}
+
+#[cfg(test)]
+mod persistence_tests {
+    use super::*;
+
+    /// What is saved can be read back by a later call, which is what a restart is. (With no real keyring behind `keyring`, a save used to
+    /// vanish: the in-memory stand-in said yes and the private file was removed.)
+    #[test]
+    fn a_saved_secret_is_read_back_by_a_fresh_lookup() {
+        let dir = std::env::temp_dir().join(format!("helix-secrets-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::env::set_var("HELIX_STATE_HOME", &dir);
+        let id = "persist-check";
+        set(id, "sk-test-value").unwrap();
+        assert_eq!(get(id).as_deref(), Some("sk-test-value"));
+        assert!(has(id));
+        clear(id).unwrap();
+        assert_eq!(get(id), None);
+        std::env::remove_var("HELIX_STATE_HOME");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

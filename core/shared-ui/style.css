@@ -829,6 +829,10 @@ body.chat .route-chip { display: inline-flex; align-items: center; gap: 4px; pad
 body.chat .route-chip button { width: 18px; height: 18px; padding: 0; border-radius: 50%; background: transparent; color: var(--label-2); line-height: 1; }
 body.chat .route-chip button:hover { background: var(--fill-2); color: var(--label); }
 body.chat .route-private { margin-top: 0; }
+body.chat .chatgpt-card { max-width: 640px; }
+body.chat .chatgpt-card .set-hint { margin: 0; }
+body.chat .chatgpt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 14px; }
+body.chat .chatgpt-signin { padding: 10px 18px; border-radius: 999px; font-size: 14px; }
 body.chat .lib-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 body.chat .lib-tools .route-search { flex: 1; }
 body.chat .lib-sort { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; color: var(--label-2); }
