@@ -1,6 +1,6 @@
 # Mobius as an Agent Client Protocol client
 
-Status: design, 2026-10-18. Nothing is built. Sources: the protocol's published schema and documentation (agentclientprotocol.com and its repository, Apache-2.0), and this computer's installed agents (`opencode`, `hermes`, `codex`, `claude`, `cursor-agent`), whose help output was read. No agent's stored credentials were opened.
+Status: 2026-10-18. Steps 1 and 2 of the build order are built (the `helix-acp` crate and its fake agent); the Mobius side is not. Sources: the protocol's published schema and documentation (agentclientprotocol.com and its repository, Apache-2.0), and this computer's installed agents (`opencode`, `hermes`, `codex`, `claude`, `cursor-agent`), whose help output was read. No agent's stored credentials were opened.
 
 ## Why
 
@@ -70,6 +70,19 @@ So the first useful targets are OpenCode and Hermes, plus any agent the person a
 4. **Settings → Agents**, the **Test** and confinement check, and **Run with** in the Code stage.
 5. **Confining the agent process**, measured against `opencode` and `hermes` by hand (they need accounts, so these runs are the owner's).
 6. Later: `session/load` for resuming, modes, passing MCP servers, and the draft HTTP transport.
+
+## Built so far
+
+`core/helix-acp`: newline-framed JSON-RPC over a child process (`Client::spawn`), the subset of messages above as typed data (anything else is kept as raw JSON, so a newer agent is not an error), and a `Handler` trait through which the host answers every file, terminal and permission request. Safeguards, each tested against `tests/fake_agent.py`:
+
+* a line that is not JSON, not JSON-RPC 2.0, or longer than 4 MiB ends the session with a protocol error;
+* at most 16 of the agent's requests are answered at once, and the rest are refused ("Too many requests at once");
+* the event queue is bounded, so a flood of updates (3000 in the test) slows the agent instead of growing memory, and none are lost;
+* an agent that dies mid-turn is an error at once, not a hang; a request the crate does not know is answered "method not found";
+* an agent on another protocol version is refused at `initialize`;
+* `RefuseAll` is the default handler: a host that offers nothing is asked for nothing.
+
+`tests/protocol.rs` also checks what the client sends (`initialize`, `session/new`, `session/prompt`, `session/cancel`, and its answers to permission and file requests) against the **published v1 schema** (vendored in `core/helix-acp/schema/`, Apache-2.0), with a small checker for the subset of JSON Schema that file uses, and checks that the checker can fail.
 
 ## Not doing
 

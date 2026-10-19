@@ -14,6 +14,7 @@ members = [
     "core/helix-software-model",
     "core/helix-wallpaper-model",
     "core/helix-desktop-api",
+    "core/helix-acp",
     "core/helix-embed",
     "core/helix-knowledge",
     "core/helix-theme",
@@ -52,6 +53,7 @@ repository = "https://github.com/BevActual/helix-desktop"
 # One place for the versions every crate shares. A member adds its own features: `tokio = { workspace = true, features = [...] }`.
 # Crates that differ on purpose say why next to their own line.
 [workspace.dependencies]
+helix-acp = { path = "core/helix-acp" }
 helix-agent = { path = "core/helix-agent" }
 helix-base = { path = "core/helix-base" }
 helix-chat = { path = "core/helix-chat" }
