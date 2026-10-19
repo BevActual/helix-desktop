@@ -98,3 +98,20 @@ What Cursor's design suggests adding, in order of value:
 | 9 | **A scratch copy or a git worktree** for an agent's edits, shown as a reviewed change, so a long task cannot half-edit the real project | M |
 
 Not copied: Cursor's cloud agents, team policy and referral machinery, and its own system prompts and tool schemas (not read).
+
+# OpenCode (read 2026-10-18)
+
+The page that prompted this (`ai-sdk.dev/providers/ai-sdk-harnesses/opencode`) is the AI SDK's **adapter that runs OpenCode inside a sandbox**, signed in with API keys or the AI Gateway, so it is not about subscription sign-in. OpenCode's own documentation (opencode.ai/docs/providers) is where its accounts are described:
+
+* **Providers are connected by a `/connect` flow** in its terminal interface, with browser sign-in for subscriptions where the provider allows it: **ChatGPT Plus/Pro**, GitHub Copilot (a device-code flow) and some enterprise single sign-on. Anything else takes an API key. Credentials live in its own file, `~/.local/share/opencode/auth.json` (present on this computer; **not read**, for the reason in `mobius-settings.md`).
+* **Claude Pro/Max sign-in was removed** (version 1.3.0) because Anthropic prohibits it in third-party tools. That matches the conclusion in `mobius-settings.md`.
+* **Model choice is layered**: a default `model`, a **`small_model`** for titles and metadata, a model per agent, and a whitelist or blacklist per provider to hide models. Mobius's equivalents are the Summaries job (titles), one model per job, and the pinned "my menu".
+* Any OpenAI-compatible server is a provider by giving its base URL, which Mobius's network provider already does.
+
+What follows for Mobius:
+
+| Idea | Note |
+|---|---|
+| Mobius could be an **ACP client**, so the person's own installed agents (OpenCode, Codex, Gemini CLI) can do coding work from the Code stage, each keeping its own sign-in and credentials, which Mobius would never see | Large; the right way to "use" tools like these without handling their logins. Worth a design note first |
+| GitHub Copilot sign-in (device code) | Not built; GitHub's terms for third-party use of Copilot tokens have not been checked |
+| `small_model` for titles and summaries | Already how the Summaries job works |
