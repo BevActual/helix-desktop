@@ -356,6 +356,14 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                       })}
                     </>
                   ) : null}
+                  {picker?.cloud && !picker.cloud.chatgpt ? (
+                    <>
+                      <div className="hx-menu-sep" />
+                      <button className="hx-menu-item" data-test="menu-chatgpt-connect" onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-open-models", { detail: { section: "providers" } })); }}>
+                        <span className="mi-text"><span className="mi-title">Connect your ChatGPT plan…</span><span className="mi-sub">Sign in once to use the plan you already pay for</span></span>
+                      </button>
+                    </>
+                  ) : null}
                   {picker?.cloud ? (
                     <>
                       <div className="hx-menu-sep" />
