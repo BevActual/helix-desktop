@@ -75,6 +75,28 @@ Tested by `hub::` unit tests (names, links, checksums, parts, redirects, a downl
 
 Not built: picture support for a Hugging Face model (its `mmproj` file must be named to match the model), and a quantisation recommendation per computer.
 
+## Routing a job through OpenRouter (2026-10-18)
+
+Cursor chooses models by task (its subagents, each with its own model and a default picked "by availability and cost", plus fallback lists and best-of-N). OpenRouter can do the same work at the provider level, so a job that runs on OpenRouter gets **Cloud routing** under its row in Settings → Models:
+
+* **Prefer**: best match (OpenRouter balances), lowest price (`provider.sort: price`), or fastest (`throughput`).
+* **If it fails, try**: up to three fallback models, sent as OpenRouter's `models` list (the model that actually answers is reported back and is the one billed). Triggers are OpenRouter's: an error, a rate limit, or a conversation too long for the first model.
+* **Only providers that promise not to keep or train on my prompts** (`provider.data_collection: deny`), **on by default**. Some models, mostly free ones, are offered only by providers that keep prompts and will not work while it is on; the refusal is explained and says where to change it.
+* The request asks for `usage`, so a **reply shows what it cost** ("about $0.0012", "no charge", or nothing when not reported) and the model that really answered.
+
+The options are in `~/.local/share/helix/mobius/cloud-routes.json`, not the routing file, because the inference service reads that file with a deliberately small parser. Act never uses the cloud, so it has none. Tested by `lan::` (request body, reply parsing, refusals), `cloud::` (option cleaning) and the nested `mobius-routing`, which sends real requests to a pretend OpenRouter and checks the body, the reply's details and that changed options are used by the next message.
+
+Not built yet: choosing the route **per message** (the decision lane could pick a job's route from what was asked), best-of-N, spend limits, and escalating from a local model to a cloud one.
+
+## Connecting a Claude or ChatGPT subscription
+
+Checked 2026-10-18, from the companies' own statements as reported and their public discussion; **not legal advice**.
+
+* **Claude (Free, Pro, Max): not allowed.** Anthropic says OAuth tokens from consumer plans may be used only in Claude Code and Claude.ai; using them in any other product, tool or service, the Agent SDK included, breaks its Consumer Terms, and enforcement began in January 2026. A third-party app is meant to use an **API key** (pay as you go). So Mobius does **not** read Claude Code's credentials or sign in with a Claude account. What works: a Claude API key (directly, or **Claude models through OpenRouter**, already supported), and, as a plain hand-off, opening the person's own `claude` in a terminal on the project (the person is using Claude Code itself).
+* **ChatGPT (Plus, Pro): partly, with conditions not yet confirmed.** OpenAI has an official OAuth, **Sign in with ChatGPT**, for apps; its terms say requests must come from the user's own local runtime. OpenAI's staff have said it is not approved for ad-hoc third-party **Codex** clients, only pure open-source clients and partners, and that others must ask. Helix is public and MIT-licensed, so it may qualify, but OpenAI's terms page could not be read here (403) and the maintainers' reply in the public discussion did not settle it. Needs the owner to confirm with OpenAI, and a client registration only the owner can make.
+* **Never** read `~/.claude`, `~/.codex/auth.json` or any other app's stored token to reuse it: that is the borrowed-token pattern both companies prohibit, and it is also taking a credential the person did not give Mobius.
+* **ACP** (the Agent Client Protocol Zed made) would let Mobius drive installed agents such as Codex or Gemini CLI. The Claude adapter is built on the Agent SDK, which falls under the same rule, so it is not a way around it.
+
 ## Not built
 
 * Knowledge: reference packs and fetched pages (each a download the person approves), and using the index in chat.

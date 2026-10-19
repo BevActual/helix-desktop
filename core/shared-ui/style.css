@@ -817,6 +817,18 @@ body.chat .hub-variant { display: flex; align-items: center; justify-content: sp
 body.chat .hub-variant-text { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
 body.chat .hub-variant button { flex: none; padding: 7px 13px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-weight: 650; font-size: 12.5px; }
 body.chat .hub-variant button:disabled { opacity: .45; background: var(--fill-2); color: var(--label-2); }
+body.chat .route-edit { margin-top: 8px; }
+body.chat .route-edit .set-hint { margin-left: 6px; }
+body.chat .route-body { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 11px; background: var(--fill-2); }
+body.chat .route-label { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--label-3); margin-bottom: 5px; }
+body.chat .route-seg { display: inline-flex; padding: 2px; border-radius: 10px; background: var(--fill-1); }
+body.chat .route-seg button { padding: 6px 12px; border-radius: 8px; background: transparent; font-size: 12.5px; font-weight: 650; color: var(--label-2); }
+body.chat .route-seg button.on { background: var(--accent); color: var(--on-accent); }
+body.chat .route-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+body.chat .route-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 10px; border-radius: var(--r-pill); background: var(--fill-1); font-size: 12.5px; font-weight: 600; }
+body.chat .route-chip button { width: 18px; height: 18px; padding: 0; border-radius: 50%; background: transparent; color: var(--label-2); line-height: 1; }
+body.chat .route-chip button:hover { background: var(--fill-2); color: var(--label); }
+body.chat .route-private { margin-top: 0; }
 body.chat .lib-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 body.chat .lib-tools .route-search { flex: 1; }
 body.chat .lib-sort { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; color: var(--label-2); }

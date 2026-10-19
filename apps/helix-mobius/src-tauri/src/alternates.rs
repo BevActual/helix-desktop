@@ -143,6 +143,7 @@ pub fn alt_keep(app: tauri::AppHandle, index: usize, which: usize) -> Result<(),
             tokens: chosen.tokens,
             ms: chosen.ms,
             files: Vec::new(),
+            cost_micro: None,
         });
         store.push(index, before);
         store.save(&chat_id)?;

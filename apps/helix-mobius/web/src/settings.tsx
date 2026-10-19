@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
 import { eligible, listOrder, reason, recommend, specialist, type Job, type ModelCard } from "./recommend";
 import { CloudModels, type CloudView } from "./cloudmodels";
+import { type RouteOptions, RouteEditor } from "./cloudroute";
 import { Icon, Picker, type Option } from "./settingsui";
 import { HubFind } from "./hubfind";
 import { KnowledgePanel } from "./knowledge";
@@ -134,8 +135,9 @@ function DownloadBar({ card, act }: { card: Card; act: (command: string, id: str
 }
 
 /** One job: what it is for, which model does it, and, when nothing suitable is installed or a better one exists, what to get. */
-function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, onMoreCloud, act }: {
+function JobRow({ job, draft, cards, lan, cloud, hasKey, route, onRoute, onAssign, onBrowse, onMoreCloud, act }: {
   job: JobInfo; draft: Draft; cards: Card[]; lan: string[]; cloud: { id: string; name: string }[]; hasKey: boolean | null;
+  route: RouteOptions | undefined; onRoute: (task: Task, options: RouteOptions) => void;
   onAssign: (task: Task, backend: string, model: string) => void; onBrowse: (job: Job) => void; onMoreCloud: () => void; act: (command: string, id: string) => void;
 }) {
   const suggestion = recommend(job.id, cards) as Card | null;
@@ -175,7 +177,9 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, onM
   // What to offer under the row.
   // Under Auto with several models installed, say which one suits this job best; with one there is nothing to choose.
   const useIt = suggestion && suggestion.installed && job.task && profile && installed.length >= 2 && !profile.model ? suggestion : null;
-  const missing = !job.task ? suggestion : (!installed.length ? suggestion : null);
+  // A job already sent to another computer or the cloud does not need a model downloaded.
+  const elsewhere = !!profile && profile.backend !== "local";
+  const missing = !job.task ? suggestion : (!installed.length && !elsewhere ? suggestion : null);
   const ready = !job.task ? cards.find((c) => c.installed && eligible(job.id, c)) : undefined;
 
   return (
@@ -200,6 +204,9 @@ function JobRow({ job, draft, cards, lan, cloud, hasKey, onAssign, onBrowse, onM
           ) : null}
         </div>
       </div>
+      {job.task && profile?.backend === "openrouter" && route ? (
+        <RouteEditor id={job.id} primary={profile.model} route={route} choices={cloud} onChange={(next) => onRoute(job.task as Task, next)} />
+      ) : null}
       {missing && !missing.installed ? (
         <div className="set-offer" data-test={`job-offer-${job.id}`}>
           <div className="set-offer-text">
@@ -364,6 +371,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   const [filter, setFilter] = useState<Filter>("all");
   const [cloudView, setCloudView] = useState<CloudView | null>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
+  const [routes, setRoutes] = useState<Record<string, RouteOptions>>({});
   const draftRef = useRef<Draft | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const hooksRef = useRef(hooks);
@@ -481,6 +489,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
           loadModels("lan");
           loadModels("openrouter");
           invoke<CloudView>("cloud_catalog", { refresh: false }).then(setCloudView, () => setCloudView({ models: [], fetched: 0, error: "", pins: [] }));
+          invoke<Record<string, RouteOptions>>("cloud_routes").then(setRoutes, () => undefined);
         } catch (error) {
           report(error);
         }
@@ -527,6 +536,10 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   const refreshCloud = () => {
     setCloudBusy(true);
     invoke<CloudView>("cloud_catalog", { refresh: true }).then(setCloudView, report).finally(() => setCloudBusy(false));
+  };
+  const setRoute = (task: Task, options: RouteOptions) => {
+    setRoutes((old) => ({ ...old, [task]: options }));
+    invoke<RouteOptions>("cloud_route_set", { task, options }).then((kept) => setRoutes((old) => ({ ...old, [task]: kept })), report);
   };
   const pinCloud = (id: string, on: boolean) => {
     invoke<string[]>("cloud_pin_set", { id, on })
@@ -592,7 +605,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
             <p className="models-lead">Pick a model for each kind of work. Mobius suggests what runs well on this computer, and downloads only when you press Get. Only one model sits in memory at a time, so switching takes a few seconds.</p>
             <div className="set-list" data-test="jobs">
               {JOBS.map((job) => (
-                <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} onAssign={assign} onBrowse={browse} onMoreCloud={() => show("cloud")} act={act} />
+                <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} route={job.task ? routes[job.task] : undefined} onRoute={setRoute} onAssign={assign} onBrowse={browse} onMoreCloud={() => show("cloud")} act={act} />
               ))}
             </div>
             <button type="button" className="set-link set-gap-sm" data-test="models-see-library" onClick={() => { setFilter("all"); show("library"); }}>See every model in the Library</button>

@@ -89,6 +89,7 @@ pick mobius-dictate && run mobius-dictate mobius-dictate-test.sh mobius-nested.s
 pick mobius-library && run mobius-library mobius-library-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-settings && run mobius-settings mobius-settings-test.sh mobius-nested.sh "$WIDE"
 pick mobius-cloudmodels && run mobius-cloudmodels mobius-cloudmodels-test.sh mobius-cloud-nested.sh "$WIDE"
+pick mobius-routing && run mobius-routing mobius-routing-test.sh mobius-routing-nested.sh "$WIDE"
 pick mobius-import && run mobius-import mobius-import-test.sh mobius-import-nested.sh "$WIDE"
 pick mobius-hub && run mobius-hub mobius-hub-test.sh mobius-hub-nested.sh "$WIDE"
 pick mobius-knowledge && run mobius-knowledge mobius-knowledge-test.sh mobius-knowledge-nested.sh "$WIDE"

@@ -1041,8 +1041,24 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             max_tokens: talk.max_tokens,
             timeout_secs: u64::from(talk.remote_timeout_secs),
         };
-        let result =
-            lan::chat_completions(&base, &model, &messages, api_key.as_deref(), options).await;
+        // OpenRouter is asked to choose among models and providers as the job's options say.
+        let route = (backend.id == "openrouter" || base.contains("openrouter.ai")).then(|| {
+            let wanted = cloud::route_options(&task);
+            lan::OpenRouterRoute {
+                fallbacks: wanted.fallbacks,
+                prefer: wanted.prefer,
+                private_only: wanted.private_only,
+            }
+        });
+        let result = lan::chat_completions_routed(
+            &base,
+            &model,
+            &messages,
+            api_key.as_deref(),
+            options,
+            route.as_ref(),
+        )
+        .await;
         let fake_op = generation.saturating_mul(1_000_003).saturating_add(7);
         {
             let shared = shared(&app);
@@ -1050,15 +1066,18 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             let _ = state.chat.started(generation, fake_op);
         }
         match result {
-            Ok(text) => {
+            Ok(reply) => {
                 let outcome = {
                     let shared = shared(&app);
                     let mut state = shared.lock().expect("state");
-                    let _ = state.chat.delta(fake_op, &text);
+                    // The reply names the model that really answered (a fallback, perhaps) and what it cost.
+                    state.turn_model = reply.model.clone();
+                    state.chat.pending_cost = reply.cost_micro;
+                    let _ = state.chat.delta(fake_op, &reply.text);
                     state.chat.complete(
                         fake_op,
                         true,
-                        &serde_json::json!({"ok": true, "text": text, "backend": label, "task": task})
+                        &serde_json::json!({"ok": true, "text": reply.text, "backend": label, "task": task, "completion_tokens": reply.completion_tokens})
                             .to_string(),
                     )
                 };
@@ -3115,6 +3134,20 @@ fn routing_cloud_menu() -> CloudMenu {
     }
 }
 
+/// How each job's cloud requests are routed: a price or speed preference, fallback models, and the privacy rule.
+#[tauri::command]
+fn cloud_routes() -> std::collections::BTreeMap<String, cloud::RouteOptions> {
+    cloud::all_route_options()
+}
+
+#[tauri::command]
+fn cloud_route_set(
+    task: String,
+    options: cloud::RouteOptions,
+) -> Result<cloud::RouteOptions, String> {
+    cloud::set_route_options(&task, options)
+}
+
 #[derive(Serialize)]
 struct CatalogView {
     models: Vec<cloud::CloudModel>,
@@ -3695,6 +3728,8 @@ fn main() {
             routing_cloud_menu,
             cloud_catalog,
             cloud_pin_set,
+            cloud_routes,
+            cloud_route_set,
             routing_list_models,
             routing_list_remote_models,
             routing_page_info,
