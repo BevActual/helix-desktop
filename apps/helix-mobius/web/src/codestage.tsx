@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
+import { AgentChooser } from "./agents";
 
 /** The Code stage: the chat's project folder beside the conversation. A file list (the files the last turn changed are marked), a viewer, and,
  * for a changed file, its diff with Revert. The file shown goes to the model with the next message as a visible chip, the same as a document. */
@@ -95,6 +96,7 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
       <strong>Project</strong>
       <span className="stage-state" title={hooks.folder()}>{hooks.folder().split("/").filter(Boolean).pop() ?? ""}</span>
       <span className="stage-spacer" />
+      <AgentChooser report={hooks.report} enabled={!!hooks.folder()} />
       <button type="button" className="mini" onClick={() => { loadTree(); setTick((t) => t + 1); }}>Refresh</button>
       <button type="button" className="icon-btn" aria-label="Close the project view" data-test="code-close" onClick={() => { setActive(false); setSelected(""); hooks.shown(null); }}>×</button>
     </header>

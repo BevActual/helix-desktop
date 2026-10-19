@@ -1,6 +1,7 @@
 //! Mobius — Helix’s desktop AI (Talk hub). Talks via `org.helix.Inference` (local) or OpenAI-compat LAN (this process).
 //! Desktop act hands off to the bar Assistant (`Shell1.AssistantSubmit`). Never holds Agent Surface grants.
 
+mod acp;
 mod act;
 mod agent;
 mod alternates;
@@ -1336,6 +1337,10 @@ fn tools_open_desk_terminal(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn tools_review(app: AppHandle, activity_id: String, approved: bool) -> Result<(), String> {
+    // a card the selected agent is waiting on is answered here; the rest belong to Tools mode
+    if app.state::<acp::Runtime>().is_waiting(&activity_id) {
+        return app.state::<acp::Runtime>().review(&activity_id, approved);
+    }
     app.state::<agent::Runtime>().review(&activity_id, approved)
 }
 
@@ -1861,7 +1866,12 @@ async fn chat_send(
         .chat
         .conversation
         .tools_enabled;
-    if using_tools {
+    if app.state::<acp::Runtime>().selected().is_some() {
+        // an agent chosen for this chat does the work; what it asks of the computer waits for the person
+        emit_view(&app);
+        tauri::async_runtime::spawn(acp::run(app, turn));
+        Ok(())
+    } else if using_tools {
         let private = has_attachments || !turn.images.is_empty();
         emit_view(&app);
         tauri::async_runtime::spawn(agent::run(app, turn, private));
@@ -2412,6 +2422,7 @@ fn chat_take_bar_handoff(app: AppHandle) -> bool {
 #[tauri::command]
 async fn chat_stop(app: AppHandle) {
     app.state::<agent::Runtime>().cancel();
+    app.state::<acp::Runtime>().cancel();
     record(&app, "stop", 0, true);
     let operation = shared(&app).lock().expect("state").chat.stop();
     if let Some(operation) = operation {
@@ -2434,6 +2445,11 @@ fn switch_to(app: &AppHandle, next: Conversation) -> Result<(), String> {
             save(&state.chat.conversation);
         }
         state.chat = Chat::new(next);
+    }
+    // an agent is chosen for one chat; another chat starts with Mobius's own
+    if app.state::<acp::Runtime>().selected().is_some() {
+        app.state::<acp::Runtime>().select(None);
+        acp::announce(app);
     }
     emit_view(app);
     emit_list(app);
@@ -3243,6 +3259,92 @@ fn chatgpt_open_usage() -> Result<(), String> {
     open_in_browser(chatgpt::USAGE_URL)
 }
 
+/// The agents Mobius can drive, whether each is installed, and whether the person has said it may run here.
+#[tauri::command]
+fn acp_agents() -> Vec<acp::AgentView> {
+    acp::list()
+}
+
+/// The agent chosen for this chat, if any.
+#[tauri::command]
+fn acp_selected(app: AppHandle) -> Option<String> {
+    app.state::<acp::Runtime>().selected()
+}
+
+/// Chooses the agent for this chat (`None` returns to Mobius's own). It needs a project folder and the person's say-so.
+#[tauri::command]
+fn acp_select(app: AppHandle, id: Option<String>) -> Result<(), String> {
+    if let Some(id) = &id {
+        let view = acp::list()
+            .into_iter()
+            .find(|a| &a.id == id)
+            .ok_or("No such agent.")?;
+        if !view.found {
+            return Err(format!("{} is not installed.", view.title));
+        }
+        if !view.trusted {
+            return Err(format!(
+                "Say that {} may run on this computer in Settings → Agents first.",
+                view.title
+            ));
+        }
+        let workspace = shared(&app)
+            .lock()
+            .expect("state")
+            .chat
+            .conversation
+            .workspace
+            .clone();
+        if workspace.is_empty() {
+            return Err("Choose a project folder first: the agent works in it.".into());
+        }
+        if shared(&app).lock().expect("state").chat.is_streaming() {
+            return Err("Wait for the reply to finish, or stop it.".into());
+        }
+    }
+    app.state::<acp::Runtime>().select(id);
+    acp::announce(&app);
+    Ok(())
+}
+
+/// Starts an agent and reports what it says it is, giving it nothing to do.
+#[tauri::command]
+async fn acp_test(id: String) -> Result<serde_json::Value, String> {
+    let def = acp::agents()
+        .into_iter()
+        .find(|a| a.id == id)
+        .ok_or("No such agent.")?;
+    acp::test(&def).await
+}
+
+#[tauri::command]
+fn acp_add_agent(
+    title: String,
+    command: String,
+    args: Vec<String>,
+) -> Result<acp::AgentDef, String> {
+    acp::add_custom(&title, &command, &args)
+}
+
+#[tauri::command]
+fn acp_remove_agent(app: AppHandle, id: String) -> Result<(), String> {
+    if app.state::<acp::Runtime>().selected().as_deref() == Some(id.as_str()) {
+        app.state::<acp::Runtime>().select(None);
+        acp::announce(&app);
+    }
+    acp::remove_custom(&id)
+}
+
+#[tauri::command]
+fn acp_trust(app: AppHandle, id: String, on: bool) -> Result<(), String> {
+    acp::set_trusted(&id, on)?;
+    if !on && app.state::<acp::Runtime>().selected().as_deref() == Some(id.as_str()) {
+        app.state::<acp::Runtime>().select(None);
+        acp::announce(&app);
+    }
+    Ok(())
+}
+
 /// How each job's cloud requests are routed: a price or speed preference, fallback models, and the privacy rule.
 #[tauri::command]
 fn cloud_routes() -> std::collections::BTreeMap<String, cloud::RouteOptions> {
@@ -3837,6 +3939,13 @@ fn main() {
             routing_cloud_menu,
             cloud_catalog,
             cloud_pin_set,
+            acp_agents,
+            acp_selected,
+            acp_select,
+            acp_test,
+            acp_add_agent,
+            acp_remove_agent,
+            acp_trust,
             chatgpt_status,
             chatgpt_sign_in,
             chatgpt_cancel,
@@ -3865,6 +3974,7 @@ fn main() {
             app.manage(web::Research::default());
             act::watch(app.handle().clone());
             app.manage(agent::Runtime::default());
+            app.manage(acp::Runtime::default());
             let mut fresh = Conversation::new(&new_id(), now()).expect("a fresh id is valid");
             if let Some(turns) = take_bar_handoff() {
                 fresh.seed_from_bar(&turns, now());

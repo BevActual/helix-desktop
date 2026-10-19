@@ -288,6 +288,8 @@ async fn a_flood_of_updates_is_all_delivered_without_losing_any() {
         }
     }
     assert_eq!(turn.await.unwrap().unwrap(), StopReason::EndTurn);
+    // by the time the turn's answer came, every update had been counted, so a host can wait for exactly that many
+    assert_eq!(client.updates_received(), 3000);
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -833,6 +833,12 @@ body.chat .chatgpt-card { max-width: 640px; }
 body.chat .chatgpt-card .set-hint { margin: 0; }
 body.chat .chatgpt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 14px; }
 body.chat .chatgpt-signin { padding: 10px 18px; border-radius: 999px; font-size: 14px; }
+body.chat .agent-choose { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 650; color: var(--label-2); }
+body.chat .agent-choose select { padding: 4px 8px; border-radius: 8px; background: var(--fill-2); color: var(--label); font: inherit; border: 0; }
+body.chat .agent-add { display: flex; flex-wrap: wrap; gap: 8px; max-width: 640px; }
+body.chat .agent-add input { flex: 1 1 140px; min-width: 0; padding: 9px 12px; border-radius: 10px; background: var(--fill-2); color: var(--label); font: inherit; border: 0; }
+body.chat .agent-add button { padding: 8px 14px; border-radius: 10px; background: var(--fill-2); font-weight: 650; font-size: 12.5px; }
+body.chat .agent-add button:disabled { opacity: .45; }
 body.chat .lib-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 body.chat .lib-tools .route-search { flex: 1; }
 body.chat .lib-sort { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; color: var(--label-2); }

@@ -3,6 +3,7 @@
 import json, os, sys, time
 
 SCENARIO = os.environ.get("FAKE", "turn")
+CWD = ""
 LOG = os.environ.get("FAKE_LOG")
 
 def out(obj):
@@ -42,6 +43,7 @@ while True:
         if SCENARIO == "huge_line": sys.stdout.write("x" * (5 * 1024 * 1024) + "\n"); sys.stdout.flush()
         if SCENARIO == "nonrpc": out({"hello": "world"})
     elif method == "session/new":
+        CWD = req["params"].get("cwd", "")
         answer(req, {"sessionId": "s1"})
     elif method == "session/prompt":
         s = req["params"]["sessionId"]
@@ -86,6 +88,39 @@ while True:
                 if "error" in m and "Too many" in m["error"].get("message", ""): refused += 1
                 else: ok += 1
             chunk(s, "agent_message_chunk", "ok:%d refused:%d" % (ok, refused))
+            answer(req, {"stopReason": "end_turn"})
+        elif SCENARIO == "mobius":
+            # a turn that asks Mobius for everything: a read, a read outside the project, an edit (after asking), and a command
+            def result_of(m): return m.get("result"), m.get("error")
+            chunk(s, "agent_thought_chunk", "Let me look at the notes first.")
+            chunk(s, "agent_message_chunk", "Looking at the project. ")
+            notes = CWD + "/notes.txt"
+            update(s, {"sessionUpdate": "tool_call", "toolCallId": "t1", "title": "Read notes.txt", "kind": "read", "status": "pending", "locations": [{"path": notes}]})
+            got, _ = result_of(ask(500, "fs/read_text_file", {"sessionId": s, "path": notes}))
+            content = (got or {}).get("content", "")
+            update(s, {"sessionUpdate": "tool_call_update", "toolCallId": "t1", "status": "completed"})
+            _, outside = result_of(ask(501, "fs/read_text_file", {"sessionId": s, "path": "/etc/hostname"}))
+            update(s, {"sessionUpdate": "tool_call", "toolCallId": "t2", "title": "Update notes.txt", "kind": "edit", "status": "pending", "locations": [{"path": notes}]})
+            perm = ask(502, "session/request_permission", {"sessionId": s, "toolCall": {"toolCallId": "t2", "title": "Update notes.txt", "kind": "edit", "locations": [{"path": notes}]},
+                       "options": [{"optionId": "yes", "name": "Allow once", "kind": "allow_once"}, {"optionId": "always", "name": "Always allow", "kind": "allow_always"}, {"optionId": "no", "name": "Reject", "kind": "reject_once"}]})
+            outcome = perm["result"]["outcome"]
+            if outcome.get("outcome") == "selected" and outcome.get("optionId") == "yes":
+                _, err = result_of(ask(503, "fs/write_text_file", {"sessionId": s, "path": notes, "content": content + "edited by the agent\n"}))
+                wrote = "declined" if err else "ok"
+            else:
+                wrote = "not-allowed"
+            update(s, {"sessionUpdate": "tool_call_update", "toolCallId": "t2", "status": "completed" if wrote == "ok" else "failed"})
+            update(s, {"sessionUpdate": "tool_call", "toolCallId": "t3", "title": "List the files", "kind": "execute", "status": "pending"})
+            made, err = result_of(ask(504, "terminal/create", {"sessionId": s, "command": "ls", "args": ["-l"]}))
+            if err: ls = "declined"
+            else:
+                tid = made["terminalId"]
+                ask(505, "terminal/wait_for_exit", {"sessionId": s, "terminalId": tid})
+                o, _ = result_of(ask(506, "terminal/output", {"sessionId": s, "terminalId": tid}))
+                ls = "ok" if "notes.txt" in (o or {}).get("output", "") else "empty"
+                ask(507, "terminal/release", {"sessionId": s, "terminalId": tid})
+            update(s, {"sessionUpdate": "plan", "entries": [{"content": "Edit the notes", "priority": "high", "status": "completed"}]})
+            chunk(s, "agent_message_chunk", "read:%s outside:%s wrote:%s ls:%s" % (content.strip().replace("\n", "|"), "refused" if outside else "allowed", wrote, ls))
             answer(req, {"stopReason": "end_turn"})
         elif SCENARIO == "terminal":
             made = ask(400, "terminal/create", {"sessionId": s, "command": "ls", "args": ["-l"], "cwd": "/work"})
