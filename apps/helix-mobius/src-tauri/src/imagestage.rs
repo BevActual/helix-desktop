@@ -207,6 +207,27 @@ pub fn imgstage_apply(
     Ok(out)
 }
 
+/// What the operations would make of the picture as it stands, as PNG bytes, without storing or changing anything: the stage shows it on the canvas
+/// for the person to accept or reject.
+#[tauri::command]
+pub fn imgstage_preview(
+    chat_id: String,
+    doc_id: String,
+    ops: Vec<Op>,
+) -> Result<tauri::ipc::Response, String> {
+    if ops.is_empty() || ops.len() > 10 {
+        return Err("Preview between one and ten edits at a time.".into());
+    }
+    let mut store = load(&chat_id);
+    let doc = find(&mut store, &doc_id)?.clone();
+    let current = view(doc).current;
+    let mut image = imageops::decode(&crate::images::load(&crate::images_dir(), &current)?)?;
+    for op in &ops {
+        image = imageops::apply(&image, op)?;
+    }
+    imageops::encode(&image, image::ImageFormat::Png).map(tauri::ipc::Response::new)
+}
+
 #[tauri::command]
 pub fn imgstage_move(chat_id: String, doc_id: String, delta: i32) -> Result<View, String> {
     let mut store = load(&chat_id);

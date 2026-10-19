@@ -18,7 +18,7 @@ export interface ImageHooks {
 export interface ImageHandle {
   open: (picture?: string, title?: string) => void;
   /** A model's suggestion, applied after the person pressed Apply on it. */
-  apply: (ops: Op[]) => Promise<void>;
+  apply: (ops: Op[]) => void;
   close: () => void;
 }
 
@@ -45,6 +45,8 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
   const [format, setFormat] = useState("png");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  // Edits the model proposed, previewed on the canvas until accepted: each can be left out, and the picture shows what the rest would do.
+  const [pending, setPending] = useState<{ ops: Op[]; on: boolean[]; url: string; error: string } | null>(null);
   const [panel, setPanel] = useState<"adjust" | "size" | "history">("adjust");
   const [zoom, setZoom] = useState<"fit" | "actual">("fit");
   const [room, setRoom] = useState({ w: 0, h: 0 });
@@ -80,7 +82,7 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
     try { show(await invoke<ImgDoc>("imgstage_apply", { chatId: key.current, docId: d.id, ops, by })); } catch (reason) { hooks.report(reason); } finally { setBusy(false); }
   }, [hooks, show]);
 
-  useEffect(() => { register({ open, apply: (ops: Op[]) => run(ops, "mobius"), close: () => { setActive(false); setDoc(null); hooks.active(false); } }); }, [register, open, run, hooks]);
+  useEffect(() => { register({ open, apply: (ops: Op[]) => { if (current.current) setPending({ ops, on: ops.map(() => true), url: "", error: "" }); else hooks.report("Open the picture on the Image stage first."); }, close: () => { setActive(false); setDoc(null); setPending(null); hooks.active(false); } }); }, [register, open, run, hooks]);
 
   const move = async (delta: number) => { if (!doc) return; try { show(await invoke<ImgDoc>("imgstage_move", { chatId: key.current, docId: doc.id, delta })); } catch (reason) { hooks.report(reason); } };
   const jump = (cursor: number) => doc && move(cursor - doc.cursor);
@@ -103,6 +105,24 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
     const k = el.getBoundingClientRect().width / doc.width;
     return { left: el.offsetLeft + box.x * k, top: el.offsetTop + box.y * k, width: box.w * k, height: box.h * k };
   })();
+
+  const pendingKey = pending ? JSON.stringify([pending.ops, pending.on, doc?.id, doc?.cursor]) : "";
+  useEffect(() => {
+    if (!pending || !doc) return;
+    let live = true, made = "";
+    const chosen = pending.ops.filter((_, i) => pending.on[i]);
+    if (chosen.length === 0) { setPending((p) => p && { ...p, url: "", error: "" }); return; }
+    invoke<ArrayBuffer>("imgstage_preview", { chatId: key.current, docId: doc.id, ops: chosen })
+      .then((bytes) => { made = URL.createObjectURL(new Blob([bytes], { type: "image/png" })); if (live) setPending((p) => p && { ...p, url: made, error: "" }); else URL.revokeObjectURL(made); })
+      .catch((reason) => live && setPending((p) => p && { ...p, url: "", error: String(reason) }));
+    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+  }, [pendingKey]);
+  const acceptPending = async () => {
+    if (!pending) return;
+    const chosen = pending.ops.filter((_, i) => pending.on[i]);
+    setPending(null);
+    if (chosen.length) await run(chosen, "mobius");
+  };
 
   if (!active) return null;
   return <aside className="stage image-stage" data-test="image-stage" aria-label="Picture">
@@ -144,9 +164,15 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
               <button type="button" className={zoom === "actual" ? "on" : ""} aria-pressed={zoom === "actual"} onClick={() => setZoom("actual")}>100%</button>
             </span>
           </div>
+          {pending && <div className="img-pending" data-test="img-pending" role="group" aria-label="Suggested edits" onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setPending(null); } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); acceptPending(); } }}>
+            <strong>Mobius suggests {pending.ops.length} edit{pending.ops.length === 1 ? "" : "s"}</strong><span className="stage-state">previewed below</span>
+            <ul>{pending.ops.map((o, i) => <li key={i}><label><input type="checkbox" checked={pending.on[i]} data-test={`pending-img-edit-${i}`} onChange={(e) => setPending((p) => p && { ...p, on: p.on.map((v, j) => (j === i ? e.target.checked : v)) })} /> {String(o.op).replace("_", " ")}</label></li>)}</ul>
+            {pending.error ? <p className="lib-error" role="alert">{pending.error}</p> : null}
+            <div className="proposal-actions"><button type="button" className="primary" data-test="pending-img-accept" disabled={!!pending.error || !pending.on.some(Boolean)} onClick={acceptPending}>Accept {pending.on.every(Boolean) ? "all" : pending.on.filter(Boolean).length} <kbd>Ctrl+Enter</kbd></button><button type="button" data-test="pending-img-reject" onClick={() => setPending(null)}>Reject <kbd>Esc</kbd></button></div>
+          </div>}
           <div className="img-canvas" data-test="img-canvas" ref={canvas}>
             {src && <div className="img-wrap" onPointerDown={down} onPointerMove={moveDrag} onPointerUp={up}>
-              <img ref={img} src={src} alt={doc.title} draggable={false} data-test="img-picture" onLoad={() => setBox((b) => b)}
+              <img ref={img} src={pending?.url || src} alt={doc.title} draggable={false} data-test="img-picture" onLoad={() => setBox((b) => b)}
                 style={(() => { const k = zoom === "actual" ? 1 : Math.max(0.05, Math.min(room.w / doc.width, room.h / doc.height, 8)); return room.w > 0 || zoom === "actual" ? { width: Math.round(doc.width * k), height: Math.round(doc.height * k), maxWidth: "none", maxHeight: "none", imageRendering: k > 2 ? "pixelated" : "auto" } : undefined; })()} />
               {overlay && <div className={`img-selection ${tool}`} style={overlay} />}
             </div>}
@@ -193,7 +219,7 @@ export function EditsCard({ ops, onApply }: { ops: Op[]; onApply: () => void }) 
   const names = ops.map((o) => String(o.op).replace("_", " ")).join(", ");
   return <div className="artifact-card" data-test="edits-card">
     <div className="artifact-head"><strong>Suggested picture edits</strong><span>{ops.length} edit{ops.length === 1 ? "" : "s"}: {names}</span>
-      <button type="button" className="mini primary" data-test="edits-apply" onClick={onApply}>Apply to the open picture</button></div>
+      <button type="button" className="mini primary" data-test="edits-apply" onClick={onApply}>Preview on the picture</button></div>
     <pre>{JSON.stringify(ops, null, 1)}</pre>
   </div>;
 }

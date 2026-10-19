@@ -1,6 +1,6 @@
 #!/bin/bash
 # The Image stage: a picture opened from the Image place sits beside the chat; edits are steps on a copy (undo and redo are a position in the list);
-# a model's suggested edits are a card that applies only when the person presses Apply.
+# a model's suggested edits are a card that is previewed on the picture and applies only when the person accepts it.
 #   HELIX_NESTED_SCRIPT=tools/nested/mobius-image-test.sh tools/nested/run.sh mobius-image tools/nested/mobius-nested.sh <wide window> "HELIX_FAKE_REPLY=..." (with tools/nested/mobius-image-nested.sh)
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); FAILED=0
 source "$ROOT/tools/nested/ui-lib.sh"
@@ -47,7 +47,10 @@ echo "--- a model's suggestion applies only when pressed"
 click_id input; wtype "Suggest edits"; wtype -k Return; idle
 wait_id edits-card 40 && echo "ok: the suggestion is a card" || { shot image-fail; sleep 1; shot image-fail; fail "no edits card"; }
 [ "$(steps)" = "Black and white|Rotate 90°;2" ] && echo "ok: nothing was applied by itself" || fail "applied early: $(steps)"
-click_id edits-apply; sleep 3
+click_id edits-apply; wait_id pending-img-accept 20 && echo "ok: the suggestion is previewed on the picture" || fail "no preview"
+[ "$(steps)" = "Black and white|Rotate 90°;2" ] && echo "ok: the preview changed nothing" || fail "previewing changed it: $(steps)"
+shot preview; sleep 1.5; shot preview
+click_id pending-img-accept; sleep 3
 [ "$(steps)" = "Black and white|Rotate 90°|Brightness +20|Crop to 10×10;4" ] && echo "ok: Apply made the two edits" || fail "after apply: $(steps)"
 by=$(python3 -c "import json;d=json.load(open('$STAGE'))['docs'][0];print(','.join(s.get('by','?') for s in d['steps']))" 2>/dev/null)
 echo "$by" | grep -q mobius && echo "ok: edits from a suggestion are marked as Mobius's ($by)" || fail "no attribution: $by"

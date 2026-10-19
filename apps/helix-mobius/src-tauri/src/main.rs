@@ -3854,6 +3854,7 @@ fn main() {
             imagestage::imgstage_list,
             imagestage::imgstage_open,
             imagestage::imgstage_apply,
+            imagestage::imgstage_preview,
             imagestage::imgstage_move,
             imagestage::imgstage_close,
             imagestage::imgstage_export,
