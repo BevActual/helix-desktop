@@ -1,6 +1,6 @@
 # Mobius as an Agent Client Protocol client
 
-Status: 2026-10-18. Steps 1 and 2 of the build order are built (the `helix-acp` crate and its fake agent); the Mobius side is not. Sources: the protocol's published schema and documentation (agentclientprotocol.com and its repository, Apache-2.0), and this computer's installed agents (`opencode`, `hermes`, `codex`, `claude`, `cursor-agent`), whose help output was read. No agent's stored credentials were opened.
+Status: 2026-10-18. Steps 1 to 4 of the build order are built: the `helix-acp` crate and its fake agent, and Mobius's session driver, approval cards, thread rendering and Settings → Agents. Confining the agent process (step 5) is not, so an agent must be switched on by the person before it can run. Sources: the protocol's published schema and documentation (agentclientprotocol.com and its repository, Apache-2.0), and this computer's installed agents (`opencode`, `hermes`, `codex`, `claude`, `cursor-agent`), whose help output was read. No agent's stored credentials were opened.
 
 ## Why
 
@@ -91,6 +91,24 @@ Both are installed here. Neither speaks ACP itself, and each needs a different a
 * `RefuseAll` is the default handler: a host that offers nothing is asked for nothing.
 
 `tests/protocol.rs` also checks what the client sends (`initialize`, `session/new`, `session/prompt`, `session/cancel`, and its answers to permission and file requests) against the **published v1 schema** (vendored in `core/helix-acp/schema/`, Apache-2.0), with a small checker for the subset of JSON Schema that file uses, and checks that the checker can fail.
+
+## In Mobius (built)
+
+`acp.rs` drives one agent per chat, as a subprocess in the chat's project folder.
+
+* **Choosing**: Settings → **Agents** lists OpenCode and Hermes (found on `PATH` as `opencode acp` and `hermes acp`) and any command the person adds, each with **Test** (starts it, shows its name, version and sign-in methods, gives it nothing to do) and a switch, **"may run on this computer"**, which is off until the person turns it on. In the Code view, **Work with: Mobius | an agent** chooses for this chat; the choice ends when the chat changes. Only an installed, switched-on agent is offered.
+* **In the thread**: the agent's words stream in as a reply, its thoughts fold into "Thought it through", its tool calls are cards with their kind, files and status, and its plan is a checklist.
+* **Everything it asks of the computer waits for the person**, on the same cards Tools mode uses:
+  * **A file it wants to write** is a change to apply or skip, shown as only the lines that differ with context, with a restore point so **Undo edit** works; reads and writes are limited to the project folder and refuse hidden files, links, and anything that looks like credentials (files up to 200,000 characters).
+  * **A file it wants to read** must be inside the project and pass the same checks, so `.env`, `.git` and `/etc` are refused outright.
+  * **A command** is shown (quoted so an argument cannot become another command) and run in the project sandbox, with no network, only when approved; the agent follows its output through the terminal calls.
+  * **Its own permission questions** are put to the person as asked. Only a one-time answer is ever given: if the agent offers just "always allow", Mobius says so and does not grant it.
+* **Stop** asks the agent to cancel and waits ten seconds for it to say so before ending it. An agent that dies or breaks the protocol ends the turn with a plain message.
+* A turn is not finished until every update the agent sent has been shown (the client counts updates so the host can wait for exactly that many).
+
+Tested by unit tests (path confinement, quoting, one-time answers, the change view, thoughts, the agent list) and the nested `mobius-acp`: a pretend agent reads a file, tries to read outside the project (refused), asks permission, proposes an edit and a command, each waiting for approval; the file is written only after approval, Undo restores it, and declining everything leaves the project untouched.
+
+**Not yet**: confining the agent process itself (it runs with the person's permissions, which is why it needs the switch), network for approved commands, resuming earlier agent sessions, MCP servers for the agent, and a permanent "always allow" kept per project.
 
 ## Not doing
 

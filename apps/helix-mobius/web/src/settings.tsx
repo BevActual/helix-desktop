@@ -6,10 +6,11 @@ import { type RouteOptions, RouteEditor } from "./cloudroute";
 import { Icon, Picker, type Option } from "./settingsui";
 import { HubFind } from "./hubfind";
 import { KnowledgePanel } from "./knowledge";
+import { AgentsPanel } from "./agents";
 import { ChatGPTPlan, type ChatGPTStatus } from "./chatgptplan";
 
 type Source = "local" | "lan" | "openrouter";
-type Section = "models" | "library" | "cloud" | "knowledge" | "providers" | "generation" | "experiments";
+type Section = "models" | "library" | "cloud" | "knowledge" | "agents" | "providers" | "generation" | "experiments";
 type Task = "chat" | "act" | "code" | "summarize" | "vision";
 
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
@@ -17,6 +18,7 @@ const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: "library", label: "Library", icon: "grid" },
   { id: "cloud", label: "Cloud models", icon: "bolt" },
   { id: "knowledge", label: "Knowledge", icon: "folder" },
+  { id: "agents", label: "Agents", icon: "code" },
   { id: "providers", label: "Providers", icon: "wifi" },
   { id: "generation", label: "Generation", icon: "settings" },
   { id: "experiments", label: "Experiments", icon: "palette" },
@@ -647,6 +649,10 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
 
           <section className="models-panel active set-panel" data-test="models-panel-knowledge" hidden={section !== "knowledge"}>
             <KnowledgePanel report={report} onGetModel={() => { setFilter("embedding"); show("library"); }} />
+          </section>
+
+          <section className="models-panel active set-panel" data-test="models-panel-agents" hidden={section !== "agents"}>
+            <AgentsPanel report={report} />
           </section>
 
           <section className="models-panel active set-panel" data-test="models-panel-providers" hidden={section !== "providers"}>

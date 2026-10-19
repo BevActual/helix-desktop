@@ -99,6 +99,8 @@ pub struct Spawn {
 type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, Error>>>>>;
 
 struct Shared {
+    /// How many `session/update` notifications have been queued for the host, so it can tell when it has seen them all.
+    updates: AtomicU64,
     pending: Pending,
     /// Why the session is over, once it is.
     closed: Mutex<Option<Error>>,
@@ -163,6 +165,7 @@ impl Client {
             };
 
         let shared = Arc::new(Shared {
+            updates: AtomicU64::new(0),
             pending: Arc::new(Mutex::new(HashMap::new())),
             closed: Mutex::new(None),
         });
@@ -375,6 +378,12 @@ impl Client {
         self.notify("session/cancel", json!({"sessionId": session_id}));
     }
 
+    /// How many updates the agent has sent so far. When a prompt's answer arrives, every update before it has been counted, so a host that
+    /// has handled this many events has seen the whole turn.
+    pub fn updates_received(&self) -> u64 {
+        self.shared.updates.load(Ordering::SeqCst)
+    }
+
     /// Ends the agent's process.
     pub async fn close(&self) {
         let _ = self.kill.send(()).await;
@@ -488,6 +497,7 @@ async fn handle_line(
                     if events.send(event).await.is_err() {
                         return false;
                     }
+                    shared.updates.fetch_add(1, Ordering::SeqCst);
                 }
             }
             true

@@ -3056,6 +3056,7 @@ dependencies = [
  "base64 0.22.1",
  "futures-util",
  "gtk",
+ "helix-acp",
  "helix-agent",
  "helix-base",
  "helix-chat",

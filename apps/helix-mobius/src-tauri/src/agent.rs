@@ -288,7 +288,7 @@ impl Model {
     }
 }
 
-fn activity(
+pub(crate) fn activity(
     app: &AppHandle,
     generation: u64,
     id: &str,
@@ -331,7 +331,7 @@ fn metadata(sources: &[web::Source]) -> Vec<WebSource> {
         })
         .collect()
 }
-fn ended_early(app: &AppHandle, generation: u64, error: &str, stopped: bool) {
+pub(crate) fn ended_early(app: &AppHandle, generation: u64, error: &str, stopped: bool) {
     let operation = generation.saturating_mul(1_000_003).saturating_add(23);
     let outcome = {
         let shared = crate::shared(app);
