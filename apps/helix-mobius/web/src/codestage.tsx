@@ -13,8 +13,14 @@ export interface CodeHooks {
   shown: (open: { title: string; text: string } | null) => void;
   chooseFolder: () => void;
   folder: () => string;
+  /** The requests made in this chat, oldest first, with their state. */
+  tasks: () => CodeTask[];
+  /** Scrolls the conversation to a request. */
+  reveal: (index: number) => void;
 }
-export interface CodeHandle { open: () => void; refresh: () => void; close: () => void }
+/** One request in this chat and what came of it: the unit of work the agent was given. */
+export interface CodeTask { index: number; request: string; state: "pending" | "running" | "waiting" | "failed" | "done"; steps: number; changed: number; inputs: string[] }
+export interface CodeHandle { open: () => void; refresh: () => void; update: () => void; close: () => void }
 
 export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) => void; hooks: CodeHooks }) {
   const [active, setActive] = useState(false);
@@ -25,6 +31,10 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
   const [text, setText] = useState("");
   const [truncated, setTruncated] = useState(false);
   const [tick, setTick] = useState(0);
+  const [side, setSide] = useState<"files" | "tasks">("files");
+  // Follow the agent: the viewer opens each file the agent touches while it works. Off until the person turns it on.
+  const [follow, setFollow] = useState(() => { try { return localStorage.getItem("mobius-code-follow") === "1"; } catch { return false; } });
+  const followed = useRef("");
   // Edit with Mobius on lines: a range chosen by dragging over the line numbers (or a click, shift-click to extend), the bar for an
   // instruction, and the proposal for those lines to accept (Enter) or reject (Esc).
   const [range, setRange] = useState<{ a: number; b: number } | null>(null);
@@ -42,7 +52,7 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
     try { const tree = await invoke<{ files: string[] }>("code_tree"); setFiles(tree.files); }
     catch (reason) { setFiles([]); setError(String(reason)); }
   }, []);
-  useEffect(() => { register({ open: () => { setActive(true); loadTree(); }, refresh: () => { setTick((t) => t + 1); loadTree(); }, close: () => { setActive(false); setSelected(""); hooks.shown(null); } }); }, [register, loadTree, hooks]);
+  useEffect(() => { register({ open: () => { setActive(true); loadTree(); }, refresh: () => { setTick((t) => t + 1); loadTree(); }, update: () => setTick((t) => t + 1), close: () => { setActive(false); setSelected(""); hooks.shown(null); } }); }, [register, loadTree, hooks]);
 
   const changes = hooks.changes();
   const changed = useMemo(() => new Map((changes?.files ?? []).map((f, i) => [f.path, { file: f, index: i }])), [changes, tick]);
@@ -88,6 +98,18 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
   // Files the turn deleted are not in the tree any more, but they are in the changes.
   const all = useMemo(() => Array.from(new Set([...files, ...(changes?.files ?? []).map((f) => f.path)])).sort(), [files, changes]);
   const shown = all.filter((f) => !filter || f.toLowerCase().includes(filter.toLowerCase()));
+  const tasks = hooks.tasks();
+  const running = [...tasks].reverse().find((t) => t.state === "running" || t.state === "waiting");
+  const fileSet = useMemo(() => new Set(all), [all]);
+  useEffect(() => {
+    if (!follow || !running) return;
+    // The newest step that names a file of the project.
+    for (let i = running.inputs.length - 1; i >= 0; i--) {
+      const hitPath = running.inputs[i].split(/[\s"'`]+/).map((t) => t.replace(/[,:;]+$/, "")).find((t) => fileSet.has(t));
+      if (hitPath) { if (followed.current !== hitPath + ":" + running.inputs.length) { followed.current = hitPath + ":" + running.inputs.length; if (hitPath !== selected) show(hitPath); } return; }
+    }
+  }, [tick, follow, running?.inputs.length]);
+  const toggleFollow = () => { const next = !follow; setFollow(next); try { localStorage.setItem("mobius-code-follow", next ? "1" : "0"); } catch { /* not remembered */ } };
   if (!active) return null;
   const hit = changed.get(selected);
   const isDiff = !!hit;
@@ -97,11 +119,24 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
       <span className="stage-state" title={hooks.folder()}>{hooks.folder().split("/").filter(Boolean).pop() ?? ""}</span>
       <span className="stage-spacer" />
       <AgentChooser report={hooks.report} enabled={!!hooks.folder()} />
+      <button type="button" className={`mini${follow ? " on" : ""}`} aria-pressed={follow} data-test="code-follow" title="Open each file the agent touches while it works" onClick={toggleFollow}>Follow</button>
       <button type="button" className="mini" onClick={() => { loadTree(); setTick((t) => t + 1); }}>Refresh</button>
       <button type="button" className="icon-btn" aria-label="Close the project view" data-test="code-close" onClick={() => { setActive(false); setSelected(""); hooks.shown(null); }}>×</button>
     </header>
     {error ? <div className="code-empty"><p>{error}</p><button type="button" className="primary" data-test="code-choose" onClick={hooks.chooseFolder}>Choose a project folder…</button></div> : <div className="code-body">
       <div className="code-files">
+        <div className="code-side-tabs" role="tablist" aria-label="Project">
+          <button type="button" role="tab" aria-selected={side === "files"} className={side === "files" ? "on" : ""} data-test="code-tab-files" onClick={() => setSide("files")}>Files</button>
+          <button type="button" role="tab" aria-selected={side === "tasks"} className={side === "tasks" ? "on" : ""} data-test="code-tab-tasks" onClick={() => setSide("tasks")}>Tasks{tasks.length ? ` · ${tasks.length}` : ""}{running ? <i className="task-dot" aria-label="running" /> : null}</button>
+        </div>
+        {side === "tasks" ? <ol className="code-tasks" data-test="code-tasks">
+          {[...tasks].reverse().map((t) => <li key={t.index}><button type="button" className={`code-task ${t.state}`} data-test={`code-task-${t.index}`} onClick={() => hooks.reveal(t.index)} title="Show this request in the conversation">
+            <span className="code-task-state" data-test={`code-task-${t.index}-${t.state}`}>{({ pending: "Queued", running: "Running", waiting: "Needs you", failed: "Failed", done: "Done" })[t.state]}</span>
+            <span className="code-task-title">{t.request.split("\n")[0].slice(0, 90)}</span>
+            <span className="code-task-meta">{t.steps ? `${t.steps} step${t.steps === 1 ? "" : "s"}` : "answered"}{t.changed ? ` · ${t.changed} file${t.changed === 1 ? "" : "s"} changed` : ""}</span>
+          </button></li>)}
+          {tasks.length === 0 && <li className="sheet-note">Requests you make in this chat are listed here with what they did.</li>}
+        </ol> : <>
         <input data-test="code-filter" placeholder="Filter files" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter files" />
         <ul>{shown.map((f) => {
           const c = changed.get(f);
@@ -110,6 +145,7 @@ export function CodeStage({ register, hooks }: { register: (handle: CodeHandle) 
           </button></li>;
         })}</ul>
         {all.length === 0 && <p className="sheet-note">No text files found.</p>}
+        </>}
       </div>
       <div className="code-view">
         {selected ? <>

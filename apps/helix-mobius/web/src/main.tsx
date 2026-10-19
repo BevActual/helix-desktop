@@ -58,7 +58,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   codeStage: (host: HTMLElement, hooks: CodeHooks) => {
     const run = handled<CodeHandle>(host, (register) => <CodeStage register={register} hooks={hooks} />);
-    return { open: () => run((h) => h.open()), refresh: () => run((h) => h.refresh()), close: () => run((h) => h.close()) };
+    return { open: () => run((h) => h.open()), refresh: () => run((h) => h.refresh()), update: () => run((h) => h.update()), close: () => run((h) => h.close()) };
   },
   stage: (host: HTMLElement, hooks: StageHooks) => {
     const run = handled<StageHandle>(host, (register) => <Stage register={register} hooks={hooks} />);

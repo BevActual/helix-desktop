@@ -94,6 +94,7 @@ pick mobius-cloudmodels && run mobius-cloudmodels mobius-cloudmodels-test.sh mob
 pick mobius-routing && run mobius-routing mobius-routing-test.sh mobius-routing-nested.sh "$WIDE"
 pick mobius-chatgpt && run mobius-chatgpt mobius-chatgpt-test.sh mobius-chatgpt-nested.sh "$WIDE"
 pick mobius-acp && run mobius-acp mobius-acp-test.sh mobius-acp-nested.sh "$WIDE"
+pick mobius-tasks && run mobius-tasks mobius-tasks-test.sh mobius-acp-nested.sh "$WIDE"
 pick mobius-import && run mobius-import mobius-import-test.sh mobius-import-nested.sh "$WIDE"
 pick mobius-hub && run mobius-hub mobius-hub-test.sh mobius-hub-nested.sh "$WIDE"
 pick mobius-knowledge && run mobius-knowledge mobius-knowledge-test.sh mobius-knowledge-nested.sh "$WIDE"

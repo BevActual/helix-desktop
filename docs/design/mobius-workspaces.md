@@ -222,3 +222,9 @@ From the person's note after looking at Cursor: the panes should be **resizable 
 * Tests: `tools/nested/mobius-panes-test.sh` (drag widens the stage, per-workspace memory, reset, the other side and back, the starters change with the mode and one sends its prompt).
 
 Not done: splitting the work area itself (two stages side by side, for a document and the picture it uses), tearing a pane off into its own window, and a saved layout per project. Next: the Margin and Task bar presentations.
+
+### Code: tasks and Follow (built)
+
+The Code stage's side column has two tabs, **Files** and **Tasks**. Every request in the chat is a task (`codeTasks()` in `chat.js`, from the messages and their activities): newest first, with a state (**Running**, **Needs you** with a ringed row while the agent waits for an approval, **Failed**, **Done**), the request's first line, and "3 steps · 1 file changed". Clicking one scrolls the conversation to that request. A pulsing dot on the tab shows something is running. **Follow** (header, remembered, off by default as in Zed) opens in the viewer each file the agent touches while it works, taken from the newest step that names a file of the project. `tools/nested/mobius-tasks-test.sh` runs the fake agent and checks Needs you, Done and Follow.
+
+Not done: tasks that run in parallel (one chat is still one turn at a time), a task opening to its own thread, and terminal output as a task of its own.

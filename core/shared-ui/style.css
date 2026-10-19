@@ -1997,3 +1997,20 @@ body.chat[data-workspace="write"] .home-below-host, body.chat[data-workspace="im
 .img-pending { padding: 8px 10px; border-radius: 10px; border: .5px solid color-mix(in srgb, var(--accent) 45%, var(--hairline)); background: color-mix(in srgb, var(--accent) 7%, var(--glass-solid)); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12.5px; }
 .img-pending ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 2px 14px; flex-basis: 100%; } .img-pending label { display: flex; gap: 6px; align-items: baseline; color: var(--label-2); }
 .img-pending .proposal-actions { flex-basis: 100%; }
+/* The Code stage's side: Files and Tasks. */
+.code-side-tabs { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--fill-1); margin-bottom: 6px; }
+.code-side-tabs button { flex: 1; padding: 3px 8px; border-radius: 7px; font-size: 12px; background: transparent; color: var(--label-2); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.code-side-tabs button.on { background: var(--fill-3, var(--fill-2)); color: var(--label-1); font-weight: 650; }
+.task-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: task-pulse 1.2s ease-in-out infinite; }
+@keyframes task-pulse { 50% { opacity: .35; } } @media (prefers-reduced-motion: reduce) { .task-dot { animation: none; } }
+.code-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; overflow: auto; }
+.code-task { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 7px 9px; border-radius: 9px; background: var(--fill-1); }
+.code-task:hover { background: var(--fill-2); }
+.code-task-state { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--label-3, var(--label-2)); }
+.code-task.running .code-task-state { color: var(--accent); } .code-task.waiting .code-task-state { color: var(--accent); } .code-task.failed .code-task-state { color: var(--danger, #ff453a); }
+.code-task.waiting { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.code-task-title { font-size: 12.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.code-task-meta { font-size: 11px; color: var(--label-3, var(--label-2)); }
+.stage header .mini.on { background: var(--accent); color: var(--on-accent); }
+.code-stage header { flex-wrap: wrap; row-gap: 6px; } .code-stage header > strong, .code-stage header .stage-state { flex: none; } .code-stage header button, .code-stage header label { white-space: nowrap; }
+.code-stage header .stage-spacer { flex: 1 1 8px; }

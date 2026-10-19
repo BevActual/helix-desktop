@@ -1139,6 +1139,7 @@ function drawChat() {
   const emptyChat = view.messages.length === 0 && (view.tasks || []).length === 0;
   $("empty").hidden = !emptyChat;
   drawModeStarters();
+  if (workspace === "code") reactCode?.update();
   // An empty chat is a home: the greeting and the composer sit in the middle of the window, and the composer settles to the bottom with the first message.
   setHome(emptyChat && workspace === "chat");
   $("send").hidden = view.streaming;
@@ -2998,7 +2999,27 @@ const reactCode = window.HelixMobiusReact?.codeStage($("stage-code"), {
     return null;
   },
   shown: (open) => { stageOpen = open; stageAttach = true; drawStageChip(); },
+  tasks: () => codeTasks(),
+  reveal: (index) => document.querySelector(`[data-test="msg-${index}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" }),
 });
+// Each request in this chat as a task: its state and what the agent did for it (the Code stage's Tasks list, and what Follow watches).
+function codeTasks() {
+  const out = [], m = view.messages;
+  for (let i = 0; i < m.length; i++) {
+    if (m[i].role !== "user") continue;
+    const reply = m[i + 1] && m[i + 1].role === "assistant" ? m[i + 1] : null;
+    const acts = (reply && reply.activities) || [];
+    const live = view.streaming && (reply ? i + 1 === m.length - 1 : i === m.length - 1);
+    const state = acts.some((a) => a.state === "waiting") ? "waiting" : live ? "running" : acts.some((a) => a.state === "failed") ? "failed" : reply ? "done" : "pending";
+    const work = acts.filter((a) => a.tool !== "changes" && a.tool !== "planning");
+    let changed = 0;
+    const summary = acts.find((a) => a.tool === "changes");
+    if (summary) { try { changed = JSON.parse(summary.input).length; } catch { /* no count */ } }
+    else changed = acts.filter((a) => a.tool === "edit_file" && a.state === "completed").length;
+    out.push({ index: i, request: m[i].text || "", state, steps: work.length, changed, inputs: work.map((a) => a.input || "") });
+  }
+  return out;
+}
 const reactImage = window.HelixMobiusReact?.imageStage($("stage-image"), {
   chatId: () => view.id,
   report: (error) => report(error),
