@@ -7,12 +7,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::imageops::{self, Op};
 
+fn you() -> String {
+    "you".into()
+}
+
 pub const MAX_STEPS: usize = 30;
 pub const MAX_DOCS: usize = 20;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Step {
     pub label: String,
+    /// Who made the edit: "you", or "mobius" for one the model suggested and the person applied.
+    #[serde(default = "you")]
+    pub by: String,
     pub op: Op,
     pub picture: String,
     pub width: u32,
@@ -154,7 +161,17 @@ pub fn imgstage_open(chat_id: String, picture: String, title: String) -> Result<
 
 /// Applies operations in order to the picture as it stands; anything undone and not redone is dropped first.
 #[tauri::command]
-pub fn imgstage_apply(chat_id: String, doc_id: String, ops: Vec<Op>) -> Result<View, String> {
+pub fn imgstage_apply(
+    chat_id: String,
+    doc_id: String,
+    ops: Vec<Op>,
+    by: Option<String>,
+) -> Result<View, String> {
+    let by = if by.as_deref() == Some("mobius") {
+        "mobius"
+    } else {
+        "you"
+    };
     if ops.is_empty() || ops.len() > 10 {
         return Err("Apply between one and ten edits at a time.".into());
     }
@@ -176,6 +193,7 @@ pub fn imgstage_apply(chat_id: String, doc_id: String, ops: Vec<Op>) -> Result<V
         })?;
         doc.steps.push(Step {
             label: op.label(),
+            by: by.into(),
             op,
             picture: picture.clone(),
             width,
@@ -187,6 +205,47 @@ pub fn imgstage_apply(chat_id: String, doc_id: String, ops: Vec<Op>) -> Result<V
     let out = view(doc.clone());
     save(&chat_id, &store)?;
     Ok(out)
+}
+
+/// A copy of one area of the picture as it stands, stored as a picture of its own (to ask about that part). Nothing in the document changes.
+#[tauri::command]
+pub fn imgstage_region(
+    chat_id: String,
+    doc_id: String,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+) -> Result<String, String> {
+    let mut store = load(&chat_id);
+    let doc = find(&mut store, &doc_id)?.clone();
+    let current = view(doc).current;
+    let image = imageops::decode(&crate::images::load(&crate::images_dir(), &current)?)?;
+    let part = imageops::apply(&image, &Op::Crop { x, y, w, h })?;
+    let bytes = imageops::encode(&part, image::ImageFormat::Png)?;
+    crate::images::store(&crate::images_dir(), &bytes)
+        .map_err(|_| "That area is larger than Mobius keeps (8 MB).".to_string())
+}
+
+/// What the operations would make of the picture as it stands, as PNG bytes, without storing or changing anything: the stage shows it on the canvas
+/// for the person to accept or reject.
+#[tauri::command]
+pub fn imgstage_preview(
+    chat_id: String,
+    doc_id: String,
+    ops: Vec<Op>,
+) -> Result<tauri::ipc::Response, String> {
+    if ops.is_empty() || ops.len() > 10 {
+        return Err("Preview between one and ten edits at a time.".into());
+    }
+    let mut store = load(&chat_id);
+    let doc = find(&mut store, &doc_id)?.clone();
+    let current = view(doc).current;
+    let mut image = imageops::decode(&crate::images::load(&crate::images_dir(), &current)?)?;
+    for op in &ops {
+        image = imageops::apply(&image, op)?;
+    }
+    imageops::encode(&image, image::ImageFormat::Png).map(tauri::ipc::Response::new)
 }
 
 #[tauri::command]

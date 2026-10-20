@@ -56,6 +56,8 @@ pick mobius-palette && run mobius-palette mobius-palette-test.sh mobius-nested.s
 pick mobius-composer && run mobius-composer mobius-composer-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=2
 pick mobius-regen && run mobius-regen mobius-regen-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=2
 pick mobius-stage   && run mobius-stage mobius-stage-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n'
+pick mobius-panes  && run mobius-panes mobius-panes-test.sh mobius-nested.sh "$WIDE" "HELIX_FAKE_REPLY=Hi."
+pick mobius-docops  && run mobius-docops mobius-docops-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n\n```docops\n[{"op":"replace","find":"gather the facts","with":"collect the evidence"},{"op":"append","text":"Step three: review."}]\n```\n'
 pick mobius-code   && run mobius-code mobius-code-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-side    && run mobius-side mobius-side-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n```\n'
 pick mobius-scheduled && run mobius-scheduled mobius-scheduled-test.sh mobius-nested.sh "$WIDE" HELIX_SCHEDULED_NO_SYSTEMD=1
@@ -89,9 +91,11 @@ pick mobius-dictate && run mobius-dictate mobius-dictate-test.sh mobius-nested.s
 pick mobius-library && run mobius-library mobius-library-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-settings && run mobius-settings mobius-settings-test.sh mobius-nested.sh "$WIDE"
 pick mobius-cloudmodels && run mobius-cloudmodels mobius-cloudmodels-test.sh mobius-cloud-nested.sh "$WIDE"
+pick mobius-picker && run mobius-picker mobius-picker-test.sh mobius-nested.sh "$WIDE"
 pick mobius-routing && run mobius-routing mobius-routing-test.sh mobius-routing-nested.sh "$WIDE"
 pick mobius-chatgpt && run mobius-chatgpt mobius-chatgpt-test.sh mobius-chatgpt-nested.sh "$WIDE"
 pick mobius-acp && run mobius-acp mobius-acp-test.sh mobius-acp-nested.sh "$WIDE"
+pick mobius-tasks && run mobius-tasks mobius-tasks-test.sh mobius-acp-nested.sh "$WIDE"
 pick mobius-import && run mobius-import mobius-import-test.sh mobius-import-nested.sh "$WIDE"
 pick mobius-hub && run mobius-hub mobius-hub-test.sh mobius-hub-nested.sh "$WIDE"
 pick mobius-knowledge && run mobius-knowledge mobius-knowledge-test.sh mobius-knowledge-nested.sh "$WIDE"

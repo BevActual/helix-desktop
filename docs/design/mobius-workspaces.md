@@ -105,7 +105,7 @@ Not done: moving a chat to a project from the page (the chat header still does i
 * **A place** ("Image" in the sidebar, the workspace menu, the palette) and **Edit** on any picture in a chat. A picture opens beside the chat; "Open a picture…" uses the system picker. `imagestage.tsx`, `imagestage.rs`, `imageops.rs`.
 * **Edits are descriptions, not code.** A fixed set (`Op`): crop, resize (percent or size), rotate (90, 180, 270), flip, brightness, contrast, black and white, invert, blur, sharpen, rectangle. Each is checked against the picture (nothing outside it, nothing out of range, up to 8,192 pixels a side, unknown fields refused) and applied by deterministic code with the `image` crate to a **copy**: every step is a new stored picture, the original is never written, and Undo, Redo and clicking a step in the history are only a position in the list (up to 30 steps per picture, 20 pictures per chat).
 * **Drag on the picture** to select an area, then "Crop to selection" or "Draw it" (a rectangle in the chosen colour); buttons and sliders for the rest; **Save as…** writes PNG, JPEG or WebP with the system dialog, never over an existing file.
-* **The model proposes in the same language.** A reply's fenced `imageops` block (a JSON list of up to ten of those descriptions) is drawn as a card, "Suggested picture edits", and **nothing is applied until the person presses Apply** on it, which applies them to the picture on the stage as steps they can undo. "Ask Mobius about this" sends a copy of the picture as it stands to the vision model with the next message.
+* **The model proposes in the same language.** A reply's fenced `imageops` block (a JSON list of up to ten of those descriptions) is drawn as a card, "Suggested picture edits", and **nothing is applied until the person accepts**: the card's *Preview on the picture* shows the result right on the canvas (`imgstage_preview` renders it without storing anything), with a checkbox per edit, and **Accept** (Ctrl+Enter) applies the chosen ones to the picture on the stage as steps they can undo, tagged Mobius; **Reject** (Esc) drops them. "Ask Mobius about this" sends a copy of the picture as it stands to the vision model with the next message.
 * Tests: five unit tests for the operations (bounds, injection-shaped JSON, the original untouched, PNG/JPEG round trip); `tools/nested/mobius-image-test.sh`.
 
 Not done: text annotation (needs a font), freehand and arrows, background removal (needs a model), layers, and a way to give the model the picture and its edit list so it can propose the next step from what it sees (the vision model can already be asked about the picture).
@@ -150,3 +150,87 @@ The Document stage is now a writing tool, not a text box. (Direction from the pe
 * **Export**: Markdown file, a self-contained HTML page (escaped, no scripts, nothing fetched, light and dark), and **Print or save as PDF** (the Read view with a print stylesheet), plus **Focus mode** (the chrome fades away; the document is all there is).
 
 Next for Write: smart punctuation, spelling suggestions through Mobius, a "make a table" block, and drag to reorder sections from the outline.
+
+## One set of tools for people and machines, and a Bots mode (direction, 2026-10-18)
+
+The direction from the person: each mode should grow into the kind of environment its work needs (Word for writing, Photoshop for pictures, an IDE for code), and **what a person can do there, a machine can do too**, through the same tools. Then **a Bots mode**, where several bots use those tools together to get a task done.
+
+**Principle.** A stage owns one list of *named, typed operations* (the image `Op` set is the model: crop, resize, rotate...). The buttons a person presses, the suggestions the model makes, and the calls an agent sends are all that same list, checked by the same code, written to the same history, undone by the same Undo. There is no second, privileged path for machines and no hidden one for people.
+
+* **Attribution.** Every history step says who made it. Built for the Image stage (`by`: you, or Mobius when the person applied its suggestion, shown as a tag in the history); Write versions already record who made them; Code edits come with the agent's name. Bots will each have their own name.
+* **Same undo.** A bot's change is a step like any other, so one Undo reverses it; nothing a bot does is outside the history.
+* **Reachable from outside.** The same operation lists can be offered to an external agent (through ACP today for files and terminals, and an MCP server for stage operations next), with the same approvals.
+
+**Environments, per mode.** Write gains what a word processor has (styles, page view, comments and suggestions in the margin, tables, find across documents); Image gains a tool rail, an options bar, layers and a history panel (the Contextual Task Bar idea from the research above); Code gains a real file tree, tabs, search, a terminal and test output on the stage, and diagnostics. The layout is the mode's, not shared: panels dock where that kind of work expects them.
+
+**Bots mode.** A place where the person gives a goal and a small team of bots works on it:
+
+* A **bot** is a role (Researcher, Writer, Editor, Coder, Reviewer, Illustrator) with a model, instructions, and a **tool allowance**: which stages' operations it may use. Nothing is granted by default; a Writer cannot run a terminal because the allowance says so, not because the prompt asks.
+* They work **in tandem on the shared stages**: one drafts a document, another proposes edits to it, a third makes the picture. Handing over is a visible message between bots, kept in the transcript.
+* The person sees a **board**: each bot, what it is doing, what it changed (attributed steps), what waits for approval. **Stop all** is always one click; each bot has a step and time budget; anything that changes files outside the stages, runs a command or leaves the computer needs approval exactly as for a single agent. Bots use models on this computer unless the person allows a cloud route, and Act never uses one.
+* It needs, in order: the shared operation registry per stage (Write and Code first, Image has it), attribution everywhere, a scheduler that gives each bot turns and enforces budgets, then the board.
+
+### Write operations (built, first slice of the shared tools)
+
+The Document stage now has its operation list, `docops.rs`: `replace` (one passage, or `all`), `delete`, `insert_after` (after the line holding an anchor), `replace_section` (everything under a heading up to the next one of the same or higher level; headings inside code fences do not count) and `append`. Each is checked against the text (the passage must exist and be the only one unless `all` is said; unknown operations and fields are refused; at most 10 edits of 20,000 characters), applied all or nothing, and recorded as a new version, so Undo is History. A reply's fenced `docops` block (a JSON list) is drawn as a card, "Suggested document edits", listing each edit in words, with **Review in the document**: the edits open as a pending change *on the page* (`stage_preview` computes the result without recording it): each edit has a checkbox, the diff shows what the ones left on would do, **Accept** (Ctrl+Enter) applies them as one new version and **Reject** (Esc) drops them. **Nothing changes until Accept.** The open document is sent to the model with a short note on this format, so small changes come back as edits instead of a whole rewrite. `stage_apply` takes the same list from any caller, which is what the toolbar and, later, outside agents will use. Tests: six unit tests (`cargo test docops`) and `tools/nested/mobius-docops-test.sh`.
+
+Not done: the toolbar and the selection bar going through `stage_apply` (they still write whole text through the editor), margin comments and suggestions as operations, and attributing versions to a named bot.
+
+## The chat shapes itself to the mode (research, 2026-10-18)
+
+The direction from the person: the chat window should transform to fit the format of the mode, not stay a conversation column beside every stage. Researched from documentation and write-ups (not used hands-on): Zed's agent panel docs, the Cursor 2.0 Agents view and forum threads about it, Adobe's March 2026 announcement of the Photoshop and Firefly AI Assistant, and comparisons of Claude Artifacts, ChatGPT Canvas and Perplexity Spaces; plus the Cursor study already in `mobius-research-2026-10.md`.
+
+**What the others do**
+
+| Tool | What the assistant looks like | What to take |
+|---|---|---|
+| Cursor 2.0 | Two layouts: the editor (files left, chat on the side) and an **Agents view** where the *agents are the sidebar* (each with status, progress, a log) and the work is what they produced; parallel agents on one task, results compared | In Code the chat becomes a list of **tasks with state**, not one long thread |
+| Zed | Agent panel with **threads** (several at once, a sidebar of them), **terminal threads** beside agent threads, a **Review Changes** view with per-hunk accept or reject, **Restore Checkpoint**, a **follow the agent** switch that jumps the editor to each file it touches, `@` mentions for files, symbols, diagnostics, selection | Review is on the work, per hunk; following is a switch; threads are cheap |
+| Photoshop / Firefly | A chat assistant that either applies edits or **walks through them step by step**; a **Contextual Task Bar** that follows the selection; **AI Markup**: draw on the picture and write a prompt for *that* area; voice | In Image the prompt belongs **on the picture**, next to the selection; and a choice between "do it" and "show me how" |
+| ChatGPT Canvas | Document beside chat; select text and ask; suggestions applied in one click; versions kept automatically; opens by itself when the task fits | Already matched (Write); the self-opening should stay a suggestion |
+| Claude Artifacts | Document beside chat, mostly viewed (edited by the model); runs code to preview | The *preview* is part of the stage (run what was made) |
+| Perplexity Spaces | A shared project space with uploaded sources; answers with citations | Projects and the knowledge store, not a stage |
+
+**The idea they share.** The conversation is one *surface* of the assistant, not the assistant. In each tool the assistant has several: a prompt where the person is looking (the task bar, the selection), results as *pending changes on the work* (hunks, tracked suggestions, a preview) and not as text to copy, a status view for things running, and the full conversation behind a click for when talk is the point.
+
+**Design for Mobius: a dock with four presentations.** The chat (the "dock") keeps one conversation and one history, but each workspace chooses how it is drawn:
+
+1. **Conversation** (Chat): the thread as today.
+2. **Margin** (Write): the thread collapses to a quiet column of cards anchored to the document: a suggestion beside the paragraph it concerns, accept or reject in place; the composer is a single line under the page ("Ask about this document", with Shorter, Continue, Outline as chips). The full thread opens from a button.
+3. **Task bar** (Image): the prompt is a bar that follows the selection on the canvas ("Describe", "Remove", "Make it warmer" for this area); the model's suggested edits show as chips in the options bar with a ghost preview on hover, applied on click; a switch picks *Apply* or *Show me step by step*; the conversation is the History tab (each prompt next to the steps it made).
+4. **Tasks** (Code, and later Bots): the thread becomes a list of tasks, each with a state (running, needs you, done), its step timeline (already built) and its changed files; a task opens to its full thread; several can run; a *follow* switch makes the Code stage open each file as the agent touches it; terminal output is a task of its own.
+
+**How it is built without five chats.** A workspace declares, in one object: its **dock presentation**, the **composer** (placeholder, quick-action chips, what `@` offers), the **default context chips** (open document, selection, folder), the **shortcuts**, and which **reply blocks are stage-bound**. A stage-bound block (`artifact`, `docops`, `imageops`, `edit_file`) is not drawn in the dock as a card to press; it becomes a *pending change on the stage* (ghost text or hunk, ghost preview, diff) with accept and reject there, and the dock keeps a one-line summary ("3 edits proposed"). This is the same rule as the shared tools: the model's output and the person's are the same operations, so they appear in the same place, differing only in the attribution tag.
+
+**Order of work**
+
+1. The **workspace descriptor** and the dock presentations: composer text and quick-action chips per workspace (cheap, visible at once), then the Margin and the Task bar presentations.
+2. **Stage-bound pending changes**: `docops` as a diff on the page with per-edit accept or reject; `imageops` as a ghost preview with Apply; both keep the dock summary.
+3. **Tasks** for Code: the list, states and the follow switch (the timeline and permission cards exist).
+4. **Voice** on the Task bar (dictation exists) and **Show me step by step** on Image.
+5. The same descriptor is what a **bot** is given: its allowed stages, composer-less, with its output going to the stage and the board.
+
+Open questions, to decide by trying them: whether the Margin should be anchored (needs the document to keep stable ranges for comments) or a simple column; whether the dock should ever hide completely in a stage (the focus layout already floats it); and how a single chat shows when two stages are open (Write and Image for a document with pictures).
+
+### Panes the person can shape, and the first dock presentation (built)
+
+From the person's note after looking at Cursor: the panes should be **resizable and movable**.
+
+* **Resize.** A divider on the edge of the work area: drag it, or focus it and use the arrow keys (Shift for bigger steps), double-click or Home to go back to the default. The width is remembered **per workspace** (Write, Image and Code each keep their own), clamped between 300 px and about 78 % of the window. It is a separate `role="separator"` element with a label, so it works from the keyboard and with a screen reader.
+* **Move, to any edge.** The ⇄ handle in the chat header: **drag** it toward an edge of the window and a translucent preview shows where the work area will sit (left, right, above or below the chat); or **click** it for a menu of the four places (keyboard reachable). The position is remembered; above and below keep their own height, remembered per workspace like the width, and the divider then resizes vertically (Up and Down arrows). Under 900 px wide the stage already takes the whole window, so these controls do not show there; the focus layout (chat floating over the work) is unchanged and hides them.
+* **Starters per mode.** While a work mode's chat is empty, the general welcome cards give way to what fits: Write offers *Make it shorter, Fix spelling and grammar, Continue writing, Suggest an outline*; Image offers *Describe this picture, Brighter, Black and white, Crop to a square* (these carry the `imageops` format so a small model answers in edits the person can apply); Code offers *Explain this project, Find likely bugs, Add tests, Summarise recent changes*. The composer's wording follows the mode too ("Ask, or say what to change"). One descriptor object, `WORKSPACE_UI` in `chat.js`, holds this; the rest of the descriptor (dock presentation, default context, stage-bound blocks) is still to come.
+* Tests: `tools/nested/mobius-panes-test.sh` (drag widens the stage, per-workspace memory, reset, the other side and back, the starters change with the mode and one sends its prompt).
+
+Not done: splitting the work area itself (two stages side by side, for a document and the picture it uses), tearing a pane off into its own window, and a saved layout per project. Next: the Margin and Task bar presentations.
+
+### Code: tasks and Follow (built)
+
+The Code stage's side column has two tabs, **Files** and **Tasks**. Every request in the chat is a task (`codeTasks()` in `chat.js`, from the messages and their activities): newest first, with a state (**Running**, **Needs you** with a ringed row while the agent waits for an approval, **Failed**, **Done**), the request's first line, and "3 steps · 1 file changed". Clicking one scrolls the conversation to that request. A pulsing dot on the tab shows something is running. **Follow** (header, remembered, off by default as in Zed) opens in the viewer each file the agent touches while it works, taken from the newest step that names a file of the project. `tools/nested/mobius-tasks-test.sh` runs the fake agent and checks Needs you, Done and Follow.
+
+Not done: tasks that run in parallel (one chat is still one turn at a time), a task opening to its own thread, and terminal output as a task of its own.
+
+### Image: a prompt bar that follows the selection (built)
+
+Drag a rectangle on the picture (Crop or Box tool) and a small bar appears beside it: **Describe**, **Read the text**, and a field, "Ask about this area…" (Enter sends, Esc clears the selection). The area is copied as a picture of its own (`imgstage_region`; the document is untouched) and goes to the vision model with the question as a normal message, so the answer lands in the chat. The idea is Photoshop's Contextual Task Bar and AI Markup: the prompt is where the person is looking. It asks *about* an area; edits still come from the toolbar or the model's previewed suggestions, because the edit operations apply to the whole picture except crop and box. Tests: `tools/nested/mobius-image-test.sh`.
+
+Not done: editing *within* an area (blur this part, brighten that), which needs region-aware operations in `imageops.rs`; then the same bar can offer them and the model can suggest them with coordinates.

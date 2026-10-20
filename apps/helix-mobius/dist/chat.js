@@ -377,7 +377,8 @@ function attachmentPayload() {
   const files = pendingAttachments.map((a) => ({ name: a.name, content: a.content, original_chars: a.original_chars }));
   if (stageOpen && stageAttach && stageOpen.text.trim()) {
     const text = stageOpen.text;
-    files.unshift({ name: `${stageOpen.title} (the open document)`, content: Array.from(text).slice(0, 6000).join(""), original_chars: Array.from(text).length });
+    const how = "\n\n[To change this document, reply with a ```docops block holding a JSON list (at most 10) of edits, each one of: {\"op\":\"replace\",\"find\":\"exact old text\",\"with\":\"new text\"}, {\"op\":\"delete\",\"find\":\"...\"}, {\"op\":\"insert_after\",\"anchor\":\"exact text on a line\",\"text\":\"...\"}, {\"op\":\"replace_section\",\"heading\":\"Heading text\",\"text\":\"...\"}, {\"op\":\"append\",\"text\":\"...\"}. Use this for small changes; for a full rewrite use an artifact block.]";
+    files.unshift({ name: `${stageOpen.title} (the open document)`, content: Array.from(text).slice(0, 6000).join("") + how, original_chars: Array.from(text).length });
   }
   return files;
 }
@@ -940,6 +941,63 @@ function toolsChipLabel() {
   return `Tools · ${name}`;
 }
 
+// What each workspace asks of the chat (docs/design/mobius-workspaces.md, "The chat shapes itself to the mode"): the composer's wording and the
+// starters shown while the conversation is empty. The model is told the stage's edit format in the starter itself, so a small change comes back as
+// edits the person applies, not a rewrite.
+const IMAGE_FORMAT = " If it needs edits, reply with one ```imageops block: a JSON list (at most 10) of {\"op\":\"crop\",\"x\":0,\"y\":0,\"w\":100,\"h\":100}, {\"op\":\"resize\",\"percent\":50}, {\"op\":\"rotate\",\"degrees\":90}, {\"op\":\"flip\",\"axis\":\"horizontal\"}, {\"op\":\"brightness\",\"amount\":20}, {\"op\":\"contrast\",\"amount\":20}, {\"op\":\"grayscale\"}, {\"op\":\"invert\"}, {\"op\":\"blur\",\"sigma\":3}, {\"op\":\"sharpen\",\"amount\":2}.";
+const WORKSPACE_UI = {
+  write: {
+    placeholder: "Ask, or say what to change",
+    title: "Write with Mobius",
+    note: "Mobius reads the open document. Small changes come back as edits you apply.",
+    starters: [
+      ["Make it shorter", "Make the document shorter and keep its meaning."],
+      ["Fix spelling and grammar", "Fix spelling and grammar. Change as little else as you can."],
+      ["Continue writing", "Continue the document with the next section."],
+      ["Suggest an outline", "Suggest an outline for this document."],
+    ],
+  },
+  image: {
+    placeholder: "Describe a change to this picture",
+    title: "Edit a picture with Mobius",
+    note: "Open a picture, then ask. Suggested edits wait for you to apply them.",
+    starters: [
+      ["Describe this picture", "Describe this picture."],
+      ["Brighter, more contrast", "Make the picture a little brighter with more contrast." + IMAGE_FORMAT],
+      ["Black and white", "Make the picture black and white." + IMAGE_FORMAT],
+      ["Crop to a square", "Crop the picture to a centred square." + IMAGE_FORMAT],
+    ],
+  },
+  code: {
+    placeholder: "Ask about the project, or give a task",
+    title: "Work on code with Mobius",
+    note: "Each step is shown, and every change waits for your review.",
+    starters: [
+      ["Explain this project", "Explain what this project is and how it is organised."],
+      ["Find likely bugs", "Read the main files and point out likely bugs."],
+      ["Add tests", "Suggest tests this project is missing, and write the first one."],
+      ["Summarise recent changes", "Summarise what changed recently in this project."],
+    ],
+  },
+};
+function drawModeStarters() {
+  const host = $("mode-starters"), ui = WORKSPACE_UI[workspace];
+  const empty = view.messages.length === 0 && (view.tasks || []).length === 0;
+  $("empty").hidden = !empty || !!ui;
+  host.hidden = !(empty && ui);
+  host.replaceChildren();
+  if (host.hidden) return;
+  host.append(el("h3", "", ui.title), el("p", "", ui.note));
+  const row = el("div", "mode-starter-row");
+  for (const [label, prompt] of ui.starters) {
+    const b = el("button", "mode-starter", label);
+    b.type = "button"; b.dataset.test = "starter-" + label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-$/, "");
+    b.onclick = () => sendPlain(prompt);
+    row.append(b);
+  }
+  host.append(row);
+}
+
 function composerPlaceholder() {
   if (listening || dictationBusy === "transcribing") return;
   if (view.analysis_job) {
@@ -948,6 +1006,8 @@ function composerPlaceholder() {
   }
   input.placeholder = composerAct
     ? "Say what to do on the desktop"
+    : WORKSPACE_UI[workspace] && !view.tools_enabled
+    ? WORKSPACE_UI[workspace].placeholder
     : view.tools_enabled
     ? "Ask a task — each step is shown for your approval"
     : "Message Mobius — / for commands";
@@ -1078,6 +1138,8 @@ function drawChat() {
   }
   const emptyChat = view.messages.length === 0 && (view.tasks || []).length === 0;
   $("empty").hidden = !emptyChat;
+  drawModeStarters();
+  if (workspace === "code") reactCode?.update();
   // An empty chat is a home: the greeting and the composer sit in the middle of the window, and the composer settles to the bottom with the first message.
   setHome(emptyChat && workspace === "chat");
   $("send").hidden = view.streaming;
@@ -1196,6 +1258,10 @@ const reactThread = window.HelixMobiusReact
     act: (text) => actOnDesktop(text),
     stage: (title, body) => reactStage?.open(title, body),
     editPicture: (id) => setWorkspace("image", id),
+    applyDocEdits: (ops) => {
+      if (!stageOpen) { report("Open the document on the Write stage first."); return; }
+      reactStage?.propose(ops);
+    },
     applyEdits: (ops) => { if (workspace !== "image") report("Open the picture on the Image stage first (Edit on a picture, or the Image place)."); else reactImage?.apply(ops); },
     quote: (text) => {
       const prefix = input.value && !input.value.endsWith("\n") ? "\n\n" : "";
@@ -2515,6 +2581,7 @@ $("open-routing").onclick = () => openRouting().catch(report);
 $("open-models").onclick = () => openRouting().catch(report);
 $("route-chip").onclick = () => openRouting().catch(report);
 $("meta-route").onclick = () => openRouting().catch(report);
+window.addEventListener("mobius-create-image", () => openCreateImage());
 window.addEventListener("mobius-open-models", (event) => openRouting(event.detail?.section).catch(report));
 $("models-back").onclick = () => {
   if (modelsDirty && !window.confirm("Discard unsaved model changes?")) return;
@@ -2756,6 +2823,7 @@ function paletteItems(query) {
 }
 
 // The stage (docs/design/mobius-workspaces.md): the open document goes to the model with the next message, as a chip that can be dropped.
+var stageReady = false, stageWidthFor = "";
 let stageOpen = null;      // { title, text } while a document is open
 let stageAttach = true;    // whether it is sent with the next message
 let workspace = "chat";    // chat | write | code: how the window is laid out (docs/design/mobius-workspaces.md)
@@ -2765,8 +2833,11 @@ function drawStageChip() {
   chip.hidden = !stageOpen;
   for (const id of ["chat", "write", "image", "code"]) $("mode-" + id).classList.toggle("active", workspace === id);
   $("workspace-btn").textContent = ({ chat: "Chat", write: "Write", image: "Image", code: "Code" })[workspace] + " ▾";
+  document.body.dataset.workspace = workspace;
   document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code" || workspace === "image");
   drawLayout();
+  if (typeof view !== "undefined" && view && view.messages) { drawModeStarters(); composerPlaceholder(); }
+  if (stageReady) { if (stageWidthFor !== workspace) { stageWidthFor = workspace; loadStageWidth(); } drawStageSide(); }
   if (!stageOpen) return;
   chip.textContent = stageAttach ? `${stageOpen.title} · sent with your message ×` : `${stageOpen.title} · not sent (click to send)`;
   chip.classList.toggle("off", !stageAttach);
@@ -2791,6 +2862,124 @@ function toggleLayout() {
   drawLayout();
 }
 $("layout-btn").onclick = () => toggleLayout();
+
+// The work area is the person's to shape: drag the divider (or use the arrow keys on it) to set its width, double-click to reset it; the width is
+// remembered per workspace. The ⇄ button puts it on the other side of the chat.
+const STAGE_MIN = 300, STAGE_MIN_H = 160;
+const DOCKS = [["right", "Right of the chat"], ["left", "Left of the chat"], ["bottom", "Below the chat"], ["top", "Above the chat"]];
+let stageDock = "right";
+try {
+  const saved = localStorage.getItem("mobius-stage-dock") || localStorage.getItem("mobius-stage-side");
+  if (["right", "left", "bottom", "top"].includes(saved)) stageDock = saved;
+} catch { /* not remembered */ }
+const stageVertical = () => stageDock === "bottom" || stageDock === "top";
+function stageSizeKey() { return (stageVertical() ? "mobius-stage-h-" : "mobius-stage-w-") + workspace; }
+function setStageWidth(px, remember) {
+  const app = $("app"), name = stageVertical() ? "--stage-h" : "--stage-w";
+  app.style.removeProperty("--stage-w"); app.style.removeProperty("--stage-h");
+  if (px) app.style.setProperty(name, Math.round(px) + "px");
+  if (remember) { try { px ? localStorage.setItem(stageSizeKey(), String(Math.round(px))) : localStorage.removeItem(stageSizeKey()); } catch { /* not remembered */ } }
+}
+function loadStageWidth() {
+  let saved = 0;
+  try { saved = Number(localStorage.getItem(stageSizeKey())) || 0; } catch { /* not remembered */ }
+  setStageWidth(saved >= (stageVertical() ? STAGE_MIN_H : STAGE_MIN) ? saved : 0, false);
+}
+function stageMax() { return stageVertical() ? Math.max(STAGE_MIN_H, window.innerHeight * 0.7) : Math.max(STAGE_MIN, Math.min(window.innerWidth * 0.78, window.innerWidth - 56 - 340)); }
+function clampStage(px) { return Math.max(stageVertical() ? STAGE_MIN_H : STAGE_MIN, Math.min(stageMax(), px)); }
+function drawStageSide() {
+  for (const [id] of DOCKS) document.body.classList.toggle("stage-" + id, stageDock === id && id !== "right");
+  $("stage-resizer").setAttribute("aria-orientation", stageVertical() ? "horizontal" : "vertical");
+  $("stage-side-btn").hidden = !document.body.classList.contains("stage-open");
+}
+function setDock(next) {
+  if (!DOCKS.some(([id]) => id === next) || next === stageDock) return;
+  stageDock = next;
+  try { localStorage.setItem("mobius-stage-dock", next); } catch { /* not remembered */ }
+  drawStageSide(); loadStageWidth();
+}
+// Moving the work area: drag the ⇄ handle to an edge of the window (a preview shows where it will sit), or click it for a menu.
+function dockAt(x, y) {
+  const fx = x / window.innerWidth, fy = y / window.innerHeight;
+  if (fx < 0.22) return "left";
+  if (fx > 0.78) return "right";
+  if (fy < 0.3) return "top";
+  if (fy > 0.7) return "bottom";
+  return stageDock;
+}
+function openDockMenu() {
+  document.querySelectorAll(".dock-menu").forEach((m) => m.remove());
+  const box = $("stage-side-btn").getBoundingClientRect();
+  const menu = el("div", "hx-menu dock-menu"); menu.dataset.test = "dock-menu"; menu.setAttribute("role", "menu");
+  menu.style.right = (window.innerWidth - box.right) + "px"; menu.style.top = (box.bottom + 6) + "px"; menu.style.bottom = "auto"; menu.style.minWidth = "200px";
+  for (const [id, label] of DOCKS) {
+    const b = el("button", "hx-menu-item" + (id === stageDock ? " current" : ""));
+    b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(id === stageDock)); b.dataset.test = "dock-" + id;
+    b.append(el("span", "mi-text", label));
+    b.onclick = () => { menu.remove(); setDock(id); };
+    menu.append(b);
+  }
+  document.body.append(menu);
+  const close = (event) => { if (!menu.contains(event.target)) { menu.remove(); document.removeEventListener("pointerdown", close, true); } };
+  setTimeout(() => document.addEventListener("pointerdown", close, true), 0);
+  menu.addEventListener("keydown", (event) => { if (event.key === "Escape") { menu.remove(); $("stage-side-btn").focus(); } });
+  menu.querySelector(".current, button")?.focus();
+}
+(() => {
+  const bar = $("stage-resizer"), host = $("stage-host"), handle = $("stage-side-btn");
+  const current = () => { const r = host.getBoundingClientRect(); return stageVertical() ? r.height : r.width; };
+  bar.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    bar.setPointerCapture(event.pointerId);
+    bar.classList.add("dragging"); document.body.classList.add("stage-dragging");
+  });
+  bar.addEventListener("pointermove", (event) => {
+    if (!bar.hasPointerCapture(event.pointerId)) return;
+    const r = host.getBoundingClientRect();
+    const px = stageDock === "left" ? event.clientX - r.left : stageDock === "right" ? r.right - event.clientX : stageDock === "top" ? event.clientY - r.top : r.bottom - event.clientY;
+    setStageWidth(clampStage(px), false);
+  });
+  const done = (event) => {
+    if (!bar.hasPointerCapture(event.pointerId)) return;
+    bar.releasePointerCapture(event.pointerId);
+    bar.classList.remove("dragging"); document.body.classList.remove("stage-dragging");
+    setStageWidth(clampStage(current()), true);
+  };
+  bar.addEventListener("pointerup", done); bar.addEventListener("pointercancel", done);
+  bar.addEventListener("dblclick", () => setStageWidth(0, true));
+  bar.addEventListener("keydown", (event) => {
+    const [more, less] = stageDock === "left" ? ["ArrowRight", "ArrowLeft"] : stageDock === "right" ? ["ArrowLeft", "ArrowRight"] : stageDock === "top" ? ["ArrowDown", "ArrowUp"] : ["ArrowUp", "ArrowDown"];
+    if (event.key !== more && event.key !== less && event.key !== "Home" && event.key !== "Enter") return;
+    event.preventDefault();
+    if (event.key === "Home" || event.key === "Enter") { setStageWidth(0, true); return; }
+    setStageWidth(clampStage(current() + (event.key === more ? 32 : -32) * (event.shiftKey ? 4 : 1)), true);
+  });
+  // The handle: a press that moves is a drag to an edge, a press that does not is a click for the menu.
+  let press = null, preview = null;
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    press = { x: event.clientX, y: event.clientY, moved: false }; handle.setPointerCapture(event.pointerId);
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (!press) return;
+    if (!press.moved && Math.hypot(event.clientX - press.x, event.clientY - press.y) < 8) return;
+    press.moved = true;
+    if (!preview) { preview = el("div", "dock-preview"); preview.dataset.test = "dock-preview"; document.body.append(preview); document.body.classList.add("stage-dragging"); }
+    const target = dockAt(event.clientX, event.clientY);
+    preview.dataset.dock = target;
+  });
+  const release = (event) => {
+    if (!press) return;
+    const was = press; press = null;
+    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    if (preview) { const target = preview.dataset.dock; preview.remove(); preview = null; document.body.classList.remove("stage-dragging"); if (target) setDock(target); }
+    else if (!was.moved && event.type === "pointerup") openDockMenu();
+  };
+  handle.addEventListener("pointerup", release); handle.addEventListener("pointercancel", release);
+  handle.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDockMenu(); } });
+  stageReady = true; stageWidthFor = workspace; loadStageWidth(); drawStageSide();
+  window.addEventListener("resize", () => { const app = $("app"); if (getComputedStyle(app).getPropertyValue(stageVertical() ? "--stage-h" : "--stage-w")) setStageWidth(clampStage(current()), false); });
+})();
 const reactStage = window.HelixMobiusReact?.stage($("stage-doc"), {
   chatId: () => view.id,
   report: (error) => report(error),
@@ -2810,11 +2999,40 @@ const reactCode = window.HelixMobiusReact?.codeStage($("stage-code"), {
     return null;
   },
   shown: (open) => { stageOpen = open; stageAttach = true; drawStageChip(); },
+  tasks: () => codeTasks(),
+  reveal: (index) => document.querySelector(`[data-test="msg-${index}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" }),
 });
+// Each request in this chat as a task: its state and what the agent did for it (the Code stage's Tasks list, and what Follow watches).
+function codeTasks() {
+  const out = [], m = view.messages;
+  for (let i = 0; i < m.length; i++) {
+    if (m[i].role !== "user") continue;
+    const reply = m[i + 1] && m[i + 1].role === "assistant" ? m[i + 1] : null;
+    const acts = (reply && reply.activities) || [];
+    const live = view.streaming && (reply ? i + 1 === m.length - 1 : i === m.length - 1);
+    const state = acts.some((a) => a.state === "waiting") ? "waiting" : live ? "running" : acts.some((a) => a.state === "failed") ? "failed" : reply ? "done" : "pending";
+    const work = acts.filter((a) => a.tool !== "changes" && a.tool !== "planning");
+    let changed = 0;
+    const summary = acts.find((a) => a.tool === "changes");
+    if (summary) { try { changed = JSON.parse(summary.input).length; } catch { /* no count */ } }
+    else changed = acts.filter((a) => a.tool === "edit_file" && a.state === "completed").length;
+    out.push({ index: i, request: m[i].text || "", state, steps: work.length, changed, inputs: work.map((a) => a.input || "") });
+  }
+  return out;
+}
 const reactImage = window.HelixMobiusReact?.imageStage($("stage-image"), {
   chatId: () => view.id,
   report: (error) => report(error),
   ask: (id) => addPictures([id]),
+  askAbout: (id, text) => {
+    addPictures([id]);
+    let tries = 0;
+    const go = () => {
+      if (pendingPictures.some((p) => p.id === id)) { input.value = text; grow(); $("composer").requestSubmit(); }
+      else if (++tries < 40) setTimeout(go, 50);
+    };
+    go();
+  },
   active: () => {},
 });
 function setWorkspace(next, doc) {

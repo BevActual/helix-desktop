@@ -60,6 +60,7 @@
           <button id="pin-chat" class="icon-btn" data-test="pin-chat" type="button" title="Pin chat" aria-label="Pin chat" hidden><i data-icon="pin"></i></button>
           <button id="project-chat" class="icon-btn" data-test="project-chat" type="button" title="Move to project" aria-label="Move to project" hidden><i data-icon="folder"></i></button>
           <button id="layout-btn" class="icon-btn layout-btn" data-test="layout-btn" type="button" hidden title="Focus the work: the chat becomes a small window over it (Ctrl+\)" aria-label="Focus the work">⤢</button>
+          <button id="stage-side-btn" class="icon-btn layout-btn" data-test="stage-side-btn" type="button" hidden title="Move the work area: drag to an edge of the window, or click for a menu" aria-label="Move the work area" aria-haspopup="menu">⇄</button>
           <button id="workspace-btn" class="route-chip workspace-btn" data-test="workspace" type="button" title="Workspace: how this window is laid out for the work">Chat ▾</button>
           <button id="route-chip" class="route-chip" data-test="route-chip" type="button" hidden title="Models and routing"></button>
         </div>
@@ -76,7 +77,7 @@
       <section id="persona-rail" class="persona-rail" data-test="persona-rail" aria-label="Personas">
         <div id="persona-dots" class="persona-dots" data-test="persona" role="listbox" aria-label="Choose a persona"></div>
       </section>
-      <div id="scroller"><div id="messages" data-test="messages"></div><div id="empty" data-test="empty"></div></div>
+      <div id="scroller"><div id="messages" data-test="messages"></div><div id="empty" data-test="empty"></div><div id="mode-starters" class="mode-starters" data-test="mode-starters" hidden></div></div>
       <button id="jump-latest" class="jump-latest" data-test="jump-latest" type="button" hidden title="Jump to latest">Latest</button>
       <div class="composer-wrap">
         <div id="act-task-host" data-test="act-task-host"></div>
@@ -230,7 +231,7 @@
       <input id="route-model-search" type="hidden">
     </section>
   </main>
-  <section id="stage-host" class="stage-host" data-test="stage-host"><div id="stage-doc" style="display: contents"></div><div id="stage-code" style="display: contents"></div><div id="stage-image" style="display: contents"></div></section>
+  <section id="stage-host" class="stage-host" data-test="stage-host"><div id="stage-resizer" class="stage-resizer" data-test="stage-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the work area" tabindex="0"></div><div id="stage-doc" style="display: contents"></div><div id="stage-code" style="display: contents"></div><div id="stage-image" style="display: contents"></div></section>
 </div>
 
 <div id="dialogs-host" style="display: contents">

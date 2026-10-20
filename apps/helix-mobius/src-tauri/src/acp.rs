@@ -362,13 +362,24 @@ pub fn plan_text(entries: &[helix_acp::PlanEntry]) -> String {
         .join("\n")
 }
 
+/// A path as the person reads it: inside the project it is relative to the folder, so `notes.txt` and not `/home/me/work/project/notes.txt`.
+pub fn short_path(folder: &Path, path: &str) -> String {
+    Path::new(path)
+        .strip_prefix(folder)
+        .ok()
+        .and_then(Path::to_str)
+        .filter(|p| !p.is_empty())
+        .unwrap_or(path)
+        .to_string()
+}
+
 /// What a card says for a tool call: its title and the files it touches.
-pub fn tool_input(title: &str, locations: &[helix_acp::ToolLocation]) -> String {
+pub fn tool_input(folder: &Path, title: &str, locations: &[helix_acp::ToolLocation]) -> String {
     let mut text = title.to_string();
     for l in locations.iter().take(5) {
         text.push_str(&format!(
             "\n{}{}",
-            l.path,
+            short_path(folder, &l.path),
             l.line.map(|n| format!(":{n}")).unwrap_or_default()
         ));
     }
@@ -452,6 +463,7 @@ struct Terminal {
 }
 
 struct Turn {
+    folder: PathBuf,
     generation: u64,
     operation: u64,
     stream: Stream,
@@ -673,7 +685,7 @@ impl Bridge {
             .map(kind_word)
             .unwrap_or("agent_step");
         let locations = request.tool_call.locations.clone().unwrap_or_default();
-        let input = format!("{}\n({kind})", tool_input(&title, &locations));
+        let input = format!("{}\n({kind})", tool_input(&self.folder, &title, &locations));
         let one_time = request
             .options
             .iter()
@@ -859,6 +871,7 @@ fn handle_update(app: &AppHandle, turn: &Arc<Mutex<Option<Turn>>>, update: Sessi
     let mut guard = turn.lock().expect("turn");
     let Some(t) = guard.as_mut() else { return };
     let (generation, operation) = (t.generation, t.operation);
+    let folder = t.folder.clone();
     match update {
         SessionUpdate::AgentMessage(ContentBlock::Text { text }) => {
             let shown = t.stream.message(&text);
@@ -871,7 +884,7 @@ fn handle_update(app: &AppHandle, turn: &Arc<Mutex<Option<Turn>>>, update: Sessi
             push_text(app, generation, operation, &shown);
         }
         SessionUpdate::ToolCall(call) => {
-            let input = tool_input(&call.title, &call.locations);
+            let input = tool_input(&folder, &call.title, &call.locations);
             t.tools.insert(
                 call.id.clone(),
                 (kind_word(call.kind).to_string(), input.clone()),
@@ -896,7 +909,9 @@ fn handle_update(app: &AppHandle, turn: &Arc<Mutex<Option<Turn>>>, update: Sessi
                 )
             });
             let input = match (&u.title, &u.locations) {
-                (Some(title), locations) => tool_input(title, locations.as_deref().unwrap_or(&[])),
+                (Some(title), locations) => {
+                    tool_input(&folder, title, locations.as_deref().unwrap_or(&[]))
+                }
                 _ => input,
             };
             t.tools.insert(u.id.clone(), (kind.clone(), input.clone()));
@@ -1132,6 +1147,7 @@ async fn drive(
 
     let (client, session, shared_turn, handled) = ensure_live(app, &def, &folder, &chat).await?;
     *shared_turn.lock().expect("turn") = Some(Turn {
+        folder: folder.clone(),
         generation: turn.generation,
         operation,
         stream: Stream::default(),
@@ -1414,8 +1430,13 @@ mod tests {
             },
         ];
         assert_eq!(
-            tool_input("Edit a", &locations),
-            "Edit a\n/p/a.rs:3\n/p/b.rs"
+            tool_input(Path::new("/p"), "Edit a", &locations),
+            "Edit a\na.rs:3\nb.rs"
+        );
+        assert_eq!(
+            tool_input(Path::new("/q"), "Edit a", &locations),
+            "Edit a\n/p/a.rs:3\n/p/b.rs",
+            "outside the project the full path stays"
         );
         let content = vec![
             json!({"type": "content", "content": {"type": "text", "text": "ok"}}),

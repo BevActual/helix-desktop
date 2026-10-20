@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
 import { eligible, listOrder, reason, recommend, specialist, type Job, type ModelCard } from "./recommend";
 import { CloudModels, type CloudView } from "./cloudmodels";
+import { ModelPicker } from "./modelpicker";
 import { type RouteOptions, RouteEditor } from "./cloudroute";
 import { Icon, Picker, type Option } from "./settingsui";
 import { HubFind } from "./hubfind";
@@ -10,11 +11,12 @@ import { AgentsPanel } from "./agents";
 import { ChatGPTPlan, type ChatGPTStatus } from "./chatgptplan";
 
 type Source = "local" | "lan" | "openrouter";
-type Section = "models" | "library" | "cloud" | "knowledge" | "agents" | "providers" | "generation" | "experiments";
+type Section = "models" | "picker" | "library" | "cloud" | "knowledge" | "agents" | "providers" | "generation" | "experiments";
 type Task = "chat" | "act" | "code" | "summarize" | "vision";
 
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: "models", label: "Models", icon: "sparkle" },
+  { id: "picker", label: "Model picker", icon: "grid" },
   { id: "library", label: "Library", icon: "grid" },
   { id: "cloud", label: "Cloud models", icon: "bolt" },
   { id: "knowledge", label: "Knowledge", icon: "folder" },
@@ -381,6 +383,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   const [routes, setRoutes] = useState<Record<string, RouteOptions>>({});
   const [chatgpt, setChatgpt] = useState<ChatGPTStatus | null>(null);
   const [chatgptModels, setChatgptModels] = useState<string[]>([]);
+  const [hiddenModels, setHiddenModels] = useState<string[]>([]);
   const draftRef = useRef<Draft | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const hooksRef = useRef(hooks);
@@ -493,6 +496,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
           invoke<{ experiments: Record<string, boolean> }>("lab_get").then((view) => setExperiments(view.experiments), () => setExperiments(null));
           setOpen(true);
           hooksRef.current.visible(true);
+          invoke<string[]>("picker_hidden").then(setHiddenModels, () => undefined);
           loadModels("local");
           refreshLibrary();
           loadModels("lan");
@@ -634,6 +638,12 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
             <button type="button" className="set-link set-gap-sm" data-test="models-see-library" onClick={() => { setFilter("all"); show("library"); }}>See every model in the Library</button>
           </section>
 
+          <section className="models-panel active set-panel" data-test="models-panel-picker" hidden={section !== "picker"}>
+            <h3 className="models-h3">Model picker</h3>
+            <p className="models-lead">Choose which models appear in the model picker of a chat.</p>
+            <ModelPicker local={cache.local ?? []} titles={Object.fromEntries(library.map((c) => [c.file, c.title]))} chatgpt={chatgptModels} cloud={cloudView} hidden={hiddenModels} loading={cloudBusy}
+              onToggleLocal={(key, shown) => invoke<string[]>("picker_set_shown", { key, shown }).then(setHiddenModels, report)} onPin={pinCloud} onRefresh={refreshCloud} onTasks={() => show("models")} />
+          </section>
           <section className="models-panel active set-panel" data-test="models-panel-library" hidden={section !== "library"}>
             <h3 className="models-h3">Library</h3>
             <p className="models-lead">Everything Mobius can run on this computer. Nothing downloads until you press Get, and each download is checked against a published checksum before it is used.</p>
