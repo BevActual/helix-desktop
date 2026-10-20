@@ -107,3 +107,14 @@ Checked 2026-10-18, from the companies' own statements as reported and their pub
 
 * Knowledge: reference packs and fetched pages (each a download the person approves), and using the index in chat.
 * Rules and Memory as sections (they are dialogs today).
+
+## Model picker: one list with a switch each (built, from looking at Cursor's Models page)
+
+Cursor's Settings → Models is a single flat list: a box to "Add or search model", a refresh button, and every model with an on/off switch that decides whether it appears in the chat's model picker. Mobius's Models page is organised by *job* (chat, code, pictures...), which answers a different question, so the list is a new section next to it, **Model picker**:
+
+* One list of models on this computer, on the ChatGPT plan (when connected) and in the OpenRouter menu, each with a source tag and a switch; those switched on come first.
+* **Add or search model**: without a search only what is in the menu is listed; typing reaches the whole OpenRouter catalog (up to 30 matches) and a switch pins the model; a typed `vendor/model-name` offers **Add … from OpenRouter** (Enter adds it). The ↻ button refreshes the catalog.
+* Switching a local or ChatGPT model off removes it from the chat's menu (`picker.rs`, `picker-hidden.json`, keys `local:<file>` and `chatgpt:<id>`); it stays installed and can still be assigned to a job in Models, and the model a chat is using now is never hidden from its own menu. OpenRouter switches are the existing pins.
+* A link at the bottom leads to Models for "which model does which job", the equivalent of Cursor's Task Models block above its list.
+
+Tests: `tools/nested/mobius-picker-test.sh`; one unit test for the key checks.

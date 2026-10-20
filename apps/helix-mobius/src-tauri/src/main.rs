@@ -25,6 +25,7 @@ mod knowledge;
 mod lan;
 mod library;
 mod output;
+mod picker;
 mod rules;
 mod scheduled;
 mod secrets;
@@ -3143,6 +3144,18 @@ struct CloudMenu {
     chatgpt_models: Vec<String>,
 }
 
+/// The models the person turned off in Settings (`local:<file>`, `chatgpt:<id>`): the chat's model menu leaves them out.
+#[tauri::command]
+fn picker_hidden() -> Vec<String> {
+    picker::hidden()
+}
+
+/// Shows or hides one model in the chat's model menu. Returns the hidden keys now.
+#[tauri::command]
+fn picker_set_shown(key: String, shown: bool) -> Result<Vec<String>, String> {
+    picker::set_shown(&key, shown)
+}
+
 #[tauri::command]
 fn routing_cloud_menu() -> CloudMenu {
     let routing = inference_routing::load();
@@ -3942,6 +3955,8 @@ fn main() {
             routing_clear_secret,
             routing_ensure_openrouter,
             routing_cloud_menu,
+            picker_hidden,
+            picker_set_shown,
             cloud_catalog,
             cloud_pin_set,
             acp_agents,

@@ -212,7 +212,12 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
           invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[]; fit: string; speed: number | null }[]>("library_list").catch(() => []),
           invoke<Route>("chat_current_route").catch(() => null),
           invoke<{ has_key: boolean; models: string[]; chatgpt?: boolean; chatgpt_models?: string[] }>("routing_cloud_menu").catch(() => ({ has_key: false, models: [] as string[], chatgpt: false, chatgpt_models: [] as string[] })),
-        ]).then(([models, cards, route, cloud]) => {
+          invoke<string[]>("picker_hidden").catch(() => [] as string[]),
+        ]).then(([all, cards, route, cloud, hidden]) => {
+          // Models the person turned off in Settings are left out, except the one this chat is using now.
+          const off = new Set(hidden);
+          const models = (Array.isArray(all) ? all : []).filter((m) => !off.has(`local:${m}`) || (route?.backend === "local" && route.model === m));
+          cloud = { ...cloud, chatgpt_models: (cloud.chatgpt_models ?? []).filter((m) => !off.has(`chatgpt:${m}`) || (route?.backend === "chatgpt" && route.model === m)) };
           const byFile: Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[]; fit: string; speed: number | null }> = {};
           cards.filter((card) => card.installed).forEach((card) => { byFile[card.file] = card; });
           setPicker({ models: Array.isArray(models) ? models : [], cards: byFile, route, cloud });
