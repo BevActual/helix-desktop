@@ -341,7 +341,7 @@ pub fn rows(
         rows.push(sliders(
             "place:latitude",
             "Latitude",
-            "Where you are, north positive. Used for sunrise and sunset: the automatic theme turns at sunset. Nothing is sent anywhere.",
+            "North is positive. Used for sunrise and sunset. Nothing is sent anywhere.",
             -90.0,
             90.0,
             place.latitude,

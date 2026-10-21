@@ -134,15 +134,20 @@ async function drawAbout() {
   const info = await invoke("about");
   const host = $("about-host");
   host.replaceChildren();
-  const card = el("div", "rows-card");
-  [["Helix Settings", info.version], ["Desktop service", info.service], ["Agent access", info.agent_access],
-   ["Settings on these pages", String(info.settings)], ["Wi-Fi", info.network ? "Available" : "Not available"], ["Bluetooth", info.bluetooth ? "Available" : "Not available"]]
-    .forEach(([name, value]) => {
+  const card = (rows) => {
+    const box = el("div", "rows-card");
+    rows.forEach(([name, value]) => {
       const line = el("div", "setting-row");
-      line.append(el("div", "setting-title", name), el("div", "slider-value", value));
-      card.append(line);
+      const text = el("div", "slider-value", value);
+      text.dataset.test = "about-" + name;
+      line.append(el("div", "setting-title", name), text);
+      box.append(line);
     });
-  host.append(card);
+    return box;
+  };
+  if (info.system.length) host.append(el("h4", "", "This computer"), card(info.system));
+  host.append(el("h4", "", "Helix"), card([["Helix Settings", info.version], ["Desktop service", info.service], ["Agent access", info.agent_access],
+    ["Wi-Fi", info.network ? "Available" : "Not available"], ["Bluetooth", info.bluetooth ? "Available" : "Not available"]]));
   queueReport();
 }
 

@@ -289,6 +289,7 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
       <div>
         {view?.clients.map((client, index) => <Client key={client.id} client={client} index={index} />)}
         {view && view.status === "connected" && view.clients.length === 0 ? <div className="empty">No application has been given access.</div> : null}
+        {view && view.status !== "connected" ? <div className="empty">Shown once Settings is connected to the desktop service.</div> : null}
       </div>
       <h4>Recent activity</h4>
       <div>

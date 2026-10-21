@@ -115,6 +115,14 @@ fn request_result(line: &str) -> Result<Value, String> {
     }
 }
 
+/// The compositor's version line ("niri 26.04 helix (…)"), for About.
+pub fn compositor_version() -> Option<String> {
+    let ok = request_json("\"Version\"")?;
+    ok.get("Version")?
+        .as_str()
+        .map(|v| v.chars().filter(|c| !c.is_control()).take(100).collect())
+}
+
 /// The pointer and keyboard settings in effect (`None` when the compositor cannot say, as stock niri cannot).
 pub fn input_settings() -> Option<InputSettings> {
     let ok = request_json("\"HelixInput\"")?;

@@ -2140,3 +2140,6 @@ button.view-tab-x:hover { background: var(--fill-3, var(--fill-1)); color: var(-
 .choice-pop li button:hover { background: var(--fill-2); } .choice-pop li button.current { background: var(--accent); color: var(--on-accent); }
 .choice-none { padding: 8px; color: var(--label-2); font-size: 12.5px; }
 .choice-select { max-width: 260px; font-size: 13px; }
+/* Cards that follow one another, and a button under a card, get air between them. */
+.rows-card + .rows-card, .rows-card + button, .rows-card + .actions { margin-top: 14px; }
+[data-test="react-page"] + .setting-about, .rows-card + .setting-about { margin-top: 14px; }

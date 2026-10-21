@@ -3,6 +3,7 @@
 //! tiers and the audit, change tiers and revoke, but it is not an agent, cannot approve anything, and never talks to the model. What a
 //! change may be is decided by the pure models in the core crates; the page only sends names those models listed.
 
+mod about;
 mod datetime;
 mod defaults;
 mod input;
@@ -917,7 +918,8 @@ struct AboutView {
     version: &'static str,
     service: &'static str,
     agent_access: &'static str,
-    settings: usize,
+    /// What the computer is: name, operating system, kernel, processor, memory, compositor.
+    system: Vec<(String, String)>,
     network: bool,
     bluetooth: bool,
 }
@@ -938,10 +940,7 @@ fn about(app: AppHandle) -> AboutView {
             "denied" => "Not permitted: this is not the installed Settings",
             _ => "Unavailable",
         },
-        settings: ROW_PAGES
-            .iter()
-            .map(|(_, ids)| state.catalog.rows(ids).len())
-            .sum(),
+        system: about::system_lines(),
         network: state.network.view().available,
         bluetooth: state.bluetooth.view().available,
     }
@@ -1975,7 +1974,7 @@ fn display_rows() -> Vec<RowView> {
         rows.push(text_row(
             "profile:status",
             "Remembered layout",
-            "Displays",
+            "Layout",
             "The compositor saves how your displays are set up, for exactly this set of displays, and applies it again when they are connected.",
             if saved { "Saved" } else { "Not yet: change a display to save it" },
         ));
