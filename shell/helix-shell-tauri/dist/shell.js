@@ -30,6 +30,20 @@ let clockFormat = "auto";
 const hour12 = () => (clockFormat === "12" ? true : clockFormat === "24" ? false : undefined);
 const clockTime = (when) => when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: hour12() });
 window.helixClockTime = clockTime;
+// What the bar shows (Settings, Top bar): each hidden item is a class on the page, and the style sheet does the hiding.
+let clockSeconds = false;
+let secondsTimer = null;
+const barClockTime = (when) => when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: clockSeconds ? "2-digit" : undefined, hour12: hour12() });
+function applyBarPrefs(raw) {
+  let prefs = {};
+  try { prefs = JSON.parse(raw); } catch (error) { prefs = {}; }
+  for (const [key, on] of Object.entries(prefs)) document.documentElement.classList.toggle("bar-hide-" + key, !on);
+  clockSeconds = prefs.seconds === true;
+  clearInterval(secondsTimer);
+  if (clockSeconds) secondsTimer = setInterval(tickClock, 1000);
+  tickClock();
+  queueReport();
+}
 function tickClock() {
   const now = new Date();
   if (!reactControls) {
@@ -37,7 +51,7 @@ function tickClock() {
     $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   }
   document.querySelector("#clock .day").textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-  document.querySelector("#clock .time").textContent = clockTime(now);
+  document.querySelector("#clock .time").textContent = barClockTime(now);
 }
 // Today panel: the month grid is built in Rust (leap years, week starts, week numbers); this draws it. Moving months re-asks with a delta.
 let calMonth = null;   // { year, month } being shown
@@ -1286,6 +1300,8 @@ function applyDockPrefs(prefs) {
   setDock(!prefs.auto_hide && !document.body.classList.contains("open"));
 }
 listen("clock-format", (event) => { clockFormat = event.payload; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
+invoke("bar_prefs").then(applyBarPrefs, () => undefined);
+listen("bar-prefs", (event) => applyBarPrefs(event.payload));
 invoke("clock_format").then((format) => { clockFormat = format; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
 listen("dock-prefs", (event) => applyDockPrefs(event.payload));
 invoke("dock_prefs").then(applyDockPrefs);

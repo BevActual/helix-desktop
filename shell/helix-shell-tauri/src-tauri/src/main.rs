@@ -15,6 +15,7 @@ mod agent_ipc;
 mod apps;
 mod backlight;
 mod bar;
+mod bar_prefs;
 mod battery;
 mod blur;
 mod capture;
@@ -2058,6 +2059,7 @@ fn main() {
             dock::dock_view,
             dock::dock_prefs,
             clock::clock_format,
+            bar_prefs::bar_prefs,
             dock::workspaces_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
@@ -2219,6 +2221,7 @@ fn main() {
             }
             // Every surface that draws a time (the bar, the control center) hears about the clock choice.
             clock::start(handle.clone());
+            bar_prefs::start(handle.clone());
             if role.is_bar_side() {
                 notify::serve(handle.clone());
                 tray::serve(handle.clone());

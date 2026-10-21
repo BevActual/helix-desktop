@@ -33,6 +33,8 @@ pick shell-auto-theme && run shell-auto-theme shell-auto-theme-test.sh tauri-fak
 pick net            && run net network-test.sh tauri-fake-desktop.sh
 pick bt             && run bt bluetooth-test.sh tauri-fake-desktop.sh
 pick ctl            && run ctl shell-control-test.sh tauri-shell.sh
+pick bar-prefs       && run bar-prefs shell-bar-prefs-test.sh tauri-shell.sh
+pick settings-topbar && run settings-topbar settings-topbar-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick cc             && run cc control-center-test.sh tauri-shell.sh HELIX_NESTED_PRIVATE_AUDIO=1
 pick notifications  && run notifications notifications-test.sh tauri-shell.sh
 pick trusted-attack && run trusted-attack trusted-attack-test.sh tauri-shell.sh

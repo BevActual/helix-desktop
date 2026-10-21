@@ -49,6 +49,11 @@ const specs: Record<string, PageSpec> = {
     load: () => invoke<RowView[]>("dock_rows"),
     change: (id, change) => invoke<RowView[]>("dock_change", { id, change }),
   },
+  topbar: {
+    load: () => invoke<RowView[]>("topbar_rows"),
+    change: (id, change) => invoke<RowView[]>("topbar_change", { id, change }),
+    note: "The control center and notification buttons always stay, so the bar can never lock you out of them.",
+  },
   notifications: {
     load: () => invoke<RowView[]>("notifications_rows"),
     change: (id, change) => invoke<RowView[]>("notifications_change", { id, change }),

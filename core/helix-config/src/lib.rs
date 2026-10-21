@@ -1,5 +1,6 @@
 //! The settings catalog, ordered lists, shell preferences and config migration. Pure data and validation.
 
+pub mod bar_prefs;
 pub mod catalog;
 pub mod clock_prefs;
 pub mod color_spec;

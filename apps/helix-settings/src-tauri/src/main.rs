@@ -8,6 +8,7 @@ mod datetime;
 mod defaults;
 mod input;
 mod look;
+mod topbar;
 mod wallhaven;
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1528,6 +1529,20 @@ fn typing_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, 
     Ok(typing_rows())
 }
 
+/// The Top bar page: which parts of the bar are shown, kept in a file the shell watches.
+#[tauri::command]
+fn topbar_rows() -> Vec<RowView> {
+    topbar::rows(&topbar::read())
+}
+
+#[tauri::command]
+fn topbar_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let next = topbar::change(&topbar::read(), &id, &change)?;
+    topbar::write(&next)?;
+    eprintln!("SETTINGS top bar {id}");
+    Ok(topbar::rows(&next))
+}
+
 /// How things look: animations, gaps, cursor size. Empty when the compositor cannot change them (it is not the Helix one).
 #[tauri::command]
 fn look_rows() -> Vec<RowView> {
@@ -2732,6 +2747,8 @@ fn main() {
             defaults_change,
             pointer_rows,
             look_rows,
+            topbar_rows,
+            topbar_change,
             look_change,
             pointer_change,
             typing_rows,
