@@ -471,6 +471,7 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             agent_desk: true,
             display_profiles: true,
             summon: true,
+            input_settings: true,
         }),
         Request::HelixSaveDisplayProfile
         | Request::HelixApplyDisplayProfile
@@ -498,6 +499,27 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             rx.recv()
                 .await
                 .map_err(|_| String::from("display profile request failed"))??
+        }
+        Request::HelixInput => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_input());
+            });
+            let input = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("input settings query failed"))?;
+            Response::HelixInput(input)
+        }
+        Request::HelixSetInput(change) => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_set_input(change));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("input settings change failed"))??;
+            Response::Handled
         }
         Request::HelixSummonContext => {
             let (tx, rx) = async_channel::bounded(1);

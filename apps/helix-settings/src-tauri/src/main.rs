@@ -4,6 +4,7 @@
 //! change may be is decided by the pure models in the core crates; the page only sends names those models listed.
 
 mod datetime;
+mod input;
 mod wallhaven;
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1434,6 +1435,41 @@ fn write_clock(format: helix_config::clock_prefs::ClockFormat) -> Result<(), Str
     Ok(())
 }
 
+/// Touchpad and mouse. Empty when the compositor cannot change them (it is not the Helix one).
+#[tauri::command]
+fn pointer_rows() -> Vec<RowView> {
+    helix_compositor::compositor_ipc::input_settings()
+        .map(|input| input::pointer_rows(&input))
+        .unwrap_or_default()
+}
+
+/// The layout and the key repeat.
+#[tauri::command]
+fn typing_rows() -> Vec<RowView> {
+    helix_compositor::compositor_ipc::input_settings()
+        .map(|input| input::typing_rows(&input, &input::read_layouts()))
+        .unwrap_or_default()
+}
+
+fn send_input(id: &str, change: &serde_json::Value) -> Result<(), String> {
+    let request = input::parse_change(id, change)?;
+    helix_compositor::compositor_ipc::set_input_settings(&request)?;
+    eprintln!("SETTINGS input {id}");
+    Ok(())
+}
+
+#[tauri::command]
+fn pointer_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    send_input(&id, &change)?;
+    Ok(pointer_rows())
+}
+
+#[tauri::command]
+fn typing_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    send_input(&id, &change)?;
+    Ok(typing_rows())
+}
+
 /// What the desktop service last said about finding the place by itself (it writes this next to the other state files).
 fn location_status_file() -> Option<std::path::PathBuf> {
     let base = std::env::var_os("XDG_STATE_HOME")
@@ -2527,6 +2563,10 @@ fn main() {
             displays_rows,
             displays_change,
             datetime_rows,
+            pointer_rows,
+            pointer_change,
+            typing_rows,
+            typing_change,
             datetime_change,
             dock_change,
             wallhaven::wallhaven_search,

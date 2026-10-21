@@ -27,6 +27,7 @@ const PAGES = [
   { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
   { name: "sound", title: "Sound", icon: "volume", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
+  { name: "pointer", title: "Mouse & touchpad", icon: "mouse", rows: false },
   { name: "datetime", title: "Date & time", icon: "clock", rows: false },
   { name: "dock", title: "Dock", icon: "grid", rows: false },
   { name: "notifications", title: "Notifications", icon: "bell", rows: false },
@@ -47,7 +48,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime" || page.name === "pointer") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -118,6 +119,7 @@ function showPage(name) {
     if (name === "power") invoke("power_rows").then(drawPower);
     if (name === "displays") invoke("displays_rows").then(drawDisplays);
     if (name === "datetime") invoke("datetime_rows").then(drawDatetime);
+    if (name === "pointer") invoke("pointer_rows").then(drawPointer);
   }
   queueReport();
 }
@@ -376,7 +378,7 @@ function rowLine(page, row) {
   if (row.description) text.append(el("div", "setting-about", row.description));
   line.append(text);
   const control = row.control;
-  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : page === "datetime" ? invoke("datetime_change", { id: row.id, change }).then(drawDatetime) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : page === "datetime" ? invoke("datetime_change", { id: row.id, change }).then(drawDatetime) : page === "pointer" ? invoke("pointer_change", { id: row.id, change }).then(drawPointer) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -502,6 +504,16 @@ function drawDisplays(rows) {
   if (searching()) drawSearch();
   queueReport();
 }
+function drawPointer(rows) {
+  if (reactPages.pointer) { reactPages.pointer.setRows(rows); return; }
+  pageRows.pointer = rows;
+  const host = $("pointer-host");
+  host.replaceChildren();
+  drawGroups(host, "pointer", rows);
+  if (!rows.length) host.append(el("div", "empty", "Mouse and touchpad settings need the Helix compositor."));
+  if (searching()) drawSearch();
+  queueReport();
+}
 function drawDatetime(rows) {
   if (reactPages.datetime) { reactPages.datetime.setRows(rows); return; }
   pageRows.datetime = rows;
@@ -531,6 +543,7 @@ invoke("notifications_rows").then((rows) => { pageRows.notifications = rows; });
 invoke("power_rows").then((rows) => { pageRows.power = rows; });
 invoke("displays_rows").then((rows) => { pageRows.displays = rows; });
 invoke("datetime_rows").then((rows) => { pageRows.datetime = rows; });
+invoke("pointer_rows").then((rows) => { pageRows.pointer = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Search: matching rows from every page, under the page they belong to ------------------------------------------------------------

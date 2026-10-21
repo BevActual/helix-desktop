@@ -55,6 +55,12 @@ const specs: Record<string, PageSpec> = {
     change: (id, change) => invoke<RowView[]>("displays_change", { id, change }),
     note: "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup.",
   },
+  pointer: {
+    load: () => invoke<RowView[]>("pointer_rows"),
+    change: (id, change) => invoke<RowView[]>("pointer_change", { id, change }),
+    empty: "Mouse and touchpad settings need the Helix compositor.",
+    note: "These apply at once and are remembered. A setting you never change here stays as your compositor config says.",
+  },
   datetime: {
     load: () => invoke<RowView[]>("datetime_rows"),
     change: (id, change) => invoke<RowView[]>("datetime_change", { id, change }),

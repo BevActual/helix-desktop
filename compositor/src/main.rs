@@ -164,6 +164,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Config::load_default()
     });
     let config_includes = config_load_result.includes;
+    niri::helix::input::apply_saved(&mut config.input);
 
     let spawn_at_startup = mem::take(&mut config.spawn_at_startup);
     let spawn_sh_at_startup = mem::take(&mut config.spawn_sh_at_startup);

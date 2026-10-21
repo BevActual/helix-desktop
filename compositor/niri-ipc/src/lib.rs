@@ -135,6 +135,11 @@ pub enum Request {
     HelixForgetDisplayProfile,
     /// Helix: whether a setup is remembered for the displays connected now.
     HelixDisplayProfile,
+    /// Helix: the pointer and keyboard settings in effect now (the overrides Settings made, over `config.kdl`).
+    HelixInput,
+    /// Helix: change pointer and keyboard settings. Only the fields that are `Some` change; they take effect at once, are remembered, and are applied
+    /// again whenever the configuration is loaded.
+    HelixSetInput(HelixInput),
     /// Helix: the window that had the keyboard when `helix-summon` was last used, once. Empty when it was never used, was a minute ago or
     /// more, or was already taken.
     HelixSummonContext,
@@ -192,6 +197,50 @@ pub enum Response {
     HelixDisplayProfile(HelixDisplayProfile),
     /// Helix summon context.
     HelixSummonContext(Option<HelixSummonContext>),
+    /// Helix pointer and keyboard settings.
+    HelixInput(HelixInput),
+}
+
+/// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixInput {
+    /// Touchpad: tap to click.
+    #[serde(default)]
+    pub touchpad_tap: Option<bool>,
+    /// Touchpad: content follows the fingers.
+    #[serde(default)]
+    pub touchpad_natural_scroll: Option<bool>,
+    /// Touchpad: pointer speed, -1 to 1.
+    #[serde(default)]
+    pub touchpad_speed: Option<f64>,
+    /// Touchpad: ignore it while typing.
+    #[serde(default)]
+    pub touchpad_disable_while_typing: Option<bool>,
+    /// Touchpad: `clickfinger` (the number of fingers decides the button) or `button-areas`.
+    #[serde(default)]
+    pub touchpad_click_method: Option<String>,
+    /// Mouse: content follows the wheel the other way.
+    #[serde(default)]
+    pub mouse_natural_scroll: Option<bool>,
+    /// Mouse: pointer speed, -1 to 1.
+    #[serde(default)]
+    pub mouse_speed: Option<f64>,
+    /// Mouse: `adaptive` (faster when moved faster) or `flat`.
+    #[serde(default)]
+    pub mouse_accel_profile: Option<String>,
+    /// Mouse: primary button on the right.
+    #[serde(default)]
+    pub mouse_left_handed: Option<bool>,
+    /// Keyboard: milliseconds a key is held before it repeats.
+    #[serde(default)]
+    pub keyboard_repeat_delay: Option<u16>,
+    /// Keyboard: repeats a second.
+    #[serde(default)]
+    pub keyboard_repeat_rate: Option<u8>,
+    /// Keyboard: the layouts, as xkb names separated by commas (`us` or `us,de`).
+    #[serde(default)]
+    pub keyboard_layout: Option<String>,
 }
 
 /// What had the keyboard when the person summoned Mobius. Only what the compositor already tells every client about windows.
@@ -243,6 +292,9 @@ pub struct HelixCapabilities {
     /// Whether `helix-summon` and `HelixSummonContext` are available.
     #[serde(default)]
     pub summon: bool,
+    /// Whether `HelixInput` and `HelixSetInput` are available.
+    #[serde(default)]
+    pub input_settings: bool,
 }
 
 /// State of the Helix agent desk workspace.

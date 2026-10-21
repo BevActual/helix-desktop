@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { invoke, type KeybindRow, type ShortcutGroup } from "@helix/ui";
+import { invoke, RowGroups, type Change, type KeybindRow, type RowView, type ShortcutGroup } from "@helix/ui";
 import type { PageHandle } from "./RowsPage";
 
 function ChordEditor({ row, onDone, report }: { row: KeybindRow; onDone: (saved: boolean) => void; report: (text: string) => void }) {
@@ -46,10 +46,12 @@ export function KeyboardPage({ register, report }: { register: (handle: PageHand
   const [keybinds, setKeybinds] = useState<KeybindRow[] | null>(null);
   const [groups, setGroups] = useState<ShortcutGroup[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [typing, setTyping] = useState<RowView[]>([]);
 
   const load = useCallback(() => {
     invoke<KeybindRow[]>("keybinds_view").then(setKeybinds, () => setKeybinds([]));
     invoke<ShortcutGroup[]>("shortcuts_view").then(setGroups, () => setGroups([]));
+    invoke<RowView[]>("typing_rows").then(setTyping, () => setTyping([]));
   }, []);
 
   useEffect(() => {
@@ -96,6 +98,14 @@ export function KeyboardPage({ register, report }: { register: (handle: PageHand
       ) : (
         <div className="empty">Navigation shortcuts are unavailable until Settings is connected.</div>
       )}
+      {typing.length ? (
+        <RowGroups
+          rows={typing}
+          onChange={(id: string, change: Change) =>
+            invoke<RowView[]>("typing_change", { id, change }).then(setTyping, (error) => report(`${id}: ${String(error)}`))
+          }
+        />
+      ) : null}
       <h4>Compositor</h4>
       <div className="setting-about note">
         These are the key binds in your compositor config. Settings shows them and flags clashes; it does not change them.

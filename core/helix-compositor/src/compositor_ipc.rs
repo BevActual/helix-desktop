@@ -17,6 +17,24 @@ pub struct AgentDeskStatus {
     pub available: bool,
 }
 
+/// The pointer and keyboard settings the compositor lets Settings change (`HelixInput`). In what the compositor reports every field is set; in a
+/// change only the set fields are applied.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct InputSettings {
+    pub touchpad_tap: Option<bool>,
+    pub touchpad_natural_scroll: Option<bool>,
+    pub touchpad_speed: Option<f64>,
+    pub touchpad_disable_while_typing: Option<bool>,
+    pub touchpad_click_method: Option<String>,
+    pub mouse_natural_scroll: Option<bool>,
+    pub mouse_speed: Option<f64>,
+    pub mouse_accel_profile: Option<String>,
+    pub mouse_left_handed: Option<bool>,
+    pub keyboard_repeat_delay: Option<u16>,
+    pub keyboard_repeat_rate: Option<u8>,
+    pub keyboard_layout: Option<String>,
+}
+
 /// What had the keyboard when Mobius was summoned (`helix-summon`): only what the compositor lists about every window.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SummonContext {
@@ -37,6 +55,9 @@ pub struct HelixCaps {
     /// `helix-summon` and the note it leaves for Mobius.
     #[serde(default)]
     pub summon: bool,
+    /// `HelixInput` and `HelixSetInput`.
+    #[serde(default)]
+    pub input_settings: bool,
 }
 
 pub fn request_json(line: &str) -> Option<Value> {
@@ -92,6 +113,18 @@ fn request_result(line: &str) -> Result<Value, String> {
         (_, Some(err)) => Err(err.as_str().unwrap_or("the compositor refused").to_string()),
         _ => Err("unexpected reply".into()),
     }
+}
+
+/// The pointer and keyboard settings in effect (`None` when the compositor cannot say, as stock niri cannot).
+pub fn input_settings() -> Option<InputSettings> {
+    let ok = request_json("\"HelixInput\"")?;
+    serde_json::from_value(ok.get("HelixInput")?.clone()).ok()
+}
+
+/// Changes the set fields now; the compositor remembers them and applies them again whenever its configuration is loaded.
+pub fn set_input_settings(change: &InputSettings) -> Result<(), String> {
+    let line = serde_json::json!({ "HelixSetInput": change }).to_string();
+    request_result(&line).map(|_| ())
 }
 
 /// The window that had the keyboard when the person last pressed the summon key, once (the compositor forgets it as it hands it over, and after
@@ -606,6 +639,29 @@ mod tests {
         let old =
             serde_json::json!({"HelixCapabilities": {"liquid_glass": true, "agent_desk": true}});
         assert!(!parse_caps(&old).display_profiles && parse_caps(&old).agent_desk);
+    }
+
+    #[test]
+    fn input_changes_name_only_the_fields_they_change() {
+        let change = InputSettings {
+            touchpad_tap: Some(true),
+            ..InputSettings::default()
+        };
+        let line = serde_json::json!({ "HelixSetInput": change }).to_string();
+        assert!(
+            line.contains("\"touchpad_tap\":true") && line.contains("\"mouse_speed\":null"),
+            "{line}"
+        );
+        let back: InputSettings =
+            serde_json::from_str(r#"{"touchpad_speed": 0.25, "keyboard_layout": "us"}"#).unwrap();
+        assert_eq!(
+            (
+                back.touchpad_speed,
+                back.keyboard_layout.as_deref(),
+                back.mouse_left_handed
+            ),
+            (Some(0.25), Some("us"), None)
+        );
     }
 
     #[test]

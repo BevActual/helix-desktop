@@ -82,6 +82,7 @@ pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nes
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-displays && run settings-displays settings-displays-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-datetime && run settings-datetime settings-datetime-test.sh settings-datetime-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-pointer && run settings-pointer settings-pointer-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-wallpaper && run settings-wallpaper settings-wallpaper-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh tauri-shell.sh
 pick ui-scale          && run ui-scale ui-scale-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
