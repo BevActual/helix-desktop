@@ -4,6 +4,7 @@
 //! change may be is decided by the pure models in the core crates; the page only sends names those models listed.
 
 mod datetime;
+mod defaults;
 mod input;
 mod wallhaven;
 
@@ -1435,6 +1436,20 @@ fn write_clock(format: helix_config::clock_prefs::ClockFormat) -> Result<(), Str
     Ok(())
 }
 
+/// Default applications: web, mail, files, text, pictures, PDFs, video and music, read from and written to `~/.config/mimeapps.list`.
+#[tauri::command]
+fn defaults_rows() -> Vec<RowView> {
+    defaults::rows(&defaults::Apps::read())
+}
+
+#[tauri::command]
+fn defaults_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let (kind, desktop) = defaults::parse_change(&id, &change)?;
+    defaults::choose(&kind, &desktop)?;
+    eprintln!("SETTINGS default {kind} {desktop}");
+    Ok(defaults_rows())
+}
+
 /// Touchpad and mouse. Empty when the compositor cannot change them (it is not the Helix one).
 #[tauri::command]
 fn pointer_rows() -> Vec<RowView> {
@@ -2563,6 +2578,8 @@ fn main() {
             displays_rows,
             displays_change,
             datetime_rows,
+            defaults_rows,
+            defaults_change,
             pointer_rows,
             pointer_change,
             typing_rows,

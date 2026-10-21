@@ -28,6 +28,7 @@ const PAGES = [
   { name: "sound", title: "Sound", icon: "volume", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
   { name: "pointer", title: "Mouse & touchpad", icon: "mouse", rows: false },
+  { name: "defaults", title: "Default apps", icon: "folder", rows: false },
   { name: "datetime", title: "Date & time", icon: "clock", rows: false },
   { name: "dock", title: "Dock", icon: "grid", rows: false },
   { name: "notifications", title: "Notifications", icon: "bell", rows: false },
@@ -48,7 +49,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime" || page.name === "pointer") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime" || page.name === "pointer" || page.name === "defaults") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -120,6 +121,7 @@ function showPage(name) {
     if (name === "displays") invoke("displays_rows").then(drawDisplays);
     if (name === "datetime") invoke("datetime_rows").then(drawDatetime);
     if (name === "pointer") invoke("pointer_rows").then(drawPointer);
+    if (name === "defaults") invoke("defaults_rows").then(drawDefaults);
   }
   queueReport();
 }
@@ -378,7 +380,7 @@ function rowLine(page, row) {
   if (row.description) text.append(el("div", "setting-about", row.description));
   line.append(text);
   const control = row.control;
-  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : page === "datetime" ? invoke("datetime_change", { id: row.id, change }).then(drawDatetime) : page === "pointer" ? invoke("pointer_change", { id: row.id, change }).then(drawPointer) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : page === "datetime" ? invoke("datetime_change", { id: row.id, change }).then(drawDatetime) : page === "pointer" ? invoke("pointer_change", { id: row.id, change }).then(drawPointer) : page === "defaults" ? invoke("defaults_change", { id: row.id, change }).then(drawDefaults) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -504,6 +506,17 @@ function drawDisplays(rows) {
   if (searching()) drawSearch();
   queueReport();
 }
+function drawDefaults(rows) {
+  if (reactPages.defaults) { reactPages.defaults.setRows(rows); return; }
+  pageRows.defaults = rows;
+  const host = $("defaults-host");
+  host.replaceChildren();
+  drawGroups(host, "defaults", rows);
+  if (!rows.length) host.append(el("div", "empty", "No applications were found for these kinds of file."));
+  host.append(el("div", "setting-about note", "Kept in ~/.config/mimeapps.list, where every program looks."));
+  if (searching()) drawSearch();
+  queueReport();
+}
 function drawPointer(rows) {
   if (reactPages.pointer) { reactPages.pointer.setRows(rows); return; }
   pageRows.pointer = rows;
@@ -544,6 +557,7 @@ invoke("power_rows").then((rows) => { pageRows.power = rows; });
 invoke("displays_rows").then((rows) => { pageRows.displays = rows; });
 invoke("datetime_rows").then((rows) => { pageRows.datetime = rows; });
 invoke("pointer_rows").then((rows) => { pageRows.pointer = rows; });
+invoke("defaults_rows").then((rows) => { pageRows.defaults = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Search: matching rows from every page, under the page they belong to ------------------------------------------------------------

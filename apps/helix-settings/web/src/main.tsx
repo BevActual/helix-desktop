@@ -55,6 +55,12 @@ const specs: Record<string, PageSpec> = {
     change: (id, change) => invoke<RowView[]>("displays_change", { id, change }),
     note: "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup.",
   },
+  defaults: {
+    load: () => invoke<RowView[]>("defaults_rows"),
+    change: (id, change) => invoke<RowView[]>("defaults_change", { id, change }),
+    empty: "No applications were found for these kinds of file.",
+    note: "Kept in ~/.config/mimeapps.list, where every program looks.",
+  },
   pointer: {
     load: () => invoke<RowView[]>("pointer_rows"),
     change: (id, change) => invoke<RowView[]>("pointer_change", { id, change }),
