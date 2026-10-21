@@ -424,10 +424,23 @@ function drawSummonChip() {
   const what = summonNote.title || summonNote.app_id || "a window";
   chip.textContent = `About: ${what.length > 48 ? what.slice(0, 47) + "…" : what} · sent with your message ×`;
 }
+// The text they had selected there, read once when they summon (never otherwise): a second chip, removable, sent only if left.
+let summonSelection = "";
+function drawSelectionChip() {
+  const chip = $("summon-selection-chip");
+  chip.hidden = !summonSelection;
+  if (!summonSelection) return;
+  const first = summonSelection.split("\n")[0];
+  chip.textContent = `Selected: “${first.length > 40 ? first.slice(0, 39) + "…" : first}” · ${summonSelection.length} characters · sent with your message ×`;
+}
+$("summon-selection-chip").onclick = () => { summonSelection = ""; drawSelectionChip(); };
 async function checkSummon() {
   try {
     const note = await invoke("summon_context");
-    if (note && (note.title || note.app_id)) { summonNote = note; drawSummonChip(); input.focus(); }
+    if (note && (note.title || note.app_id)) {
+      summonNote = note; drawSummonChip(); input.focus();
+      invoke("summon_selection").then((text) => { summonSelection = text || ""; drawSelectionChip(); }, () => undefined);
+    }
   } catch { /* no compositor to ask */ }
 }
 $("summon-chip").onclick = () => { summonNote = null; drawSummonChip(); };
@@ -440,6 +453,10 @@ function attachmentPayload() {
     const lines = [`The person summoned you from another window. Title: ${summonNote.title || "(none)"}`, `Application: ${summonNote.app_id || "(unknown)"}`];
     files.unshift({ name: "the window they were using", content: lines.join("\n"), original_chars: lines.join("\n").length });
     summonNote = null; drawSummonChip();
+  }
+  if (summonSelection) {
+    files.unshift({ name: "the text they had selected", content: summonSelection, original_chars: summonSelection.length });
+    summonSelection = ""; drawSelectionChip();
   }
   if (stageOpen && stageAttach && stageOpen.text.trim()) {
     const text = stageOpen.text;

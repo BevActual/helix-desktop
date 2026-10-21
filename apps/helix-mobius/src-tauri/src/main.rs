@@ -787,6 +787,56 @@ fn summon_context() -> Option<helix_compositor::compositor_ipc::SummonContext> {
     helix_compositor::compositor_ipc::take_summon_context()
 }
 
+/// The text selected in the window the person was using (the primary selection), read with `wl-paste` once they summoned Mobius. Text only, at most 4,000
+/// characters, and nothing when there is none or `wl-paste` is not installed. The page shows it as a chip the person can remove; it is not kept.
+fn read_primary_selection() -> Option<String> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+    let mut child = Command::new("wl-paste")
+        .args(["--primary", "--no-newline", "--type", "text/plain"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = (&mut stdout).take(32 * 1024).read_to_end(&mut bytes);
+        bytes
+    });
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => break,
+            Ok(Some(_)) | Err(_) => return None,
+            Ok(None) if started.elapsed() > Duration::from_secs(1) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+    let text = String::from_utf8_lossy(&reader.join().ok()?).into_owned();
+    let text: String = text
+        .chars()
+        .filter(|c| !c.is_control() || matches!(c, '\n' | '\t'))
+        .take(4000)
+        .collect();
+    let text = text.trim().to_string();
+    (!text.is_empty()).then_some(text)
+}
+
+#[tauri::command]
+async fn summon_selection() -> Option<String> {
+    tauri::async_runtime::spawn_blocking(read_primary_selection)
+        .await
+        .ok()
+        .flatten()
+}
+
 /// A short desktop notice when Mobius needs the person while they are elsewhere.
 #[tauri::command]
 fn mobius_notify(summary: String, body: String) {
@@ -4073,6 +4123,7 @@ fn main() {
             chat_list,
             mobius_notify,
             summon_context,
+            summon_selection,
             chat_status,
             chat_send,
             chat_pick_attachments,
