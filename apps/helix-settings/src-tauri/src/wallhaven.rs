@@ -134,7 +134,11 @@ pub async fn wallhaven_thumb(id: String) -> Option<String> {
 
 /// Downloads a listed picture into the wallpaper folder (once) and makes it the wallpaper.
 #[tauri::command]
-pub async fn wallhaven_use(app: AppHandle, id: String) -> Result<(), String> {
+pub async fn wallhaven_use(
+    app: AppHandle,
+    id: String,
+    output: Option<String>,
+) -> Result<(), String> {
     let hit = listed(&id).ok_or("That picture is not in the list any more. Search again.")?;
     let folder = crate::wallpaper_folder(&app);
     let target = folder.join(model::file_name(&hit));
@@ -165,5 +169,5 @@ pub async fn wallhaven_use(app: AppHandle, id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())??;
     }
     eprintln!("SETTINGS wallhaven saved");
-    crate::write_choice(&app, helix_wallpaper_model::Source::Image(target))
+    crate::apply_wallpaper(&app, helix_wallpaper_model::Source::Image(target), output)
 }

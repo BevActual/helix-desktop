@@ -18,7 +18,7 @@ const SIZES: [string, string][] = [
   ["any", "Any size"],
 ];
 
-function ImageTile({ image }: { image: ImageRow }) {
+function ImageTile({ image, output }: { image: ImageRow; output: string | null }) {
   const ref = useLazyBackground<HTMLButtonElement>(() => invoke<string | null>("wallpaper_thumb", { index: image.index }));
   return (
     <button
@@ -26,7 +26,7 @@ function ImageTile({ image }: { image: ImageRow }) {
       className={`wp-tile${image.current ? " current" : ""}`}
       title={image.name}
       data-test={`wp-image-${image.index}`}
-      onClick={() => invoke("wallpaper_choose_image", { index: image.index })}
+      onClick={() => invoke("wallpaper_choose_image", { index: image.index, output })}
     >
       <span className="wp-name">{image.name}</span>
     </button>
@@ -44,7 +44,7 @@ function HitTile({ id, label, saved, busy, onUse }: { id: string; label: string;
 }
 
 /** Searching wallhaven.cc (safe-for-work only). It is one component for the life of the page, so choosing a picture keeps the results. */
-function Wallhaven({ report }: { report: (text: string) => void }) {
+function Wallhaven({ report, output }: { report: (text: string) => void; output: string | null }) {
   const [query, setQuery] = useState("");
   const [sorting, setSorting] = useState("toplist");
   const [minimum, setMinimum] = useState("1080");
@@ -78,7 +78,7 @@ function Wallhaven({ report }: { report: (text: string) => void }) {
     if (using) return;
     setUsing(id);
     setMessage("");
-    invoke("wallhaven_use", { id }).then(
+    invoke("wallhaven_use", { id, output }).then(
       () => setSaved((current) => new Set(current).add(id)),
       (error) => { setMessage(String(error)); report(`wallhaven_use: ${String(error)}`); },
     ).finally(() => setUsing(null));
@@ -118,10 +118,20 @@ function Wallhaven({ report }: { report: (text: string) => void }) {
 
 export function WallpaperPage({ register, report }: { register: (handle: PageHandle) => void; report: (text: string) => void }) {
   const [view, setView] = useState<PickerView | null>(null);
+  const [outputs, setOutputs] = useState<string[]>([]);
+  const [target, setTarget] = useState("all");
+  const output = target === "all" ? null : target;
 
   const load = useCallback(() => {
-    invoke<PickerView>("wallpaper_view").then(setView, (error) => report(`wallpaper_view: ${String(error)}`));
-  }, [report]);
+    invoke<string[]>("wallpaper_outputs").then(
+      (names) => {
+        setOutputs(names);
+        if (target !== "all" && !names.includes(target)) setTarget("all");
+      },
+      () => setOutputs([]),
+    );
+    invoke<PickerView>("wallpaper_view", { output }).then(setView, (error) => report(`wallpaper_view: ${String(error)}`));
+  }, [report, output, target]);
 
   useEffect(() => {
     register({ setRows: () => undefined, refresh: load });
@@ -135,6 +145,14 @@ export function WallpaperPage({ register, report }: { register: (handle: PageHan
   if (!view) return null;
   return (
     <div data-test="react-page">
+      <h4>Show on</h4>
+      <div className="segments" data-test="wp-targets">
+        <button type="button" className={`segment${target === "all" ? " current" : ""}`} data-test="wp-target-all" onClick={() => setTarget("all")}>All displays</button>
+        {outputs.map((name) => (
+          <button type="button" key={name} className={`segment${target === name ? " current" : ""}`} data-test={`wp-target-${name}`} onClick={() => setTarget(name)}>{name}</button>
+        ))}
+      </div>
+      <div className="setting-about note">All displays sets every screen. A named display keeps its own picture.</div>
       <h4>Colours</h4>
       <div className="swatches">
         {view.swatches.map((swatch) => (
@@ -144,17 +162,17 @@ export function WallpaperPage({ register, report }: { register: (handle: PageHan
             style={{ background: swatch.hex }}
             title={swatch.hex}
             data-test={`wp-swatch-${swatch.index}`}
-            onClick={() => invoke("wallpaper_choose_swatch", { index: swatch.index })}
+            onClick={() => invoke("wallpaper_choose_swatch", { index: swatch.index, output })}
           />
         ))}
       </div>
       <h4>Find on Wallhaven</h4>
-      <Wallhaven report={report} />
+      <Wallhaven report={report} output={output} />
       <h4>Pictures</h4>
       <div className="setting-about note">{view.folder}</div>
       <div className="wp-grid">
         {view.images.map((image) => (
-          <ImageTile key={`${image.index}:${image.name}`} image={image} />
+          <ImageTile key={`${image.index}:${image.name}`} image={image} output={output} />
         ))}
       </div>
       {view.images.length === 0 ? <div className="empty">No pictures in this folder.</div> : null}

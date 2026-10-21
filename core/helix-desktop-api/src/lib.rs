@@ -389,10 +389,28 @@ impl Desktop {
         proxy.call("StopInputMeter", &()).await
     }
 
-    /// `Audio1.StartInputMeter` with sink id (returns error for unknown sinks).
-    pub async fn audio_start_input_meter(&self, sink_id: u32) -> zbus::Result<()> {
+    /// `Audio1.StartInputMeter` with the microphone's id (returns an error for an unknown one).
+    /// Renews that caller's eight-second lease. Level samples are not part of the audio snapshot.
+    pub async fn audio_start_input_meter(&self, source: u32) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Audio).await?;
-        proxy.call("StartInputMeter", &(sink_id,)).await
+        proxy.call("StartInputMeter", &(source,)).await
+    }
+
+    /// Calls `on_level` for every `InputLevel` sent to this connection: source id, peak (0..=1 as the
+    /// service sent it), and whether a sample was available.
+    pub async fn watch_input_level<F>(&self, mut on_level: F) -> zbus::Result<()>
+    where
+        F: FnMut(u32, f64, bool) + Send,
+    {
+        let proxy = self.domain_proxy(Domain::Audio).await?;
+        let mut levels = proxy.receive_signal("InputLevel").await?;
+        while let Some(message) = levels.next().await {
+            if let Ok((source, peak, available)) = message.body().deserialize::<(u32, f64, bool)>()
+            {
+                on_level(source, peak, available);
+            }
+        }
+        Ok(())
     }
 
     /// Calls `on_prompt` with every `Prompt` signal the service sends this client for a pairing (kind, device, passkey, pin, entered).

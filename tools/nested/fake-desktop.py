@@ -182,6 +182,37 @@ def network_action(name, args, emit):
 
 next_operation = [100]
 connection = None
+meter = {"sender": None, "source": None, "timer": None, "step": 0}
+
+def meter_tick():
+    if connection is None or meter["sender"] is None:
+        meter["timer"] = None
+        return False
+    meter["step"] = (meter["step"] + 1) % 4
+    peak = 0.35 + 0.15 * meter["step"]
+    connection.emit_signal(meter["sender"], PATH, "org.helix.Desktop.Audio1", "InputLevel",
+                           GLib.Variant("(udb)", (int(meter["source"]), float(peak), True)))
+    return True
+
+def start_meter(sender, source):
+    source = int(source)
+    if source not in audio["sources"]:
+        raise Refused("Microphone is no longer available")
+    with open(audio_log_path, "a") as log:
+        log.write(f"METER start {source}\n")
+    meter["sender"] = sender
+    meter["source"] = source
+    if meter["timer"] is None:
+        meter["timer"] = GLib.timeout_add(200, meter_tick)
+
+def stop_meter():
+    with open(audio_log_path, "a") as log:
+        log.write("METER stop\n")
+    meter["sender"] = None
+    meter["source"] = None
+    if meter["timer"] is not None:
+        GLib.source_remove(meter["timer"])
+        meter["timer"] = None
 
 def emit_changed(interface):
     connection.emit_signal(None, PATH, interface, "Changed", None)
@@ -242,6 +273,16 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             next_operation[0] += 1
             invocation.return_value(GLib.Variant("(t)", (next_operation[0],)))
             GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Audio1"), False)[1])
+        elif method == "StartInputMeter" and short == "Audio1":
+            (source,) = params.unpack()
+            try:
+                start_meter(sender, source)
+            except Refused as error:
+                invocation.return_dbus_error("org.helix.Desktop.Error.Failed", str(error)); return
+            invocation.return_value(None)
+        elif method == "StopInputMeter" and short == "Audio1":
+            stop_meter()
+            invocation.return_value(None)
         elif method == "Reply" and short == "Bluetooth1":
             response, cancel = params.unpack()
             path = bt["pairing"]

@@ -96,6 +96,8 @@ pub struct Notifications {
     next_id: u32,
     items: Vec<Item>,
     dnd: bool,
+    /// Quiet hours are in effect right now. Ordinary banners stay hidden; the manual switch is unchanged.
+    quiet: bool,
     recent: Vec<(String, u64)>,
     /// What the person chose in Settings; `None` means the defaults above.
     default_toast_ms: Option<u64>,
@@ -380,6 +382,11 @@ impl Notifications {
         self.dnd = on;
     }
 
+    /// Quiet hours, as the shell computed them from the clock. This does not change the Do not disturb switch.
+    pub fn set_quiet(&mut self, on: bool) {
+        self.quiet = on;
+    }
+
     /// The shade was looked at: nothing is unread any more.
     pub fn mark_all_read(&mut self) {
         for item in &mut self.items {
@@ -441,7 +448,7 @@ impl Notifications {
             .iter()
             .filter(|item| {
                 item.toast_until.is_some_and(|until| until > now)
-                    && (!self.dnd || item.urgency == Urgency::Critical)
+                    && (!(self.dnd || self.quiet) || item.urgency == Urgency::Critical)
                     && item.urgency != Urgency::Low
             })
             .take(self.max_toasts.unwrap_or(MAX_TOASTS).clamp(1, MAX_TOASTS))
@@ -618,6 +625,17 @@ mod tests {
         );
         assert_eq!(view.toasts[0].app, "Power");
         assert_eq!(view.items.len(), 2, "the other is still recorded");
+        assert!(view.dnd);
+        n.set_dnd(false);
+        n.set_quiet(true);
+        let view = n.view(3);
+        assert!(
+            !view.dnd,
+            "quiet hours do not flip the Do not disturb switch"
+        );
+        assert_eq!(view.toasts.len(), 1);
+        assert_eq!(view.toasts[0].app, "Power");
+        assert_eq!(view.items.len(), 2);
         let events = n.expire(1_000_000);
         assert!(events.iter().all(|e| *e
             != Event::Closed {

@@ -39,4 +39,23 @@ for name, (x, y) in [("left", (w // 8, h // 2)), ("centre", (w // 2, h // 2)), (
     print(("ok: " if good else "FAIL: ") + name + " is the new colour", got)
 sys.exit(0 if ok else 1)
 PY
+echo "--- a colour for this output wins over the default"
+NAME=$(niri msg --json outputs | python3 -c 'import json,sys; print(next(iter(json.load(sys.stdin))))')
+printf '[wallpaper.default]\npath = "color:#ff00ff"\n[wallpaper.monitors."%s"]\npath = "color:#00ff00"\n' "$NAME" > "$SCRATCH/state/choice.toml.tmp" && mv "$SCRATCH/state/choice.toml.tmp" "$SCRATCH/state/choice.toml"
+sleep 3
+niri msg action screenshot-screen --show-pointer false >/dev/null 2>&1; sleep 1.5
+cp "$(ls -t "$SCRATCH"/shots/*.png | head -1)" "$SCRATCH/wallpaper-monitor.png"
+python3 - "$SCRATCH/wallpaper-monitor.png" <<'PY' || FAILED=1
+import sys, gi
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import GdkPixbuf
+pb = GdkPixbuf.Pixbuf.new_from_file(sys.argv[1]); w, h, n, rs = pb.get_width(), pb.get_height(), pb.get_n_channels(), pb.get_rowstride()
+px = pb.get_pixels()
+def at(x, y): i = y * rs + x * n; return px[i], px[i + 1], px[i + 2]
+ok = True
+for name, (x, y) in [("left", (w // 8, h // 2)), ("centre", (w // 2, h // 2)), ("right", (w - w // 8, h // 2))]:
+    got = at(x, y); good = all(abs(a - b) < 24 for a, b in zip(got, (0, 255, 0))); ok &= good
+    print(("ok: " if good else "FAIL: ") + name + " is this display's colour", got)
+sys.exit(0 if ok else 1)
+PY
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

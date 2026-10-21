@@ -52,7 +52,8 @@ const specs: Record<string, PageSpec> = {
   displays: {
     load: () => invoke<RowView[]>("displays_rows"),
     empty: "No displays reported.",
-    note: "Resolution, scale and arrangement are set in the compositor's configuration.",
+    change: (id, change) => invoke<RowView[]>("displays_change", { id, change }),
+    note: "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup.",
   },
   accessibility: { change: serviceChange("accessibility"), empty: "There is nothing to adjust here on this desktop." },
 };

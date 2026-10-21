@@ -38,8 +38,7 @@ Notifications, Power & lock, Privacy & agents and About. The gaps below come fro
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
-| Sound page: live input level meter | S | A `watch_input_level` call in `helix-desktop-api` for the `InputLevel` signal; `Audio1.StartInputMeter` is already there | The page ships without the meter (device choice, volume and mute are done) |
-| **Notifications page, next**: do-not-disturb schedule and per-app rules (banner time and count are done) | M | A consumer in `helix_shell_model::notifications` for each | `settings-audit.md` |
+| **Notifications page, next**: per-app rules (quiet hours, the on/off switch, banner time and count are done and kept in one file with Quick Settings) | M | A consumer in `helix_shell_model::notifications` | `settings-audit.md` |
 | **Night light**: temperature and schedule | L | A gamma-control client (`wlr-gamma-control` is in `protocols/`); the service only guards the setting today | `settings-audit.md`; `configuration.rs` has guards, no gamma client |
 | **Interface scale in the shell's own chrome** (bar, dock, panels follow the scale) | M | The bar and dock set layer-surface sizes and exclusive zones, so they need to follow the scale rather than be zoomed | Applications follow `accessibility.ui_scale` already; the shell does not |
 | Candidates, not yet confirmed as needed: date/time and region, default applications, pointer and touchpad | M each | Product decision | Common desktop expectations; no doc asks for them yet |
@@ -82,8 +81,7 @@ acts on it, and a nested test asserts the exact requests sent.
 ## Suggested order
 
 1. Foundations, all of section 1 (a few days, unlocks everything).
-2. Sound page: biggest visible hole, no dependencies, and it exercises the page pattern the others reuse.
-3. Act loop end to end: the product bet, and it decides what the agent-facing UI work looks like.
-4. Software: a real install tested on a throwaway machine, then adding and removing sources.
-5. Notifications page together with its consumer, then night light, then UI scale.
-6. Greeter power actions and packaging, then shell slices and the extension design.
+2. Act loop end to end: the product bet, and it decides what the agent-facing UI work looks like.
+3. Software: a real install tested on a throwaway machine, then adding and removing sources.
+4. Notifications page together with its consumer, then night light, then UI scale. The Sound page, including the microphone test, is done. Quiet hours hide ordinary banners between two hours and are checked when the hour changes (`notifications-prefs-test.sh`). Displays sets resolution, scale, orientation, arrangement, variable refresh, and power, and keeps them in `helix-setup.kdl` (`settings-displays-test.sh`). Night light still needs a gamma client before it can be a row. Per-app notification rules are still open.
+5. Greeter power actions and packaging, then shell slices and the extension design.

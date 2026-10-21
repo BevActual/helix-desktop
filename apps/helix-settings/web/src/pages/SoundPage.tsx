@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke, listen, Slider, type AudioView, type OutputView } from "@helix/ui";
+import { invoke, listen, Meter, Slider, type AudioView, type OutputView } from "@helix/ui";
 import { ListRow, SwitchRow } from "../components";
 import type { PageHandle } from "./RowsPage";
 
@@ -52,6 +52,69 @@ function Level({ title, percent, muted, test, disabled, setVolume, setMuted }: {
   );
 }
 
+/** The microphone is open only while this is on. Leaving the page closes it. */
+function MicTest({ disabled }: { disabled: boolean }) {
+  const [testing, setTesting] = useState(false);
+  const [percent, setPercent] = useState(0);
+  const [heard, setHeard] = useState(false);
+
+  useEffect(() => {
+    const page = document.getElementById("page-sound");
+    if (!page) return;
+    const observer = new MutationObserver(() => {
+      if (page.hidden) setTesting(false);
+    });
+    observer.observe(page, { attributes: true, attributeFilter: ["hidden"] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!testing) return;
+    let gone = false;
+    let unlisten = () => {};
+    invoke("audio_test_microphone", { on: true }).catch((error) => console.error(error));
+    listen<{ source: number; percent: number; available: boolean }>("audio-level", (level) => {
+      setPercent(level.percent);
+      if (level.available) setHeard(true);
+    }).then((stop) => {
+      if (gone) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      gone = true;
+      unlisten();
+      setHeard(false);
+      setPercent(0);
+      invoke("audio_test_microphone", { on: false }).catch((error) => console.error(error));
+    };
+  }, [testing]);
+
+  return (
+    <div className="rows-card">
+      <SwitchRow
+        title="Test microphone"
+        about="Opens the microphone and shows how loud it is. It closes when you leave this page."
+        on={testing}
+        test="sound-input-test"
+        disabled={disabled}
+        onChange={setTesting}
+      />
+      {testing ? (
+        <div className="setting-row">
+          <div className="setting-text grow">
+            {heard ? (
+              <div key="heard" className="setting-about" data-test="sound-input-heard">Hearing the microphone</div>
+            ) : (
+              <div key="listening" className="setting-about">Listening…</div>
+            )}
+            <Meter percent={percent} live label="Microphone level" />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SoundPage({ register }: { register: (handle: PageHandle) => void }) {
   const [view, setView] = useState<AudioView | null>(null);
 
@@ -95,6 +158,7 @@ export function SoundPage({ register }: { register: (handle: PageHandle) => void
         setVolume={(percent) => call("audio_set_input_volume", { percent })}
         setMuted={(muted) => call("audio_set_input_muted", { muted })}
       />
+      <MicTest disabled={!view.input} />
       <Devices title="Input devices" devices={view.inputs} test="sound-in" icon="mic" choose={(id) => call("audio_set_default_input", { id })} />
     </div>
   );

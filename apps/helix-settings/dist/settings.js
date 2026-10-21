@@ -106,7 +106,12 @@ function showPage(name) {
   } else {
     if (name === "about") drawAbout();
     if (name === "keyboard") drawKeyboard();
-    if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
+    if (name === "wallpaper") {
+      invoke("wallpaper_outputs").then((names) => {
+        wallpaperOutputs = names || [];
+        return invoke("wallpaper_view", { output: wallpaperOutput() });
+      }).then(drawWallpaper);
+    }
     if (name === "dock") invoke("dock_rows").then(drawDock);
     if (name === "notifications") invoke("notifications_rows").then(drawNotifications);
     if (name === "power") invoke("power_rows").then(drawPower);
@@ -137,10 +142,29 @@ async function drawAbout() {
 
 // Wallpaper: a grid of the pictures in the folder; choosing one writes the choice and the wallpaper process reloads by itself ---------
 let thumbObserver = null;
+let wallpaperTarget = "all";
+let wallpaperOutputs = [];
+function wallpaperOutput() { return wallpaperTarget === "all" ? null : wallpaperTarget; }
 function drawWallpaper(view) {
   if (reactPages.wallpaper) return;   // the React page listens for this event itself
   const host = $("wallpaper-host");
   host.replaceChildren();
+  host.append(el("h4", "", "Show on"));
+  const segments = el("div", "segments");
+  segments.dataset.test = "wp-targets";
+  const addTarget = (value, label) => {
+    const button = el("button", "segment" + (wallpaperTarget === value ? " current" : ""), label);
+    button.type = "button";
+    button.dataset.test = "wp-target-" + value;
+    button.onclick = () => {
+      wallpaperTarget = value;
+      invoke("wallpaper_view", { output: wallpaperOutput() }).then(drawWallpaper);
+    };
+    segments.append(button);
+  };
+  addTarget("all", "All displays");
+  wallpaperOutputs.forEach((name) => addTarget(name, name));
+  host.append(segments, el("div", "setting-about note", "All displays sets every screen. A named display keeps its own picture."));
   host.append(el("h4", "", "Colours"));
   const swatches = el("div", "swatches");
   view.swatches.forEach((swatch) => {
@@ -148,7 +172,7 @@ function drawWallpaper(view) {
     button.style.background = swatch.hex;
     button.title = swatch.hex;
     button.dataset.test = "wp-swatch-" + swatch.index;
-    button.onclick = () => invoke("wallpaper_choose_swatch", { index: swatch.index });
+    button.onclick = () => invoke("wallpaper_choose_swatch", { index: swatch.index, output: wallpaperOutput() });
     swatches.append(button);
   });
   host.append(swatches);
@@ -172,7 +196,7 @@ function drawWallpaper(view) {
     tile.dataset.test = "wp-image-" + image.index;
     tile.title = image.name;
     tile.append(el("span", "wp-name", image.name));
-    tile.onclick = () => invoke("wallpaper_choose_image", { index: image.index });
+    tile.onclick = () => invoke("wallpaper_choose_image", { index: image.index, output: wallpaperOutput() });
     grid.append(tile);
     thumbObserver.observe(tile);
   });
@@ -244,7 +268,7 @@ function wallhavenBlock() {
         tile.onclick = () => {
           if (wallhaven.using) return;
           wallhaven.using = hit.id; tile.classList.add("busy"); message.textContent = "";
-          invoke("wallhaven_use", { id: hit.id }).catch((error) => { message.textContent = String(error); })
+          invoke("wallhaven_use", { id: hit.id, output: wallpaperOutput() }).catch((error) => { message.textContent = String(error); })
             .then(() => { if (!tile.querySelector(".wp-saved")) tile.append(el("span", "wp-saved", "Saved")); })
             .finally(() => { wallhaven.using = null; tile.classList.remove("busy"); });
         };
@@ -350,7 +374,7 @@ function rowLine(page, row) {
   if (row.description) text.append(el("div", "setting-about", row.description));
   line.append(text);
   const control = row.control;
-  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -455,11 +479,14 @@ function drawPower(rows) {
   queueReport();
 }
 function drawDisplays(rows) {
+  if (reactPages.displays) { reactPages.displays.setRows(rows); return; }
+  pageRows.displays = rows;
   const host = $("displays-host");
   host.replaceChildren();
   drawGroups(host, "displays", rows);
   if (!rows.length) host.append(el("div", "empty", "No displays reported."));
-  host.append(el("div", "setting-about note", "Resolution, scale and arrangement are set in the compositor's configuration."));
+  host.append(el("div", "setting-about note", "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup."));
+  if (searching()) drawSearch();
   queueReport();
 }
 function drawRows(view) {
@@ -479,6 +506,7 @@ function drawRows(view) {
 invoke("dock_rows").then((rows) => { pageRows.dock = rows; });
 invoke("notifications_rows").then((rows) => { pageRows.notifications = rows; });
 invoke("power_rows").then((rows) => { pageRows.power = rows; });
+invoke("displays_rows").then((rows) => { pageRows.displays = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Search: matching rows from every page, under the page they belong to ------------------------------------------------------------
