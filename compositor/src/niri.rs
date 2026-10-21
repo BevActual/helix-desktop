@@ -434,6 +434,10 @@ pub struct Niri {
 
     /// Helix: toplevel opens that should land on the agent desk without stealing focus.
     pub helix_place_on_agent_desk: u32,
+    /// The set of displays whose remembered setup was last applied (or saved), so it is applied once per change of set.
+    pub helix_profile_key: Option<Vec<String>>,
+    /// What had the keyboard when `helix-summon` was pressed, and when.
+    pub helix_summon: Option<(Instant, niri_ipc::HelixSummonContext)>,
     pub ipc_outputs_changed: bool,
 
     pub satellite: Option<Satellite>,
@@ -2114,6 +2118,8 @@ impl State {
 
         let new_config = self.backend.ipc_outputs().lock().unwrap().clone();
         self.niri.output_management_state.notify_changes(new_config);
+
+        self.helix_displays_changed();
     }
 
     pub fn open_screenshot_ui(&mut self, show_pointer: bool, path: Option<String>) {
@@ -2525,9 +2531,12 @@ impl Niri {
         let xdg_foreign_state = XdgForeignState::new::<State>(&display_handle);
 
         let is_tty = matches!(backend, Backend::Tty(_));
+        // The nested test compositor has no gamma hardware. With HELIX_NESTED_GAMMA set it offers a pretend 256-entry table and logs what a client
+        // sets (`HELIX gamma …`), so a colour client such as night light can be tested end to end without a screen.
+        let virtual_gamma = !is_tty && crate::utils::helix_nested_gamma();
         let gamma_control_manager_state =
             GammaControlManagerState::new::<State, _>(&display_handle, move |client| {
-                is_tty && !client.get_data::<ClientState>().unwrap().restricted
+                (is_tty || virtual_gamma) && !client.get_data::<ClientState>().unwrap().restricted
             });
         let activation_state = XdgActivationState::new::<State>(&display_handle);
         event_loop
@@ -2808,6 +2817,8 @@ impl Niri {
 
             ipc_server,
             helix_place_on_agent_desk: 0,
+            helix_profile_key: None,
+            helix_summon: None,
             ipc_outputs_changed: false,
 
             satellite: None,

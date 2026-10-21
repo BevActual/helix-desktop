@@ -34,6 +34,14 @@ Not covered, by design: `zwp_virtual_keyboard_v1` keys are delivered by smithay 
 
 Touch points when rebasing: `niri-config/src/misc.rs` (`TrustedSurface`, `Helix`), `niri-config/src/lib.rs` (field, `trusted-surface` / `helix` nodes), `src/layer/mapped.rs` (`trusted`, `block_out_from`), `src/handlers/layer_shell.rs` (decided when the surface maps), `src/niri.rs` (`layer_is_trusted`, `trusted_layer_on`, `blocks_synthetic_input`, `update_keyboard_focus`, `contents_under`, `layers_in_render_order`, the first render pass), `src/input/mod.rs` (`process_input_event`), `src/handlers/compositor.rs` (agent-desk placement on map), `src/helix/agent_desk.rs`, `niri-ipc/src/lib.rs` (`LayerSurface::trusted`, `HelixCapabilities`, `HelixAgentDesk`, `Workspace::is_agent_desk`), `src/ipc/{server,client}.rs`.
 
+### Summon
+
+`helix-summon` (a bind action; `niri msg action helix-summon`) notes the title, app id and pid of the window that has the keyboard, then raises the window whose app id is `summon-app-id` (default `org.helix.Mobius`) or starts `summon-command` (default `helix-mobius`). `HelixSummonContext` returns the note once; it expires after a minute, and a summon while the summoned application is itself focused leaves no note. Config: `helix { summon-app-id "…"; summon-command "cmd" "arg"; }`. Touch points when rebasing: `src/helix/summon.rs`, `niri-config/src/{binds,misc}.rs`, `niri-ipc/src/lib.rs`, `src/input/mod.rs`, `src/ipc/server.rs`.
+
+### Display profiles
+
+The compositor remembers how the connected displays are set up (scale, orientation, resolution, position, on or off, variable refresh) for exactly this *set* of displays, in `$XDG_STATE_HOME/helix/display-profiles.json`, and applies it again when the set is connected. A display is known by `make model serial`, or by its connector when it reports no identity or shares one. IPC: `HelixSaveDisplayProfile`, `HelixApplyDisplayProfile`, `HelixForgetDisplayProfile`, `HelixDisplayProfile`; `HelixCapabilities.display_profiles` is true. Touch points when rebasing: `src/helix/display_profiles.rs`, `State::refresh_ipc_outputs` (the one call), `src/ipc/server.rs`, `niri-ipc/src/lib.rs`.
+
 ### Agent desk
 
 ```kdl
@@ -45,6 +53,8 @@ helix {
 IPC: `HelixPlaceOnAgentDesk`, `HelixFocusAgentDesk`, `HelixScreenshotOutput`, `HelixScreenshotAllOutputs`, `HelixAgentDesk` request. Workspace events include `is_agent_desk`. `HelixCapabilities` reports `agent_desk: true`.
 
 After changing compositor IPC, rebuild (`cargo build --release -p niri --bin niri` from the repository root), run `tools/install-trusted-niri.sh apply`, and log out and back in. The session that is already running keeps its old `niri` binary until then; `desktop-capture all` and per-output capture need the installed build.
+
+Colour tables: `wlr-gamma-control` is offered on a real (tty) session only. The headless test compositor offers a pretend 256-entry table when `HELIX_NESTED_GAMMA=1` and logs `HELIX gamma output=… r=… g=… b=…` (the last entry of each channel) or `reset`, so `helix-nightlight` can be tested end to end (`tools/nested/nightlight-test.sh`).
 
 Nested tests (`tools/nested/run.sh`) set `HELIX_NESTED_HEADLESS=1` so niri starts with the headless backend and a 1280×720 output instead of winit on the host display.
 

@@ -2411,6 +2411,9 @@ impl State {
             Action::HelixFocusAgentDesk {} => {
                 self.helix_focus_agent_desk();
             }
+            Action::HelixSummon => {
+                self.helix_summon();
+            }
             Action::LoadConfigFile(path) => {
                 if let Some(watcher) = &self.niri.config_file_watcher {
                     watcher.load_config(path);

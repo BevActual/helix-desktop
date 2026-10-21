@@ -210,6 +210,211 @@ pub fn resolve_include_path(niri_dir: &Path, which: &str) -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
+/// One output written into `helix-setup.kdl`. Names are connector names the page already checked.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DisplaySetup {
+    pub name: String,
+    pub off: bool,
+    pub scale: Option<f64>,
+    pub transform: Option<String>,
+    pub mode: Option<String>,
+    pub position: Option<(i32, i32)>,
+    pub vrr: bool,
+}
+
+impl DisplaySetup {
+    pub fn block(&self) -> Result<String, &'static str> {
+        if !crate::compositor_ipc::config_name_ok(&self.name) {
+            return Err("unknown display");
+        }
+        let mut lines = vec![format!("output \"{}\" {{", self.name)];
+        if self.off {
+            lines.push("    off".into());
+        } else {
+            if let Some(mode) = &self.mode {
+                if mode.chars().any(|c| c.is_control() || c == '"') {
+                    return Err("pick a resolution");
+                }
+                lines.push(format!("    mode \"{mode}\""));
+            }
+            if let Some(scale) = self.scale {
+                let text = crate::compositor_ipc::scale_token(scale)
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("{scale:.2}"));
+                lines.push(format!("    scale {text}"));
+            }
+            if let Some(transform) = &self.transform {
+                if transform != "normal"
+                    && transform
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-')
+                {
+                    lines.push(format!("    transform \"{transform}\""));
+                }
+            }
+            if let Some((x, y)) = self.position {
+                lines.push(format!("    position x={x} y={y}"));
+            }
+            if self.vrr {
+                lines.push("    variable-refresh-rate".into());
+            }
+        }
+        lines.push("}".into());
+        Ok(lines.join("\n"))
+    }
+}
+
+/// Rewrite the output blocks in `helix-setup.kdl` and make sure the main config includes that file.
+pub fn save_displays(displays: &[DisplaySetup]) -> Result<(), String> {
+    let blocks = displays
+        .iter()
+        .map(DisplaySetup::block)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(str::to_string)?;
+    write_setup(|existing| replace_output_blocks(existing, &blocks))
+}
+
+/// Writes one output's block and leaves every other block, and everything else in the file, as it was. `replaces` are other names the same display
+/// was saved under (its connector, now that it is saved by identity); their blocks are dropped so the display has just one.
+pub fn save_display(display: &DisplaySetup, replaces: &[&str]) -> Result<(), String> {
+    let block = display.block().map_err(str::to_string)?;
+    write_setup(|existing| {
+        let mut text = existing.to_string();
+        for name in replaces.iter().filter(|name| **name != display.name) {
+            text = upsert_output_block(&text, name, None);
+        }
+        upsert_output_block(&text, &display.name, Some(&block))
+    })
+}
+
+/// Whether the saved block for any of `names` already has a line starting with `keyword` (`position`, `mode`, ...). Used so that changing one thing
+/// about a display does not pin the things the person never set.
+pub fn saved_output_has(names: &[&str], keyword: &str) -> bool {
+    let Some(dir) = niri_config_dir() else {
+        return false;
+    };
+    let text = fs::read_to_string(dir.join(SETUP_INCLUDE)).unwrap_or_default();
+    find_output_blocks(&text)
+        .into_iter()
+        .filter(|(block_name, _)| names.contains(&block_name.as_str()))
+        .any(|(_, range)| {
+            text[range]
+                .lines()
+                .any(|line| line.split_whitespace().next() == Some(keyword))
+        })
+}
+
+fn write_setup(edit: impl FnOnce(&str) -> String) -> Result<(), String> {
+    let dir = niri_config_dir().ok_or("no config home")?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let setup_path = dir.join(SETUP_INCLUDE);
+    let existing = fs::read_to_string(&setup_path).unwrap_or_default();
+    let mut next = edit(&existing);
+    if !next.contains("Managed by Helix Settings") {
+        next = format!("{SETUP_HEADER}\n{next}");
+    }
+    if !next.ends_with('\n') {
+        next.push('\n');
+    }
+    write_atomic(&setup_path, next.as_bytes())?;
+    ensure_include(&dir.join("config.kdl"), SETUP_INCLUDE)
+}
+
+/// Every `output "name" { … }` block in a KDL text, with its byte range: on one line, over several, or with the brace on the next line.
+fn find_output_blocks(text: &str) -> Vec<(String, std::ops::Range<usize>)> {
+    let lines: Vec<(usize, &str)> = text
+        .split_inclusive('\n')
+        .scan(0usize, |offset, line| {
+            let at = *offset;
+            *offset += line.len();
+            Some((at, line))
+        })
+        .collect();
+    let mut found = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let (start, line) = lines[i];
+        let Some(name) = output_header(line) else {
+            i += 1;
+            continue;
+        };
+        let mut depth = brace_delta(line);
+        let mut opened = line.contains('{');
+        let mut end_line = i;
+        let mut j = i + 1;
+        while j < lines.len() && (depth > 0 || !opened) {
+            if !opened && !lines[j].1.trim().is_empty() && !lines[j].1.trim_start().starts_with('{')
+            {
+                break;
+            }
+            opened |= lines[j].1.contains('{');
+            depth += brace_delta(lines[j].1);
+            end_line = j;
+            j += 1;
+        }
+        if opened && depth <= 0 {
+            let end = lines[end_line].0 + lines[end_line].1.len();
+            found.push((name.to_string(), start..end));
+            i = end_line + 1;
+        } else {
+            i += 1;
+        }
+    }
+    found
+}
+
+/// `existing` without any block for `name`, and with `block` (when given) added at the end.
+pub fn upsert_output_block(existing: &str, name: &str, block: Option<&str>) -> String {
+    remove_blocks(
+        existing,
+        |found| found == name,
+        block.map(|b| vec![b.to_string()]).unwrap_or_default(),
+    )
+}
+
+/// Drop every `output "…" { … }` block and append `blocks`, leaving the rest of the file alone.
+pub fn replace_output_blocks(existing: &str, blocks: &[String]) -> String {
+    remove_blocks(existing, |_| true, blocks.to_vec())
+}
+
+fn remove_blocks(existing: &str, drop: impl Fn(&str) -> bool, add: Vec<String>) -> String {
+    let mut kept = existing.to_string();
+    for (name, range) in find_output_blocks(existing).into_iter().rev() {
+        if drop(&name) {
+            kept.replace_range(range, "");
+        }
+    }
+    let mut next = kept.trim_end().to_string();
+    if !add.is_empty() {
+        if !next.is_empty() {
+            next.push_str("\n\n");
+        }
+        next.push_str(&add.join("\n\n"));
+    }
+    if !next.is_empty() && !next.ends_with('\n') {
+        next.push('\n');
+    }
+    next
+}
+
+/// The connector name in a line that starts an output block (`output "eDP-1" {` or just `output "eDP-1"`).
+fn output_header(line: &str) -> Option<&str> {
+    let rest = line.trim().strip_prefix("output")?.trim_start();
+    let quoted = rest.strip_prefix('"')?;
+    let (name, after) = quoted.split_once('"')?;
+    let after = after.trim_start();
+    (crate::compositor_ipc::config_name_ok(name) && (after.is_empty() || after.starts_with('{')))
+        .then_some(name)
+}
+
+fn brace_delta(line: &str) -> i32 {
+    line.chars().fold(0, |depth, c| match c {
+        '{' => depth + 1,
+        '}' => depth - 1,
+        _ => depth,
+    })
+}
+
 pub fn save_snippet(snippet: &HelixSnippet) -> Result<(), String> {
     let name = snippet.agent_desk_name.trim();
     if name.is_empty() || name.chars().count() > 64 {
@@ -221,13 +426,56 @@ pub fn save_snippet(snippet: &HelixSnippet) -> Result<(), String> {
     let dir = niri_config_dir().ok_or("no config home")?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let setup_path = dir.join(SETUP_INCLUDE);
-    let body = format!(
-        "{SETUP_HEADER}\nhelix {{\n    agent-desk-name \"{name}\"\n}}\n",
+    let existing = fs::read_to_string(&setup_path).unwrap_or_default();
+    let helix = format!(
+        "helix {{\n    agent-desk-name \"{name}\"\n}}",
         name = name.replace('\\', "\\\\")
     );
-    write_atomic(&setup_path, body.as_bytes())?;
+    let mut next = replace_helix_block(&existing, &helix);
+    if !next.contains("Managed by Helix Settings") {
+        next = format!("{SETUP_HEADER}\n{next}");
+    }
+    if !next.ends_with('\n') {
+        next.push('\n');
+    }
+    write_atomic(&setup_path, next.as_bytes())?;
     ensure_include(&dir.join("config.kdl"), SETUP_INCLUDE)?;
     Ok(())
+}
+
+fn replace_helix_block(existing: &str, helix: &str) -> String {
+    let mut kept = String::new();
+    let mut lines = existing.lines().peekable();
+    let mut replaced = false;
+    while let Some(line) = lines.next() {
+        if line.trim().starts_with("helix") && line.contains('{') {
+            let mut depth = brace_delta(line);
+            while depth > 0 {
+                let Some(inner) = lines.next() else { break };
+                depth += brace_delta(inner);
+            }
+            if !replaced {
+                kept.push_str(helix);
+                kept.push('\n');
+                replaced = true;
+            }
+            continue;
+        }
+        if line.contains("Managed by Helix Settings") {
+            continue;
+        }
+        kept.push_str(line);
+        kept.push('\n');
+    }
+    let mut next = kept.trim().to_string();
+    if !replaced {
+        if !next.is_empty() {
+            next = format!("{helix}\n\n{next}");
+        } else {
+            next = helix.to_string();
+        }
+    }
+    next
 }
 
 fn read_snippet(niri_dir: Option<&Path>) -> HelixSnippet {
@@ -319,6 +567,97 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_block_and_merge_keep_the_agent_desk() {
+        let block = DisplaySetup {
+            name: "eDP-1".into(),
+            off: false,
+            scale: Some(1.5),
+            transform: Some("90".into()),
+            mode: Some("1920x1080@60.000".into()),
+            position: Some((1280, 0)),
+            vrr: true,
+        }
+        .block()
+        .unwrap();
+        assert!(block.contains("scale 1.5"));
+        assert!(block.contains("transform \"90\""));
+        assert!(block.contains("mode \"1920x1080@60.000\""));
+        assert!(block.contains("position x=1280 y=0"));
+        assert!(block.contains("variable-refresh-rate"));
+        let existing = "helix {\n    agent-desk-name \"Mobius desk\"\n}\n\noutput \"eDP-1\" {\n    scale 1\n}\n";
+        let merged = replace_output_blocks(existing, &[block]);
+        assert!(merged.contains("agent-desk-name \"Mobius desk\""));
+        assert!(merged.contains("scale 1.5"));
+        assert_eq!(merged.matches("output \"eDP-1\"").count(), 1);
+        let kept = replace_helix_block(&merged, "helix {\n    agent-desk-name \"Lab\"\n}");
+        assert!(kept.contains("agent-desk-name \"Lab\""));
+        assert!(kept.contains("scale 1.5"));
+        assert!(!kept.contains("Mobius desk"));
+    }
+
+    #[test]
+    fn one_display_is_replaced_and_the_others_are_left_alone() {
+        let text = "// Managed by Helix Settings.\noutput \"A\" { scale 2 }\noutput \"B\"\n{\n    scale 1\n}\noutput \"C\" {\n    off\n}\nhelix {\n}\n";
+        let blocks = find_output_blocks(text);
+        assert_eq!(
+            blocks.iter().map(|b| b.0.as_str()).collect::<Vec<_>>(),
+            ["A", "B", "C"]
+        );
+        let next = upsert_output_block(text, "A", Some("output \"A\" {\n    scale 1.5\n}"));
+        assert_eq!(next.matches("output \"A\"").count(), 1, "{next}");
+        assert!(next.contains("scale 1.5") && !next.contains("scale 2"));
+        assert!(
+            next.contains("output \"B\"\n{\n    scale 1\n}"),
+            "B untouched: {next}"
+        );
+        assert!(next.contains("output \"C\" {\n    off\n}") && next.contains("helix {"));
+        let gone = upsert_output_block(text, "B", None);
+        assert!(!gone.contains("output \"B\"") && gone.contains("output \"A\""));
+    }
+
+    #[test]
+    fn a_display_saved_by_identity_replaces_its_connector_block() {
+        let text =
+            "output \"DP-3\" {\n    scale 2\n}\noutput \"Dell U2720Q ABC123\" {\n    scale 1\n}\n";
+        assert_eq!(
+            find_output_blocks(text)
+                .iter()
+                .map(|b| b.0.as_str())
+                .collect::<Vec<_>>(),
+            ["DP-3", "Dell U2720Q ABC123"]
+        );
+        let mut next = upsert_output_block(text, "DP-3", None);
+        next = upsert_output_block(
+            &next,
+            "Dell U2720Q ABC123",
+            Some("output \"Dell U2720Q ABC123\" {\n    scale 1.5\n}"),
+        );
+        assert!(
+            !next.contains("DP-3") && next.contains("scale 1.5") && !next.contains("scale 2"),
+            "{next}"
+        );
+        let display = DisplaySetup {
+            name: "Dell U2720Q ABC123".into(),
+            off: false,
+            scale: Some(1.5),
+            transform: None,
+            mode: None,
+            position: None,
+            vrr: false,
+        };
+        assert!(display
+            .block()
+            .unwrap()
+            .starts_with("output \"Dell U2720Q ABC123\""));
+        assert!(DisplaySetup {
+            name: "bad\"name".into(),
+            ..display
+        }
+        .block()
+        .is_err());
+    }
 
     #[test]
     fn parses_agent_desk_name() {

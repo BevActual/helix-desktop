@@ -392,6 +392,8 @@ pub enum Action {
     },
     #[knuffel(skip)]
     HelixFocusAgentDesk {},
+    /// Remember which window has the keyboard, then raise Mobius (or start it): `helix-summon`.
+    HelixSummon,
     #[knuffel(skip)]
     MruAdvance {
         direction: MruDirection,
@@ -745,6 +747,7 @@ impl From<niri_ipc::Action> for Action {
             },
             niri_ipc::Action::HelixPlaceOnAgentDesk { count } => Self::HelixPlaceOnAgentDesk { count },
             niri_ipc::Action::HelixFocusAgentDesk {} => Self::HelixFocusAgentDesk {},
+            niri_ipc::Action::HelixSummon {} => Self::HelixSummon,
         }
     }
 }

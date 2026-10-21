@@ -732,6 +732,9 @@ impl GammaControlHandler for State {
     }
 
     fn get_gamma_size(&mut self, output: &Output) -> Option<u32> {
+        if !matches!(self.backend, crate::backend::Backend::Tty(_)) {
+            return Some(256);
+        }
         match self.backend.tty().get_gamma_size(output) {
             Ok(0) => None, // Setting gamma is not supported.
             Ok(size) => Some(size),
@@ -746,6 +749,21 @@ impl GammaControlHandler for State {
     }
 
     fn set_gamma(&mut self, output: &Output, ramp: Option<Vec<u16>>) -> Option<()> {
+        if !matches!(self.backend, crate::backend::Backend::Tty(_)) {
+            // The pretend table of the nested test compositor: say what was set, so a test can read it.
+            match &ramp {
+                Some(ramp) if ramp.len() == 768 => info!(
+                    "HELIX gamma output={} r={} g={} b={}",
+                    output.name(),
+                    ramp[255],
+                    ramp[511],
+                    ramp[767]
+                ),
+                Some(ramp) => info!("HELIX gamma output={} bad-length={}", output.name(), ramp.len()),
+                None => info!("HELIX gamma output={} reset", output.name()),
+            }
+            return Some(());
+        }
         match self.backend.tty().set_gamma(output, ramp) {
             Ok(()) => Some(()),
             Err(err) => {

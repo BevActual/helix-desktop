@@ -126,6 +126,18 @@ pub enum Request {
     HelixCapabilities,
     /// Helix: agent desk workspace state (name, id, window count, focus).
     HelixAgentDesk,
+    /// Helix: remember how the connected displays are set up (scale, orientation, resolution, position, on or off) for exactly this set of
+    /// displays. When the same set is connected again, the compositor applies it by itself.
+    HelixSaveDisplayProfile,
+    /// Helix: apply the remembered setup for the displays connected now, if there is one.
+    HelixApplyDisplayProfile,
+    /// Helix: forget the remembered setup for the displays connected now.
+    HelixForgetDisplayProfile,
+    /// Helix: whether a setup is remembered for the displays connected now.
+    HelixDisplayProfile,
+    /// Helix: the window that had the keyboard when `helix-summon` was last used, once. Empty when it was never used, was a minute ago or
+    /// more, or was already taken.
+    HelixSummonContext,
 }
 
 /// Reply from niri to client.
@@ -176,6 +188,34 @@ pub enum Response {
     HelixCapabilities(HelixCapabilities),
     /// Helix agent desk state.
     HelixAgentDesk(HelixAgentDesk),
+    /// Helix display profile state.
+    HelixDisplayProfile(HelixDisplayProfile),
+    /// Helix summon context.
+    HelixSummonContext(Option<HelixSummonContext>),
+}
+
+/// What had the keyboard when the person summoned Mobius. Only what the compositor already tells every client about windows.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixSummonContext {
+    /// The window's title, if it set one.
+    pub title: Option<String>,
+    /// The window's application id, if it set one.
+    pub app_id: Option<String>,
+    /// The process that owns the window's connection, if known.
+    pub pid: Option<i32>,
+    /// Milliseconds since the summon.
+    pub age_ms: u64,
+}
+
+/// Whether a display setup is remembered for the set of displays connected now.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixDisplayProfile {
+    /// The displays connected now, by "make model serial" (or connector when a display reports no identity), sorted.
+    pub displays: Vec<String>,
+    /// Whether a setup is remembered for exactly this set.
+    pub saved: bool,
 }
 
 /// Capabilities reported by helix-niri. Stock niri never sends this response.
@@ -197,6 +237,12 @@ pub struct HelixCapabilities {
     /// Whether agent-desk IPC and window placement are available.
     #[serde(default)]
     pub agent_desk: bool,
+    /// Whether the compositor remembers display setups per set of connected displays and applies them itself.
+    #[serde(default)]
+    pub display_profiles: bool,
+    /// Whether `helix-summon` and `HelixSummonContext` are available.
+    #[serde(default)]
+    pub summon: bool,
 }
 
 /// State of the Helix agent desk workspace.
@@ -1025,6 +1071,8 @@ pub enum Action {
     },
     /// Helix: focus the agent desk workspace.
     HelixFocusAgentDesk {},
+    /// Helix: remember which window has the keyboard, then raise Mobius (or start it).
+    HelixSummon {},
 }
 
 fn helix_default_place_count() -> u8 {
