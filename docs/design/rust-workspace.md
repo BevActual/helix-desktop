@@ -14,7 +14,7 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 | `dev/` | Nested probes only (`helix-attacker`, `experiments/`) |
 | `compositor/` | helix-niri fork: `niri`, `niri-config`, `niri-ipc`, `niri-visual-tests` (GTK 4, built only on request) |
 
-**Apps have a React frontend** built by the npm workspace at the repo root (`apps/<app>/web`, `core/shared-ui/react`; see `frontend-stack.md`). A Rust-only checkout still builds: without `node_modules` the hand-written pages are used.
+**Apps have a React frontend** built by the npm workspace at the repo root (`apps/<app>/web`, `core/shared-ui/react`; see `frontend-stack.md`). A Rust-only checkout still builds: without `node_modules` the hand-written pages are used. With `node_modules`, a frontend that fails to compile stops the build (set `HELIX_ALLOW_STALE_FRONTEND=1` to ship the older pages anyway).
 
 **The session shell is Tauri** (`tools/switch-shell.sh install`). C++ session UI, GTK apps and the `cpp/` tree are deleted; `org.helix.Desktop` is Rust (`services/helix-desktop`). The only C/C++ left is the llama, whisper and image engine shims under `services/*/native/` (`desktop-contract-tests.md` for bus behaviour).
 
