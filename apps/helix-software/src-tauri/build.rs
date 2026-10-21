@@ -28,9 +28,11 @@ fn main() {
             .status()
         {
             Ok(status) if status.success() => {}
-            Ok(status) => println!(
-                "cargo:warning=Software UI did not build ({status}); the hand-written page is used"
+            Ok(status) if std::env::var_os("HELIX_ALLOW_STALE_FRONTEND").is_some() => println!(
+                "cargo:warning=Software UI did not build ({status}); the older page is used"
             ),
+            // A failed build leaves the previous page in place, and a warning is easy to miss (cargo -q hides it): stop instead.
+            Ok(status) => panic!("Software UI did not build ({status}); run `npm run build` in the workspace to see why, or set HELIX_ALLOW_STALE_FRONTEND=1"),
             Err(error) => {
                 println!("cargo:warning=npm not available ({error}); the hand-written page is used")
             }

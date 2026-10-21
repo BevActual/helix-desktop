@@ -33,7 +33,9 @@ fn main() {
             .status();
         match status {
             Ok(status) if status.success() => {}
-            Ok(status) => println!("cargo:warning=React pages did not build ({status}); the hand-written pages are used"),
+            Ok(status) if std::env::var_os("HELIX_ALLOW_STALE_FRONTEND").is_some() => println!("cargo:warning=React pages did not build ({status}); the older drawing is used"),
+            // A failed build leaves the previous pages in place, and a warning is easy to miss (cargo -q hides it): stop instead.
+            Ok(status) => panic!("React pages did not build ({status}); run `npm run build` in the workspace to see why, or set HELIX_ALLOW_STALE_FRONTEND=1"),
             Err(error) => println!("cargo:warning=npm not available ({error}); the hand-written pages are used"),
         }
     } else {
