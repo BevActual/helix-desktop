@@ -1449,6 +1449,43 @@ fn defaults_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>
     Ok(defaults_rows())
 }
 
+/// The accent colour's name, from the desktop service (`blue` when it has none).
+#[tauri::command]
+async fn accent_get() -> String {
+    let Some(desktop) = current() else {
+        return "blue".into();
+    };
+    desktop
+        .settings()
+        .await
+        .ok()
+        .and_then(|settings| {
+            settings
+                .as_array()?
+                .iter()
+                .find(|e| e.get("id").and_then(|v| v.as_str()) == Some("theme.accent"))?
+                .get("value")?
+                .as_str()
+                .map(str::to_string)
+        })
+        .filter(|name| helix_config::settings::ACCENTS.contains(&name.as_str()))
+        .unwrap_or_else(|| "blue".into())
+}
+
+#[tauri::command]
+async fn accent_set(name: String) -> Result<(), String> {
+    if !helix_config::settings::ACCENTS.contains(&name.as_str()) {
+        return Err("that is not one of the accent colours".into());
+    }
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    desktop
+        .update_setting("theme.accent", &serde_json::json!(name))
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS accent {name}");
+    Ok(())
+}
+
 /// Touchpad and mouse. Empty when the compositor cannot change them (it is not the Helix one).
 #[tauri::command]
 fn pointer_rows() -> Vec<RowView> {
@@ -2480,12 +2517,20 @@ fn startup_page() -> Option<String> {
 /// 0 until the desktop service has said, then 1 for dark and 2 for light.
 static APP_THEME: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
-fn theme_script() -> Option<&'static str> {
-    match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
-        1 => Some("document.documentElement.dataset.theme = 'dark'"),
-        2 => Some("document.documentElement.dataset.theme = 'light'"),
-        _ => None,
-    }
+/// The accent colour's name, once the desktop service has said (`blue` until then).
+static APP_ACCENT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+fn theme_script() -> Option<String> {
+    let dark = match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => true,
+        2 => false,
+        _ => return None,
+    };
+    let accent = APP_ACCENT.lock().map(|a| a.clone()).unwrap_or_default();
+    Some(helix_desktop_api::theme_script(&helix_desktop_api::Look {
+        dark,
+        accent,
+    }))
 }
 
 /// Applies the person's interface scale and light or dark theme (Settings) to this application's windows now and whenever they change.
@@ -2521,15 +2566,22 @@ fn follow_appearance(app: tauri::AppHandle) {
             return;
         };
         let _ = desktop
-            .watch_theme_dark(move |dark| {
-                eprintln!("UI theme {}", if dark { "dark" } else { "light" });
+            .watch_theme(move |look| {
+                eprintln!(
+                    "UI theme {} accent {}",
+                    if look.dark { "dark" } else { "light" },
+                    look.accent
+                );
                 APP_THEME.store(
-                    if dark { 1 } else { 2 },
+                    if look.dark { 1 } else { 2 },
                     std::sync::atomic::Ordering::Relaxed,
                 );
+                if let Ok(mut accent) = APP_ACCENT.lock() {
+                    *accent = look.accent.clone();
+                }
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
-                        let _ = window.eval(script);
+                        let _ = window.eval(&script);
                     }
                 }
             })
@@ -2577,6 +2629,8 @@ fn main() {
             displays_rows,
             displays_change,
             datetime_rows,
+            accent_get,
+            accent_set,
             defaults_rows,
             defaults_change,
             pointer_rows,
@@ -2628,7 +2682,7 @@ fn main() {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 if let Some(script) = theme_script() {
-                    let _ = webview.eval(script);
+                    let _ = webview.eval(&script);
                 }
             }
         })

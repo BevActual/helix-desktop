@@ -18,7 +18,7 @@ log_path = os.path.join(state_dir, "fake-network-actions.log")
 bt_log_path = os.path.join(state_dir, "fake-bluetooth-actions.log")
 settings_log_path = os.path.join(state_dir, "fake-settings-actions.log")
 audio_log_path = os.path.join(state_dir, "fake-audio-actions.log")
-settings = {"theme.mode": "dark", "nightlight.enabled": False, "theme.pure_black_dark": False, "accessibility.ui_scale": 1.0,
+settings = {"theme.mode": "dark", "theme.accent": "blue", "nightlight.enabled": False, "theme.pure_black_dark": False, "accessibility.ui_scale": 1.0,
             "location.custom_schedule": False, "location.sunset": "19:00", "location.sunrise": "07:00",
             "location.latitude": 51.5, "location.longitude": -0.12, "location.auto_locate": False, "location.address": ""}
 # A test can start the desktop with its own day and night times (HELIX_FAKE_CUSTOM_SCHEDULE=1 HELIX_FAKE_SUNSET=HH:MM HELIX_FAKE_SUNRISE=HH:MM).
@@ -237,6 +237,7 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             entries = [entry(id="audio.sound_volume", type="number", value=0.5),
                        entry(id="theme.mode", title="Appearance", group="Colors", type="mode", value=settings["theme.mode"], options=["dark", "light", "auto"], **{"option-labels": ["Dark", "Light", "Automatic"]}),
                        entry(id="theme.pure_black_dark", title="Pure black in dark mode", group="Colors", description="Darker surfaces on OLED screens.", type="boolean", value=settings["theme.pure_black_dark"]),
+                       entry(id="theme.accent", title="Accent colour", group="Colors", type="string", value=settings["theme.accent"]),
                        entry(id="nightlight.enabled", title="Night Light", group="Night Light", type="boolean", value=settings["nightlight.enabled"]),
                        entry(id="accessibility.ui_scale", title="Interface scale", group="Presentation", type="number", value=float(settings["accessibility.ui_scale"])),
                        entry(id="location.auto_locate", type="boolean", value=settings["location.auto_locate"]),
@@ -251,7 +252,7 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             setting_id, value = params.unpack()
             if isinstance(value, GLib.Variant): value = value.unpack()
             with open(settings_log_path, "a") as log: log.write(f"UPDATE {setting_id} {json.dumps(value)}\n")
-            ok = (setting_id == "theme.mode" and value in ("dark", "light", "auto")) or (setting_id in ("nightlight.enabled", "theme.pure_black_dark") and isinstance(value, bool)) or (setting_id in ("location.custom_schedule", "location.auto_locate") and isinstance(value, bool)) or (setting_id in ("location.sunset", "location.sunrise") and isinstance(value, str)) or (setting_id in ("location.latitude", "location.longitude") and isinstance(value, (int, float)) and not isinstance(value, bool)) or (setting_id == "accessibility.ui_scale" and isinstance(value, (int, float)) and not isinstance(value, bool))
+            ok = (setting_id == "theme.mode" and value in ("dark", "light", "auto")) or (setting_id == "theme.accent" and value in ("blue", "purple", "pink", "red", "orange", "yellow", "green", "graphite")) or (setting_id in ("nightlight.enabled", "theme.pure_black_dark") and isinstance(value, bool)) or (setting_id in ("location.custom_schedule", "location.auto_locate") and isinstance(value, bool)) or (setting_id in ("location.sunset", "location.sunrise") and isinstance(value, str)) or (setting_id in ("location.latitude", "location.longitude") and isinstance(value, (int, float)) and not isinstance(value, bool)) or (setting_id == "accessibility.ui_scale" and isinstance(value, (int, float)) and not isinstance(value, bool))
             if not ok:
                 with open(settings_log_path, "a") as log: log.write(f"REFUSED {setting_id} {json.dumps(value)}\n")
                 invocation.return_dbus_error("org.helix.Desktop.Error.InvalidArgument", "Setting could not be saved"); return

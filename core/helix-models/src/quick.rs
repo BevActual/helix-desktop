@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 
 const THEME_MODE: &str = "theme.mode";
 const NIGHT_LIGHT: &str = "nightlight.enabled";
+const ACCENT: &str = "theme.accent";
 const MODES: [&str; 3] = ["dark", "light", "auto"];
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -18,6 +19,8 @@ pub struct Quick {
     night_light: Option<bool>,
     /// What the theme draws as right now (`auto` resolved by the day and night schedule). Set by the host, which knows the time.
     resolved_dark: Option<bool>,
+    /// The accent colour's name (`theme.accent`), when the service lists it.
+    accent: Option<String>,
 }
 
 /// One Configuration1.Update call: the setting id and its new value.
@@ -43,6 +46,8 @@ pub struct QuickView {
     /// Whether the desktop draws dark right now. Differs from `dark` under Automatic, where the tile is off but the theme follows
     /// the time of day. `None` when there is no theme setting.
     pub resolved_dark: Option<bool>,
+    /// The accent colour's name (`blue`, `purple`, ...); the page's stylesheet turns it into colours.
+    pub accent: Option<String>,
 }
 
 fn find<'a>(entries: &'a [Value], id: &str) -> Option<&'a Value> {
@@ -65,10 +70,15 @@ impl Quick {
         let night_light = find(entries, NIGHT_LIGHT)
             .filter(|entry| entry.get("type").and_then(Value::as_str) == Some("boolean"))
             .and_then(|entry| entry.get("value").and_then(Value::as_bool));
+        let accent = find(entries, ACCENT)
+            .and_then(|entry| entry.get("value").and_then(Value::as_str))
+            .filter(|name| !name.is_empty() && name.chars().all(|c| c.is_ascii_lowercase()))
+            .map(str::to_string);
         Self {
             theme,
             night_light,
             resolved_dark: None,
+            accent,
         }
     }
 
@@ -102,6 +112,7 @@ impl Quick {
                 "light" => false,
                 _ => self.resolved_dark.unwrap_or(true),
             }),
+            accent: self.accent.clone(),
         }
     }
 
@@ -142,6 +153,19 @@ mod tests {
             {"id": "theme.mode", "type": "mode", "value": theme, "options": ["dark", "light", "auto"]},
             {"id": "nightlight.enabled", "type": "boolean", "value": night},
         ])
+    }
+
+    #[test]
+    fn the_accent_is_a_plain_name_or_nothing() {
+        let with = |value: Value| {
+            Quick::from_settings(&json!([{"id": "theme.accent", "type": "string", "value": value}]))
+                .view()
+                .accent
+        };
+        assert_eq!(with(json!("purple")).as_deref(), Some("purple"));
+        assert_eq!(with(json!("not a name; alert(1)")), None);
+        assert_eq!(with(json!("")), None);
+        assert_eq!(Quick::from_settings(&json!([])).view().accent, None);
     }
 
     #[test]
@@ -247,7 +271,8 @@ mod tests {
                     dark: None,
                     dark_label: None,
                     resolved_dark: None,
-                    night_light: None
+                    night_light: None,
+                    accent: None
                 },
                 "{data}"
             );

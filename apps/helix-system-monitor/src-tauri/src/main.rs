@@ -206,12 +206,20 @@ fn start_polls(app: AppHandle) {
 /// 0 until the desktop service has said, then 1 for dark and 2 for light.
 static APP_THEME: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
-fn theme_script() -> Option<&'static str> {
-    match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
-        1 => Some("document.documentElement.dataset.theme = 'dark'"),
-        2 => Some("document.documentElement.dataset.theme = 'light'"),
-        _ => None,
-    }
+/// The accent colour's name, once the desktop service has said (`blue` until then).
+static APP_ACCENT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+fn theme_script() -> Option<String> {
+    let dark = match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => true,
+        2 => false,
+        _ => return None,
+    };
+    let accent = APP_ACCENT.lock().map(|a| a.clone()).unwrap_or_default();
+    Some(helix_desktop_api::theme_script(&helix_desktop_api::Look {
+        dark,
+        accent,
+    }))
 }
 
 /// Applies the person's interface scale and light or dark theme (Settings) to this application's windows now and whenever they change.
@@ -247,15 +255,22 @@ fn follow_appearance(app: tauri::AppHandle) {
             return;
         };
         let _ = desktop
-            .watch_theme_dark(move |dark| {
-                eprintln!("UI theme {}", if dark { "dark" } else { "light" });
+            .watch_theme(move |look| {
+                eprintln!(
+                    "UI theme {} accent {}",
+                    if look.dark { "dark" } else { "light" },
+                    look.accent
+                );
                 APP_THEME.store(
-                    if dark { 1 } else { 2 },
+                    if look.dark { 1 } else { 2 },
                     std::sync::atomic::Ordering::Relaxed,
                 );
+                if let Ok(mut accent) = APP_ACCENT.lock() {
+                    *accent = look.accent.clone();
+                }
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
-                        let _ = window.eval(script);
+                        let _ = window.eval(&script);
                     }
                 }
             })
@@ -279,7 +294,7 @@ fn main() {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 if let Some(script) = theme_script() {
-                    let _ = webview.eval(script);
+                    let _ = webview.eval(&script);
                 }
             }
         })

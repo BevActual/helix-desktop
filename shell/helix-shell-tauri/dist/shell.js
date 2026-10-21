@@ -922,6 +922,7 @@ $("tile-night").addEventListener("click", () => invoke("quick_set_night_light", 
 function drawQuick(view) {
   // The shell follows the system theme: the same setting the Dark theme tile changes.
   document.documentElement.dataset.theme = view.resolved_dark === false ? "light" : "dark";
+  document.documentElement.dataset.accent = view.accent || "blue";
   if (reactControls) { queueReport(); return; }
   const dark = view.dark !== null && view.dark !== undefined;
   $("tile-dark").style.display = dark ? "" : "none";

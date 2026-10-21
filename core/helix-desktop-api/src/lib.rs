@@ -102,6 +102,36 @@ fn dark_for(
     }
 }
 
+/// How Helix applications look: light or dark, and the accent colour (a name from `helix_config::settings::ACCENTS`; the stylesheet turns it into colours).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Look {
+    pub dark: bool,
+    pub accent: String,
+}
+
+/// The script that puts a look on a page: `data-theme` and `data-accent` on the root element. The accent is checked here, so nothing but a plain
+/// name is ever put in a script.
+pub fn theme_script(look: &Look) -> String {
+    let accent: String = look
+        .accent
+        .chars()
+        .filter(|c| c.is_ascii_lowercase())
+        .take(16)
+        .collect();
+    format!(
+        "document.documentElement.dataset.theme = '{}'; document.documentElement.dataset.accent = '{}'",
+        if look.dark { "dark" } else { "light" },
+        if accent.is_empty() { "blue" } else { &accent },
+    )
+}
+
+fn accent_of(entries: &[OwnedValue]) -> String {
+    entry_of(entries, "theme.accent")
+        .and_then(|dict| dict_string(&dict, "value"))
+        .filter(|name| name.chars().all(|c| c.is_ascii_lowercase()) && !name.is_empty())
+        .unwrap_or_else(|| "blue".into())
+}
+
 /// Whether applications should draw dark now, from a GetSettings catalog (`theme.mode` and the `location.*` rows).
 pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTime) -> bool {
     let mode = entry_of(entries, "theme.mode").and_then(|dict| dict_string(&dict, "value"));
@@ -606,6 +636,44 @@ impl Desktop {
             }
         }
         Ok(())
+    }
+
+    /// Calls `on_look` with how applications should look now (dark or light, and the accent colour), then again whenever either changes: after a
+    /// settings change, and once a minute so an automatic theme turns at sunset and sunrise.
+    pub async fn watch_theme<F>(&self, mut on_look: F) -> zbus::Result<()>
+    where
+        F: FnMut(Look) + Send,
+    {
+        let proxy = ConfigurationProxy::new(&self.connection).await?;
+        let mut entries = proxy.get_settings().await?;
+        let now = || helix_theme::schedule::LocalTime::now();
+        let mut last = Look {
+            dark: theme_is_dark(&entries, now()),
+            accent: accent_of(&entries),
+        };
+        on_look(last.clone());
+        let mut changes = proxy.receive_changed().await?;
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+        tick.tick().await;
+        loop {
+            tokio::select! {
+                changed = changes.next() => {
+                    if changed.is_none() {
+                        return Ok(());
+                    }
+                    entries = proxy.get_settings().await?;
+                }
+                _ = tick.tick() => {}
+            }
+            let look = Look {
+                dark: theme_is_dark(&entries, now()),
+                accent: accent_of(&entries),
+            };
+            if look != last {
+                last = look.clone();
+                on_look(look);
+            }
+        }
     }
 
     /// Calls `on_dark` with whether applications should draw dark now, then again whenever that changes: after a settings change, and

@@ -2143,3 +2143,19 @@ button.view-tab-x:hover { background: var(--fill-3, var(--fill-1)); color: var(-
 /* Cards that follow one another, and a button under a card, get air between them. */
 .rows-card + .rows-card, .rows-card + button, .rows-card + .actions { margin-top: 14px; }
 [data-test="react-page"] + .setting-about, .rows-card + .setting-about { margin-top: 14px; }
+/* Accent colours (Settings → Appearance). The root element carries `data-accent`; each name sets the accent for dark and light, and the colour of the text on it. */
+:root[data-accent="purple"] { --accent: #bf5af2; } :root[data-theme="light"][data-accent="purple"] { --accent: #9b46d9; }
+:root[data-accent="pink"] { --accent: #ff375f; } :root[data-theme="light"][data-accent="pink"] { --accent: #e0254a; }
+:root[data-accent="red"] { --accent: #ff453a; } :root[data-theme="light"][data-accent="red"] { --accent: #e0352b; }
+:root[data-accent="orange"] { --accent: #ff9f0a; --on-accent: #1d1d1f; } :root[data-theme="light"][data-accent="orange"] { --accent: #e07f00; --on-accent: #fff; }
+:root[data-accent="yellow"] { --accent: #ffd60a; --on-accent: #1d1d1f; } :root[data-theme="light"][data-accent="yellow"] { --accent: #e6b800; --on-accent: #1d1d1f; }
+:root[data-accent="green"] { --accent: #30d158; --on-accent: #06210f; } :root[data-theme="light"][data-accent="green"] { --accent: #1fa843; --on-accent: #fff; }
+:root[data-accent="graphite"] { --accent: #98989d; --on-accent: #fff; } :root[data-theme="light"][data-accent="graphite"] { --accent: #6e6e73; }
+/* The swatches on the Appearance page: each shows its own colour whatever the accent is now. */
+.accent-swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.accent-swatch { width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid transparent; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.25); }
+.accent-swatch[aria-checked="true"] { outline: 2px solid var(--label); outline-offset: 2px; }
+.accent-swatch[data-accent="blue"] { background: #0a84ff; } .accent-swatch[data-accent="purple"] { background: #bf5af2; } .accent-swatch[data-accent="pink"] { background: #ff375f; }
+.accent-swatch[data-accent="red"] { background: #ff453a; } .accent-swatch[data-accent="orange"] { background: #ff9f0a; } .accent-swatch[data-accent="yellow"] { background: #ffd60a; }
+.accent-swatch[data-accent="green"] { background: #30d158; } .accent-swatch[data-accent="graphite"] { background: #98989d; }
+.setting-row.stacked { flex-direction: column; align-items: flex-start; gap: 12px; }
