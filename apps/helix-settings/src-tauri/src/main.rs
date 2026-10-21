@@ -1803,6 +1803,78 @@ fn displays_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>
     Ok(display_rows())
 }
 
+/// The displays in use, for the arrangement picture: where each sits on the desktop and how large it is, in logical pixels.
+#[tauri::command]
+fn display_layout() -> Vec<serde_json::Value> {
+    use helix_compositor::compositor_ipc::{connected_outputs, output_name_ok};
+    connected_outputs()
+        .iter()
+        .filter(|output| output_name_ok(&output.name) && output.scale.is_some())
+        .filter_map(|output| {
+            Some(serde_json::json!({
+                "name": output.name,
+                "label": display_heading(output),
+                "x": output.x?,
+                "y": output.y?,
+                "w": output.logical_width?,
+                "h": output.logical_height?,
+            }))
+        })
+        .collect()
+}
+
+/// Moves one display to where it was dropped, snapped against a neighbour so the desktop stays in one piece.
+#[tauri::command]
+fn display_move(name: String, x: i32, y: i32) -> Result<Vec<serde_json::Value>, String> {
+    use helix_compositor::compositor_ipc::{
+        apply_output, connected_outputs, output_request, snap_position, OutputAdjust,
+    };
+    let outputs = connected_outputs();
+    let output = outputs
+        .iter()
+        .find(|output| output.name == name && output.scale.is_some())
+        .ok_or("that display is not in use")?;
+    let size = output
+        .logical_width
+        .zip(output.logical_height)
+        .ok_or("that display is not in use")?;
+    let others: Vec<(i32, i32, u32, u32)> = outputs
+        .iter()
+        .filter(|other| other.name != name && other.scale.is_some())
+        .filter_map(|other| {
+            Some((
+                other.x?,
+                other.y?,
+                other.logical_width?,
+                other.logical_height?,
+            ))
+        })
+        .collect();
+    let at =
+        snap_position((x, y), size, &others).ok_or("there is no other display to sit beside")?;
+    if output.x != Some(at.0) || output.y != Some(at.1) {
+        // A display with no position of its own is placed by the compositor after the others, so it would jump when this one moves: give every
+        // other display the place it has now first.
+        for other in outputs
+            .iter()
+            .filter(|other| other.name != name && other.scale.is_some())
+        {
+            if let Some(here) = other.x.zip(other.y) {
+                let keep = OutputAdjust::Position(Some(here));
+                apply_output(&output_request(&other.name, keep).map_err(str::to_string)?)?;
+                wait_until_applied(&other.name, &keep);
+                persist_display(&other.name, &keep)?;
+            }
+        }
+        let adjust = OutputAdjust::Position(Some(at));
+        apply_output(&output_request(&name, adjust).map_err(str::to_string)?)?;
+        wait_until_applied(&name, &adjust);
+        persist_display(&name, &adjust)?;
+        eprintln!("SETTINGS display {name} moved to {} {}", at.0, at.1);
+    }
+    Ok(display_layout())
+}
+
 fn place_adjust(
     value: &str,
     output: &helix_compositor::compositor_ipc::OutputSnapshot,
@@ -2650,6 +2722,8 @@ fn main() {
             power_rows,
             power_change,
             displays_rows,
+            display_layout,
+            display_move,
             displays_change,
             datetime_rows,
             accent_get,

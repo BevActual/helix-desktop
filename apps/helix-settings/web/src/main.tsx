@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { invoke, type Change, type RowView } from "@helix/ui";
 import { RowsPage, type PageHandle, type PageSpec } from "./pages/RowsPage";
 import { AboutPage } from "./pages/AboutPage";
+import { DisplaysPage } from "./pages/DisplaysPage";
 import { AppearancePage } from "./pages/AppearancePage";
 import { KeyboardPage } from "./pages/KeyboardPage";
 import { WallpaperPage } from "./pages/WallpaperPage";
@@ -30,6 +31,13 @@ const report = (text: string) => {
 
 const serviceChange = (page: string) => (id: string, change: Change) => invoke<void>("setting_change", { page, id, change });
 
+const displays: PageSpec = {
+  load: () => invoke<RowView[]>("displays_rows"),
+  empty: "No displays reported.",
+  change: (id, change) => invoke<RowView[]>("displays_change", { id, change }),
+  note: "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup.",
+};
+
 const appearance: PageSpec = {
   change: serviceChange("appearance"),
   empty: "There is nothing to adjust here on this desktop.",
@@ -48,12 +56,6 @@ const specs: Record<string, PageSpec> = {
   power: {
     load: () => invoke<RowView[]>("power_rows"),
     change: (id, change) => invoke<RowView[]>("power_change", { id, change }),
-  },
-  displays: {
-    load: () => invoke<RowView[]>("displays_rows"),
-    empty: "No displays reported.",
-    change: (id, change) => invoke<RowView[]>("displays_change", { id, change }),
-    note: "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup.",
   },
   defaults: {
     load: () => invoke<RowView[]>("defaults_rows"),
@@ -86,6 +88,9 @@ const custom: Record<string, (props: { register: (handle: PageHandle) => void; o
       onRows={options.onRows}
       report={report}
     />
+  ),
+  displays: ({ register, options }) => (
+    <DisplaysPage spec={displays} register={register} initialRows={options.initialRows} onRows={options.onRows} report={report} />
   ),
   keyboard: ({ register }) => <KeyboardPage register={register} report={report} />,
   wallpaper: ({ register }) => <WallpaperPage register={register} report={report} />,

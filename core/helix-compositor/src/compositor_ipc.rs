@@ -288,6 +288,57 @@ pub enum Side {
     Below,
 }
 
+/// Where a display dropped with its top-left at `desired` ends up: against the nearest edge of another display, so the desktop has no gaps or overlaps
+/// and the pointer can always cross. `size` is the moved display's logical size and `others` are the other displays in use as `(x, y, width, height)`.
+/// A display is never more than a little way from level with its neighbour's edge: within a few pixels it snaps to the matching edge. `None` when
+/// there is nowhere to put it (no other display).
+pub fn snap_position(
+    desired: (i32, i32),
+    size: (u32, u32),
+    others: &[(i32, i32, u32, u32)],
+) -> Option<(i32, i32)> {
+    const SNAP: i64 = 32;
+    let (w, h) = (i64::from(size.0), i64::from(size.1));
+    let (dx, dy) = (i64::from(desired.0), i64::from(desired.1));
+    let overlaps = |x: i64, y: i64| {
+        others.iter().any(|&(ox, oy, ow, oh)| {
+            let (ox, oy, ow, oh) = (i64::from(ox), i64::from(oy), i64::from(ow), i64::from(oh));
+            x < ox + ow && x + w > ox && y < oy + oh && y + h > oy
+        })
+    };
+    // Slide along an edge: some of the two displays must face each other, then snap the near edges level.
+    let along = |want: i64, start: i64, length: i64, own: i64| {
+        let keep = 64.min(own).min(length);
+        let mut at = want.clamp(start - own + keep, start + length - keep);
+        if (at - start).abs() <= SNAP {
+            at = start;
+        } else if ((at + own) - (start + length)).abs() <= SNAP {
+            at = start + length - own;
+        }
+        at
+    };
+    let mut best: Option<(i64, (i64, i64))> = None;
+    for &(ox, oy, ow, oh) in others {
+        let (ox, oy, ow, oh) = (i64::from(ox), i64::from(oy), i64::from(ow), i64::from(oh));
+        let candidates = [
+            (ox + ow, along(dy, oy, oh, h)),
+            (ox - w, along(dy, oy, oh, h)),
+            (along(dx, ox, ow, w), oy + oh),
+            (along(dx, ox, ow, w), oy - h),
+        ];
+        for (x, y) in candidates {
+            if overlaps(x, y) {
+                continue;
+            }
+            let distance = (x - dx).pow(2) + (y - dy).pow(2);
+            if best.is_none_or(|(d, _)| distance < d) {
+                best = Some((distance, (x, y)));
+            }
+        }
+    }
+    best.and_then(|(_, (x, y))| Some((i32::try_from(x).ok()?, i32::try_from(y).ok()?)))
+}
+
 /// Logical top-left of `this` when it sits on `side` of `other` (`x`, `y`, width, height).
 pub fn place_beside(side: Side, other: (i32, i32, u32, u32), this_size: (u32, u32)) -> (i32, i32) {
     let (x, y, width, height) = other;
@@ -828,5 +879,42 @@ mod tests {
         assert!(mode_from_token("1920x1080").is_none());
         assert_eq!(kdl_transform("Normal"), Some("normal"));
         assert_eq!(kdl_transform("90"), Some("90"));
+    }
+
+    #[test]
+    fn a_dropped_display_lands_against_a_neighbour_and_never_on_top_of_one() {
+        let main = (0, 0, 1920, 1080);
+        // Dropped a little way off the right edge, a little low: it is pulled to the edge and level with the top.
+        assert_eq!(
+            snap_position((1950, 20), (1280, 720), &[main]),
+            Some((1920, 0))
+        );
+        // Dropped well below: it goes underneath, level with the left edge.
+        assert_eq!(
+            snap_position((10, 1300), (1280, 720), &[main]),
+            Some((0, 1080))
+        );
+        // Dropped on top of the other: it goes to the nearest side instead.
+        let on_top = snap_position((1000, 100), (1280, 720), &[main]).unwrap();
+        assert!(
+            on_top == (1920, 100) || on_top == (-1280, 100) || on_top.1 == 1080 || on_top.1 == -720,
+            "{on_top:?}"
+        );
+        // Far off to the right and up: it still touches (a slide along the edge keeps them facing).
+        let far = snap_position((5000, -5000), (1280, 720), &[main]).unwrap();
+        assert!(far.0 == 1920 || far.1 == -720 || far.1 == 1080, "{far:?}");
+        assert!(
+            far.0 > -1280 && far.0 < 1920 + 1280 && far.1 > -720 - 1 && far.1 < 1080 + 1,
+            "it stays within reach of the other: {far:?}"
+        );
+        // Nothing to sit beside.
+        assert_eq!(snap_position((0, 0), (1280, 720), &[]), None);
+        // With two neighbours it picks the closer free spot and does not overlap the other.
+        let second = (1920, 0, 1280, 720);
+        let spot = snap_position((1930, 700), (1920, 1080), &[main, second]).unwrap();
+        assert!(
+            spot.1 >= 720 || spot.0 >= 3200 || spot.0 + 1920 <= 0,
+            "{spot:?}"
+        );
     }
 }
