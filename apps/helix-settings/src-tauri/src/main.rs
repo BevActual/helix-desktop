@@ -8,6 +8,7 @@ mod datetime;
 mod defaults;
 mod input;
 mod look;
+mod powerprofile;
 mod topbar;
 mod wallhaven;
 
@@ -1355,13 +1356,27 @@ fn read_idle_prefs() -> (helix_config::idle_prefs::IdlePrefs, String) {
 
 /// The Power & lock page: when the session locks and the screen goes off (`idle.toml`, read by helix-idle).
 #[tauri::command]
-fn power_rows() -> Vec<RowView> {
-    read_idle_prefs().0.rows()
+async fn power_rows() -> Vec<RowView> {
+    let mut rows = match powerprofile::read().await {
+        Some(profiles) => powerprofile::rows(&profiles),
+        None => Vec::new(),
+    };
+    rows.extend(read_idle_prefs().0.rows());
+    rows
 }
 
 #[tauri::command]
-fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+async fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     use std::io::Write;
+    if id == "profile:mode" {
+        let mode = change
+            .get("value")
+            .and_then(|v| v.as_str())
+            .ok_or("not text")?;
+        powerprofile::set(mode).await?;
+        eprintln!("SETTINGS power mode {mode}");
+        return Ok(power_rows().await);
+    }
     use std::os::unix::fs::OpenOptionsExt;
     let change = match (
         change.get("kind").and_then(|k| k.as_str()),
@@ -1400,7 +1415,12 @@ fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, S
             .status();
     }
     eprintln!("SETTINGS power {id} changed");
-    Ok(next.rows())
+    let mut rows = match powerprofile::read().await {
+        Some(profiles) => powerprofile::rows(&profiles),
+        None => Vec::new(),
+    };
+    rows.extend(next.rows());
+    Ok(rows)
 }
 
 /// The Displays page: each connected output, with scale and orientation the compositor applies for this session.
