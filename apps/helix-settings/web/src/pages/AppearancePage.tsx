@@ -42,9 +42,7 @@ function LookRows({ report }: { report: (text: string) => void }) {
     invoke<RowView[]>("look_change", { id, change: next }).then(setRows, (error) => report(`${id}: ${String(error)}`));
   };
   return (
-    <div data-test="look-rows">
-      <RowGroups rows={rows} onChange={change} />
-    </div>
+    <RowGroups rows={rows} onChange={change} />
   );
 }
 
@@ -87,7 +85,7 @@ export function AppearancePage({
       <RowsPage spec={spec} initialRows={initialRows} register={register} onRows={onRows} report={report} />
       <AccentRow report={report} />
       <LookRows report={report} />
-      <div className="setting-about">
+      <div className="setting-about" style={{ marginTop: 18 }}>
         <button className="primary" type="button" data-test="greeter-sync" disabled={busy} onClick={sync}>
           Sync login screen
         </button>

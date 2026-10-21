@@ -21,6 +21,9 @@ audio_log_path = os.path.join(state_dir, "fake-audio-actions.log")
 settings = {"theme.mode": "dark", "theme.accent": "blue", "nightlight.enabled": False, "theme.pure_black_dark": False, "accessibility.ui_scale": 1.0,
             "location.custom_schedule": False, "location.sunset": "19:00", "location.sunrise": "07:00",
             "location.latitude": 51.5, "location.longitude": -0.12, "location.auto_locate": False, "location.address": ""}
+# A test can start the desktop in the light look (HELIX_FAKE_THEME=light).
+if os.environ.get("HELIX_FAKE_THEME") in ("dark", "light"):
+    settings["theme.mode"] = os.environ["HELIX_FAKE_THEME"]
 # A test can start the desktop with its own day and night times (HELIX_FAKE_CUSTOM_SCHEDULE=1 HELIX_FAKE_SUNSET=HH:MM HELIX_FAKE_SUNRISE=HH:MM).
 if os.environ.get("HELIX_FAKE_CUSTOM_SCHEDULE") == "1":
     settings["location.custom_schedule"] = True
