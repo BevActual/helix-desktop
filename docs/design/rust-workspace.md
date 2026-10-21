@@ -10,7 +10,7 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 | `shell/` | `helix-shell-tauri` — live session shell |
 | `greeter/` | `helix-greeter` — greetd login (Tauri) |
 | `apps/` | Settings, Software, System Monitor, Chat (Tauri toplevels) |
-| `services/` | `helix-wallpaper`, `helix-idle`, `helix-desktop` (Rust `org.helix.Desktop` scaffold) |
+| `services/` | `helix-wallpaper`, `helix-idle`, `helix-nightlight`, `helix-desktop` (Rust `org.helix.Desktop` scaffold) |
 | `dev/` | Nested probes only (`helix-attacker`, `experiments/`) |
 | `compositor/` | helix-niri fork: `niri`, `niri-config`, `niri-ipc`, `niri-visual-tests` (GTK 4, built only on request) |
 

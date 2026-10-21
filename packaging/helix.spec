@@ -193,14 +193,14 @@ TOML
 desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %if %{with check}
 cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models \
-  -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model -p helix-wallpaper-model
+  -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model -p helix-wallpaper-model -p helix-nightlight-model
 %endif
 
 %post
-%systemd_user_post helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service
+%systemd_user_post helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service helix-nightlight.service
 
 %preun
-%systemd_user_preun helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service
+%systemd_user_preun helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service helix-nightlight.service
 
 %files
 %license LICENSE
@@ -214,6 +214,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-shell-strut
 %{_bindir}/helix-wallpaper
 %{_bindir}/helix-idle
+%{_bindir}/helix-nightlight
 %{_bindir}/helix-settings
 %{_bindir}/helix-mobius
 %{_bindir}/helix-software
@@ -227,6 +228,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_userunitdir}/helix-shell-bar.service
 %{_userunitdir}/helix-shell-panels.service
 %{_userunitdir}/helix-idle.service
+%{_userunitdir}/helix-nightlight.service
 %{_userunitdir}/helix-wallpaper.service
 %{_prefix}/lib/systemd/user-preset/90-helix.preset
 %{_datadir}/dbus-1/services/org.helix.Desktop.service

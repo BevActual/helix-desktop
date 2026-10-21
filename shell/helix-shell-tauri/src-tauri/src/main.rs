@@ -1103,6 +1103,8 @@ async fn refresh_quick(app: &AppHandle) {
         None => serde_json::Value::Null,
     };
     let mut quick = Quick::from_settings(&settings);
+    // Night light is the `helix-nightlight` service's own file, not a setting of the desktop service.
+    quick.use_night_light(Some(helix_nightlight_model::load().enabled));
     quick.set_resolved_dark(helix_desktop_api::theme_is_dark_json(
         &settings,
         helix_desktop_api::LocalTime::now(),
@@ -1215,12 +1217,10 @@ async fn quick_set_dark(app: AppHandle, on: bool) -> Result<(), String> {
 
 #[tauri::command]
 async fn quick_set_night_light(app: AppHandle, on: bool) -> Result<(), String> {
-    let update = shell_state(&app)
-        .lock()
-        .expect("shell state")
-        .quick
-        .set_night_light(on);
-    send_setting(update).await
+    helix_nightlight_model::set_enabled(on)?;
+    eprintln!("QUICK night light {}", if on { "on" } else { "off" });
+    refresh_quick(&app).await;
+    Ok(())
 }
 
 /// What the on-screen indicator shows after a key press or a slider: one value, drawn for a moment.
@@ -1350,15 +1350,10 @@ async fn brightness_set(app: AppHandle, percent: f64) -> Result<(), String> {
         .map(|_| ())
 }
 
-/// Flips the Night Light setting from its current state (what a key binding wants).
+/// Flips Night Light from its current state (what a key binding wants).
 pub(crate) async fn toggle_night_light(app: &AppHandle) {
-    let update = {
-        let state = shell_state(app);
-        let shell = state.lock().expect("shell state");
-        let on = shell.quick.view().night_light.unwrap_or(false);
-        shell.quick.set_night_light(!on)
-    };
-    let _ = send_setting(update).await;
+    let on = helix_nightlight_model::load().enabled;
+    let _ = quick_set_night_light(app.clone(), !on).await;
 }
 
 pub(crate) async fn toggle_dark_theme(app: &AppHandle) {

@@ -15,11 +15,18 @@ for id in time battery tile-wifi tile-bt tile-dark tile-night tile-wifi-open til
 shot qs-main
 
 echo "--- tiles that are plain settings"
-click_id tile-dark; click_id tile-dark; click_id tile-night; click_id tile-night
-check "dark theme off then on; night light on then off" "$(cat $S/fake-settings-actions.log 2>/dev/null)" 'UPDATE theme.mode "light"
-UPDATE theme.mode "dark"
-UPDATE nightlight.enabled true
-UPDATE nightlight.enabled false'
+click_id tile-dark; click_id tile-dark
+check "dark theme off then on" "$(cat $S/fake-settings-actions.log 2>/dev/null)" 'UPDATE theme.mode "light"
+UPDATE theme.mode "dark"'
+# Night light is the helix-nightlight service's own file, not a setting of the desktop service.
+NIGHT=$SCRATCH/config/helix/nightlight.json
+night() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["enabled"])' "$NIGHT" 2>/dev/null || echo missing; }
+click_id tile-night; sleep 1
+check "night light on writes nightlight.json" "$(night)" "True"
+click_id tile-night; sleep 1
+check "night light off writes it again" "$(night)" "False"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["warmth"] and "scheduled" in d else 1)' "$NIGHT" && echo "ok: and the warmth and schedule are kept" || { echo "FAIL: the file lost the other settings: $(cat "$NIGHT")"; FAILED=1; }
+grep -q "nightlight.enabled" "$S/fake-settings-actions.log" 2>/dev/null && { echo "FAIL: it also changed the desktop service's setting"; FAILED=1; } || echo "ok: the desktop service is not involved"
 
 echo "--- the Internet and Bluetooth tiles switch the radio; the arrow does not"
 click_id tile-wifi; click_id tile-wifi; click_id tile-bt; click_id tile-bt

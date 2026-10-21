@@ -77,6 +77,12 @@ impl Quick {
         self.theme.as_deref()
     }
 
+    /// Night light is not a setting of the desktop service: the `helix-nightlight` service reads its own file. The host reads that and says
+    /// whether it is on here, which is what gives the tile; `None` (no such service) leaves the tile out.
+    pub fn use_night_light(&mut self, on: Option<bool>) {
+        self.night_light = on;
+    }
+
     /// Records what `auto` resolves to at the current time (the model does not read the clock).
     pub fn set_resolved_dark(&mut self, dark: bool) {
         self.resolved_dark = Some(dark);
@@ -136,6 +142,16 @@ mod tests {
             {"id": "theme.mode", "type": "mode", "value": theme, "options": ["dark", "light", "auto"]},
             {"id": "nightlight.enabled", "type": "boolean", "value": night},
         ])
+    }
+
+    #[test]
+    fn night_light_comes_from_the_host_not_the_settings_list() {
+        let mut quick = Quick::from_settings(&json!([]));
+        assert_eq!(quick.view().night_light, None);
+        quick.use_night_light(Some(false));
+        assert_eq!(quick.view().night_light, Some(false));
+        quick.use_night_light(Some(true));
+        assert_eq!(quick.view().night_light, Some(true));
     }
 
     #[test]

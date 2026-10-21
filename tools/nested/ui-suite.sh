@@ -4,6 +4,7 @@
 #   (wallhaven-test.sh needs the internet and is run by hand.)
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+SUITE_FAILED=0
 # Whichever shell build was made last (fast or release), unless HELIX_SHELL_BIN says otherwise.
 export HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$(ls -t "$ROOT/target/fast/helix-shell-tauri" "$ROOT/target/release/helix-shell-tauri" 2>/dev/null | head -1)}"
 # A shell started from a launched program must not decide the tests' roles for them.
@@ -14,7 +15,13 @@ run() {  # name script program [env...]
   # Tests count the actions a run sent, so each starts from an empty scratch directory (this exact path, made by this script).
   rm -rf "/tmp/helix-nested/suite-$name"
   HELIX_NESTED_SCRIPT="$ROOT/tools/nested/$script" timeout 420 "$ROOT/tools/nested/run.sh" "suite-$name" "$ROOT/tools/nested/$program" "$@" >"$out" 2>&1
-  if grep -qE 'FAIL|TIMEOUT|NOT FOUND|FAILED' "$out"; then echo "FAIL  $name   ($out)"; grep -E 'FAIL|TIMEOUT|NOT FOUND' "$out" | head -3; else echo "ok    $name"; fi
+  if grep -qE '^(FAIL:|NOT FOUND:|PASS:.*FAIL)|FAIL  |TIMEOUT|NOT FOUND:|FAILED$' "$out"; then
+    echo "FAIL  $name   ($out)"
+    grep -E '^(FAIL:|NOT FOUND:)|FAIL  |TIMEOUT|NOT FOUND:|FAILED$' "$out" | head -3
+    SUITE_FAILED=1
+  else
+    echo "ok    $name"
+  fi
 }
 # A window wide enough to show Mobius's chat list (below 720 px it is behind a button). One line of KDL cannot hold the nested block, so it has newlines.
 WIDE=$'HELIX_NESTED_KDL=layout {\n gaps 0\n default-column-width { fixed 1100; }\n}'
@@ -39,6 +46,7 @@ pick dock           && run dock dock-test.sh dock-nested.sh
 pick ws             && run ws workspaces-test.sh tauri-fake-desktop.sh
 pick tray           && run tray tray-test.sh tauri-fake-desktop.sh
 pick idle           && run idle idle-test.sh idle-nested.sh
+pick nightlight    && run nightlight nightlight-test.sh nightlight-nested.sh HELIX_NESTED_GAMMA=1
 pick island         && run island island-test.sh tauri-shell.sh
 pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-net   && run settings-net settings-net-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
@@ -57,6 +65,7 @@ pick mobius-composer && run mobius-composer mobius-composer-test.sh mobius-neste
 pick mobius-regen && run mobius-regen mobius-regen-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=2
 pick mobius-stage   && run mobius-stage mobius-stage-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n'
 pick mobius-panes  && run mobius-panes mobius-panes-test.sh mobius-nested.sh "$WIDE" "HELIX_FAKE_REPLY=Hi."
+pick mobius-summon && run mobius-summon mobius-summon-test.sh mobius-nested.sh "$WIDE"
 pick mobius-docops  && run mobius-docops mobius-docops-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n\n```docops\n[{"op":"replace","find":"gather the facts","with":"collect the evidence"},{"op":"append","text":"Step three: review."}]\n```\n'
 pick mobius-code   && run mobius-code mobius-code-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-side    && run mobius-side mobius-side-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n```\n'
@@ -70,11 +79,13 @@ pick mobius-hint    && run mobius-hint mobius-hint-test.sh mobius-nested.sh "$WI
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-displays && run settings-displays settings-displays-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-wallpaper && run settings-wallpaper settings-wallpaper-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh tauri-shell.sh
 pick ui-scale          && run ui-scale ui-scale-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick ui-theme          && run ui-theme ui-theme-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
-pick mobius         && run mobius mobius-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=25
+pick mobius         && run mobius mobius-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=800
 pick greeter        && run greeter greeter-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick greeter-session && run greeter-session greeter-session-test.sh greeter-session-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software       && run software software-test.sh software-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
@@ -131,3 +142,4 @@ pick mobius-web && run mobius-web mobius-web-test.sh mobius-web-nested.sh "HELIX
 pick mobius-edit  && run mobius-edit mobius-edit-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-tools && run mobius-tools mobius-tools-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
 pick mobius-reply-save && run mobius-reply-save mobius-reply-save-test.sh mobius-reply-save-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10
+exit "$SUITE_FAILED"

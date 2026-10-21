@@ -50,9 +50,9 @@ OUT=${CARGO_TARGET_DIR:-$ROOT/target}/$PROFILE
 D=$DESTDIR
 
 # The session half: binaries (package -> binary), and the systemd user units made from tools/systemd/*.in.
-SESSION_PKGS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-greeter helix-settings helix-mobius helix-software helix-system-monitor"
-SESSION_BINS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-greeter helix-settings helix-mobius helix-software helix-system-monitor"
-SESSION_UNITS="helix-shell-strut helix-shell-bar helix-shell-panels helix-idle helix-wallpaper"
+SESSION_PKGS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor"
+SESSION_BINS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor"
+SESSION_UNITS="helix-shell-strut helix-shell-bar helix-shell-panels helix-idle helix-nightlight helix-wallpaper"
 
 if [ "$UNINSTALL" = 1 ]; then
   rm -f "$D$BINDIR"/helix-desktop "$D$BINDIR"/helix-assistant "$D$BINDIR"/helix-inference \
@@ -154,13 +154,14 @@ if [ "$SESSION" = 1 ]; then
   [ -x "$D$BINDIR/helix-system-monitor" ] && install -Dm644 "$ROOT/assets/org.helix.SystemMonitor.svg" "$D$DATADIR/icons/hicolor/scalable/apps/org.helix.SystemMonitor.svg"
 
   # systemd user units. Enabling is per user (`systemctl --user enable --now helix-shell-strut helix-shell-bar ...`).
-  unit_args=("SHELL_BIN=$BINDIR/helix-shell-tauri" "STRUT_BIN=$BINDIR/helix-shell-strut" "IDLE_BIN=$BINDIR/helix-idle"
+  unit_args=("SHELL_BIN=$BINDIR/helix-shell-tauri" "STRUT_BIN=$BINDIR/helix-shell-strut" "IDLE_BIN=$BINDIR/helix-idle" "NIGHTLIGHT_BIN=$BINDIR/helix-nightlight"
              "WALLPAPER_BIN=$BINDIR/helix-wallpaper" "ASKPASS=$BINDIR/helix-askpass")
   for unit in $SESSION_UNITS; do
     case $unit in
       helix-shell-strut) have_bin=helix-shell-strut ;;
       helix-shell-bar|helix-shell-panels) have_bin=helix-shell-tauri ;;
       helix-idle) have_bin=helix-idle ;;
+      helix-nightlight) have_bin=helix-nightlight ;;
       helix-wallpaper) have_bin=helix-wallpaper ;;
     esac
     [ -x "$D$BINDIR/$have_bin" ] && subst "$ROOT/tools/systemd/$unit.service.in" "$D$UNITDIR/$unit.service" "${unit_args[@]}"

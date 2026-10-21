@@ -17,6 +17,7 @@ helix-chat = { workspace = true }
 helix-compositor = { workspace = true }
 helix-config = { workspace = true }
 helix-models = { workspace = true }
+helix-nightlight-model = { workspace = true }
 helix-shell-model = { workspace = true }
 gtk = { workspace = true }
 gtk-layer-shell = { workspace = true, features = ["v0_6"] }
