@@ -2174,3 +2174,4 @@ html.bar-hide-date #clock .day { display: none; }
 html.bar-hide-wifi #status [data-slot="wifi"], html.bar-hide-bluetooth #status [data-slot="bt"], html.bar-hide-volume #status [data-slot="vol"], html.bar-hide-battery #batt { display: none !important; }
 html.bar-hide-battery_percent #batt-label { display: none; }
 #clock .time { font-variant-numeric: tabular-nums; }
+.arrangement-screen:focus-visible { outline: 2px solid var(--label-1, #fff); outline-offset: 2px; }

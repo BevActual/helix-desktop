@@ -12,7 +12,10 @@ import json, subprocess
 w = next(x for x in json.loads(subprocess.check_output(["niri","msg","--json","windows"])) if "settings" in (x["app_id"] or "").lower())
 o = json.loads(subprocess.check_output(["niri","msg","--json","outputs"]))["headless-1"]["logical"]
 l = w["layout"]; t = l.get("tile_pos_in_workspace_view") or [0,0]; f = l.get("window_offset_in_tile") or [0,0]
-print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
+every = [v["logical"] for v in json.loads(subprocess.check_output(["niri","msg","--json","outputs"])).values()]
+# The virtual pointer's 0..1 spans every display together.
+W = max(l["x"] + l["width"] for l in every) - min(l["x"] for l in every); H = max(l["y"] + l["height"] for l in every) - min(l["y"] for l in every)
+print(f'{t[0]+f[0]} {t[1]+f[1]}|{W} {H}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
@@ -47,4 +50,16 @@ grep -a "SETTINGS display" "$LOG" | tail -2
 [ "$Y2" = "$((Y1 + 720))" ] && echo "ok: headless-2 now sits directly below headless-1, touching" || fail "not below: $X2 $Y2"
 [ "$X2" -ge -1023 ] && [ "$X2" -le 1279 ] && echo "ok: and still faces it (x $X2)" || fail "x out of reach: $X2"
 shot arrange-after
+echo "--- the keyboard: the dragged screen has the focus, so the arrow keys move it"
+# The drag left the keyboard focus on the screen that was dragged.
+shot arrange-focus
+wtype -k Right; sleep 2
+read X2 Y2 <<< "$(pos headless-2)"; read X1 Y1 <<< "$(pos headless-1)"
+echo "after Right: headless-1 $X1 $Y1, headless-2 $X2 $Y2"
+[ "$X2" -ge "$((X1 + 1280))" ] && echo "ok: the right arrow put headless-2 to the right of headless-1" || fail "right arrow: $X2 $Y2"
+wtype -k Down; sleep 2
+read X2 Y2 <<< "$(pos headless-2)"
+echo "after Down: headless-2 $X2 $Y2"
+[ "$X2" -lt 1280 ] && [ "$Y2" -ge "$((Y1 + 720))" ] && echo "ok: the down arrow put it back below" || fail "down arrow: $X2 $Y2"
+shot arrange-keys
 [ "$FAILED" = 0 ] && echo "PASS: settings arrange" || exit 1

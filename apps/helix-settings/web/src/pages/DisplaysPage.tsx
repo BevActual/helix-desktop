@@ -42,9 +42,10 @@ function Arrangement({ screens, onMove, busy }: { screens: Screen[]; onMove: (na
 
   // Mouse events on the window rather than pointer capture: the drag keeps following the pointer when it leaves the box, and it also works under the
   // compositor's synthetic pointer.
-  const down = (event: React.MouseEvent, screen: Screen) => {
+  const down = (event: React.MouseEvent<HTMLElement>, screen: Screen) => {
     if (busy || event.button !== 0) return;
     event.preventDefault();
+    event.currentTarget.focus();
     const from = { x: event.clientX, y: event.clientY };
     offset.current = { dx: 0, dy: 0 };
     setDrag({ name: screen.name, dx: 0, dy: 0 });
@@ -64,6 +65,15 @@ function Arrangement({ screens, onMove, busy }: { screens: Screen[]; onMove: (na
     window.addEventListener("mouseup", up);
   };
 
+  // The keyboard way: an arrow key throws the screen a width and a half that way, and the snap puts it against whatever it lands near.
+  const key = (event: React.KeyboardEvent, screen: Screen) => {
+    const step: Record<string, [number, number]> = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+    const by = step[event.key];
+    if (!by || busy) return;
+    event.preventDefault();
+    onMove(screen.name, Math.round(screen.x + by[0] * screen.w * 1.5), Math.round(screen.y + by[1] * screen.h * 1.5));
+  };
+
   return (
     <div className="arrangement" style={{ width: WIDTH, height: HEIGHT }} data-test="arrangement" role="group" aria-label="Arrangement of your displays">
       {screens.map((screen, index) => {
@@ -76,7 +86,11 @@ function Arrangement({ screens, onMove, busy }: { screens: Screen[]; onMove: (na
             className={`arrangement-screen${dragging ? " dragging" : ""}`}
             data-test={`arrange-${screen.name}`}
             style={{ left, top, width: screen.w * scale, height: screen.h * scale }}
+            tabIndex={0}
+            role="button"
+            aria-label={`${screen.label}. Arrow keys move it to the other side of its neighbour.`}
             onMouseDown={(event) => down(event, screen)}
+            onKeyDown={(event) => key(event, screen)}
           >
             <span className="arrangement-number">{index + 1}</span>
             <span className="arrangement-name">{screen.name}</span>
@@ -121,7 +135,7 @@ export function DisplaysPage({ spec, register, initialRows, onRows, report }: { 
           <h4>Arrangement</h4>
           <div className="rows-card arrangement-card">
             <Arrangement screens={screens} onMove={moved} busy={busy} />
-            <div className="setting-about" data-test="arrangement-note">{note || "Drag a screen to where it sits on your desk. It snaps against its neighbour so the pointer can cross."}</div>
+            <div className="setting-about" data-test="arrangement-note">{note || "Drag a screen to where it sits on your desk, or pick one and use the arrow keys. It snaps against its neighbour so the pointer can cross."}</div>
           </div>
         </>
       ) : null}
