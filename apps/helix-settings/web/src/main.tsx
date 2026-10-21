@@ -49,6 +49,12 @@ const specs: Record<string, PageSpec> = {
     load: () => invoke<RowView[]>("dock_rows"),
     change: (id, change) => invoke<RowView[]>("dock_change", { id, change }),
   },
+  multitask: {
+    load: () => invoke<RowView[]>("multitask_rows"),
+    change: (id, change) => invoke<RowView[]>("multitask_change", { id, change }),
+    empty: "Multitasking settings need the Helix compositor.",
+    note: "These apply at once and are remembered.",
+  },
   startup: {
     load: () => invoke<RowView[]>("startup_rows"),
     change: (id, change) => invoke<RowView[]>("startup_change", { id, change }),

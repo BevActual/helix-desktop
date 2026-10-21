@@ -1599,6 +1599,22 @@ fn look_rows() -> Vec<RowView> {
         .unwrap_or_default()
 }
 
+/// Multitasking: focus, centring, the hot corner. Empty when the compositor cannot change them.
+#[tauri::command]
+fn multitask_rows() -> Vec<RowView> {
+    helix_compositor::compositor_ipc::look_settings()
+        .map(|look| look::multitask_rows(&look))
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn multitask_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let request = look::parse_multitask_change(&id, &change)?;
+    helix_compositor::compositor_ipc::set_look_settings(&request)?;
+    eprintln!("SETTINGS multitasking {id}");
+    Ok(multitask_rows())
+}
+
 #[tauri::command]
 fn look_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     let request = look::parse_change(&id, &change)?;
@@ -2800,6 +2816,8 @@ fn main() {
             startup_change,
             topbar_change,
             look_change,
+            multitask_rows,
+            multitask_change,
             pointer_change,
             typing_rows,
             typing_change,

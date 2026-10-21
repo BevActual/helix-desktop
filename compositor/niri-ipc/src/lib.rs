@@ -224,6 +224,18 @@ pub struct HelixLook {
     /// The colour of the ring around the focused window, `#rrggbb`.
     #[serde(default)]
     pub focus_color: Option<String>,
+    /// Whether the window under the pointer takes the keyboard focus.
+    #[serde(default)]
+    pub focus_follows_mouse: Option<bool>,
+    /// Whether moving the pointer into the top-left corner opens the overview.
+    #[serde(default)]
+    pub hot_corner: Option<bool>,
+    /// When the focused column is centred: `never`, `always` or `on-overflow`.
+    #[serde(default)]
+    pub center_focused: Option<String>,
+    /// Whether switching to the workspace you are on goes back to the one before.
+    #[serde(default)]
+    pub workspace_back_and_forth: Option<bool>,
 }
 
 /// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.

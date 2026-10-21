@@ -5,6 +5,8 @@
 use std::path::PathBuf;
 
 use niri_config::appearance::Color;
+use niri_config::input::FocusFollowsMouse;
+use niri_config::layout::CenterFocusedColumn;
 use niri_config::Config;
 use niri_ipc::HelixLook;
 
@@ -58,7 +60,29 @@ pub fn validate(look: &HelixLook) -> Result<(), String> {
             return Err("a colour is #rrggbb".into());
         }
     }
+    if let Some(mode) = &look.center_focused {
+        if center_mode(mode).is_none() {
+            return Err("centring is never, always or on-overflow".into());
+        }
+    }
     Ok(())
+}
+
+fn center_mode(name: &str) -> Option<CenterFocusedColumn> {
+    match name {
+        "never" => Some(CenterFocusedColumn::Never),
+        "always" => Some(CenterFocusedColumn::Always),
+        "on-overflow" => Some(CenterFocusedColumn::OnOverflow),
+        _ => None,
+    }
+}
+
+fn center_name(mode: CenterFocusedColumn) -> &'static str {
+    match mode {
+        CenterFocusedColumn::Never => "never",
+        CenterFocusedColumn::Always => "always",
+        CenterFocusedColumn::OnOverflow => "on-overflow",
+    }
 }
 
 fn merge(base: &mut HelixLook, change: &HelixLook) {
@@ -74,6 +98,18 @@ fn merge(base: &mut HelixLook, change: &HelixLook) {
     if change.focus_color.is_some() {
         base.focus_color = change.focus_color.clone();
     }
+    if change.focus_follows_mouse.is_some() {
+        base.focus_follows_mouse = change.focus_follows_mouse;
+    }
+    if change.hot_corner.is_some() {
+        base.hot_corner = change.hot_corner;
+    }
+    if change.center_focused.is_some() {
+        base.center_focused = change.center_focused.clone();
+    }
+    if change.workspace_back_and_forth.is_some() {
+        base.workspace_back_and_forth = change.workspace_back_and_forth;
+    }
 }
 
 /// Puts the overrides over a configuration.
@@ -86,6 +122,18 @@ pub fn overlay(config: &mut Config, look: &HelixLook) {
     }
     if let Some(size) = look.cursor_size {
         config.cursor.xcursor_size = size;
+    }
+    if let Some(on) = look.focus_follows_mouse {
+        config.input.focus_follows_mouse = on.then_some(FocusFollowsMouse { max_scroll_amount: None });
+    }
+    if let Some(on) = look.hot_corner {
+        config.gestures.hot_corners.off = !on;
+    }
+    if let Some(mode) = look.center_focused.as_deref().and_then(center_mode) {
+        config.layout.center_focused_column = mode;
+    }
+    if let Some(on) = look.workspace_back_and_forth {
+        config.input.workspace_auto_back_and_forth = on;
     }
     if let Some([r, g, b]) = look.focus_color.as_deref().and_then(parse_hex) {
         let color = Color::from_rgba8_unpremul(r, g, b, 255);
@@ -105,6 +153,10 @@ pub fn effective(config: &Config) -> HelixLook {
         window_gaps: Some(config.layout.gaps.clamp(0.0, 64.0).round() as u16),
         cursor_size: Some(config.cursor.xcursor_size),
         focus_color: Some(format!("#{:02x}{:02x}{:02x}", byte(c.r), byte(c.g), byte(c.b))),
+        focus_follows_mouse: Some(config.input.focus_follows_mouse.is_some()),
+        hot_corner: Some(!config.gestures.hot_corners.off),
+        center_focused: Some(center_name(config.layout.center_focused_column).to_string()),
+        workspace_back_and_forth: Some(config.input.workspace_auto_back_and_forth),
     }
 }
 
@@ -164,6 +216,12 @@ mod tests {
         assert_eq!(seen.animations, Some(false));
         overlay(&mut config, &HelixLook { window_gaps: Some(8), animations: Some(true), ..HelixLook::default() });
         assert_eq!((config.layout.gaps, config.animations.off), (8.0, false));
+        overlay(&mut config, &HelixLook { focus_follows_mouse: Some(true), hot_corner: Some(false), center_focused: Some("always".into()), workspace_back_and_forth: Some(false), ..HelixLook::default() });
+        let seen = effective(&config);
+        assert_eq!((seen.focus_follows_mouse, seen.hot_corner, seen.workspace_back_and_forth), (Some(true), Some(false), Some(false)));
+        assert_eq!(seen.center_focused.as_deref(), Some("always"));
+        overlay(&mut config, &HelixLook { focus_follows_mouse: Some(false), ..HelixLook::default() });
+        assert_eq!(effective(&config).focus_follows_mouse, Some(false));
     }
 
     #[test]
@@ -176,6 +234,7 @@ mod tests {
             HelixLook { focus_color: Some("blue".into()), ..HelixLook::default() },
             HelixLook { focus_color: Some("#12345".into()), ..HelixLook::default() },
             HelixLook { focus_color: Some("#12345g".into()), ..HelixLook::default() },
+            HelixLook { center_focused: Some("sometimes".into()), ..HelixLook::default() },
         ] {
             assert!(validate(&bad).is_err(), "{bad:?}");
         }

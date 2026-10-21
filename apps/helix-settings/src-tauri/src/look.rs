@@ -2,7 +2,7 @@
 //! accent). Like the input settings they are applied by the Helix compositor at once and remembered by it; another compositor reports nothing.
 
 use helix_compositor::compositor_ipc::LookSettings;
-use helix_config::catalog::{Control, RowView};
+use helix_config::catalog::{Choice, Control, RowView};
 use serde_json::Value;
 
 /// The accent colours (name, `#rrggbb`) as the dark theme draws them; the ring is drawn on dark and light windows alike.
@@ -70,6 +70,82 @@ pub fn look_rows(look: &LookSettings) -> Vec<RowView> {
     ]
 }
 
+/// Multitasking: how windows and workspaces behave. The same compositor overrides as the look, on their own page.
+pub fn multitask_rows(look: &LookSettings) -> Vec<RowView> {
+    let row = |id: &str, title: &str, group: &str, description: &str, control: Control| RowView {
+        id: id.into(),
+        title: title.into(),
+        group: group.into(),
+        description: description.into(),
+        overridden: false,
+        control,
+    };
+    let on = |v: Option<bool>, default: bool| Control::Switch {
+        on: v.unwrap_or(default),
+    };
+    vec![
+        row(
+            "mt:focus",
+            "Focus follows the pointer",
+            "Windows",
+            "The window under the pointer gets the keyboard without a click.",
+            on(look.focus_follows_mouse, false),
+        ),
+        row(
+            "mt:center",
+            "Centre the focused column",
+            "Windows",
+            "Never leaves the row where it is. Always keeps what you are working on in the middle. When needed centres only when the next column would be cut off.",
+            Control::Choice {
+                options: [("never", "Never"), ("always", "Always"), ("on-overflow", "When needed")]
+                    .iter()
+                    .map(|(value, label)| Choice { value: (*value).into(), label: (*label).into() })
+                    .collect(),
+                current: look.center_focused.clone().unwrap_or_else(|| "never".into()),
+            },
+        ),
+        row(
+            "mt:corner",
+            "Hot corner",
+            "Workspaces",
+            "Push the pointer into the top-left corner to see all your workspaces and windows.",
+            on(look.hot_corner, true),
+        ),
+        row(
+            "mt:back",
+            "Pressing the current workspace goes back",
+            "Workspaces",
+            "Switching to the workspace you are already on returns to the one before it.",
+            on(look.workspace_back_and_forth, false),
+        ),
+    ]
+}
+
+pub fn parse_multitask_change(id: &str, change: &Value) -> Result<LookSettings, String> {
+    let kind = change.get("kind").and_then(Value::as_str);
+    let value = change.get("value");
+    let switch = || {
+        value
+            .and_then(Value::as_bool)
+            .ok_or("not a boolean".to_string())
+    };
+    let mut out = LookSettings::default();
+    match (id, kind) {
+        ("mt:focus", Some("switch")) => out.focus_follows_mouse = Some(switch()?),
+        ("mt:corner", Some("switch")) => out.hot_corner = Some(switch()?),
+        ("mt:back", Some("switch")) => out.workspace_back_and_forth = Some(switch()?),
+        ("mt:center", Some("choice")) => {
+            let mode = value.and_then(Value::as_str).ok_or("not text")?;
+            if !matches!(mode, "never" | "always" | "on-overflow") {
+                return Err("pick when to centre".into());
+            }
+            out.center_focused = Some(mode.to_string());
+        }
+        _ => return Err("unknown change".into()),
+    }
+    Ok(out)
+}
+
 pub fn parse_change(id: &str, change: &Value) -> Result<LookSettings, String> {
     let kind = change.get("kind").and_then(Value::as_str);
     let value = change.get("value");
@@ -107,6 +183,7 @@ mod tests {
             window_gaps: Some(4),
             cursor_size: Some(40),
             focus_color: None,
+            ..LookSettings::default()
         });
         assert!(matches!(rows[0].control, Control::Switch { on: false }));
         assert!(matches!(rows[1].control, Control::Slider { value, .. } if value == 4.0));
@@ -133,6 +210,36 @@ mod tests {
         );
         assert!(set("look:gaps", "number", json!("x")).is_err());
         assert!(set("look:nope", "switch", json!(true)).is_err());
+    }
+
+    #[test]
+    fn multitasking_rows_and_changes() {
+        let rows = multitask_rows(&LookSettings {
+            focus_follows_mouse: Some(true),
+            center_focused: Some("always".into()),
+            hot_corner: Some(false),
+            ..LookSettings::default()
+        });
+        assert!(matches!(rows[0].control, Control::Switch { on: true }));
+        assert!(matches!(&rows[1].control, Control::Choice { current, .. } if current == "always"));
+        assert!(matches!(rows[2].control, Control::Switch { on: false }));
+        let set = |id: &str, kind: &str, v: Value| {
+            parse_multitask_change(id, &json!({"kind": kind, "value": v}))
+        };
+        assert_eq!(
+            set("mt:corner", "switch", json!(false)).unwrap().hot_corner,
+            Some(false)
+        );
+        assert_eq!(
+            set("mt:center", "choice", json!("on-overflow"))
+                .unwrap()
+                .center_focused
+                .as_deref(),
+            Some("on-overflow")
+        );
+        assert!(set("mt:center", "choice", json!("sometimes")).is_err());
+        assert!(set("mt:focus", "switch", json!("yes")).is_err());
+        assert!(set("look:gaps", "number", json!(3)).is_err());
     }
 
     #[test]

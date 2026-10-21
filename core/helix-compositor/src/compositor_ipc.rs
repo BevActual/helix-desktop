@@ -44,6 +44,11 @@ pub struct LookSettings {
     pub cursor_size: Option<u8>,
     /// `#rrggbb`.
     pub focus_color: Option<String>,
+    pub focus_follows_mouse: Option<bool>,
+    pub hot_corner: Option<bool>,
+    /// `never`, `always` or `on-overflow`.
+    pub center_focused: Option<String>,
+    pub workspace_back_and_forth: Option<bool>,
 }
 
 /// What had the keyboard when Mobius was summoned (`helix-summon`): only what the compositor lists about every window.
