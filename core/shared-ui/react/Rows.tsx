@@ -74,6 +74,32 @@ export function Segments({ id, options, current, onChange }: { id: string; optio
   );
 }
 
+/** A choice with too many options for a row of buttons (time zones): the current one on a button that opens a short list with a filter. */
+export function ChoiceList({ id, options, current, onChange }: { id: string; options: Choice[]; current: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [needle, setNeedle] = useState("");
+  const shown = options.filter((o) => !needle || `${o.label} ${o.value}`.toLowerCase().includes(needle.toLowerCase())).slice(0, 80);
+  const label = options.find((o) => o.value === current)?.label ?? current;
+  return (
+    <div className="choice-list">
+      <button type="button" className="choice-current" aria-expanded={open} data-test={`set-${id}`} onClick={() => setOpen(!open)}>{label}<span aria-hidden="true"> ▾</span></button>
+      {open ? (
+        <div className="choice-pop" role="listbox" aria-label={id}>
+          <input type="search" autoFocus placeholder="Type to find" spellCheck={false} data-test={`set-${id}-filter`} value={needle} onChange={(e) => setNeedle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} />
+          <ul>
+            {shown.map((o) => (
+              <li key={o.value}>
+                <button type="button" role="option" aria-selected={o.value === current} className={o.value === current ? "current" : ""} data-test={`set-${id}-${o.value}`} onClick={() => { setOpen(false); setNeedle(""); if (o.value !== current) onChange(o.value); }}>{o.label}</button>
+              </li>
+            ))}
+            {shown.length === 0 ? <li className="choice-none">Nothing matches.</li> : null}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Row({ row, onChange }: { row: RowView; onChange: (id: string, change: Change) => void }) {
   const control = row.control;
   return (
@@ -86,7 +112,9 @@ export function Row({ row, onChange }: { row: RowView; onChange: (id: string, ch
       {control.kind === "slider" && (
         <Slider id={row.id} min={control.min} max={control.max} integer={control.integer} value={control.value} onCommit={(value) => onChange(row.id, { kind: "number", value })} />
       )}
-      {control.kind === "choice" && <Segments id={row.id} options={control.options} current={control.current} onChange={(value) => onChange(row.id, { kind: "choice", value })} />}
+      {control.kind === "choice" && (control.options.length > 6
+        ? <ChoiceList id={row.id} options={control.options} current={control.current} onChange={(value) => onChange(row.id, { kind: "choice", value })} />
+        : <Segments id={row.id} options={control.options} current={control.current} onChange={(value) => onChange(row.id, { kind: "choice", value })} />)}
       {control.kind === "text" && <div className="setting-value">{control.value}</div>}
     </div>
   );

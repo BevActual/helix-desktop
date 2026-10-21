@@ -18,6 +18,7 @@ mod bar;
 mod battery;
 mod blur;
 mod capture;
+mod clock;
 mod confirmer;
 mod control;
 mod desktop_action;
@@ -2056,6 +2057,7 @@ fn main() {
             report_interactive,
             dock::dock_view,
             dock::dock_prefs,
+            clock::clock_format,
             dock::workspaces_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
@@ -2215,6 +2217,8 @@ fn main() {
                         })
                 });
             }
+            // Every surface that draws a time (the bar, the control center) hears about the clock choice.
+            clock::start(handle.clone());
             if role.is_bar_side() {
                 notify::serve(handle.clone());
                 tray::serve(handle.clone());

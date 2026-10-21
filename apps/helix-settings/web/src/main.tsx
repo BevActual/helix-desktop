@@ -55,6 +55,11 @@ const specs: Record<string, PageSpec> = {
     change: (id, change) => invoke<RowView[]>("displays_change", { id, change }),
     note: "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup.",
   },
+  datetime: {
+    load: () => invoke<RowView[]>("datetime_rows"),
+    change: (id, change) => invoke<RowView[]>("datetime_change", { id, change }),
+    note: "The time zone and automatic time are the system's, so changing them asks for your password. Location is only used here, to work out sunrise and sunset.",
+  },
   accessibility: { change: serviceChange("accessibility"), empty: "There is nothing to adjust here on this desktop." },
 };
 

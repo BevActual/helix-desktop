@@ -47,6 +47,7 @@ pick ws             && run ws workspaces-test.sh tauri-fake-desktop.sh
 pick tray           && run tray tray-test.sh tauri-fake-desktop.sh
 pick idle           && run idle idle-test.sh idle-nested.sh
 pick nightlight    && run nightlight nightlight-test.sh nightlight-nested.sh HELIX_NESTED_GAMMA=1
+pick nightlight-sun && run nightlight-sun nightlight-sun-test.sh nightlight-sun-nested.sh HELIX_NESTED_GAMMA=1
 pick island         && run island island-test.sh tauri-shell.sh
 pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-net   && run settings-net settings-net-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
@@ -80,6 +81,7 @@ pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "H
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-displays && run settings-displays settings-displays-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-datetime && run settings-datetime settings-datetime-test.sh settings-datetime-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-wallpaper && run settings-wallpaper settings-wallpaper-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh tauri-shell.sh
 pick ui-scale          && run ui-scale ui-scale-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

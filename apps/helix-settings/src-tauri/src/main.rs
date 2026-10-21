@@ -3,6 +3,7 @@
 //! tiers and the audit, change tiers and revoke, but it is not an agent, cannot approve anything, and never talks to the model. What a
 //! change may be is decided by the pure models in the core crates; the page only sends names those models listed.
 
+mod datetime;
 mod wallhaven;
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1400,6 +1401,92 @@ fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, S
 }
 
 /// The Displays page: each connected output, with scale and orientation the compositor applies for this session.
+fn clock_file() -> Option<std::path::PathBuf> {
+    dock_prefs_file().map(|p| p.with_file_name("clock-settings.json"))
+}
+
+fn read_clock() -> helix_config::clock_prefs::ClockFormat {
+    clock_file()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| helix_config::clock_prefs::ClockFormat::parse(&text))
+        .unwrap_or_default()
+}
+
+fn write_clock(format: helix_config::clock_prefs::ClockFormat) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let path = clock_file().ok_or("no folder for the settings")?;
+    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        file.write_all(format.to_json().as_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+    eprintln!("SETTINGS clock {}", format.name());
+    Ok(())
+}
+
+/// The Date & time page: the time zone and automatic time from timedated, the clock format the shell watches, and where the person is.
+#[tauri::command]
+async fn datetime_rows() -> Vec<RowView> {
+    let place = match current() {
+        Some(desktop) => desktop
+            .settings()
+            .await
+            .map(|settings| datetime::Place::from_settings(&settings))
+            .unwrap_or_default(),
+        None => datetime::Place::default(),
+    };
+    let timedate = datetime::read_timedate().await;
+    let clock = read_clock();
+    datetime::rows(timedate.as_ref(), clock, &place, &datetime::now_text(clock))
+}
+
+#[tauri::command]
+async fn datetime_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    use datetime::Edit;
+    let service = |setting: &'static str, value: serde_json::Value| async move {
+        let desktop = current().ok_or("not connected to the desktop service")?;
+        desktop
+            .update_setting(setting, &value)
+            .await
+            .map_err(|error| error.to_string())?;
+        eprintln!("SETTINGS set {setting} {value}");
+        Ok::<(), String>(())
+    };
+    match datetime::parse_edit(&id, &change)? {
+        Edit::Timezone(zone) => {
+            let known = datetime::read_timedate()
+                .await
+                .is_some_and(|td| td.zones.contains(&zone));
+            if !known {
+                return Err("that is not a time zone this computer knows".into());
+            }
+            datetime::set_timezone(&zone).await?;
+            eprintln!("SETTINGS timezone {zone}");
+        }
+        Edit::Ntp(on) => {
+            datetime::set_ntp(on).await?;
+            eprintln!("SETTINGS ntp {on}");
+        }
+        Edit::Clock(format) => write_clock(format)?,
+        Edit::Latitude(n) => service("location.latitude", serde_json::json!(n)).await?,
+        Edit::Longitude(n) => service("location.longitude", serde_json::json!(n)).await?,
+        Edit::Custom(on) => service("location.custom_schedule", serde_json::json!(on)).await?,
+        Edit::Sunrise(t) => service("location.sunrise", serde_json::json!(t)).await?,
+        Edit::Sunset(t) => service("location.sunset", serde_json::json!(t)).await?,
+    }
+    Ok(datetime_rows().await)
+}
+
 #[tauri::command]
 fn displays_rows() -> Vec<RowView> {
     display_rows()
@@ -1446,6 +1533,14 @@ fn night_rows(night: &helix_nightlight_model::NightLight) -> Vec<RowView> {
         ),
     ];
     if night.scheduled {
+        rows.push(row(
+            "sun",
+            "Follow sunset and sunrise",
+            "Uses where you are, set in Date & time. Off uses the hours below.",
+            Control::Switch { on: night.sun },
+        ));
+    }
+    if night.scheduled && !night.sun {
         for (id, title, value) in [
             ("start", "From (hour)", night.start),
             ("end", "Until (hour)", night.end),
@@ -2409,6 +2504,8 @@ fn main() {
             power_change,
             displays_rows,
             displays_change,
+            datetime_rows,
+            datetime_change,
             dock_change,
             wallhaven::wallhaven_search,
             wallhaven::wallhaven_thumb,

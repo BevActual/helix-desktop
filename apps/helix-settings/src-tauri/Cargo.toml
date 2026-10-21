@@ -25,6 +25,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tauri = { workspace = true }
 zbus = { workspace = true, features = ["tokio"] }
+libc = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync"] }
 ureq = { workspace = true }
 

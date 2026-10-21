@@ -115,6 +115,10 @@ import json, sys
 d = json.load(open(sys.argv[1]))
 assert d["enabled"] is True and d["scheduled"] is True and 2000 <= d["warmth"] <= 6500, d
 PY
+has_id "set-night:sun" && echo "ok: with a schedule, it can follow sunset and sunrise" || fail "no follow-the-sun switch"
+click_id "set-night:sun"; sleep 1
+python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["sun"] is True else 1)' "$NIGHT" && echo "ok: following the sun is recorded" || fail "sun not recorded: $(cat "$NIGHT")"
+has_id "set-night:start" && fail "the hours stay while following the sun" || echo "ok: the hours go away while following the sun"
 click_id "set-night:scheduled"; sleep 1
 python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["scheduled"] is False else 1)' "$NIGHT" && echo "ok: the schedule can be turned off (always warm)" || fail "schedule not recorded"
 has_id "set-night:start" && fail "the hours stay when there is no schedule" || echo "ok: the hours go away without a schedule"

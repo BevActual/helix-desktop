@@ -3106,8 +3106,11 @@ dependencies = [
 name = "helix-nightlight"
 version = "0.1.0"
 dependencies = [
+ "helix-desktop-api",
  "helix-nightlight-model",
+ "helix-theme",
  "libc",
+ "tokio",
  "wayland-client",
  "wayland-protocols-wlr",
 ]
@@ -3134,6 +3137,7 @@ dependencies = [
  "helix-nightlight-model",
  "helix-wallpaper-model",
  "image",
+ "libc",
  "serde",
  "serde_json",
  "tauri",

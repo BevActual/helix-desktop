@@ -7,7 +7,10 @@ license.workspace = true
 description = "Night light: warms the screen in the evening through the compositor's gamma-control protocol. A separate small process; it holds the gamma tables only while the screen is meant to be warm."
 
 [dependencies]
+helix-desktop-api = { workspace = true }
 helix-nightlight-model = { path = "../../core/helix-nightlight-model" }
+helix-theme = { workspace = true }
+tokio = { workspace = true, features = ["rt", "time"] }
 wayland-client = { workspace = true }
 wayland-protocols-wlr = { workspace = true, features = ["client"] }
 libc = { workspace = true }

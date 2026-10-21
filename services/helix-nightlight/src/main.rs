@@ -7,7 +7,10 @@
 use std::os::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd};
 use std::time::{Duration, Instant};
 
-use helix_nightlight_model::{ramp, white_point, NightLight, NEUTRAL};
+use std::sync::{Arc, Mutex};
+
+use helix_nightlight_model::{ramp, white_point, NightLight, Sky, NEUTRAL};
+use helix_theme::schedule::{evaluate, LocalTime, LocationConfig};
 use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::{
     wl_output::WlOutput,
@@ -38,6 +41,39 @@ struct App {
     outputs: Vec<Output>,
     /// What the screens should show now; `None` means ordinary colours (no tables held).
     want: Option<[f64; 3]>,
+}
+
+/// Where the person is (Settings → Date & time), asked of the desktop service once a minute, for a night light that follows the sun. `None` until
+/// the service has answered, or when there is none (then the hours are used).
+fn watch_location() -> Arc<Mutex<Option<LocationConfig>>> {
+    let shared: Arc<Mutex<Option<LocationConfig>>> = Arc::new(Mutex::new(None));
+    let writer = shared.clone();
+    // A minute, unless a test asks for faster.
+    let every = std::env::var("HELIX_NIGHTLIGHT_LOCATION_SECONDS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|n| (1..=3600).contains(n))
+        .unwrap_or(60);
+    std::thread::spawn(move || {
+        let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        else {
+            return;
+        };
+        loop {
+            runtime.block_on(async {
+                if let Ok(desktop) = helix_desktop_api::Desktop::session().await {
+                    if let Ok(settings) = desktop.settings().await {
+                        *writer.lock().expect("location") =
+                            Some(helix_desktop_api::location_from_json(&settings));
+                    }
+                }
+            });
+            std::thread::sleep(Duration::from_secs(every));
+        }
+    });
+    shared
 }
 
 /// Minutes since local midnight.
@@ -254,6 +290,7 @@ fn main() {
             });
         }
     }
+    let location = watch_location();
     let path = helix_nightlight_model::config_path();
     let mut stamp = None;
     let mut config = NightLight::default();
@@ -268,7 +305,25 @@ fn main() {
                 config.enabled, config.warmth, config.scheduled, config.start, config.end
             );
         }
-        let kelvin = config.temperature_at(local_minute());
+        let minute = local_minute();
+        let strength = match (
+            config.scheduled && config.sun,
+            location.lock().expect("location").as_ref(),
+        ) {
+            (true, Some(place)) => {
+                let now = evaluate(place, LocalTime::now());
+                config.strength_with_sky(
+                    minute,
+                    Sky {
+                        night: now.night,
+                        since_ms: now.since_boundary_ms,
+                        until_ms: now.until_boundary_ms,
+                    },
+                )
+            }
+            _ => config.strength_at(minute),
+        };
+        let kelvin = config.temperature_for(strength);
         let want = (kelvin != NEUTRAL).then(|| white_point(kelvin));
         if want != app.want {
             if want.is_some() != app.want.is_some() {

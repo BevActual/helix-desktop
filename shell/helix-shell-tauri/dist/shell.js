@@ -25,14 +25,19 @@ function drawStatus() {
   slot("bt").style.display = statusState.bt ? "" : "none";
 }
 let clockTimer = null;
+// The person's clock choice (Settings, Date & time): "auto" follows the language, "12" and "24" are fixed.
+let clockFormat = "auto";
+const hour12 = () => (clockFormat === "12" ? true : clockFormat === "24" ? false : undefined);
+const clockTime = (when) => when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: hour12() });
+window.helixClockTime = clockTime;
 function tickClock() {
   const now = new Date();
   if (!reactControls) {
-    $("qs-time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    $("qs-time").textContent = clockTime(now);
     $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   }
   document.querySelector("#clock .day").textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-  document.querySelector("#clock .time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  document.querySelector("#clock .time").textContent = clockTime(now);
 }
 // Today panel: the month grid is built in Rust (leap years, week starts, week numbers); this draws it. Moving months re-asks with a delta.
 let calMonth = null;   // { year, month } being shown
@@ -1279,6 +1284,8 @@ function applyDockPrefs(prefs) {
   magnify(null);
   setDock(!prefs.auto_hide && !document.body.classList.contains("open"));
 }
+listen("clock-format", (event) => { clockFormat = event.payload; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
+invoke("clock_format").then((format) => { clockFormat = format; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
 listen("dock-prefs", (event) => applyDockPrefs(event.payload));
 invoke("dock_prefs").then(applyDockPrefs);
 function magnify(x) {

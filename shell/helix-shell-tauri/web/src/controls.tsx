@@ -165,7 +165,7 @@ export function ControlCenter({ register }: { register: (handle: ControlsHandle)
     <div id="qs-main" style={{ display: detail ? "none" : "" }}>
       <div id="qs-head">
         <div>
-          <div id="qs-time" data-test="time">{now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+          <div id="qs-time" data-test="time">{(window as unknown as { helixClockTime?: (d: Date) => string }).helixClockTime?.(now) ?? now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
           <div id="qs-date">{now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</div>
         </div>
         <div id="qs-battery" data-test="battery" className={battery?.low ? "low" : ""} style={{ display: battery?.present ? "" : "none" }}>

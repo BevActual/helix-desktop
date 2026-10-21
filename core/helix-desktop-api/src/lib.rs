@@ -129,11 +129,8 @@ pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTi
     )
 }
 
-/// The same answer from the settings list as JSON (what [`Desktop::settings`] returns).
-pub fn theme_is_dark_json(
-    settings: &serde_json::Value,
-    now: helix_theme::schedule::LocalTime,
-) -> bool {
+/// Where the person is, from the settings list as JSON (what [`Desktop::settings`] returns): the `location.*` rows.
+pub fn location_from_json(settings: &serde_json::Value) -> helix_theme::schedule::LocationConfig {
     let entry = |id: &str| {
         settings
             .as_array()
@@ -144,25 +141,38 @@ pub fn theme_is_dark_json(
             })
             .and_then(|e| e.get("value"))
     };
-    dark_for(
-        entry("theme.mode").and_then(|v| v.as_str()),
-        || helix_theme::schedule::LocationConfig {
-            custom_schedule: entry("location.custom_schedule")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false),
-            sunset: entry("location.sunset")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            sunrise: entry("location.sunrise")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            latitude: entry("location.latitude").and_then(|v| v.as_f64()),
-            longitude: entry("location.longitude").and_then(|v| v.as_f64()),
-        },
-        now,
-    )
+    helix_theme::schedule::LocationConfig {
+        custom_schedule: entry("location.custom_schedule")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        sunset: entry("location.sunset")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        sunrise: entry("location.sunrise")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        latitude: entry("location.latitude").and_then(|v| v.as_f64()),
+        longitude: entry("location.longitude").and_then(|v| v.as_f64()),
+    }
+}
+
+/// The same answer from the settings list as JSON (what [`Desktop::settings`] returns).
+pub fn theme_is_dark_json(
+    settings: &serde_json::Value,
+    now: helix_theme::schedule::LocalTime,
+) -> bool {
+    let mode = settings
+        .as_array()
+        .and_then(|entries| {
+            entries
+                .iter()
+                .find(|e| e.get("id").and_then(|v| v.as_str()) == Some("theme.mode"))
+        })
+        .and_then(|e| e.get("value"))
+        .and_then(|v| v.as_str());
+    dark_for(mode, || location_from_json(settings), now)
 }
 
 pub fn sound_volume_label(volume: Option<f64>) -> String {

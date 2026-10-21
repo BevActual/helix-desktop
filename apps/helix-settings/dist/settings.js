@@ -27,6 +27,7 @@ const PAGES = [
   { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
   { name: "sound", title: "Sound", icon: "volume", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
+  { name: "datetime", title: "Date & time", icon: "clock", rows: false },
   { name: "dock", title: "Dock", icon: "grid", rows: false },
   { name: "notifications", title: "Notifications", icon: "bell", rows: false },
   { name: "power", title: "Power & lock", icon: "lock", rows: false },
@@ -46,7 +47,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -116,6 +117,7 @@ function showPage(name) {
     if (name === "notifications") invoke("notifications_rows").then(drawNotifications);
     if (name === "power") invoke("power_rows").then(drawPower);
     if (name === "displays") invoke("displays_rows").then(drawDisplays);
+    if (name === "datetime") invoke("datetime_rows").then(drawDatetime);
   }
   queueReport();
 }
@@ -374,7 +376,7 @@ function rowLine(page, row) {
   if (row.description) text.append(el("div", "setting-about", row.description));
   line.append(text);
   const control = row.control;
-  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : page === "datetime" ? invoke("datetime_change", { id: row.id, change }).then(drawDatetime) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -424,6 +426,17 @@ function rowLine(page, row) {
     line.append(wrap);
   } else if (control.kind === "text") {
     line.append(el("div", "setting-value", control.value));
+  } else if (control.kind === "choice" && control.options.length > 6) {
+    const select = el("select", "choice-select");
+    select.dataset.test = "set-" + row.id;
+    control.options.forEach((option) => {
+      const item = el("option", "", option.label);
+      item.value = option.value;
+      item.selected = option.value === control.current;
+      select.append(item);
+    });
+    select.addEventListener("change", () => send({ kind: "choice", value: select.value }));
+    line.append(select);
   } else if (control.kind === "choice") {
     const segments = el("div", "segments");
     control.options.forEach((option) => {
@@ -489,6 +502,16 @@ function drawDisplays(rows) {
   if (searching()) drawSearch();
   queueReport();
 }
+function drawDatetime(rows) {
+  if (reactPages.datetime) { reactPages.datetime.setRows(rows); return; }
+  pageRows.datetime = rows;
+  const host = $("datetime-host");
+  host.replaceChildren();
+  drawGroups(host, "datetime", rows);
+  host.append(el("div", "setting-about note", "The time zone and automatic time are the system's, so changing them asks for your password. Location is only used here, to work out sunrise and sunset."));
+  if (searching()) drawSearch();
+  queueReport();
+}
 function drawRows(view) {
   pageRows[view.page] = view.rows;
   if (reactPages[view.page]) {
@@ -507,6 +530,7 @@ invoke("dock_rows").then((rows) => { pageRows.dock = rows; });
 invoke("notifications_rows").then((rows) => { pageRows.notifications = rows; });
 invoke("power_rows").then((rows) => { pageRows.power = rows; });
 invoke("displays_rows").then((rows) => { pageRows.displays = rows; });
+invoke("datetime_rows").then((rows) => { pageRows.datetime = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Search: matching rows from every page, under the page they belong to ------------------------------------------------------------

@@ -25,6 +25,17 @@ pub struct NightLight {
     pub start: u32,
     /// Hour (0–23) the warm window closes.
     pub end: u32,
+    /// With a schedule: follow sunset and sunrise where the person is (Settings → Date & time), instead of `start` and `end`.
+    pub sun: bool,
+}
+
+/// Where the sun is, as the day and night schedule (`helix-theme`) works it out for the place the person set: whether it is night, and how long
+/// since it became night or day (`since`) and until the next change (`until`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Sky {
+    pub night: bool,
+    pub since_ms: i64,
+    pub until_ms: i64,
 }
 
 impl Default for NightLight {
@@ -35,6 +46,7 @@ impl Default for NightLight {
             scheduled: true,
             start: START_DEFAULT,
             end: END_DEFAULT,
+            sun: false,
         }
     }
 }
@@ -67,6 +79,9 @@ impl NightLight {
         if let Some(n) = value.get("end").and_then(Value::as_u64) {
             night.end = (n % 24) as u32;
         }
+        if let Some(on) = value.get("sun").and_then(Value::as_bool) {
+            night.sun = on;
+        }
         night
     }
 
@@ -78,6 +93,7 @@ impl NightLight {
             "scheduled": self.scheduled,
             "start": self.start,
             "end": self.end,
+            "sun": self.sun,
         })
         .to_string()
     }
@@ -88,6 +104,7 @@ impl NightLight {
         match name {
             "enabled" => next.enabled = value.as_bool().ok_or(NightLightError::BadValue)?,
             "scheduled" => next.scheduled = value.as_bool().ok_or(NightLightError::BadValue)?,
+            "sun" => next.sun = value.as_bool().ok_or(NightLightError::BadValue)?,
             "warmth" => {
                 let n = value.as_u64().ok_or(NightLightError::BadValue)?;
                 if !(WARMTH_MIN as u64..=WARMTH_MAX as u64).contains(&n) {
@@ -145,9 +162,28 @@ impl NightLight {
         }
     }
 
+    /// How warm the screen should be when it follows the sun: warm after dark with the same fade as the hours, and cooling over the last
+    /// stretch of the night before sunrise. Always 1 when not scheduled (and 0 when off), the same as `strength_at`.
+    pub fn strength_with_sky(&self, minute: u32, sky: Sky) -> f64 {
+        if !self.enabled || !self.scheduled || !self.sun {
+            return self.strength_at(minute);
+        }
+        if !sky.night {
+            return 0.0;
+        }
+        let fade = f64::from(FADE_MINUTES) * 60_000.0;
+        ((sky.since_ms as f64) / fade)
+            .min((sky.until_ms as f64) / fade)
+            .clamp(0.0, 1.0)
+    }
+
     /// The temperature the screen shows at `minute`.
     pub fn temperature_at(&self, minute: u32) -> u32 {
-        let strength = self.strength_at(minute);
+        self.temperature_for(self.strength_at(minute))
+    }
+
+    /// The temperature for a strength from 0 (ordinary) to 1 (the chosen warmth).
+    pub fn temperature_for(&self, strength: f64) -> u32 {
         (NEUTRAL as f64 + (self.warmth as f64 - NEUTRAL as f64) * strength).round() as u32
     }
 }
@@ -321,6 +357,63 @@ mod tests {
     }
 
     #[test]
+    fn following_the_sun_is_warm_in_the_dark_and_fades_at_each_end() {
+        let n = NightLight {
+            sun: true,
+            ..evening()
+        };
+        let sky = |night, since_min: i64, until_min: i64| Sky {
+            night,
+            since_ms: since_min * 60_000,
+            until_ms: until_min * 60_000,
+        };
+        assert_eq!(
+            n.strength_with_sky(12 * 60, sky(false, 300, 200)),
+            0.0,
+            "daytime"
+        );
+        assert_eq!(
+            n.strength_with_sky(23 * 60, sky(true, 240, 400)),
+            1.0,
+            "deep night"
+        );
+        assert!(
+            (n.strength_with_sky(20 * 60, sky(true, 15, 600)) - 0.5).abs() < 1e-9,
+            "warming after sunset"
+        );
+        assert!(
+            (n.strength_with_sky(6 * 60, sky(true, 500, 15)) - 0.5).abs() < 1e-9,
+            "cooling before sunrise"
+        );
+        // Without `sun`, or without a schedule, the hours (or always-on) rule.
+        let hours = NightLight {
+            sun: false,
+            ..evening()
+        };
+        assert_eq!(
+            hours.strength_with_sky(22 * 60, sky(false, 0, 0)),
+            hours.strength_at(22 * 60)
+        );
+        let always = NightLight {
+            scheduled: false,
+            sun: true,
+            ..evening()
+        };
+        assert_eq!(always.strength_with_sky(12 * 60, sky(false, 0, 0)), 1.0);
+        assert_eq!(
+            NightLight {
+                sun: true,
+                ..NightLight::default()
+            }
+            .strength_with_sky(0, sky(true, 999, 999)),
+            0.0,
+            "off is off"
+        );
+        assert_eq!(n.temperature_for(0.0), NEUTRAL);
+        assert_eq!(n.temperature_for(1.0), n.warmth);
+    }
+
+    #[test]
     fn a_daytime_window_works_too() {
         let n = NightLight {
             start: 9,
@@ -341,6 +434,7 @@ mod tests {
             scheduled: false,
             start: 21,
             end: 6,
+            sun: true,
         };
         assert_eq!(NightLight::parse(&n.to_json()), n);
         assert_eq!(NightLight::parse("not json"), NightLight::default());
