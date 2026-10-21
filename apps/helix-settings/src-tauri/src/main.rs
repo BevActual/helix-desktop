@@ -1434,6 +1434,17 @@ fn write_clock(format: helix_config::clock_prefs::ClockFormat) -> Result<(), Str
     Ok(())
 }
 
+/// What the desktop service last said about finding the place by itself (it writes this next to the other state files).
+fn location_status_file() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_STATE_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/state"))
+        })?;
+    Some(base.join("helix/location-status.json"))
+}
+
 /// The Date & time page: the time zone and automatic time from timedated, the clock format the shell watches, and where the person is.
 #[tauri::command]
 async fn datetime_rows() -> Vec<RowView> {
@@ -1447,7 +1458,17 @@ async fn datetime_rows() -> Vec<RowView> {
     };
     let timedate = datetime::read_timedate().await;
     let clock = read_clock();
-    datetime::rows(timedate.as_ref(), clock, &place, &datetime::now_text(clock))
+    let locate = location_status_file()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| datetime::LocateStatus::parse(&text))
+        .unwrap_or_default();
+    datetime::rows(
+        timedate.as_ref(),
+        clock,
+        &place,
+        &locate,
+        &datetime::now_text(clock),
+    )
 }
 
 #[tauri::command]
@@ -1480,6 +1501,7 @@ async fn datetime_change(id: String, change: serde_json::Value) -> Result<Vec<Ro
         Edit::Clock(format) => write_clock(format)?,
         Edit::Latitude(n) => service("location.latitude", serde_json::json!(n)).await?,
         Edit::Longitude(n) => service("location.longitude", serde_json::json!(n)).await?,
+        Edit::Auto(on) => service("location.auto_locate", serde_json::json!(on)).await?,
         Edit::Custom(on) => service("location.custom_schedule", serde_json::json!(on)).await?,
         Edit::Sunrise(t) => service("location.sunrise", serde_json::json!(t)).await?,
         Edit::Sunset(t) => service("location.sunset", serde_json::json!(t)).await?,

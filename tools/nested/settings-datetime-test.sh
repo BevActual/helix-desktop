@@ -21,7 +21,7 @@ click_id page-datetime; sleep 1.5
 wait_id set-time:zone 20 && echo "ok: the time zone is on the page" || fail "no time zone row"
 wait_id set-time:ntp 5 && echo "ok: so is automatic time" || fail "no automatic time row"
 has_id set-time:clock-24 && echo "ok: and the clock choice" || fail "no clock choice"
-has_id set-place:latitude && has_id set-place:longitude && echo "ok: and where you are" || fail "no location rows"
+has_id set-place:auto && has_id set-place:latitude && has_id set-place:longitude && echo "ok: and where you are, by hand or automatically" || fail "no location rows"
 has_id set-place:sunrise && fail "custom times shown while they are off" || echo "ok: custom times are hidden until asked for"
 shot datetime; sleep 1; shot datetime
 echo "--- the time zone, from the list"
@@ -37,6 +37,13 @@ grep -q "SetNTP False interactive=True" "$S/fake-timedate.log" && echo "ok: auto
 echo "--- the clock is a file the shell watches"
 click_id set-time:clock-24; sleep 1.5
 python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["format"]=="24" else 1)' "$SCRATCH/config/helix/clock-settings.json" && echo "ok: 24-hour is kept in clock-settings.json" || fail "clock file: $(cat "$SCRATCH/config/helix/clock-settings.json" 2>&1)"
+echo "--- finding the place automatically replaces the typed coordinates"
+click_id set-place:auto; sleep 1.5
+grep -q 'UPDATE location.auto_locate true' "$S/fake-settings-actions.log" && echo "ok: turning it on went to the desktop service" || fail "auto: $(cat "$S/fake-settings-actions.log")"
+has_id set-place:latitude && fail "typed coordinates stay while it is automatic" || echo "ok: the typed coordinates go away while it finds the place itself"
+shot datetime-auto; sleep 1; shot datetime-auto
+click_id set-place:auto; sleep 1.5
+grep -q 'UPDATE location.auto_locate false' "$S/fake-settings-actions.log" && has_id set-place:latitude && echo "ok: and come back when it is turned off" || fail "did not return to typed coordinates"
 echo "--- location and custom times go to the desktop service"
 click_id set-place:custom; sleep 1.5
 grep -q 'UPDATE location.custom_schedule true' "$S/fake-settings-actions.log" && echo "ok: custom times on" || fail "custom: $(cat "$S/fake-settings-actions.log")"

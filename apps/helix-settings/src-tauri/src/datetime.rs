@@ -24,6 +24,9 @@ pub struct TimeDate {
 pub struct Place {
     pub latitude: f64,
     pub longitude: f64,
+    /// Find it automatically (GeoClue), and the place it found.
+    pub auto: bool,
+    pub address: String,
     pub custom: bool,
     pub sunrise: String,
     pub sunset: String,
@@ -34,6 +37,8 @@ impl Default for Place {
         Place {
             latitude: 0.0,
             longitude: 0.0,
+            auto: false,
+            address: String::new(),
             custom: false,
             sunrise: "06:00".into(),
             sunset: "18:00".into(),
@@ -59,6 +64,12 @@ impl Place {
         }
         if let Some(n) = value("location.longitude").and_then(Value::as_f64) {
             place.longitude = n;
+        }
+        if let Some(on) = value("location.auto_locate").and_then(Value::as_bool) {
+            place.auto = on;
+        }
+        if let Some(text) = value("location.address").and_then(Value::as_str) {
+            place.address = text.chars().filter(|c| !c.is_control()).take(120).collect();
         }
         if let Some(on) = value("location.custom_schedule").and_then(Value::as_bool) {
             place.custom = on;
@@ -108,6 +119,7 @@ pub enum Edit {
     Clock(ClockFormat),
     Latitude(f64),
     Longitude(f64),
+    Auto(bool),
     Custom(bool),
     Sunrise(String),
     Sunset(String),
@@ -148,6 +160,7 @@ pub fn parse_edit(id: &str, change: &Value) -> Result<Edit, String> {
                 .then_some(Edit::Longitude(n))
                 .ok_or_else(|| "longitude is -180 to 180".to_string())
         }
+        ("place:auto", Some("switch")) => Ok(Edit::Auto(switch()?)),
         ("place:custom", Some("switch")) => Ok(Edit::Custom(switch()?)),
         ("place:sunrise", Some("choice")) => {
             let t = text()?;
@@ -165,11 +178,39 @@ pub fn parse_edit(id: &str, change: &Value) -> Result<Edit, String> {
     }
 }
 
+/// What the desktop service last said about finding the place automatically (`location-status.json`): `state` and a sentence.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LocateStatus {
+    pub state: String,
+    pub message: String,
+}
+
+impl LocateStatus {
+    pub fn parse(text: &str) -> LocateStatus {
+        let value: Value = serde_json::from_str(text).unwrap_or(Value::Null);
+        let field = |name: &str| {
+            value
+                .get(name)
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(200)
+                .collect::<String>()
+        };
+        LocateStatus {
+            state: field("state"),
+            message: field("message"),
+        }
+    }
+}
+
 /// The page's rows. `now` is the date and time as text, made by the caller (this builds nothing from the clock).
 pub fn rows(
     timedate: Option<&TimeDate>,
     clock: ClockFormat,
     place: &Place,
+    locate: &LocateStatus,
     now: &str,
 ) -> Vec<RowView> {
     let row = |group: &str, id: &str, title: &str, description: &str, control: Control| RowView {
@@ -260,36 +301,60 @@ pub fn rows(
             current: clock.name().into(),
         },
     ));
-    let sliders = |id: &str, title: &str, description: &str, min: f64, max: f64, value: f64| {
-        row(
+    rows.push(row(
+        "Location",
+        "place:auto",
+        "Find where I am automatically",
+        "Asks the system's location service (GeoClue), which may look this computer up over the network. Off unless you turn it on. Only the town is kept, never the street.",
+        Control::Switch { on: place.auto },
+    ));
+    if place.auto {
+        let line = match locate.state.as_str() {
+            "located" if !locate.message.is_empty() => locate.message.clone(),
+            "located" | "locating" => "Looking for where you are…".to_string(),
+            "denied" | "unavailable" if !locate.message.is_empty() => locate.message.clone(),
+            _ if !place.address.is_empty() => place.address.clone(),
+            _ => "Waiting for the location service…".to_string(),
+        };
+        rows.push(row(
             "Location",
-            id,
-            title,
-            description,
-            Control::Slider {
-                min,
-                max,
-                integer: false,
-                value,
-            },
-        )
-    };
-    rows.push(sliders(
-        "place:latitude",
-        "Latitude",
-        "Where you are, north positive. Used for sunrise and sunset: the automatic theme turns at sunset. Nothing is sent anywhere.",
-        -90.0,
-        90.0,
-        place.latitude,
-    ));
-    rows.push(sliders(
-        "place:longitude",
-        "Longitude",
-        "East positive.",
-        -180.0,
-        180.0,
-        place.longitude,
-    ));
+            "place:where",
+            "Where",
+            "Used for sunrise and sunset.",
+            Control::Text { value: line },
+        ));
+    } else {
+        let sliders = |id: &str, title: &str, description: &str, min: f64, max: f64, value: f64| {
+            row(
+                "Location",
+                id,
+                title,
+                description,
+                Control::Slider {
+                    min,
+                    max,
+                    integer: false,
+                    value,
+                },
+            )
+        };
+        rows.push(sliders(
+            "place:latitude",
+            "Latitude",
+            "Where you are, north positive. Used for sunrise and sunset: the automatic theme turns at sunset. Nothing is sent anywhere.",
+            -90.0,
+            90.0,
+            place.latitude,
+        ));
+        rows.push(sliders(
+            "place:longitude",
+            "Longitude",
+            "East positive.",
+            -180.0,
+            180.0,
+            place.longitude,
+        ));
+    }
     rows.push(row(
         "Location",
         "place:custom",
@@ -406,7 +471,14 @@ mod tests {
     #[test]
     fn the_rows_say_what_is_set_and_hide_what_does_not_apply() {
         let place = Place::default();
-        let all = rows(Some(&td()), ClockFormat::Hours24, &place, "Wednesday");
+        let locate = LocateStatus::default();
+        let all = rows(
+            Some(&td()),
+            ClockFormat::Hours24,
+            &place,
+            &locate,
+            "Wednesday",
+        );
         let ids: Vec<&str> = all.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(
             ids,
@@ -415,6 +487,7 @@ mod tests {
                 "time:zone",
                 "time:ntp",
                 "time:clock",
+                "place:auto",
                 "place:latitude",
                 "place:longitude",
                 "place:custom"
@@ -430,6 +503,7 @@ mod tests {
                 custom: true,
                 ..place.clone()
             },
+            &locate,
             "x",
         );
         assert!(
@@ -440,13 +514,50 @@ mod tests {
             can_ntp: false,
             ..td()
         };
-        assert!(!rows(Some(&no_ntp), ClockFormat::Auto, &place, "x")
-            .iter()
-            .any(|r| r.id == "time:ntp"));
-        let none = rows(None, ClockFormat::Auto, &place, "x");
+        assert!(
+            !rows(Some(&no_ntp), ClockFormat::Auto, &place, &locate, "x")
+                .iter()
+                .any(|r| r.id == "time:ntp")
+        );
+        let none = rows(None, ClockFormat::Auto, &place, &locate, "x");
         assert!(none
             .iter()
             .any(|r| r.id == "time:zone" && matches!(r.control, Control::Text { .. })));
+    }
+
+    #[test]
+    fn automatic_location_replaces_the_typed_coordinates_with_what_was_found() {
+        let on = Place {
+            auto: true,
+            address: "Paris, France".into(),
+            ..Place::default()
+        };
+        let waiting = rows(None, ClockFormat::Auto, &on, &LocateStatus::default(), "x");
+        let ids: Vec<&str> = waiting.iter().map(|r| r.id.as_str()).collect();
+        assert!(
+            ids.contains(&"place:where") && !ids.contains(&"place:latitude"),
+            "{ids:?}"
+        );
+        let found = LocateStatus::parse(r#"{"state":"located","message":"Paris, France"}"#);
+        let line = |status: &LocateStatus| {
+            rows(None, ClockFormat::Auto, &on, status, "x")
+                .into_iter()
+                .find(|r| r.id == "place:where")
+                .map(|r| match r.control {
+                    Control::Text { value } => value,
+                    _ => String::new(),
+                })
+        };
+        assert_eq!(line(&found).as_deref(), Some("Paris, France"));
+        let denied = LocateStatus::parse(
+            r#"{"state":"denied","message":"The location service does not allow Helix to ask."}"#,
+        );
+        assert!(line(&denied).unwrap().contains("does not allow"));
+        assert_eq!(
+            parse_edit("place:auto", &json!({"kind": "switch", "value": true})),
+            Ok(Edit::Auto(true))
+        );
+        assert_eq!(LocateStatus::parse("garbage"), LocateStatus::default());
     }
 
     #[test]

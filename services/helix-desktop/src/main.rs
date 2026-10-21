@@ -24,6 +24,7 @@ mod desktop_operations;
 mod displays;
 mod displays_backend;
 mod displays_support;
+mod location;
 mod msg_ipc;
 mod network;
 mod network_backend;
@@ -130,6 +131,8 @@ async fn main() -> zbus::Result<()> {
         agents::start_system_agents(hub, backends.0, backends.1).await;
         backends
     };
+
+    tokio::spawn(location::run(Arc::clone(&state), connection.clone()));
 
     let rule = MatchRule::builder()
         .msg_type(MessageType::Signal)

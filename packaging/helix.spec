@@ -154,6 +154,7 @@ rm -f %{buildroot}%{_bindir}/helix-transcribe %{buildroot}%{_bindir}/helix-image
 
 # The user preset for the session units.
 install -Dm644 packaging/90-helix.preset %{buildroot}%{_prefix}/lib/systemd/user-preset/90-helix.preset
+install -Dm644 packaging/90-helix-geoclue.conf %{buildroot}%{_sysconfdir}/geoclue/conf.d/90-helix.conf
 
 # The compositor, laid out the way the distribution's own niri package does.
 NIRI="%{?helix_target}%{!?helix_target:target}/%{helix_profile}/niri"
@@ -231,6 +232,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_userunitdir}/helix-nightlight.service
 %{_userunitdir}/helix-wallpaper.service
 %{_prefix}/lib/systemd/user-preset/90-helix.preset
+%config(noreplace) %{_sysconfdir}/geoclue/conf.d/90-helix.conf
 %{_datadir}/dbus-1/services/org.helix.Desktop.service
 %{_datadir}/dbus-1/services/org.helix.Inference.service
 %{_datadir}/polkit-1/actions/org.helix.Shell.upgrade.policy
