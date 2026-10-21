@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
 import { Blocks, type Block } from "./thread";
 import { describeDocOp } from "./imagestage";
-import { continueList, findAll, indent, makeLink, outline, readingMinutes, setHeading, toggleLines, toggleWrap, type Edit } from "./markdownEdit";
+import { continueList, editsToDocOps, findAll, indent, makeLink, outline, readingMinutes, setHeading, toggleLines, toggleWrap, type Edit } from "./markdownEdit";
 
 /** The stage: the panel beside the chat where the work lives. Today it holds documents: the model drafts them (an `artifact:Title` block in a
  * reply), the person edits them here, every change is a version, and the open document goes to the model with the next message as a visible
@@ -111,6 +111,7 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
   const findField = useRef<HTMLInputElement>(null);
   const accept = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const editChain = useRef(Promise.resolve());
   const current = useRef({ title: "", text: "" });
   current.current = { title, text };
 
@@ -204,9 +205,23 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
     const { selectionStart: start, selectionEnd: end } = el;
     setSel(end - start >= 3 ? { start, end } : null);
   };
-  // A change made by the toolbar, a shortcut or an accepted suggestion goes through the editing command so Undo still works.
-  const applyEdit = (edit: Edit) => { const el = area.current; if (el) { replaceText(el, edit.text, { start: edit.start, end: edit.end }); noteSelection(); } };
-  const format = (fn: (t: string, s: number, e: number) => Edit) => { const el = area.current; if (!el) return; applyEdit(fn(el.value, el.selectionStart, el.selectionEnd)); };
+  /** Toolbar, shortcuts and accepted suggestions go through `stage_apply`, the same operations as a `docops` block. */
+  const applyDocEdit = async (edit: Edit) => {
+    const el = area.current;
+    if (!el || !title) return;
+    const before = el.value;
+    const ops = editsToDocOps(before, edit.text, edit.start, edit.end);
+    if (!ops.length) { hooks.report("That change could not be saved as a document operation. Try selecting more context."); return; }
+    clearTimeout(timer.current);
+    try {
+      adopt(await invoke<Store>("stage_apply", { chatId: hooks.chatId(), title, ops, by: "person" }), title);
+      setSaved(true);
+      replaceText(el, edit.text, { start: edit.start, end: edit.end });
+      noteSelection();
+    } catch (reason) { hooks.report(reason); }
+  };
+  const applyEdit = (edit: Edit) => { editChain.current = editChain.current.then(() => applyDocEdit(edit)); };
+  const format = (fn: (t: string, s: number, e: number) => Edit) => { const el = area.current; if (!el) return; const edit = fn(el.value, el.selectionStart, el.selectionEnd); if (edit.text !== el.value) applyEdit(edit); };
 
   const ask = async (kind: string, instruction = "") => {
     if (!sel || working) return;
@@ -220,13 +235,24 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
     } catch (reason) { setProblem(String(reason)); } finally { setWorking(false); }
   };
   const applyProposal = () => {
-    if (!proposal) return;
+    if (!proposal || !title) return;
     const el = area.current;
-    if (!el || text.slice(proposal.start, proposal.end) !== proposal.old) { setProblem("The text changed while Mobius worked, so the suggestion was dropped."); setProposal(null); return; }
-    const next = text.slice(0, proposal.start) + proposal.text + text.slice(proposal.end);
+    const before = el?.value ?? text;
+    if (!el || before.slice(proposal.start, proposal.end) !== proposal.old) { setProblem("The text changed while Mobius worked, so the suggestion was dropped."); setProposal(null); return; }
+    const { start, end, text: suggested } = proposal;
+    const next = before.slice(0, start) + suggested + before.slice(end);
+    const caret = start + suggested.length;
     setProposal(null);
-    replaceText(el, next, { start: proposal.start, end: proposal.start + proposal.text.length });
-    noteSelection();
+    clearTimeout(timer.current);
+    editChain.current = editChain.current.then(async () => {
+      clearTimeout(timer.current);
+      try {
+        adopt(await invoke<Store>("stage_record", { chatId: hooks.chatId(), title, body: next, by: "person" }), title);
+        setSaved(true);
+        replaceText(el, next, { start: caret, end: caret });
+        noteSelection();
+      } catch (reason) { hooks.report(reason); }
+    });
   };
   const rejectProposal = () => { setProposal(null); setTimeout(() => area.current?.focus(), 0); };
 
@@ -258,8 +284,16 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
     setTimeout(() => { const a = area.current ?? el; if (a) { replaceText(a, v.body, { start: 0, end: 0 }); noteSelection(); } }, 0);
   };
   const goTo = (n: number) => { if (matches.length === 0) return; const i = (n + matches.length) % matches.length; setHit(i); const el = area.current; if (el && mode === "write") { el.focus(); el.setSelectionRange(matches[i], matches[i] + needle.length); const lines = el.value.slice(0, matches[i]).split("\n").length - 1; el.scrollTop = Math.max(0, lines * (size * 1.7) - 80); } };
-  const replaceOne = () => { const el = area.current; if (!el || matches.length === 0) return; const at = matches[hit % matches.length]; replaceText(el, text.slice(0, at) + replacement + text.slice(at + needle.length), { start: at, end: at + replacement.length }); };
-  const replaceAll = () => { const el = area.current; if (!el || matches.length === 0) return; const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"); replaceText(el, text.replace(re, () => replacement), { start: 0, end: 0 }); };
+  const replaceOne = () => {
+    const el = area.current; if (!el || matches.length === 0) return;
+    const at = matches[hit % matches.length];
+    applyEdit({ text: text.slice(0, at) + replacement + text.slice(at + needle.length), start: at, end: at + replacement.length });
+  };
+  const replaceAll = () => {
+    const el = area.current; if (!el || matches.length === 0) return;
+    const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    applyEdit({ text: text.replace(re, () => replacement), start: 0, end: 0 });
+  };
   const rename = async (to: string) => {
     // Enter and the blur that follows it both ask; the second is the same request.
     if (to.trim() === "" || to.trim() === title || to.trim() === lastRename.current) return;
@@ -296,7 +330,7 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
     setSlash(null);
     const without = el.value.slice(0, from) + el.value.slice(to);
     if (id === "continue") {
-      replaceText(el, without, { start: from, end: from });
+      applyEdit({ text: without, start: from, end: from });
       const before = without.slice(Math.max(0, from - 3000), from);
       if (!before.trim()) { setProblem("Write something first, and Mobius can continue it."); return; }
       setWorking(true); setProblem("");
@@ -308,7 +342,8 @@ export function Stage({ register, hooks }: { register: (handle: StageHandle) => 
     const insert: Record<string, string> = { h1: "# ", h2: "## ", h3: "### ", bullet: "- ", number: "1. ", quote: "> ", code: "```\n\n```", divider: "---\n" };
     const text = insert[id] ?? "";
     const caret = from + (id === "code" ? 4 : text.length);
-    replaceText(el, without.slice(0, from) + text + without.slice(from), { start: caret, end: caret });
+    const next = without.slice(0, from) + text + without.slice(from);
+    applyEdit({ text: next, start: caret, end: caret });
   };
   const keys = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (slash && slashItems.length) {

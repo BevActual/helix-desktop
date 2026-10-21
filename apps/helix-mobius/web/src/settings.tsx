@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@helix/ui";
+import { invoke, Segments } from "@helix/ui";
+import { MemoryEditor } from "./memory";
 import { eligible, listOrder, reason, recommend, specialist, type Job, type ModelCard } from "./recommend";
 import { CloudModels, type CloudView } from "./cloudmodels";
 import { ModelPicker } from "./modelpicker";
@@ -11,33 +12,45 @@ import { AgentsPanel } from "./agents";
 import { ChatGPTPlan, type ChatGPTStatus } from "./chatgptplan";
 
 type Source = "local" | "lan" | "openrouter";
-type Section = "models" | "picker" | "library" | "cloud" | "knowledge" | "agents" | "providers" | "generation" | "experiments";
+type Section = "models" | "picker" | "library" | "cloud" | "knowledge" | "memory" | "agents" | "providers" | "generation" | "experiments";
 type Task = "chat" | "act" | "code" | "summarize" | "vision";
 
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
-  { id: "models", label: "Models", icon: "sparkle" },
-  { id: "picker", label: "Model picker", icon: "grid" },
+  { id: "models", label: "Tasks", icon: "sparkle" },
+  { id: "picker", label: "Model menu", icon: "chat" },
   { id: "library", label: "Library", icon: "grid" },
-  { id: "cloud", label: "Cloud models", icon: "bolt" },
+  { id: "cloud", label: "Cloud", icon: "bolt" },
   { id: "knowledge", label: "Knowledge", icon: "folder" },
+  { id: "memory", label: "Memory", icon: "pin" },
   { id: "agents", label: "Agents", icon: "code" },
-  { id: "providers", label: "Providers", icon: "wifi" },
-  { id: "generation", label: "Generation", icon: "settings" },
+  { id: "providers", label: "Connections", icon: "wifi" },
+  { id: "generation", label: "Replies", icon: "settings" },
   { id: "experiments", label: "Experiments", icon: "palette" },
+];
+/** The rail is grouped by the question a person is asking, not as one flat list of features. */
+const NAV: { label: string; ids: Section[] }[] = [
+  { label: "Work", ids: ["models", "picker"] },
+  { label: "Models", ids: ["library", "cloud"] },
+  { label: "Agent", ids: ["knowledge", "memory", "agents"] },
+  { label: "Setup", ids: ["providers", "generation", "experiments"] },
 ];
 const OPENROUTER = "https://openrouter.ai/api/v1";
 
 interface JobInfo { id: Job; title: string; note: string; task?: Task; local?: boolean; }
 /** What a person wants done, in their words. Each is run by one model, chosen here. */
 const JOBS: JobInfo[] = [
-  { id: "chat", title: "Chat", note: "Everyday questions, writing and ideas", task: "chat" },
-  { id: "code", title: "Code", note: "Writing, explaining and fixing code", task: "code" },
-  { id: "vision", title: "Pictures", note: "Reading pictures and screenshots you attach", task: "vision" },
-  { id: "summarize", title: "Summaries", note: "Short digests and chat titles. A small, quick model is best", task: "summarize" },
-  { id: "act", title: "Act", note: "Controls your desktop. Always runs on this computer", task: "act", local: true },
-  { id: "speech", title: "Dictation", note: "Turns your voice into text with the microphone button" },
-  { id: "image", title: "Image creation", note: "Makes pictures from a description" },
-  { id: "embedding", title: "Meaning search", note: "Reads what a message means: suggests the right mode now, and will search your notes and files" },
+  { id: "chat", title: "Chat and Write", note: "The conversation, and a document open beside it", task: "chat" },
+  { id: "code", title: "Code", note: "The project beside the chat: explain it, edit files, review the diff", task: "code" },
+  { id: "vision", title: "Image", note: "A picture beside the chat, including a question about one area", task: "vision" },
+  { id: "image", title: "Create an image", note: "A new picture from a description" },
+  { id: "summarize", title: "Summaries", note: "Names a chat and shortens a long one. A small, quick model is best", task: "summarize" },
+  { id: "speech", title: "Dictation", note: "The microphone in the composer" },
+  { id: "act", title: "Act", note: "Changes the desktop. Always runs on this computer", task: "act", local: true },
+  { id: "embedding", title: "Meaning search", note: "Suggests a mode from what you type, and searches your notes and files" },
+];
+const JOB_GROUPS: { title: string; lead: string; ids: Job[] }[] = [
+  { title: "Applications", lead: "The places in the sidebar. Each uses one model.", ids: ["chat", "code", "vision", "image"] },
+  { title: "While you work", lead: "The agent uses these. They are not a place of their own.", ids: ["summarize", "speech", "act", "embedding"] },
 ];
 
 interface Profile { backend: string; model: string; }
@@ -67,6 +80,17 @@ interface Draft {
   timeoutSecs: number;
 }
 interface Probe { text: string; ok: boolean; }
+interface ReplyPrefs { detail: string; thinking: string; }
+const DETAIL_HINT: Record<string, string> = {
+  concise: "Short. The result first, then only what it needs.",
+  balanced: "The usual length. A style on one chat replaces this.",
+  detailed: "More of what a reader needs to follow the result.",
+};
+const THINKING_HINT: Record<string, string> = {
+  folded: "Open while it is still thinking, then closed.",
+  open: "The reasoning stays open above the answer.",
+  hidden: "Not shown. It stays out of later turns either way.",
+};
 interface Progress { phase: "downloading" | "verifying" | "failed"; done: number; total: number; error: string; }
 interface Card extends ModelCard {
   maker: string; blurb: string; license: string; loaded: boolean; progress: Progress | null;
@@ -376,6 +400,8 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   const [experiments, setExperiments] = useState<Record<string, boolean> | null>(null);
   const [lanProbe, setLanProbe] = useState<Probe | null>(null);
   const [cloudProbe, setCloudProbe] = useState<Probe | null>(null);
+  const [reply, setReply] = useState<ReplyPrefs>({ detail: "balanced", thinking: "folded" });
+  const replyRef = useRef(reply);
   const [saved, setSaved] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [cloudView, setCloudView] = useState<CloudView | null>(null);
@@ -384,6 +410,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
   const [chatgpt, setChatgpt] = useState<ChatGPTStatus | null>(null);
   const [chatgptModels, setChatgptModels] = useState<string[]>([]);
   const [hiddenModels, setHiddenModels] = useState<string[]>([]);
+  const [urlOpen, setUrlOpen] = useState(false);
   const draftRef = useRef<Draft | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const hooksRef = useRef(hooks);
@@ -503,6 +530,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
           loadModels("openrouter");
           invoke<CloudView>("cloud_catalog", { refresh: false }).then(setCloudView, () => setCloudView({ models: [], fetched: 0, error: "", pins: [] }));
           invoke<Record<string, RouteOptions>>("cloud_routes").then(setRoutes, () => undefined);
+          invoke<ReplyPrefs>("reply_prefs").then((prefs) => { replyRef.current = prefs; setReply(prefs); }, () => undefined);
           invoke<ChatGPTStatus>("chatgpt_status").then((st) => {
             setChatgpt(st);
             if (st.connected) invoke<string[]>("chatgpt_models").then(setChatgptModels, () => undefined);
@@ -519,6 +547,18 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
       setOpen(false);
       hooksRef.current.visible(false);
     });
+  };
+  const chooseReply = (patch: Partial<ReplyPrefs>) => {
+    const next = { ...replyRef.current, ...patch };
+    replyRef.current = next;
+    setReply(next);
+    invoke<ReplyPrefs>("reply_prefs_set", next).then((savedPrefs) => {
+      replyRef.current = savedPrefs;
+      setReply(savedPrefs);
+      setSaved("Saved");
+      window.setTimeout(() => setSaved((s) => (s === "Saved" ? "" : s)), 1600);
+      window.dispatchEvent(new CustomEvent("mobius-reply-prefs", { detail: savedPrefs }));
+    }, report);
   };
   const change = (patch: Partial<Draft>) => setDraft((old) => (old ? { ...old, ...patch } : old));
   const changeTalk = (patch: Partial<Draft>) => {
@@ -614,45 +654,66 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
         <button id="models-back" className="icon-btn" data-test="models-back" type="button" title="Back to chat" aria-label="Back to chat" onClick={close}><Icon name="chevron-left" /></button>
         <div className="models-page-titles">
           <h2>Settings</h2>
-          <p>Choose the models Mobius uses, where they run, and how it behaves.</p>
+          <p>The model for each task, what the menu offers, and where a reply comes from.</p>
         </div>
         <div className="set-saved" aria-live="polite" data-test="settings-saved">{saved}</div>
       </header>
       <div className="models-page-body">
         <nav className="models-nav set-nav" aria-label="Settings sections">
-          {SECTIONS.map((entry) => (
-            <button key={entry.id} type="button" className={`models-nav-btn${entry.id === section ? " active" : ""}`} data-models-section={entry.id} data-test={`models-nav-${entry.id}`} onClick={() => show(entry.id)}>
-              <Icon name={entry.icon} /><span>{entry.label}</span>
-            </button>
+          {NAV.map((group) => (
+            <div key={group.label} className="set-nav-group">
+              <div className="set-nav-label">{group.label}</div>
+              {group.ids.map((id) => {
+                const entry = SECTIONS.find((item) => item.id === id)!;
+                return (
+                  <button key={entry.id} type="button" className={`models-nav-btn${entry.id === section ? " active" : ""}`} data-models-section={entry.id} data-test={`models-nav-${entry.id}`} onClick={() => show(entry.id)}>
+                    <Icon name={entry.icon} /><span>{entry.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </nav>
         <div className="models-panels">
           <section className="models-panel active set-panel" data-test="models-panel-models" hidden={section !== "models"}>
-            <h3 className="models-h3">What each job uses</h3>
-            <p className="models-lead">Pick a model for each kind of work. Mobius suggests what runs well on this computer, and downloads only when you press Get. Only one model sits in memory at a time, so switching takes a few seconds.</p>
-            <div className="set-list" data-test="jobs">
-              {JOBS.map((job) => (
-                <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} chatgpt={chatgptModels} route={job.task ? routes[job.task] : undefined} onRoute={setRoute} onAssign={assign} onBrowse={browse} onMoreCloud={() => show("cloud")} act={act} />
+            <h3 className="models-h3">Tasks</h3>
+            <p className="models-lead">One model for each kind of work. A better fit is offered when one is already installed. Nothing downloads until you press Get. Only one model is in memory at a time, so switching takes a few seconds.</p>
+            <div data-test="jobs">
+              {JOB_GROUPS.map((group) => (
+                <div key={group.title} className="set-group">
+                  <h4 className="set-group-title">{group.title}</h4>
+                  <p className="models-lead">{group.lead}</p>
+                  <div className="set-list">
+                    {group.ids.map((id) => {
+                      const job = JOBS.find((item) => item.id === id)!;
+                      return <JobRow key={job.id} job={job} draft={draft} cards={library} lan={lans} cloud={clouds} hasKey={hasKey} chatgpt={chatgptModels} route={job.task ? routes[job.task] : undefined} onRoute={setRoute} onAssign={assign} onBrowse={browse} onMoreCloud={() => show("cloud")} act={act} />;
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
             <button type="button" className="set-link set-gap-sm" data-test="models-see-library" onClick={() => { setFilter("all"); show("library"); }}>See every model in the Library</button>
           </section>
 
           <section className="models-panel active set-panel" data-test="models-panel-picker" hidden={section !== "picker"}>
-            <h3 className="models-h3">Model picker</h3>
-            <p className="models-lead">Choose which models appear in the model picker of a chat.</p>
+            <h3 className="models-h3">Models</h3>
+            <p className="models-lead">Choose which models appear in the model menu.</p>
+            <button type="button" className="picker-tasks" data-test="picker-tasks" onClick={() => show("models")}>
+              <span><strong>Task models</strong><span>Choose a model for each kind of work, or leave it on the one that fits this computer.</span></span>
+              <em>Tasks</em>
+            </button>
             <ModelPicker local={cache.local ?? []} titles={Object.fromEntries(library.map((c) => [c.file, c.title]))} chatgpt={chatgptModels} cloud={cloudView} hidden={hiddenModels} loading={cloudBusy}
               onToggleLocal={(key, shown) => invoke<string[]>("picker_set_shown", { key, shown }).then(setHiddenModels, report)} onPin={pinCloud} onRefresh={refreshCloud} onTasks={() => show("models")} />
           </section>
           <section className="models-panel active set-panel" data-test="models-panel-library" hidden={section !== "library"}>
             <h3 className="models-h3">Library</h3>
-            <p className="models-lead">Everything Mobius can run on this computer. Nothing downloads until you press Get, and each download is checked against a published checksum before it is used.</p>
+            <p className="models-lead">Models that run on this computer. Get one to assign it to a task or to show it in the menu. Nothing downloads until you press Get, and each download is checked against a published checksum before it is used.</p>
             <Library cards={library} draft={draft} filter={filter} setFilter={setFilter} onAssign={assign} act={act} report={report} />
           </section>
 
           <section className="models-panel active set-panel" data-test="models-panel-cloud" hidden={section !== "cloud"}>
             <h3 className="models-h3">Cloud models</h3>
-            <p className="models-lead">Hundreds of hosted models through OpenRouter. Add the ones you want to <strong>my menu</strong> and they appear in the chat's model menu and in the choices for each job. The menu holds only what you add.</p>
+            <p className="models-lead">Hosted models. Add one to the menu, or assign it to a task. A chat on one of these leaves this computer, and Act never uses one.</p>
             <CloudModels view={cloudView} loading={cloudBusy} hasKey={hasKey} profiles={draft.profiles} now={Math.floor(Date.now() / 1000)}
               onRefresh={refreshCloud} onPin={pinCloud} onAssign={assign} onProviders={() => show("providers")} />
           </section>
@@ -666,7 +727,9 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
           </section>
 
           <section className="models-panel active set-panel" data-test="models-panel-providers" hidden={section !== "providers"}>
-            <h3 className="models-h3">ChatGPT plan</h3>
+            <h3 className="models-h3">Connections</h3>
+            <p className="models-lead">A task runs on this computer unless you connect somewhere else. Act always stays here.</p>
+            <h3 className="models-h3 set-gap">ChatGPT plan</h3>
             <p className="models-lead">Use the plan you already pay for. This is OpenAI's own sign-in for apps that run on your computer, and it is what Helix uses because it is open source.</p>
             <ChatGPTPlan status={chatgpt} onStatus={chatgptChanged} report={report} />
             <h3 className="models-h3 set-gap">Another computer on your network</h3>
@@ -683,11 +746,16 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
             <h3 className="models-h3 set-gap">Cloud (OpenRouter)</h3>
             <p className="models-lead">Hundreds of hosted models through one key. The key lives in the Secret Service, never in transcripts or the routing file. Chats on a cloud model leave this computer, and Act never uses one.</p>
             <div className="models-form-card">
-              <label className="sheet-field">API URL
-                <input id="route-cloud-url" data-test="route-cloud-url" type="url" placeholder={OPENROUTER} value={draft.cloudUrl} onChange={(event) => change({ cloudUrl: event.target.value })} />
+              <label className="sheet-field key-line"><span>API key</span>
+                <input id="route-cloud-key" data-test="route-cloud-key" type="password" autoComplete="off" placeholder="Enter API key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
               </label>
-              <label className="sheet-field">API key
-                <input id="route-cloud-key" data-test="route-cloud-key" type="password" autoComplete="off" placeholder="Paste to update; leave blank to keep" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
+              <label className="sheet-check">
+                <input type="checkbox" data-test="route-cloud-url-toggle" checked={urlOpen || (!!draft.cloudUrl.trim() && draft.cloudUrl.trim() !== OPENROUTER)}
+                  onChange={(event) => { const on = event.target.checked; setUrlOpen(on); if (!on) change({ cloudUrl: OPENROUTER }); }} />
+                <span><strong>Use a different API address</strong><br /><span className="set-hint">Off uses OpenRouter. Turn it on to point the same key at another compatible address.</span></span>
+              </label>
+              <label className="sheet-field" hidden={!(urlOpen || (!!draft.cloudUrl.trim() && draft.cloudUrl.trim() !== OPENROUTER))}>API address
+                <input id="route-cloud-url" data-test="route-cloud-url" type="url" placeholder={OPENROUTER} value={draft.cloudUrl} onChange={(event) => change({ cloudUrl: event.target.value })} />
               </label>
               <div className="models-form-row">
                 <button id="route-probe-cloud" type="button" className="primary" data-test="route-probe-cloud" onClick={() => probe("cloud")}>Save &amp; test</button>
@@ -697,15 +765,43 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
                     .then(() => invoke<PageInfo>("routing_page_info").then(setInfo))
                     .catch(report);
                 }}>Clear key</button>
-                <p id="route-cloud-key-status" className="sheet-note" data-test="route-cloud-key-status">{hasKey === null ? "" : hasKey ? "API key is saved securely." : "No API key saved yet."}</p>
+                <p id="route-cloud-key-status" className="sheet-note" data-test="route-cloud-key-status">{hasKey === null ? "" : hasKey ? "Secret saved" : "No key saved yet."}</p>
               </div>
               <span id="route-probe-cloud-status" className={`models-inline-status${cloudProbe ? (cloudProbe.ok ? " ok" : " bad") : ""}`} data-test="route-probe-cloud-status">{cloudProbe?.text ?? ""}</span>
             </div>
           </section>
 
+          <section className="models-panel active set-panel" data-test="models-panel-memory" hidden={section !== "memory"}>
+            {section === "memory" ? <div data-test="memory-panel">
+              <h3 className="models-h3">Memory</h3>
+              <p className="models-lead">Things you asked Mobius to remember in every chat. Only you add to this list. It is kept on this computer and sent to models on this computer only, never to a cloud model.</p>
+              <MemoryEditor onDone={close} />
+            </div> : null}
+          </section>
+
           <section className="models-panel active set-panel" data-test="models-panel-generation" hidden={section !== "generation"}>
             <h3 className="models-h3">How replies are written</h3>
-            <p className="models-lead">Applied to Chat and Code, on this computer and on other providers. Changes are saved as you make them.</p>
+            <p className="models-lead">How much a reply says, and whether reasoning is shown. A style on one chat replaces how much it says. Changes are saved as you make them.</p>
+            <div className="models-form-card">
+              <label className="sheet-field reply-choice">How much to say
+                <Segments id="reply-detail" current={reply.detail} onChange={(detail) => chooseReply({ detail })} options={[
+                  { value: "concise", label: "Concise" },
+                  { value: "balanced", label: "Balanced" },
+                  { value: "detailed", label: "Detailed" },
+                ]} />
+                <span className="set-hint">{DETAIL_HINT[reply.detail] ?? DETAIL_HINT.balanced}</span>
+              </label>
+              <label className="sheet-field reply-choice">Reasoning
+                <Segments id="reply-thinking" current={reply.thinking} onChange={(thinking) => chooseReply({ thinking })} options={[
+                  { value: "folded", label: "Folded" },
+                  { value: "open", label: "Always open" },
+                  { value: "hidden", label: "Hidden" },
+                ]} />
+                <span className="set-hint">{THINKING_HINT[reply.thinking] ?? THINKING_HINT.folded}</span>
+              </label>
+            </div>
+            <h3 className="models-h3 set-group-title">Length and wait</h3>
+            <p className="models-lead">Applied to Chat and Code, on this computer and on other providers.</p>
             <div className="models-form-card">
               <label className="sheet-field">Temperature
                 <div className="models-slider-row">

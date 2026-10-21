@@ -99,6 +99,47 @@ export function outline(text: string): Heading[] {
 
 export const readingMinutes = (words: number) => Math.max(1, Math.round(words / 230));
 
+/** Turns one edit into document operations the Write stage and the model share. */
+export function editsToDocOps(before: string, after: string, anchor = 0, anchorEnd = anchor): Record<string, unknown>[] {
+  if (before === after) return [];
+  let a = 0;
+  let b = 0;
+  while (a < before.length && a < after.length && before[a] === after[a]) a++;
+  while (b < before.length - a && b < after.length - a && before[before.length - 1 - b] === after[after.length - 1 - b]) b++;
+  const endBefore = before.length - b;
+  const endAfter = after.length - b;
+  let from = a;
+  const hits = (find: string) => {
+    let n = 0;
+    let i = 0;
+    while ((i = before.indexOf(find, i)) >= 0) { n++; i += 1; }
+    return n;
+  };
+  while (from > 0) {
+    const find = before.slice(from, endBefore);
+    if (!find) return after.slice(endAfter) ? [{ op: "append", text: after.slice(endAfter) }] : [];
+    if (hits(find) === 1) return [{ op: "replace", find, with: after.slice(from, endAfter) }];
+    from = lineStart(before, from);
+  }
+  const find = before.slice(0, endBefore);
+  if (!find) return after ? [{ op: "append", text: after }] : [];
+  if (hits(find) === 1) return [{ op: "replace", find, with: after.slice(0, endAfter) }];
+  const lineIdx = before.slice(0, Math.min(anchor, before.length)).split("\n").length - 1;
+  const lineEndIdx = before.slice(0, Math.min(anchorEnd, before.length)).split("\n").length - 1;
+  const linesBefore = before.split("\n");
+  const linesAfter = after.split("\n");
+  const oldLine = linesBefore[lineIdx] ?? "";
+  const newLine = linesAfter[lineIdx] ?? "";
+  if (oldLine !== newLine && hits(oldLine) === 1) return [{ op: "replace", find: oldLine, with: newLine }];
+  let endIdx = lineEndIdx;
+  while (endIdx + 1 < linesBefore.length && linesBefore[endIdx + 1] === linesAfter[endIdx + 1]) endIdx++;
+  while (endIdx + 1 < linesBefore.length && linesBefore[endIdx + 1] !== linesAfter[endIdx + 1]) endIdx++;
+  const block = linesBefore.slice(lineIdx, endIdx + 1).join("\n");
+  const blockAfter = linesAfter.slice(lineIdx, endIdx + 1).join("\n");
+  if (block && block !== blockAfter && hits(block) === 1) return [{ op: "replace", find: block, with: blockAfter }];
+  return [];
+}
+
 /** Every place `needle` occurs (case-insensitive), as start offsets. */
 export function findAll(text: string, needle: string): number[] {
   if (!needle) return [];

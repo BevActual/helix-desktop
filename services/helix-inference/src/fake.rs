@@ -108,7 +108,11 @@ impl Backend for FakeBackend {
     }
 
     fn snapshot(&self) -> Value {
-        json!({"backend": "fake", "loaded": self.loaded()})
+        json!({
+            "backend": "fake",
+            "loaded": self.loaded(),
+            "contextTokens": 8192
+        })
     }
 }
 

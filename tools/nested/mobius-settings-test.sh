@@ -62,6 +62,22 @@ shot settings-library
 echo "--- 5. the other sections"
 click_id models-nav-generation; sleep 0.6
 wait_id route-temperature && echo "ok: Generation has the reply settings" || fail "no generation settings"
+wait_id set-reply-detail-balanced && echo "ok: how much a reply says" || fail "no reply detail"
+click_id set-reply-detail-concise; sleep 0.6
+PREFS=$SCRATCH/data/helix/mobius/reply-prefs.json
+python3 - "$PREFS" <<'PY' && echo "ok: concise is saved at once" || fail "reply prefs not saved"
+import json, sys
+p = json.load(open(sys.argv[1]))
+assert p["detail"] == "concise" and p["thinking"] == "folded", p
+PY
+click_id set-reply-thinking-hidden; sleep 0.6
+python3 - "$PREFS" <<'PY' && echo "ok: hidden reasoning is saved" || fail "thinking pref not saved"
+import json, sys
+p = json.load(open(sys.argv[1]))
+assert p["detail"] == "concise" and p["thinking"] == "hidden", p
+PY
+click_id models-nav-memory; sleep 0.6
+wait_id memory-panel && wait_id memory-empty && echo "ok: Memory is a settings section" || fail "no memory section"
 click_id models-nav-providers; sleep 0.6
 wait_id route-cloud-key && echo "ok: Providers has the network and cloud settings" || fail "no providers settings"
 shot settings-providers

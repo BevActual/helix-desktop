@@ -309,7 +309,8 @@ fn record_result(id: &str, chat: &str, error: &str) {
     let _ = save(&tasks);
 }
 
-async fn notify(summary: &str, body: &str) {
+/// A short desktop notice (scheduled tasks and Mobius when a tool needs approval).
+pub(crate) async fn desktop_notify(summary: &str, body: &str) {
     let Ok(connection) = zbus::Connection::session().await else {
         return;
     };
@@ -349,7 +350,7 @@ pub async fn run(id: &str) -> i32 {
     match ask(&task).await {
         Ok(chat) => {
             record_result(id, &chat, "");
-            notify(
+            desktop_notify(
                 &format!("{} is ready", task.name),
                 "Open Mobius to read it.",
             )
@@ -358,7 +359,7 @@ pub async fn run(id: &str) -> i32 {
         }
         Err(error) => {
             record_result(id, "", &error);
-            notify(&format!("{} could not run", task.name), &error).await;
+            desktop_notify(&format!("{} could not run", task.name), &error).await;
             1
         }
     }

@@ -31,8 +31,10 @@ click_id stage-mode-read; wait_id stage-read && echo "ok: the Read view opened" 
 shot write-read; sleep 1; shot write-read
 click_id stage-mode-write; wait_id stage-text || fail "back to Write failed"
 echo "--- formatting from the toolbar"
-drag_id stage-text 0.08 0.55
-click_id fmt-bold; sleep 0.5; click_id fmt-heading-2; sleep 3
+click_id stage-text
+wtype -k Home; sleep 0.2
+wtype -M shift-end; sleep 0.2
+click_id fmt-bold; sleep 0.8; click_id fmt-heading-2; sleep 3
 latest | grep -q '^## .*\*\*' && echo "ok: bold and a heading were applied to the selected line" || fail "formatting: $(latest | head -3)"
 echo "--- the outline lists the heading"
 has_id outline-0 && fail "the outline should stay out of the way in a narrow stage" || echo "ok: a narrow stage keeps the outline hidden until asked"

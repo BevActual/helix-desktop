@@ -191,6 +191,9 @@ export function ImageStage({ register, hooks }: { register: (handle: ImageHandle
                 <div className="img-ask-chips">
                   <button type="button" data-test="img-ask-describe" onClick={() => askArea("Describe this part of the picture.")}>Describe</button>
                   <button type="button" data-test="img-ask-text" onClick={() => askArea("Read any text in this part of the picture.")}>Read the text</button>
+                  <button type="button" data-test="img-region-blur" disabled={busy} onClick={() => { if (!box) return; run([{ op: "blur_region", ...box, sigma: 3 }]).then(() => setBox(null)); }}>Blur area</button>
+                  <button type="button" data-test="img-region-brighten" disabled={busy} onClick={() => { if (!box) return; run([{ op: "brightness_region", ...box, amount: 25 }]).then(() => setBox(null)); }}>Brighten area</button>
+                  <button type="button" data-test="img-region-contrast" disabled={busy} onClick={() => { if (!box) return; run([{ op: "contrast_region", ...box, amount: 30 }]).then(() => setBox(null)); }}>More contrast</button>
                 </div>
                 <input data-test="img-ask-input" value={areaText} placeholder="Ask about this area…" maxLength={300} onChange={(e) => setAreaText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && areaText.trim()) { e.preventDefault(); askArea(areaText); } }} />
               </div>}

@@ -54,6 +54,30 @@ pub enum Op {
         fill: Option<bool>,
         thickness: Option<u32>,
     },
+    /// Blur only inside a rectangle; the rest of the picture is unchanged.
+    BlurRegion {
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        sigma: f32,
+    },
+    /// Brightness only inside a rectangle (-100 to 100).
+    BrightnessRegion {
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        amount: i32,
+    },
+    /// Contrast only inside a rectangle (-100 to 100).
+    ContrastRegion {
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        amount: f32,
+    },
 }
 
 impl Op {
@@ -74,8 +98,33 @@ impl Op {
             Op::Blur { sigma } => format!("Blur {sigma:.1}"),
             Op::Sharpen { amount } => format!("Sharpen {amount:.1}"),
             Op::Rect { .. } => "Rectangle".into(),
+            Op::BlurRegion { sigma, .. } => format!("Blur area {sigma:.1}"),
+            Op::BrightnessRegion { amount, .. } => format!("Brighten area {amount:+}"),
+            Op::ContrastRegion { amount, .. } => format!("Contrast area {amount:+.0}"),
         }
     }
+}
+
+fn check_rect(x: u32, y: u32, cw: u32, ch: u32, w: u32, h: u32) -> Result<(), String> {
+    if cw == 0
+        || ch == 0
+        || x.checked_add(cw).is_none_or(|e| e > w)
+        || y.checked_add(ch).is_none_or(|e| e > h)
+    {
+        return Err("The region is outside the picture.".into());
+    }
+    Ok(())
+}
+
+fn composite_region(base: &DynamicImage, x: u32, y: u32, patch: &DynamicImage) -> DynamicImage {
+    let mut canvas = base.to_rgba8();
+    let patch = patch.to_rgba8();
+    for py in 0..patch.height() {
+        for px in 0..patch.width() {
+            canvas.put_pixel(x + px, y + py, *patch.get_pixel(px, py));
+        }
+    }
+    DynamicImage::ImageRgba8(canvas)
 }
 
 fn colour(text: &str) -> Result<Rgba<u8>, String> {
@@ -214,6 +263,51 @@ pub fn apply(image: &DynamicImage, op: &Op) -> Result<DynamicImage, String> {
                 }
             }
             Ok(DynamicImage::ImageRgba8(canvas))
+        }
+        Op::BlurRegion {
+            x,
+            y,
+            w: cw,
+            h: ch,
+            sigma,
+        } => {
+            check_rect(*x, *y, *cw, *ch, w, h)?;
+            if *sigma <= 0.0 || *sigma > 25.0 {
+                return Err("Blur is above 0 and up to 25.".into());
+            }
+            let piece = image.crop_imm(*x, *y, *cw, *ch);
+            let blurred = piece.blur(*sigma);
+            Ok(composite_region(image, *x, *y, &blurred))
+        }
+        Op::BrightnessRegion {
+            x,
+            y,
+            w: cw,
+            h: ch,
+            amount,
+        } => {
+            check_rect(*x, *y, *cw, *ch, w, h)?;
+            if !(-100..=100).contains(amount) {
+                return Err("Brightness is -100 to 100.".into());
+            }
+            let piece = image.crop_imm(*x, *y, *cw, *ch);
+            let lit = piece.brighten(*amount * 255 / 100);
+            Ok(composite_region(image, *x, *y, &lit))
+        }
+        Op::ContrastRegion {
+            x,
+            y,
+            w: cw,
+            h: ch,
+            amount,
+        } => {
+            check_rect(*x, *y, *cw, *ch, w, h)?;
+            if !(-100.0..=100.0).contains(amount) {
+                return Err("Contrast is -100 to 100.".into());
+            }
+            let piece = image.crop_imm(*x, *y, *cw, *ch);
+            let adjusted = piece.adjust_contrast(*amount);
+            Ok(composite_region(image, *x, *y, &adjusted))
         }
         Op::Brightness { .. } => Err("Brightness is -100 to 100.".into()),
         Op::Contrast { .. } => Err("Contrast is -100 to 100.".into()),
@@ -373,6 +467,24 @@ mod tests {
             }
         )
         .is_err());
+    }
+
+    #[test]
+    fn region_ops_leave_pixels_outside_unchanged() {
+        let p = picture(40, 20);
+        let out = apply(
+            &p,
+            &Op::BrightnessRegion {
+                x: 5,
+                y: 2,
+                w: 10,
+                h: 6,
+                amount: 40,
+            },
+        )
+        .unwrap();
+        assert_eq!(out.get_pixel(0, 0), p.get_pixel(0, 0));
+        assert_ne!(out.get_pixel(8, 4), p.get_pixel(8, 4));
     }
 
     #[test]

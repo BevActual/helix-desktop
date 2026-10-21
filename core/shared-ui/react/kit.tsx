@@ -193,10 +193,19 @@ export function EmptyState({ icon: name, children, action }: { icon: string; chi
   );
 }
 
-export function Meter({ percent }: { percent: number }) {
+export function Meter({ percent, live, label }: { percent: number; live?: boolean; label?: string }) {
+  const value = Math.max(0, Math.min(100, percent));
   return (
-    <div className="hx-meter" aria-hidden="true">
-      <i style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} />
+    <div
+      className={live ? "hx-meter live" : "hx-meter"}
+      role={live ? "meter" : undefined}
+      aria-hidden={live ? undefined : true}
+      aria-label={live ? label : undefined}
+      aria-valuemin={live ? 0 : undefined}
+      aria-valuemax={live ? 100 : undefined}
+      aria-valuenow={live ? Math.round(value) : undefined}
+    >
+      <i style={{ width: `${value}%` }} />
     </div>
   );
 }

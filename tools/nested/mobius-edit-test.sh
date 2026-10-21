@@ -68,4 +68,25 @@ click_id change-revert-0; sleep 2
 [ "$(cat "$NOTES")" = "ALPHA" ] && echo "ok: the other file kept its change" || { echo "FAIL: notes: $(cat "$NOTES")"; exit 1; }
 click_id change-revert-1; sleep 2
 [ "$(cat "$NOTES")" = "$(printf 'alpha\nbeta')" ] && echo "ok: the modified file was restored" || { echo "FAIL: notes: $(cat "$NOTES")"; exit 1; }
+echo "--- per-hunk accept keeps one change and drops the other"
+python3 - "$NOTES" <<'PY'
+import sys
+lines = ["top", "alpha", "middle"] + [f"filler {i}" for i in range(35)] + ["omega", "bottom"]
+open(sys.argv[1], "w").write("\n".join(lines) + "\n")
+PY
+printf '[{"tool":"terminal","command":"sed -i s/alpha/ALPHA/ notes.txt; sed -i s/omega/OMEGA/ notes.txt"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+paste_id input 'Change alpha and omega'
+click_id send
+wait_id tool-approve; click_id tool-approve; idle
+wait_id changes-card || { echo "FAIL: no Changes card for two hunks"; exit 1; }
+click_id change-0; sleep 1
+wait_id change-hunk-0-1 20 || { echo "FAIL: expected two hunks"; exit 1; }
+click_id change-hunk-accept-0-0; sleep 2
+python3 - "$NOTES" <<'PY'
+import sys
+text = open(sys.argv[1]).read()
+assert "ALPHA" in text and "alpha" not in text, text
+assert "omega" in text and "OMEGA" not in text, text
+PY
+echo "ok: Accept this hunk kept the first change only"
 echo "PASS: mobius edit"

@@ -26,6 +26,7 @@ mod lan;
 mod library;
 mod output;
 mod picker;
+mod replyprefs;
 mod rules;
 mod scheduled;
 mod secrets;
@@ -69,6 +70,8 @@ struct State {
     chat: Chat,
     /// Last backend label shown after a turn (local / LAN name).
     last_backend: String,
+    /// `contextTokens` from the last `GetSnapshot` on the inference service (0 when unknown).
+    inference_context_tokens: u32,
 }
 
 type Shared = Arc<Mutex<State>>;
@@ -380,8 +383,25 @@ struct HubStatus {
     left_device: bool,
 }
 
+fn enrich_context(view: &mut helix_chat::chat::ChatView, inference_context_tokens: u32) {
+    // The window of the model this chat will use: the loaded local model's, or the catalog's for a cloud model (0 when it is not known).
+    let local = view.route_backend.is_empty()
+        || view.route_backend == "local"
+        || view.route_backend == "On this computer";
+    view.context.model_context_tokens = if local {
+        inference_context_tokens
+    } else if !view.route_model.is_empty() {
+        cloud::model_context_tokens(&view.route_model)
+    } else {
+        0
+    };
+}
+
 fn emit_view(app: &AppHandle) {
-    let view = shared(app).lock().expect("state").chat.view();
+    let store = shared(app);
+    let state = store.lock().expect("state");
+    let mut view = state.chat.view();
+    enrich_context(&mut view, state.inference_context_tokens);
     let _ = app.emit("chat-view", view);
 }
 
@@ -760,6 +780,21 @@ fn chat_list() -> Vec<Summary> {
     summaries()
 }
 
+/// The window the person was using when they pressed the summon key, once. Shown as a chip they can remove; it goes with their next message only
+/// if they leave it. Nothing but the title, the application and the process is known, all of which the compositor lists for every window.
+#[tauri::command]
+fn summon_context() -> Option<helix_compositor::compositor_ipc::SummonContext> {
+    helix_compositor::compositor_ipc::take_summon_context()
+}
+
+/// A short desktop notice when Mobius needs the person while they are elsewhere.
+#[tauri::command]
+fn mobius_notify(summary: String, body: String) {
+    tauri::async_runtime::spawn(async move {
+        scheduled::desktop_notify(&summary, &body).await;
+    });
+}
+
 #[tauri::command]
 async fn chat_status(app: AppHandle) -> HubStatus {
     let backend = shared(&app).lock().expect("state").last_backend.clone();
@@ -779,10 +814,32 @@ async fn chat_status(app: AppHandle) -> HubStatus {
             left_device,
         };
     };
+    let mut inference_context_tokens = 0u32;
     let inference = match proxy.call_method("GetSnapshot", &()).await {
-        Ok(_) => "ready",
+        Ok(reply) => {
+            if let Ok(map) = reply
+                .body()
+                .deserialize::<std::collections::HashMap<String, zbus::zvariant::OwnedValue>>()
+            {
+                inference_context_tokens = map
+                    .get("contextTokens")
+                    .map(helix_desktop_api::owned_to_json)
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0)
+                    .min(u32::MAX as u64) as u32;
+            }
+            "ready"
+        }
         Err(_) => "offline",
     };
+    {
+        let store = shared(&app);
+        let mut state = store.lock().expect("state");
+        state.inference_context_tokens = inference_context_tokens;
+        let mut view = state.chat.view();
+        enrich_context(&mut view, inference_context_tokens);
+        let _ = app.emit("chat-view", view);
+    }
     HubStatus {
         inference,
         backend,
@@ -800,8 +857,9 @@ fn error_text(error: &ChatError) -> &'static str {
     }
 }
 
-/// The system prompt for this turn: the persona's identity, then the project's instructions, then the chat's style (each layer only
-/// while its experiment is on). Composed in one place so every send, edit and regenerate agrees.
+/// The system prompt for this turn: the persona's identity, then the project's instructions, then how to answer. A style on this chat
+/// wins; otherwise the reply setting (concise or detailed) is that layer. Balanced adds nothing. Composed in one place so every send,
+/// edit and regenerate agrees.
 fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
     let using_tools = shared(app)
         .lock()
@@ -809,7 +867,7 @@ fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
         .chat
         .conversation
         .tools_enabled;
-    let tools_identity = "You are Mobius, the assistant built into the person's Helix Linux desktop. Tools mode is enabled for this conversation. You can request public web research and reviewed shell commands in a chosen project folder. Use observed results and source references; never invent tool output or claim an unapproved command ran. Desktop settings and application control still require Act mode. Explain errors and declined tools plainly.";
+    let tools_identity = "You are Mobius, the assistant built into the person's Helix Linux desktop. Agent mode is on for this conversation. You can request public web research and reviewed shell commands in a chosen project folder, then continue from what you observe. Use observed results and source references; never invent tool output or claim an unapproved command ran. Desktop settings and application control still go through Desktop mode. Explain errors and declined tools plainly.";
     let identity = if persona.system_prompt.trim().is_empty() {
         if using_tools {
             tools_identity
@@ -838,7 +896,23 @@ fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
     } else {
         String::new()
     };
-    mobius_lab::compose_system(identity, &project_text, &style_text)
+    let voice = if style_text.trim().is_empty() {
+        replyprefs::detail_instruction(&replyprefs::load().detail).to_string()
+    } else {
+        style_text
+    };
+    mobius_lab::compose_system(identity, &project_text, &voice)
+}
+
+const PLAN_NOTE: &str = "Plan mode. Do not request tools, edit files, or change the desktop. Reply with a plan the person can edit: a one-line goal, numbered steps, and the files or commands you would use. End by asking whether to build it in Agent mode.";
+
+fn prompt_for_turn(app: &AppHandle, persona: &Persona, plan: bool) -> String {
+    let base = active_prompt(app, persona);
+    if plan {
+        format!("{base}\n\n{PLAN_NOTE}")
+    } else {
+        base
+    }
 }
 
 /// The routing and persona a turn uses once the chat's own model choice is taken into account: the chat's backend and model replace what the
@@ -1505,8 +1579,117 @@ fn tools_revert_change(app: AppHandle, activity_id: String, index: usize) -> Res
     Ok(())
 }
 
+fn tools_adjust_change_hunk(
+    app: &AppHandle,
+    activity_id: &str,
+    index: usize,
+    hunk: usize,
+    keep_only: bool,
+) -> Result<(), String> {
+    let chat_id = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Wait for the reply to finish, or stop it.".into());
+        }
+        state.chat.conversation.id.clone()
+    };
+    let store_path = edit_store(&chat_id, &format!("{activity_id}-{index}"));
+    let body = std::fs::read_to_string(&store_path)
+        .map_err(|_| "There is no restore point for that file.".to_string())?;
+    let mut checkpoint: edits::Checkpoint =
+        serde_json::from_str(&body).map_err(|_| "The restore point is damaged.".to_string())?;
+    let before = checkpoint.before.as_deref().unwrap_or("");
+    let expected = checkpoint
+        .after_present
+        .then_some(checkpoint.after.as_str());
+    let current = std::fs::read_to_string(&checkpoint.path).ok();
+    if current.as_deref() != expected {
+        return Err("The file has changed since this turn, so it was left alone.".into());
+    }
+    let next = if checkpoint.after_present {
+        if keep_only {
+            edits::after_accepting_only_hunk(before, &checkpoint.after, hunk)?
+        } else {
+            edits::after_reverting_hunk(before, &checkpoint.after, hunk)?
+        }
+    } else {
+        before.to_string()
+    };
+    if next == before && checkpoint.before.is_some() {
+        std::fs::write(&checkpoint.path, before).map_err(|e| e.to_string())?;
+        checkpoint.after = before.to_string();
+    } else if next == before {
+        std::fs::remove_file(&checkpoint.path).map_err(|e| e.to_string())?;
+        checkpoint.after.clear();
+        checkpoint.after_present = false;
+    } else {
+        std::fs::write(&checkpoint.path, &next).map_err(|e| e.to_string())?;
+        checkpoint.after = next;
+        checkpoint.after_present = true;
+    }
+    std::fs::write(
+        &store_path,
+        serde_json::to_string(&checkpoint).unwrap_or_default(),
+    )
+    .map_err(|e| format!("Could not update the restore point: {e}"))?;
+    {
+        let shared = shared(app);
+        let mut state = shared.lock().expect("state");
+        for message in state.chat.conversation.messages.iter_mut() {
+            for activity in message
+                .activities
+                .iter_mut()
+                .filter(|a| a.id == activity_id)
+            {
+                let mut list: Vec<edits::FileChange> =
+                    serde_json::from_str(&activity.input).unwrap_or_default();
+                if let Some(change) = list.get_mut(index) {
+                    edits::refresh_change(change, &checkpoint);
+                }
+                activity.input = serde_json::to_string(&list).unwrap_or_default();
+            }
+        }
+    }
+    persist(app);
+    emit_view(app);
+    Ok(())
+}
+
+/// Undoes one hunk of a file listed in a turn's Changes card, leaving the rest of that file's edits from the turn.
+#[tauri::command]
+fn tools_revert_hunk(
+    app: AppHandle,
+    activity_id: String,
+    index: usize,
+    hunk: usize,
+) -> Result<(), String> {
+    tools_adjust_change_hunk(&app, &activity_id, index, hunk, false)
+}
+
+/// Keeps only one hunk from a turn's edit on a file; the other hunks from that turn are dropped.
+#[tauri::command]
+fn tools_accept_hunk(
+    app: AppHandle,
+    activity_id: String,
+    index: usize,
+    hunk: usize,
+) -> Result<(), String> {
+    tools_adjust_change_hunk(&app, &activity_id, index, hunk, true)
+}
+
 fn memory_file() -> PathBuf {
     data_home().join("helix/mobius/memory.json")
+}
+
+#[tauri::command]
+fn reply_prefs() -> replyprefs::ReplyPrefs {
+    replyprefs::load()
+}
+
+#[tauri::command]
+fn reply_prefs_set(detail: String, thinking: String) -> Result<replyprefs::ReplyPrefs, String> {
+    replyprefs::save(&detail, &thinking)
 }
 
 #[tauri::command]
@@ -1564,6 +1747,8 @@ fn code_tree(app: AppHandle) -> Result<CodeTree, String> {
 struct CodeFile {
     text: String,
     truncated: bool,
+    /// The file exactly, when it all fits in the viewer, so an edit can be saved back. Empty when truncated.
+    source: String,
 }
 
 /// One file of the project folder for the Code stage's viewer: the first 3,000 lines. Same boundary as the edit tool (inside the folder, not
@@ -1587,6 +1772,46 @@ fn code_read(app: AppHandle, path: String) -> Result<CodeFile, String> {
     let truncated = lines.len() > 3000;
     Ok(CodeFile {
         text: terminal::display(&lines[..lines.len().min(3000)].join("\n"), usize::MAX),
+        truncated,
+        source: if truncated { String::new() } else { text },
+    })
+}
+
+#[derive(Serialize)]
+struct CodeSearchHit {
+    path: String,
+    line: u32,
+    text: String,
+}
+
+#[derive(Serialize)]
+struct CodeSearch {
+    hits: Vec<CodeSearchHit>,
+    truncated: bool,
+}
+
+/// Lines in the project folder that contain `query`. Same files and limits as the Code stage's tree.
+#[tauri::command]
+fn code_search(app: AppHandle, query: String) -> Result<CodeSearch, String> {
+    let workspace = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        state.chat.conversation.workspace.clone()
+    };
+    if workspace.is_empty() {
+        return Err("This chat has no project folder yet.".into());
+    }
+    let root = terminal::workspace(&workspace)?;
+    let (hits, truncated) = attach::search_text(&root, &query);
+    Ok(CodeSearch {
+        hits: hits
+            .into_iter()
+            .map(|hit| CodeSearchHit {
+                path: hit.path,
+                line: hit.line,
+                text: hit.text,
+            })
+            .collect(),
         truncated,
     })
 }
@@ -1796,6 +2021,7 @@ async fn chat_send(
     text: String,
     attachments: Option<Vec<AttachmentIn>>,
     pictures: Option<Vec<String>>,
+    plan: Option<bool>,
 ) -> Result<(), String> {
     if let Some(prompt) = text.trim().strip_prefix("/image ") {
         if attachments.as_ref().is_some_and(|v| !v.is_empty())
@@ -1807,7 +2033,8 @@ async fn chat_send(
     }
     let store = personas::load();
     let persona = store.active_persona().clone();
-    let prompt = active_prompt(&app, &persona);
+    let planning = plan.unwrap_or(false);
+    let prompt = prompt_for_turn(&app, &persona, planning);
     let attachments = attachments.unwrap_or_default();
     let has_attachments = !attachments.is_empty();
     let excerpts = attachments
@@ -1868,12 +2095,12 @@ async fn chat_send(
         .chat
         .conversation
         .tools_enabled;
-    if app.state::<acp::Runtime>().selected().is_some() {
-        // an agent chosen for this chat does the work; what it asks of the computer waits for the person
+    if app.state::<acp::Runtime>().selected().is_some() && !planning {
+        // an agent chosen for this chat does the work (a plan is written by the chat model: nothing is run for it); what it asks of the computer waits for the person
         emit_view(&app);
         tauri::async_runtime::spawn(acp::run(app, turn));
         Ok(())
-    } else if using_tools {
+    } else if using_tools && !planning {
         let private = has_attachments || !turn.images.is_empty();
         emit_view(&app);
         tauri::async_runtime::spawn(agent::run(app, turn, private));
@@ -2999,7 +3226,19 @@ fn knowledge_cancel() {
     knowledge::cancel();
 }
 
-/// Passages from the folders that match what the person typed. Local only: nothing leaves this computer.
+/// Passages from the person's folders that would be given to the model for this question (when knowledge in chat is on).
+#[tauri::command]
+fn knowledge_peek(query: String) -> Vec<helix_chat::chat::FileRef> {
+    knowledge::relevant(query.trim())
+        .into_iter()
+        .map(|p| helix_chat::chat::FileRef {
+            title: p.title,
+            heading: p.heading,
+            excerpt: p.text.chars().take(160).collect(),
+        })
+        .collect()
+}
+
 #[tauri::command]
 async fn knowledge_search(query: String) -> Result<Vec<knowledge::Found>, String> {
     tauri::async_runtime::spawn_blocking(move || knowledge::search(&query, 8))
@@ -3832,6 +4071,8 @@ fn main() {
             analysis_cancel,
             analysis_explain,
             chat_list,
+            mobius_notify,
+            summon_context,
             chat_status,
             chat_send,
             chat_pick_attachments,
@@ -3854,6 +4095,7 @@ fn main() {
             inline::stage_transform,
             inline::code_transform,
             inline::code_apply,
+            inline::code_save,
             scheduled::scheduled_list,
             scheduled::scheduled_save,
             scheduled::scheduled_set_enabled,
@@ -3877,10 +4119,15 @@ fn main() {
             project_set_folder,
             code_tree,
             code_read,
+            code_search,
             memory_list,
             memory_add,
             memory_remove,
+            reply_prefs,
+            reply_prefs_set,
             tools_revert_change,
+            tools_revert_hunk,
+            tools_accept_hunk,
             web_lookup,
             web_cancel,
             web_open_source,
@@ -3928,6 +4175,7 @@ fn main() {
             knowledge_cancel,
             knowledge_set_use,
             knowledge_search,
+            knowledge_peek,
             hub_repo,
             hub_download,
             library_reveal,
@@ -4024,6 +4272,7 @@ fn main() {
                 once_route: None,
                 chat: Chat::new(fresh),
                 last_backend: "On this computer".into(),
+                inference_context_tokens: 0,
             })));
             if seeded {
                 let shared = shared(app.handle());

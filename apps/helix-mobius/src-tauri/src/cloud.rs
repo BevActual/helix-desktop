@@ -308,6 +308,19 @@ pub fn set_route_options(task: &str, options: RouteOptions) -> Result<RouteOptio
     Ok(cleaned)
 }
 
+/// Context window in tokens for a cloud model id, when it is in the cached OpenRouter catalog.
+pub fn model_context_tokens(id: &str) -> u32 {
+    if id.trim().is_empty() {
+        return 0;
+    }
+    load_catalog()
+        .models
+        .iter()
+        .find(|m| m.id == id)
+        .map(|m| m.context.min(u32::MAX as u64) as u32)
+        .unwrap_or(0)
+}
+
 /// Letters, digits and `/ . : _ -`, at most 120 of them, with a vendor before a slash.
 pub fn valid_id(id: &str) -> bool {
     !id.is_empty()

@@ -25,8 +25,12 @@ export interface ChatListHooks {
   projects: (names: string[]) => void;
   report: (error: unknown) => void;
 }
+export interface ChatListLive {
+  streaming?: boolean;
+  waiting?: boolean;
+}
 export interface ChatListHandle {
-  set: (items: ChatItem[], currentId: string) => void;
+  set: (items: ChatItem[], currentId: string, live?: ChatListLive) => void;
 }
 
 /** The date section a chat opens: Pinned, Today, Yesterday, Previous 7 Days, Earlier; shown once, above its first chat. */
@@ -61,6 +65,7 @@ function sectionOf(item: ChatItem, index: number, all: ChatItem[], now: number):
 export function ChatList({ register, hooks }: { register: (handle: ChatListHandle) => void; hooks: ChatListHooks }) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [currentId, setCurrentId] = useState("");
+  const [live, setLive] = useState<ChatListLive>({});
   const [filter, setFilter] = useState("");
   const [project, setProject] = useState("");
   const [result, setResult] = useState<{ query: string; hits: Hit[] } | null>(null);
@@ -69,7 +74,7 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
   hooksRef.current = hooks;
 
   useEffect(() => {
-    register({ set: (next, id) => { setItems(next); setCurrentId(id); } });
+    register({ set: (next, id, flags) => { setItems(next); setCurrentId(id); setLive(flags || {}); } });
   }, [register]);
 
   const projects = useMemo(() => Array.from(new Set(items.map((item) => item.project).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [items]);
@@ -155,6 +160,8 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
                 }}
               >
                 <span className="chat-open-line">
+                  {item.id === currentId && live.waiting ? <span className="chat-waiting" data-test="chat-waiting" title="Needs your review" /> : null}
+                  {item.id === currentId && live.streaming && !live.waiting ? <span className="chat-working" data-test="chat-working" title="Writing" /> : null}
                   {item.pinned ? <span className="chat-pin-mark"><Icon name="pin" /></span> : null}
                   <span className="chat-open-title">{item.title}</span>
                   {!searching ? <span className="chat-open-when">{when(item.updated, now)}</span> : null}

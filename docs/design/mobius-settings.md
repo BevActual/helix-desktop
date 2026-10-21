@@ -4,17 +4,20 @@ Status: first pass built (2026-10-18). Replaces the "Models & routing" page. Ent
 
 ## Shape
 
-A rail of sections beside one column of content, the way Cursor's Settings and system settings pages are laid out; under 720 px the rail becomes a row of tabs.
+A rail of sections beside one column of content, the way Cursor's Settings and system settings pages are laid out; under 720 px the rail becomes a row of tabs. The rail is grouped by the question being asked. Section ids are unchanged (`models-nav-models` and the rest), so tests keep clicking the same buttons.
 
-| Section | What it holds |
-|---|---|
-| **Models** | One row per **job**: Chat, Code, Pictures, Summaries, Act, Dictation, Image creation. Each shows the model that does it (a menu of what is installed here, on the network, or in the cloud), where it runs and how it fits this computer. A job with nothing suitable installed offers the model to get, with the reason ("The most capable model that fits your graphics card") |
-| **Library** | Every model Mobius can run: search, filter (installed, chat, code, pictures, speech, images, fits this computer), sort (best for this computer, smallest, name), Get with progress, Remove |
-| **Cloud models** | OpenRouter's catalog (471 models when measured, 2026-10-18): search by name, maker or what it does; filter (in my menu, free, sees pictures, thinks first, uses tools, long documents); sort (newest, cheapest, longest documents). Each row shows price per million tokens, context size and abilities. **Add to my menu** puts a model in the chat's model menu; **Use for…** assigns it to Chat, Code, Pictures or Summaries; any `vendor/model` id can be added by hand. Chats on these leave the computer, and Act never uses one |
-| **Knowledge** | Folders Mobius reads into a local search index (see `knowledge.md`): add, read again, remove, and try a search that shows what would be found, by words and by meaning. Nothing leaves the computer |
-| **Providers** | Another computer on the network, and OpenRouter with its key in the Secret Service |
-| **Generation** | Temperature, longest reply, provider timeout, battery-saver rule |
-| **Experiments** | The switches for things being tried, and the routing file's path |
+| Group | Section | What it holds |
+|---|---|---|
+| **Work** | **Tasks** | One model per kind of work, in two lists. **Applications** are the places in the sidebar: Chat and Write, Code, Image, Create an image. **While you work** is what the agent uses and is not a place of its own: Summaries, Dictation, Act, Meaning search. Each row shows the model that does it, where it runs and how it fits this computer. A task with nothing suitable installed offers the model to get |
+| **Work** | **Model menu** | Which models appear in the composer's model menu. A switch hides one from the menu without uninstalling it or stopping it from doing a task |
+| **Models** | **Library** | Every model Mobius can run: search, filter (installed, chat, code, pictures, speech, images, fits this computer), sort (best for this computer, smallest, name), Get with progress, Remove |
+| **Models** | **Cloud** | OpenRouter's catalog (471 models when measured, 2026-10-18): search by name, maker or what it does; filter (in my menu, free, sees pictures, thinks first, uses tools, long documents); sort (newest, cheapest, longest documents). Each row shows price per million tokens, context size and abilities. **Add to my menu** puts a model in the chat's model menu; **Use for…** assigns it to a task; any `vendor/model` id can be added by hand. Chats on these leave the computer, and Act never uses one |
+| **Agent** | **Knowledge** | Folders the agent can search while you work (see `knowledge.md`): add, read again, remove, and try a search that shows what would be found, by words and by meaning. Nothing leaves the computer |
+| **Agent** | **Memory** | Facts the person asked Mobius to remember. The same list as `/remember`. Only the person adds to it. It is sent to models on this computer only |
+| **Agent** | **Agents** | Coding agents Mobius can hand a Code project to. Each keeps its own sign-in. File writes and commands wait for approval |
+| **Setup** | **Connections** | ChatGPT plan, another computer on the network, and OpenRouter with its key in the Secret Service. Act always stays on this computer |
+| **Setup** | **Replies** | How much a reply says (concise, balanced, detailed) and whether reasoning is shown (folded, always open, hidden). Then temperature, longest reply, provider timeout, battery-saver rule |
+| **Setup** | **Experiments** | The switches for things being tried, and the routing file's path |
 
 ## Decisions
 
@@ -28,7 +31,7 @@ A rail of sections beside one column of content, the way Cursor's Settings and s
 Its sections are General, Appearance, Agents, Tab, Models, Voice, Rules/Skills/Subagents, Plugins, Code Intelligence, Tools & MCPs, Hooks, Beta, Network, Cloud Agents, Worktrees and Developer. Worth taking:
 
 * **A model switcher you curate.** Each model has an "Add model to switcher" toggle and there is an "Add or search model" box, so the picker holds what the person uses. Mobius's picker lists every installed model plus six cloud ones. Next: a "Show in the model menu" choice per model, and "Add a model by id" for cloud and network providers.
-* **Keys reveal their fields.** "Use OpenAI API Key" is a switch that opens the key and an optional base URL, with "Secret saved" shown once stored. Mobius's key already behaves like this; the status line should be the same words.
+* **Keys reveal their fields.** A switch opens the key and an optional base URL, with "Secret saved" shown once stored. Mobius's OpenRouter key is the field on the row; "Secret saved" is the status; **Use a different API address** reveals the address, and off it is OpenRouter's.
 * **Per-model parameters with "Restore default parameters"** and per-role overrides (a subagent can inherit, use a default, or be disabled). Mobius's analogue is Summaries and Act following Chat unless set.
 * **A Beta page** for experiments, which Experiments already is.
 
@@ -103,16 +106,25 @@ Checked 2026-10-18, from the companies' own statements as reported and their pub
 * **Never** read `~/.claude`, `~/.codex/auth.json` or any other app's stored token to reuse it: that is the borrowed-token pattern both companies prohibit, and it is also taking a credential the person did not give Mobius.
 * **ACP** (the Agent Client Protocol Zed made) would let Mobius drive installed agents such as Codex or Gemini CLI. The Claude adapter is built on the Agent SDK, which falls under the same rule, so it is not a way around it.
 
+## How a reply is written (2026-10-20)
+
+Two choices on Replies, saved in `reply-prefs.json` (not the routing file) as they are made:
+
+* **How much to say**: Concise, Balanced, Detailed. Balanced is the default and adds nothing to the prompt. Concise and Detailed are one line in the system prompt, and only when that chat has no style of its own: a style replaces them.
+* **Reasoning**: Folded (open while it is written, closed after), Always open, or Hidden. The thinking text stays in the saved reply and is still not sent back as history. Hidden still shows "Writing" until the answer itself starts.
+
+`/memory`, an empty `/remember`, and the palette's Memory command open Settings → Memory. The sheet remains for a build without the React page.
+
 ## Not built
 
 * Knowledge: reference packs and fetched pages (each a download the person approves), and using the index in chat.
-* Rules and Memory as sections (they are dialogs today).
+* Rules as a section. Project rules are a file in the project folder (`AGENTS.md`, `.helix/rules.md`, `.cursorrules`), shown in the Tools sheet, not a Mobius setting.
 
 ## Model picker: one list with a switch each (built, from looking at Cursor's Models page)
 
 Cursor's Settings → Models is a single flat list: a box to "Add or search model", a refresh button, and every model with an on/off switch that decides whether it appears in the chat's model picker. Mobius's Models page is organised by *job* (chat, code, pictures...), which answers a different question, so the list is a new section next to it, **Model picker**:
 
-* One list of models on this computer, on the ChatGPT plan (when connected) and in the OpenRouter menu, each with a source tag and a switch; those switched on come first.
+* The page is titled **Models**, with the line "Choose which models appear in the model menu." **Task models** sits above the list and opens Tasks, where a model is chosen for a kind of work. One list of models on this computer, on the ChatGPT plan (when connected) and in the OpenRouter menu, each with a source tag and a switch; those switched on come first.
 * **Add or search model**: without a search only what is in the menu is listed; typing reaches the whole OpenRouter catalog (up to 30 matches) and a switch pins the model; a typed `vendor/model-name` offers **Add … from OpenRouter** (Enter adds it). The ↻ button refreshes the catalog.
 * Switching a local or ChatGPT model off removes it from the chat's menu (`picker.rs`, `picker-hidden.json`, keys `local:<file>` and `chatgpt:<id>`); it stays installed and can still be assigned to a job in Models, and the model a chat is using now is never hidden from its own menu. OpenRouter switches are the existing pins.
 * A link at the bottom leads to Models for "which model does which job", the equivalent of Cursor's Task Models block above its list.

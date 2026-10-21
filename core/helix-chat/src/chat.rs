@@ -562,6 +562,7 @@ impl Conversation {
                 .map(|m| m.wire_text().chars().count().saturating_sub(CONTEXT_CHARS))
                 .sum(),
             first_message: (start < end).then_some(start),
+            model_context_tokens: 0,
         }
     }
 
@@ -1066,6 +1067,9 @@ pub struct ContextInfo {
     pub budget_chars: usize,
     pub truncated_chars: usize,
     pub first_message: Option<usize>,
+    /// Loaded model context window in tokens, when the inference service or cloud catalog reports it (0 = unknown).
+    #[serde(default)]
+    pub model_context_tokens: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

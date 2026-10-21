@@ -76,10 +76,10 @@ From Cursor's documentation and reviews of Cursor 2.0 (I could not run Cursor he
 
 ### Order
 
-1. **Mode control**: done. A chip beside Send (Ask, Tools, Act) opens a menu; Shift+Tab cycles. Tools is the chat's own setting; Act is for the next message only, then the composer returns to what it was. The folder chip shows only while Tools are on; "Project folder…" is in the menu. `tools/nested/mobius-mode-test.sh`; the act and tools suites now switch mode first. Menus now stay inside the window (the mode menu ran off the right edge).
-2. **`@` pills**: done. Typing `@` before a word offers files from the chat's project folder (a bounded walk: text extensions only, no hidden or build folders, kept inside the folder, secrets refused as for any attachment) and other chats; choosing one adds a chip, the same chip as a picked file, which previews and removes. `tools/nested/mobius-mention-test.sh`. **The context ring** is still to do: it needs the loaded model's window from the inference service.
+1. **Mode control**: the composer is the open harness, in the same shape as Cursor. The chip beside Send is **Agent** (search, edit, and commands in the project folder; each step is reviewed, then the agent continues), **Ask** (answer only), **Plan** (a plan in the reply; nothing runs), and **Desktop** (the next message only, then the composer returns). In Plan, **Build** switches to Agent and sends “Build the plan above.” Shift+Tab cycles Agent → Ask → Plan → Desktop. A new chat still opens in Ask so a plain question does not start the tool loop. The folder chip shows while Agent is on. `tools/nested/mobius-mode-test.sh`.
+2. **`@` pills**: done. Typing `@` before a word offers files from the chat's project folder (a bounded walk: text extensions only, no hidden or build folders, kept inside the folder, secrets refused as for any attachment) and other chats; choosing one adds a chip, the same chip as a picked file, which previews and removes. `tools/nested/mobius-mention-test.sh`. **Context ring (2026-10-20):** the Context chip and panel show a ring against the model window when `GetSnapshot.contextTokens` (local) or the OpenRouter catalog (cloud route) is known; otherwise the recent-history character budget.
 3. **Checkpoints and the Changes panel** (trust in Tools and Act; needs the agent-desk snapshot).
-4. **Running indicators, `/side`, Plan**.
+4. **Running indicators, `/side`, Plan**. The open chat shows a working or waiting mark in the list. While a reply runs, the composer shows what it is doing (Writing, Searching, Running a command, Approve command). Plan and Build are in the mode control.
 5. **Auto with the decision lane**, which needs the `Embed` call.
 
 Not taken: cloud-first model pricing and usage pools; many cloud agents in worktrees (Mobius is one person's assistant on one computer); anything that sends text off the computer by default.
@@ -96,7 +96,7 @@ What each does that a local, private desktop assistant could use, and what we le
 | **Open WebUI / Ollama** | A server with a UI on top; models pulled by name; many connections | Helix has the service and the library. Not a model to follow; the lesson is that "add a model by name or URL" belongs in the library's first screen. |
 | **Raycast AI** | **Presets** (model, instructions, creativity and tools in one named thing, with a shared directory); **tools as `@` mentions** inside a message; **Quick AI** for a one-off question that continues in the chat | Mobius personas are close to presets: add the model and Tools mode to a persona so one click gives "Code reviewer on the 7B with the project folder". Tools as `@` mentions (`@web`, `@desktop`) would unify `@` with Tools and Act. A quick answer in the launcher that **opens in Mobius to continue** is a small bridge between the two. |
 | **Zed** | The agent panel next to the editor; **changes reviewed in one view with accept or reject per hunk**; an open protocol (ACP) so any agent can use its UI | The Changes panel (next on the list) should accept or reject per file and per hunk. The protocol idea matters: an agent from another program using Mobius's surface is the shape of Agent Surface already. |
-| **Warp** | Notifies you, in the app and on the desktop, when an agent needs approval, review or help | The shell's notifications already exist: an approval waiting for an agent task that is not on screen should raise one, with the action in it. |
+| **Warp** | Notifies you, in the app and on the desktop, when an agent needs approval, review or help | **Built (2026-10-20):** a tool waiting for review marks the chat in the sidebar (`chat-waiting`), shows a **show the chat** bar above the composer when you are on another view or the window is not focused, and raises a short desktop notice once per step through `mobius_notify`. |
 | **GNOME HIG, libadwaita** | Adaptive layouts (one design from phone to desktop width), patterns shown in a demo app rather than rules | Mobius's chat list already collapses below 720 px; every app should be looked at at that width (the nested harness cannot yet set it, see "Seen, not changed") and at the light theme. |
 
 ### Tools worth researching (what an assistant could call)
@@ -109,7 +109,7 @@ What each does that a local, private desktop assistant could use, and what we le
 ### Order of the next work
 
 1. Embeddings in Rust (`core/helix-embed`, done, no llama): routing, `@` by meaning and retrieval share it. The composer's Act offer uses it already.
-2. Context ring, Changes panel with per-hunk accept, checkpoints.
+2. Context ring (recent-history budget; model window from inference snapshot or cloud catalog when known), checkpoints; Changes per-hunk accept/reject (done; `mobius-edit-test.sh`).
 3. Model library: fits-on-this-machine, measured speed, add by name.
 4. Persona as preset (model plus Tools plus folder).
 
@@ -152,8 +152,7 @@ outside the folder.
 text files: 2,000 files, 512 KiB each, 30 MB, no hidden or build folders), so the card lists everything the turn changed whether an edit or a
 command did it: each file as added, modified or deleted, with its unified diff (cut at 8,000 characters) and **Revert** per file. A revert puts the
 file back only if it still holds what the turn left. `tools/nested/mobius-edit-test.sh` runs a command that adds and changes a file and reverts
-each. Still to do: accept or reject before a command runs (a command cannot be previewed, so this stays review-before-run plus revert-after), a
-restore of the whole turn in one click, and files the snapshot does not cover (binaries, large files, ignored folders).
+each. **Per-hunk review (2026-10-20):** when a modified file's unified diff has more than one `@@` hunk, each hunk shows **Accept this hunk** (`tools_accept_hunk`, keep only that group) and **Reject this hunk** (`tools_revert_hunk`, drop that group); the row and restore point refresh. Still to do: accept or reject before a command runs (review-before-run plus revert-after), a restore of the whole turn in one click, and files the snapshot does not cover (binaries, large files, ignored folders).
 
 **Checklist (done).** `{"type":"checklist","title":"…","items":["a",{"label":"b","done":true}]}`: up to 20 items with a progress bar and an "n of m" count. Ticks are the person's own and stay in this browser (keyed by the list's text, so they survive a reload and are lost harmlessly); "Tell Mobius where I am" sends "Done: …  Left: …" as a message when the person wants the model to know.
 
@@ -230,12 +229,16 @@ Tests: `mobius-welcome` and `mobius-web` open the "More ways to start" disclosur
 
 Second pass: the composer **glides** between the middle of the window and the bottom (a short decelerating move, skipped for people who ask for less motion), the message actions are quiet until the pointer is near, and the home, conversation and composer were reviewed in the **light theme** (they hold up). Found by the tests: the layout log did not describe the composer after the glide (it reported part-way), so it now reports once the move ends; and the layout log reports class changes too.
 
-Next for Chat: a quieter streaming state, the narrow window (the nested compositor cannot resize the page, so it is not yet reviewed).
+Next for Chat: the narrow window (the nested compositor cannot resize the page, so it is not yet reviewed).
 
-Third pass (composer and list): **"+"** at the left of the composer holds everything that adds to a message (Attach files, Add a picture, Create an image, Pick online sources), so the composer reads like Messages: a plus, the field, the microphone, the mode and Send. The microphone stays beside Send because it is the one that needs its recording state in view. The chat list rows now say **when** a chat was last touched (the time today, the weekday this week, the date after) and, when the title is not the first message, a line of what it began with; **Up, Down, Home and End** walk the list. `tools/nested/mobius-composer-test.sh`.
+Eighth pass (a quiet reply): before any words arrive the thread shows one soft mark and the word **Writing**, and once words arrive a thin caret follows them. The three bouncing dots are gone. The chat that is being written shows the same mark in the sidebar, in the row's own colour, so leaving the thread does not hide that it is still going. Reduced motion holds both still.
+
+Third pass (composer and list): **"+"** at the left of the composer holds everything that adds to a message (Attach files, Add a picture, Create an image, Pick online sources). The microphone stays beside Send because it is the one that needs its recording state in view. The chat list rows now say **when** a chat was last touched (the time today, the weekday this week, the date after) and, when the title is not the first message, a line of what it began with; **Up, Down, Home and End** walk the list. `tools/nested/mobius-composer-test.sh`.
 
 Fourth pass (editing where it is): **renaming a chat** is the title itself turning into a field (Enter keeps it, Escape puts it back, leaving the field keeps it), and **editing a message** is the bubble turning into a box with the text in it (Enter sends, Shift+Enter breaks the line, Escape puts it back; "Replies after this message are replaced"). Neither opens a sheet any more, so what you edit never leaves the screen it is on. The sheets stay in the code for the fallback page. `mobius-dialogs` and `mobius-pictures` cover both.
 
 Fifth pass (switching models, where it matters): a **▾ beside Regenerate** opens "Redo this reply with…" with each installed model (size, whether it sees pictures, ready now or loads first, the speed measured here) and, with OpenRouter set up, a few cloud ones marked as leaving the computer. The reply is redone with that model **for that reply only**: the chat keeps the model it has, the new reply says which model wrote it, and the old one is replaced, so two models can be compared by trying them in turn. `once_route` in `main.rs`, `regenerate.tsx`, `tools/nested/mobius-regen-test.sh`. 
+
+Seventh pass (one agent box): the composer is a single card, the way Cursor, Claude and ChatGPT put the message above its controls. The field is the top of the card. The footer holds **+**, the mode, the model (with a menu mark), Tools when it is on, **⋯**, the microphone and Send. The chip row above the card is gone; a queued follow-up still sits above it. `data-test` names are unchanged.
 
 Sixth pass (comparing answers): when a reply is redone, **the one it replaces is kept** (up to three, in a small file beside the transcript, never sent to a model), and **Compare** appears under the latest reply: the current answer on the left, another on the right (arrows when there are more), each with the model, the tokens and the speed, and **Keep this one** on either. Keeping the other swaps it in and keeps the one it replaced, so a choice can be changed back. An answer is only shown against the question it answered (editing the question hides the old alternatives). `alternates.rs` (unit tested), `compare.tsx`, `mobius-regen-test.sh`.

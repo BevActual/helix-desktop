@@ -41,6 +41,17 @@ undo (the same rule as `edit_file` and charts):
 What the model sees of the stage is explicit and visible: a chip above the composer ("Plan, document · 1,240 characters") that can be removed,
 the same attachment mechanism `@` uses.
 
+## Core workspace backlog (2026-10-20)
+
+| Item | Status |
+|---|---|
+| Write toolbar → `stage_apply` | Done (`workpanel.tsx`, `mobius-write-test.sh`) |
+| Changes per-hunk accept/reject | Done (`tools_accept_hunk`, `mobius-edit-test.sh`) |
+| Context ring | Done for local + cloud: ring uses recent-history budget until `GetSnapshot.contextTokens` or the OpenRouter catalog reports a model window (~4 chars/token) |
+| Knowledge citations | Done for v1: reply `From your files · n`, composer preview chips (`knowledge_peek`, respects Settings), `mobius-knowledge-test.sh` for attach-at-send |
+| Region image ops | Done for v1: `blur_region`, `brightness_region`, `contrast_region` + contextual bar; `mobius-image-test.sh` exercises region blur |
+| Parallel agent tasks | **Deferred:** needs a second inference slot and project-folder conflict rules (`mobius-workspaces.md` Code tasks) |
+
 ## Order of work
 
 1. **The stage and the Document stage** (first slice, below): panel, layout presets, `artifact` blocks, versions, the open document goes to the
@@ -64,9 +75,9 @@ per chat); `workpanel.tsx` is the panel; `tools/nested/mobius-stage-test.sh` run
 * **The switcher**: "Chat ▾" in the header (Write and Code, with Image, Design and Browse listed as planned), and "Workspace: …" in the palette. Switching closes the other stage, and a different chat starts in Chat again.
 * **Write** opens the Document stage ("Untitled" if the chat has no document yet).
 * **Code** shows the chat's project folder beside the conversation: a filterable file list (text files, bounded, no hidden or build folders), a viewer with line numbers (first 3,000 lines, same boundary as the edit tool), and the files the last turn changed marked with their kind. A changed file shows its **diff** with **Revert this change** instead of its text. The file in view goes to the model with the next message as the same visible chip a document uses. Without a project folder the stage offers to choose one.
-* `code_tree` and `code_read` in `main.rs`, `codestage.tsx`, `tools/nested/mobius-code-test.sh` (open Code, list files, view one, the chip, a turn's edit shows as marked with its diff, revert from the stage).
+* `code_tree`, `code_read` and `code_search` in `main.rs`, `codestage.tsx`, `tools/nested/mobius-code-test.sh` (open Code, list files, view one, the chip, a turn's edit shows as marked with its diff, revert from the stage).
 
-Still to do for Code: a real folder tree (it is a flat list with the folder in grey), editing in the viewer through the same reviewed `edit_file` path, the terminal and test output on the stage, and search across files.
+The file list is a tree: folders come first and collapse, and opening a file opens the folders above it. A filter still lists matching files flat, with the folder in grey. **Edit** turns the viewer into a text box for the whole file (files longer than the 3,000-line view stay read-only). Nothing is written until **Review change** shows the diff and **Accept** saves it through the same restore point as `edit_file` (Undo on the stage puts it back; a file that changed underneath is left alone). Opening another file, or closing the stage from its own button, waits until that edit is accepted or cancelled. Two or more characters in the filter also search inside those files (`code_search`): up to three lines a file and forty in all, skipping hidden folders, links and credential files. A match opens the file and scrolls to the line. A **Terminal** tab beside Files and Tasks mirrors the latest command's live output from the chat (the same stream the step card uses). **Open** on a line in the Changes card jumps to that file on the Code stage. Still to do for Code: test output on the stage. On the Changes card, a modified file with multiple `@@` hunks shows **Accept this hunk** (keep only that group) and **Reject this hunk** (drop that group).
 
 ## Modes as places in the sidebar (built, after looking at ChatGPT, Claude and Muse)
 
@@ -103,7 +114,7 @@ Not done: moving a chat to a project from the page (the chat header still does i
 ## The Image stage (built, first set of operations)
 
 * **A place** ("Image" in the sidebar, the workspace menu, the palette) and **Edit** on any picture in a chat. A picture opens beside the chat; "Open a picture…" uses the system picker. `imagestage.tsx`, `imagestage.rs`, `imageops.rs`.
-* **Edits are descriptions, not code.** A fixed set (`Op`): crop, resize (percent or size), rotate (90, 180, 270), flip, brightness, contrast, black and white, invert, blur, sharpen, rectangle. Each is checked against the picture (nothing outside it, nothing out of range, up to 8,192 pixels a side, unknown fields refused) and applied by deterministic code with the `image` crate to a **copy**: every step is a new stored picture, the original is never written, and Undo, Redo and clicking a step in the history are only a position in the list (up to 30 steps per picture, 20 pictures per chat).
+* **Edits are descriptions, not code.** A fixed set (`Op`): crop, resize (percent or size), rotate (90, 180, 270), flip, brightness, contrast, black and white, invert, blur, sharpen, rectangle, and region-only blur/brightness/contrast (`blur_region`, `brightness_region`, `contrast_region`). Each is checked against the picture (nothing outside it, nothing out of range, up to 8,192 pixels a side, unknown fields refused) and applied by deterministic code with the `image` crate to a **copy**: every step is a new stored picture, the original is never written, and Undo, Redo and clicking a step in the history are only a position in the list (up to 30 steps per picture, 20 pictures per chat).
 * **Drag on the picture** to select an area, then "Crop to selection" or "Draw it" (a rectangle in the chosen colour); buttons and sliders for the rest; **Save as…** writes PNG, JPEG or WebP with the system dialog, never over an existing file.
 * **The model proposes in the same language.** A reply's fenced `imageops` block (a JSON list of up to ten of those descriptions) is drawn as a card, "Suggested picture edits", and **nothing is applied until the person accepts**: the card's *Preview on the picture* shows the result right on the canvas (`imgstage_preview` renders it without storing anything), with a checkbox per edit, and **Accept** (Ctrl+Enter) applies the chosen ones to the picture on the stage as steps they can undo, tagged Mobius; **Reject** (Esc) drops them. "Ask Mobius about this" sends a copy of the picture as it stands to the vision model with the next message.
 * Tests: five unit tests for the operations (bounds, injection-shaped JSON, the original untouched, PNG/JPEG round trip); `tools/nested/mobius-image-test.sh`.
@@ -133,7 +144,7 @@ What Mobius took:
 * **A bar on the selection in a document**: select three or more characters and a bar offers Improve, Shorter, Longer, Simplify and Fix grammar, plus a free instruction (Ctrl+I, as in Copilot and Zed). The answer is a **proposed change shown old and new** that nothing writes until **Enter** accepts it; **Esc** rejects it. It is accepted as the person's own edit (a new version), and refused if the text changed while the model worked. It uses the model on this computer only (a selection is private text), and takes off the quotes, fences and thinking small models wrap around an answer. `inline.rs` (unit tested), `workpanel.tsx`, `tools/nested/mobius-inline-test.sh`.
 * Found on the way: the document box could not select text at all (the window turns `user-select` off for everything and the textarea had not turned it back on).
 
-**Code, too (built):** in the Code stage, click or drag over line numbers (shift-click extends) and a bar appears with Simplify, Add comments, Fix bug, Make it idiomatic and a free instruction. The model gets the file with the selected lines marked and about 40 lines of context each way, and returns the replacement for those lines only; the answer is a diff, **Enter** applies it (as a restore point the stage's **Undo** puts back, the same one `edit_file` uses), **Esc** rejects it. It refuses when the lines changed since the suggestion, and shares the file boundary of the edit tool (inside the folder, not hidden, not credentials). `inline.rs`, `codestage.tsx`, `tools/nested/mobius-code-test.sh`.
+**Code, too (built):** in the Code stage, click or drag over line numbers (shift-click extends) and a bar appears with Simplify, Add comments, Fix bug, Make it idiomatic and a free instruction. The model gets the file with the selected lines marked and about 40 lines of context each way, and returns the replacement for those lines only; the answer is a diff, **Enter** applies it (as a restore point the stage's **Undo** puts back, the same one `edit_file` uses), **Esc** rejects it. It refuses when the lines changed since the suggestion, and shares the file boundary of the edit tool (inside the folder, not hidden, not credentials). The same restore point covers a change the person types themselves: **Edit**, then **Review change**, then **Accept**. `inline.rs`, `codestage.tsx`, `tools/nested/mobius-code-test.sh`.
 
 Next, from the same research: the same idea for the **Image** (the Contextual Task Bar idea: a selection shows the actions that fit it, Crop, Rectangle, Blur, "Describe this", beside it instead of in a toolbar far away), Apple's output shapes (summarize as key points, a list or a table), and the AI browsers' pattern for a **Browse stage**: the assistant reads the page beside it, and acts only with approval.
 
@@ -174,7 +185,7 @@ The direction from the person: each mode should grow into the kind of environmen
 
 The Document stage now has its operation list, `docops.rs`: `replace` (one passage, or `all`), `delete`, `insert_after` (after the line holding an anchor), `replace_section` (everything under a heading up to the next one of the same or higher level; headings inside code fences do not count) and `append`. Each is checked against the text (the passage must exist and be the only one unless `all` is said; unknown operations and fields are refused; at most 10 edits of 20,000 characters), applied all or nothing, and recorded as a new version, so Undo is History. A reply's fenced `docops` block (a JSON list) is drawn as a card, "Suggested document edits", listing each edit in words, with **Review in the document**: the edits open as a pending change *on the page* (`stage_preview` computes the result without recording it): each edit has a checkbox, the diff shows what the ones left on would do, **Accept** (Ctrl+Enter) applies them as one new version and **Reject** (Esc) drops them. **Nothing changes until Accept.** The open document is sent to the model with a short note on this format, so small changes come back as edits instead of a whole rewrite. `stage_apply` takes the same list from any caller, which is what the toolbar and, later, outside agents will use. Tests: six unit tests (`cargo test docops`) and `tools/nested/mobius-docops-test.sh`.
 
-Not done: the toolbar and the selection bar going through `stage_apply` (they still write whole text through the editor), margin comments and suggestions as operations, and attributing versions to a named bot.
+Not done: margin comments and suggestions as operations, and attributing versions to a named bot. The Write toolbar, shortcuts, slash inserts, and find-and-replace go through `stage_apply` as `docops` replace/append operations. Typing debounces to `stage_record`. **Accepted selection suggestions** (Ask on the selection) record the full document as a **person** version via `stage_record` so repeated lines in the draft cannot block a unique `replace` (toolbar edits still prefer `stage_apply` when the ops are unambiguous).
 
 ## The chat shapes itself to the mode (research, 2026-10-18)
 
@@ -223,14 +234,25 @@ From the person's note after looking at Cursor: the panes should be **resizable 
 
 Not done: splitting the work area itself (two stages side by side, for a document and the picture it uses), tearing a pane off into its own window, and a saved layout per project. Next: the Margin and Task bar presentations.
 
+### A sidebar that folds, and tabs for the open views (built)
+
+From the person's note after looking at Cursor's window: the conversation list can fold away, and each kind of work is a tab you can leave open.
+
+* **Fold.** The sidebar button in the chat header (the same one that opens the drawer on a narrow window) folds the sidebar to an icon rail at 720 px and wider: the places stay, one icon each, and the chat list hides. It is remembered. Below 720 px it is still the drawer.
+* **Tabs.** Chat, Write, Image and Code are tabs under the header once a second one is open. Opening a place adds its tab; closing a tab leaves Chat, which stays. The open set is remembered for the session. The sidebar rows and the workspace menu still switch the same places.
+
+### Tools, from ArtCraft and Warp (2026-10-19)
+
+ArtCraft's crafting apps (PhotoCraft, VectorCraft, WordCraft and the rest) make every control a named command, and the same command is what a person presses and what an agent may call. Warp's agent runs in a real terminal and waits before a command runs. Mobius already kept one operation list per stage. The Tools sheet now names that list for the place you are in (Write, Image or Code), and says that a terminal command always waits and can be stopped. The research tools stay the switch above it.
+
 ### Code: tasks and Follow (built)
 
 The Code stage's side column has two tabs, **Files** and **Tasks**. Every request in the chat is a task (`codeTasks()` in `chat.js`, from the messages and their activities): newest first, with a state (**Running**, **Needs you** with a ringed row while the agent waits for an approval, **Failed**, **Done**), the request's first line, and "3 steps · 1 file changed". Clicking one scrolls the conversation to that request. A pulsing dot on the tab shows something is running. **Follow** (header, remembered, off by default as in Zed) opens in the viewer each file the agent touches while it works, taken from the newest step that names a file of the project. `tools/nested/mobius-tasks-test.sh` runs the fake agent and checks Needs you, Done and Follow.
 
-Not done: tasks that run in parallel (one chat is still one turn at a time), a task opening to its own thread, and terminal output as a task of its own.
+Not done: tasks that run in parallel (one chat is still one turn at a time — the composer queue holds follow-ups, but a second agent turn needs a separate inference slot and conflict rules on the project folder; deferred until that contract is designed), a task opening to its own thread, and terminal output as a task of its own.
 
 ### Image: a prompt bar that follows the selection (built)
 
 Drag a rectangle on the picture (Crop or Box tool) and a small bar appears beside it: **Describe**, **Read the text**, and a field, "Ask about this area…" (Enter sends, Esc clears the selection). The area is copied as a picture of its own (`imgstage_region`; the document is untouched) and goes to the vision model with the question as a normal message, so the answer lands in the chat. The idea is Photoshop's Contextual Task Bar and AI Markup: the prompt is where the person is looking. It asks *about* an area; edits still come from the toolbar or the model's previewed suggestions, because the edit operations apply to the whole picture except crop and box. Tests: `tools/nested/mobius-image-test.sh`.
 
-Not done: editing *within* an area (blur this part, brighten that), which needs region-aware operations in `imageops.rs`; then the same bar can offer them and the model can suggest them with coordinates.
+**Region edits (2026-10-20):** `blur_region`, `brightness_region`, and `contrast_region` in `imageops.rs` change only the selected rectangle; the contextual bar offers **Blur area**, **Brighten area**, and **More contrast**, and models can suggest the same ops with `x`, `y`, `w`, `h`. Not done: every global adjust as a region op, or feathered masks.

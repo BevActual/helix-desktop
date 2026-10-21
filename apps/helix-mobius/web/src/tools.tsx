@@ -1,6 +1,41 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
-interface Snapshot { id: string; tools_enabled: boolean; workspace: string; streaming: boolean }
+interface Snapshot { id: string; tools_enabled: boolean; workspace: string; streaming: boolean; craft?: string }
+/** Named operations of one craft. The buttons a person presses and the steps a model proposes are this same list. A terminal command always waits, the way a terminal agent does. */
+const CRAFTS: Record<string, { title: string; note: string; tools: [string, string][] }> = {
+  write: {
+    title: "Write",
+    note: "Suggestions land on the document. Nothing changes until you accept.",
+    tools: [
+      ["Replace", "One passage, or every copy of it"],
+      ["Delete", "Remove a passage"],
+      ["Insert", "Add text after a line"],
+      ["Replace section", "Rewrite everything under a heading"],
+      ["Append", "Add to the end"],
+    ],
+  },
+  image: {
+    title: "Image",
+    note: "Suggestions are previewed on the picture. The original stays one undo away.",
+    tools: [
+      ["Crop", "Keep a rectangle"],
+      ["Resize", "By percent or by size"],
+      ["Rotate", "Quarter turns"],
+      ["Flip", "Left to right, or top to bottom"],
+      ["Adjust", "Brightness, contrast, black and white, blur, sharpen"],
+      ["Box", "Draw a rectangle in a chosen colour"],
+    ],
+  },
+  code: {
+    title: "Code",
+    note: "A file edit shows its diff first. A command runs only after you allow it, and only inside the project folder.",
+    tools: [
+      ["Read", "The file in view goes with your next message"],
+      ["Edit", "Replace one exact passage, then undo if the file is unchanged since"],
+      ["Terminal", "A command in the folder. No network, no home folder. Always asks"],
+    ],
+  },
+};
 export interface ToolsHandle { open: (view: Snapshot) => void }
 export function ChatTools({ register }: { register: (handle: ToolsHandle) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -33,7 +68,12 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
         <pre>{rules.text}</pre>
         <p className="sheet-note">The project's own guidance for assistants. Tools mode follows it as guidance; every command and edit still waits for your review.</p>
       </details>}
-      <p className="sheet-note">Commands can read and change this folder. They get no network, home folder or desktop session. Tool results are sent to the chat model.</p>
+      <p className="sheet-note">Commands can read and change this folder. They get no network, home folder or desktop session. Tool results are sent to the chat model. A terminal command always waits for you, and you can stop it while it runs.</p>
+      {CRAFTS[view?.craft || ""] && <section className="craft-tools" data-test="craft-tools">
+        <h4>{CRAFTS[view?.craft || ""].title}</h4>
+        <p className="sheet-note">{CRAFTS[view?.craft || ""].note}</p>
+        <ul>{CRAFTS[view?.craft || ""].tools.map(([name, about]) => <li key={name}><strong>{name}</strong><span>{about}</span></li>)}</ul>
+      </section>}
       <details className="tools-desk">
         <summary>Agent desk</summary>
         <p className="sheet-note">Desktop changes still use Act. With agent-desk placement on, the first approved command also opens a terminal there.</p>
