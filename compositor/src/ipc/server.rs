@@ -472,6 +472,7 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             display_profiles: true,
             summon: true,
             input_settings: true,
+            look_settings: true,
         }),
         Request::HelixSaveDisplayProfile
         | Request::HelixApplyDisplayProfile
@@ -510,6 +511,27 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                 .await
                 .map_err(|_| String::from("input settings query failed"))?;
             Response::HelixInput(input)
+        }
+        Request::HelixLook => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_look());
+            });
+            let look = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("look settings query failed"))?;
+            Response::HelixLook(look)
+        }
+        Request::HelixSetLook(change) => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_set_look(change));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("look settings change failed"))??;
+            Response::Handled
         }
         Request::HelixSetInput(change) => {
             let (tx, rx) = async_channel::bounded(1);

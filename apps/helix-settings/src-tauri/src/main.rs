@@ -7,6 +7,7 @@ mod about;
 mod datetime;
 mod defaults;
 mod input;
+mod look;
 mod wallhaven;
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1482,6 +1483,12 @@ async fn accent_set(name: String) -> Result<(), String> {
         .update_setting("theme.accent", &serde_json::json!(name))
         .await
         .map_err(|error| error.to_string())?;
+    // The ring around the focused window follows the accent (nothing happens on another compositor).
+    if let Some(ring) = look::accent_ring(&name) {
+        if helix_compositor::compositor_ipc::look_settings().is_some() {
+            let _ = helix_compositor::compositor_ipc::set_look_settings(&ring);
+        }
+    }
     eprintln!("SETTINGS accent {name}");
     Ok(())
 }
@@ -1519,6 +1526,22 @@ fn pointer_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>,
 fn typing_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     send_input(&id, &change)?;
     Ok(typing_rows())
+}
+
+/// How things look: animations, gaps, cursor size. Empty when the compositor cannot change them (it is not the Helix one).
+#[tauri::command]
+fn look_rows() -> Vec<RowView> {
+    helix_compositor::compositor_ipc::look_settings()
+        .map(|look| look::look_rows(&look))
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn look_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let request = look::parse_change(&id, &change)?;
+    helix_compositor::compositor_ipc::set_look_settings(&request)?;
+    eprintln!("SETTINGS look {id}");
+    Ok(look_rows())
 }
 
 /// What the desktop service last said about finding the place by itself (it writes this next to the other state files).
@@ -2634,6 +2657,8 @@ fn main() {
             defaults_rows,
             defaults_change,
             pointer_rows,
+            look_rows,
+            look_change,
             pointer_change,
             typing_rows,
             typing_change,

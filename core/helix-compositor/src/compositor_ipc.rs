@@ -35,6 +35,17 @@ pub struct InputSettings {
     pub keyboard_layout: Option<String>,
 }
 
+/// How things look, as far as the compositor lets Settings change it (`HelixLook`). In what it reports every field is set; in a change only the set
+/// fields are applied.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct LookSettings {
+    pub animations: Option<bool>,
+    pub window_gaps: Option<u16>,
+    pub cursor_size: Option<u8>,
+    /// `#rrggbb`.
+    pub focus_color: Option<String>,
+}
+
 /// What had the keyboard when Mobius was summoned (`helix-summon`): only what the compositor lists about every window.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SummonContext {
@@ -58,6 +69,9 @@ pub struct HelixCaps {
     /// `HelixInput` and `HelixSetInput`.
     #[serde(default)]
     pub input_settings: bool,
+    /// `HelixLook` and `HelixSetLook`.
+    #[serde(default)]
+    pub look_settings: bool,
 }
 
 pub fn request_json(line: &str) -> Option<Value> {
@@ -132,6 +146,18 @@ pub fn input_settings() -> Option<InputSettings> {
 /// Changes the set fields now; the compositor remembers them and applies them again whenever its configuration is loaded.
 pub fn set_input_settings(change: &InputSettings) -> Result<(), String> {
     let line = serde_json::json!({ "HelixSetInput": change }).to_string();
+    request_result(&line).map(|_| ())
+}
+
+/// The look settings in effect (`None` when the compositor cannot say).
+pub fn look_settings() -> Option<LookSettings> {
+    let ok = request_json("\"HelixLook\"")?;
+    serde_json::from_value(ok.get("HelixLook")?.clone()).ok()
+}
+
+/// Changes the set fields now; remembered, and applied again whenever the compositor's configuration is loaded.
+pub fn set_look_settings(change: &LookSettings) -> Result<(), String> {
+    let line = serde_json::json!({ "HelixSetLook": change }).to_string();
     request_result(&line).map(|_| ())
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke, type RowView } from "@helix/ui";
+import { invoke, RowGroups, type Change, type RowView } from "@helix/ui";
 import { RowsPage, type PageHandle, type PageSpec } from "./RowsPage";
 
 const ACCENTS: [string, string][] = [["blue", "Blue"], ["purple", "Purple"], ["pink", "Pink"], ["red", "Red"], ["orange", "Orange"], ["yellow", "Yellow"], ["green", "Green"], ["graphite", "Graphite"]];
@@ -30,6 +30,21 @@ function AccentRow({ report }: { report: (text: string) => void }) {
         </div>
       </div>
     </>
+  );
+}
+
+/** Animations, gaps and cursor size, which the Helix compositor holds. Nothing is drawn on another compositor. */
+function LookRows({ report }: { report: (text: string) => void }) {
+  const [rows, setRows] = useState<RowView[]>([]);
+  useEffect(() => { invoke<RowView[]>("look_rows").then(setRows, () => undefined); }, []);
+  if (rows.length === 0) return null;
+  const change = (id: string, next: Change) => {
+    invoke<RowView[]>("look_change", { id, change: next }).then(setRows, (error) => report(`${id}: ${String(error)}`));
+  };
+  return (
+    <div data-test="look-rows">
+      <RowGroups rows={rows} onChange={change} />
+    </div>
   );
 }
 
@@ -71,6 +86,7 @@ export function AppearancePage({
     <>
       <RowsPage spec={spec} initialRows={initialRows} register={register} onRows={onRows} report={report} />
       <AccentRow report={report} />
+      <LookRows report={report} />
       <div className="setting-about">
         <button className="primary" type="button" data-test="greeter-sync" disabled={busy} onClick={sync}>
           Sync login screen

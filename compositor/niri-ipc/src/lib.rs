@@ -140,6 +140,11 @@ pub enum Request {
     /// Helix: change pointer and keyboard settings. Only the fields that are `Some` change; they take effect at once, are remembered, and are applied
     /// again whenever the configuration is loaded.
     HelixSetInput(HelixInput),
+    /// Helix: how things look in effect now (the overrides Settings made, over `config.kdl`).
+    HelixLook,
+    /// Helix: change how things look: animations, the gap between windows, the cursor size and the colour of the focus ring. Only the `Some` fields change; they
+    /// take effect at once, are remembered, and are applied again whenever the configuration is loaded.
+    HelixSetLook(HelixLook),
     /// Helix: the window that had the keyboard when `helix-summon` was last used, once. Empty when it was never used, was a minute ago or
     /// more, or was already taken.
     HelixSummonContext,
@@ -199,6 +204,26 @@ pub enum Response {
     HelixSummonContext(Option<HelixSummonContext>),
     /// Helix pointer and keyboard settings.
     HelixInput(HelixInput),
+    /// Helix look settings.
+    HelixLook(HelixLook),
+}
+
+/// The look settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixLook {
+    /// Whether windows and workspaces animate.
+    #[serde(default)]
+    pub animations: Option<bool>,
+    /// Logical pixels between windows and the screen's edge, 0 to 64.
+    #[serde(default)]
+    pub window_gaps: Option<u16>,
+    /// The cursor's size in pixels, 16 to 64.
+    #[serde(default)]
+    pub cursor_size: Option<u8>,
+    /// The colour of the ring around the focused window, `#rrggbb`.
+    #[serde(default)]
+    pub focus_color: Option<String>,
 }
 
 /// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.
@@ -295,6 +320,9 @@ pub struct HelixCapabilities {
     /// Whether `HelixInput` and `HelixSetInput` are available.
     #[serde(default)]
     pub input_settings: bool,
+    /// Whether `HelixLook` and `HelixSetLook` are available.
+    #[serde(default)]
+    pub look_settings: bool,
 }
 
 /// State of the Helix agent desk workspace.

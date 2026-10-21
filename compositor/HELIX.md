@@ -132,3 +132,7 @@ debug {
 ```
 
 recompiles the fragment shader from that file on every config load (touch `config.kdl` to reload). A shader that fails to compile logs a warning and leaves the previous program in place. Remove the key for release.
+
+## Look settings
+
+`HelixLook` reports and `HelixSetLook` changes animations (on or off), `window_gaps` (0 to 64), `cursor_size` (16 to 64) and `focus_color` (`#rrggbb`, which recolours the focus ring and the window border). Only the fields that are set change. They are overrides, like `HelixInput`: kept in `$XDG_STATE_HOME/helix/look-overrides.json`, applied over `config.kdl` at start (`main.rs`) and in `reload_config`, and applied at once when set (`src/helix/look.rs`). Advertised as `look_settings` in `HelixCapabilities`.
