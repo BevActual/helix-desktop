@@ -9,6 +9,7 @@ mod defaults;
 mod input;
 mod look;
 mod powerprofile;
+mod startup;
 mod topbar;
 mod wallhaven;
 
@@ -1549,6 +1550,33 @@ fn typing_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, 
     Ok(typing_rows())
 }
 
+/// Startup apps: what starts at login, from the autostart folders.
+#[tauri::command]
+fn startup_rows() -> Vec<RowView> {
+    let Some(user) = startup::user_dir() else {
+        return Vec::new();
+    };
+    let entries = startup::read(&user, &startup::system_folders());
+    let addable = startup::installed(&startup::app_folders());
+    startup::rows(&entries, &addable)
+}
+
+#[tauri::command]
+fn startup_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let user = startup::user_dir().ok_or("no folder for the settings")?;
+    match startup::parse_change(&id, &change)? {
+        startup::Edit::Enable(entry, on) => {
+            startup::set_enabled(&user, &startup::system_folders(), &entry, on)?;
+            eprintln!("SETTINGS startup {entry} {}", if on { "on" } else { "off" });
+        }
+        startup::Edit::Add(app) => {
+            startup::add(&user, &startup::app_folders(), &app)?;
+            eprintln!("SETTINGS startup added {app}");
+        }
+    }
+    Ok(startup_rows())
+}
+
 /// The Top bar page: which parts of the bar are shown, kept in a file the shell watches.
 #[tauri::command]
 fn topbar_rows() -> Vec<RowView> {
@@ -2768,6 +2796,8 @@ fn main() {
             pointer_rows,
             look_rows,
             topbar_rows,
+            startup_rows,
+            startup_change,
             topbar_change,
             look_change,
             pointer_change,

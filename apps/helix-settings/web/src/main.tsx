@@ -49,6 +49,12 @@ const specs: Record<string, PageSpec> = {
     load: () => invoke<RowView[]>("dock_rows"),
     change: (id, change) => invoke<RowView[]>("dock_change", { id, change }),
   },
+  startup: {
+    load: () => invoke<RowView[]>("startup_rows"),
+    change: (id, change) => invoke<RowView[]>("startup_change", { id, change }),
+    empty: "Nothing starts when you log in.",
+    note: "These start the next time you log in. Turning one off keeps it on the list, and a program from the system is never changed.",
+  },
   topbar: {
     load: () => invoke<RowView[]>("topbar_rows"),
     change: (id, change) => invoke<RowView[]>("topbar_change", { id, change }),

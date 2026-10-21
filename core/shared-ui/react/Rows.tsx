@@ -79,7 +79,7 @@ export function ChoiceList({ id, options, current, onChange }: { id: string; opt
   const [open, setOpen] = useState(false);
   const [needle, setNeedle] = useState("");
   const shown = options.filter((o) => !needle || `${o.label} ${o.value}`.toLowerCase().includes(needle.toLowerCase())).slice(0, 80);
-  const label = options.find((o) => o.value === current)?.label ?? current;
+  const label = options.find((o) => o.value === current)?.label ?? (current || "Choose…");
   return (
     <div className="choice-list">
       <button type="button" className="choice-current" aria-expanded={open} data-test={`set-${id}`} onClick={() => setOpen(!open)}>{label}<span aria-hidden="true"> ▾</span></button>
@@ -112,7 +112,7 @@ export function Row({ row, onChange }: { row: RowView; onChange: (id: string, ch
       {control.kind === "slider" && (
         <Slider id={row.id} min={control.min} max={control.max} integer={control.integer} value={control.value} onCommit={(value) => onChange(row.id, { kind: "number", value })} />
       )}
-      {control.kind === "choice" && (control.options.length > 6
+      {control.kind === "choice" && (control.options.length > 6 || control.current === ""
         ? <ChoiceList id={row.id} options={control.options} current={control.current} onChange={(value) => onChange(row.id, { kind: "choice", value })} />
         : <Segments id={row.id} options={control.options} current={control.current} onChange={(value) => onChange(row.id, { kind: "choice", value })} />)}
       {control.kind === "text" && <div className="setting-value">{control.value}</div>}
