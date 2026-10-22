@@ -9,9 +9,80 @@ use std::collections::HashMap;
 
 const MAX_LIVE: usize = 3;
 
+/// The person's answer to a question: yes or no, and for a yes whether to remember it ("always allow this").
+#[derive(Clone, Copy)]
+struct Answer {
+    approved: bool,
+    always: bool,
+}
+
+/// What the person chose to always allow in a project folder, so the next task there starts with it.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct Remembered {
+    allow_commands: Vec<String>,
+    auto_edits: bool,
+    apps: Vec<String>,
+}
+type FolderMemory = std::collections::BTreeMap<String, Remembered>;
+
+fn folder_memory_path() -> std::path::PathBuf {
+    crate::data_home().join("helix/mobius/folder-policy.json")
+}
+fn read_folder_memory() -> FolderMemory {
+    std::fs::read(folder_memory_path())
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+/// Writes down what a task's policy now allows for its folder.
+fn remember(policy: &helix_task::Policy) {
+    if policy.folder.is_empty() {
+        return;
+    }
+    let mut all = read_folder_memory();
+    if all.len() > 200 && !all.contains_key(&policy.folder) {
+        return;
+    }
+    let entry = all.entry(policy.folder.clone()).or_default();
+    for command in &policy.allow_commands {
+        if !entry.allow_commands.contains(command) && entry.allow_commands.len() < 60 {
+            entry.allow_commands.push(command.clone());
+        }
+    }
+    entry.auto_edits |= policy.auto_edits;
+    for app in &policy.apps {
+        if !entry.apps.contains(app) && entry.apps.len() < 30 {
+            entry.apps.push(app.clone());
+        }
+    }
+    let path = folder_memory_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&path, serde_json::to_vec_pretty(&all).unwrap_or_default());
+}
+/// A new task in a folder starts with what the person already said yes to there.
+fn recall(policy: &mut helix_task::Policy) {
+    let Some(entry) = read_folder_memory().remove(&policy.folder) else {
+        return;
+    };
+    for command in entry.allow_commands {
+        if !policy.allow_commands.contains(&command) {
+            policy.allow_commands.push(command);
+        }
+    }
+    policy.auto_edits |= entry.auto_edits;
+    for app in entry.apps {
+        if !policy.apps.contains(&app) {
+            policy.apps.push(app);
+        }
+    }
+}
+
 struct Live {
     cancel: watch::Sender<bool>,
-    pending: Option<oneshot::Sender<bool>>,
+    pending: Option<oneshot::Sender<Answer>>,
 }
 #[derive(Default)]
 pub struct Background {
@@ -48,7 +119,7 @@ impl Background {
             None => false,
         }
     }
-    fn waiting(&self, id: &str) -> Result<oneshot::Receiver<bool>, String> {
+    fn waiting(&self, id: &str) -> Result<oneshot::Receiver<Answer>, String> {
         let mut live = self.live.lock().expect("background tasks");
         let run = live
             .get_mut(id)
@@ -58,14 +129,14 @@ impl Background {
         run.pending = Some(sender);
         Ok(receiver)
     }
-    fn review(&self, id: &str, approved: bool) -> Result<(), String> {
+    fn review(&self, id: &str, answer: Answer) -> Result<(), String> {
         let mut live = self.live.lock().expect("background tasks");
         let sender = live
             .get_mut(id)
             .and_then(|r| r.pending.take())
             .ok_or("That task is not waiting for you.")?;
         sender
-            .send(approved)
+            .send(answer)
             .map_err(|_| "The task ended before your answer.".to_string())
     }
 }
@@ -107,6 +178,9 @@ pub async fn agent_task_start(
     if practice == Some(true) {
         policy.mode = helix_task::Mode::Practice;
         policy.name = "Practice run".into();
+    }
+    if policy.mode == helix_task::Mode::Enforce {
+        recall(&mut policy);
     }
     policy.network = network == Some(true) && !policy.folder.is_empty();
     if !policy.allows_model(model.local) {
@@ -215,8 +289,19 @@ pub fn agent_task_stop(app: AppHandle, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn agent_task_review(app: AppHandle, id: String, approved: bool) -> Result<(), String> {
-    app.state::<Background>().review(&id, approved)
+pub fn agent_task_review(
+    app: AppHandle,
+    id: String,
+    approved: bool,
+    always: Option<bool>,
+) -> Result<(), String> {
+    app.state::<Background>().review(
+        &id,
+        Answer {
+            approved,
+            always: approved && always == Some(true),
+        },
+    )
 }
 
 async fn run(app: AppHandle, id: String, mut cancel: watch::Receiver<bool>) {
@@ -265,6 +350,7 @@ async fn ask_person(
     store: &Store,
     reason: &str,
     input: &str,
+    action: Option<&helix_task::Action>,
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<bool, String> {
     let receiver = app.state::<Background>().waiting(&task.id)?;
@@ -283,11 +369,18 @@ async fn ask_person(
     let answer = tokio::select! {
         biased;
         _ = cancel.changed() => return Err("Task stopped.".into()),
-        result = tokio::time::timeout(Duration::from_secs(3600), receiver) => result.ok().and_then(|r| r.ok()).unwrap_or(false),
+        result = tokio::time::timeout(Duration::from_secs(3600), receiver) => result.ok().and_then(|r| r.ok()).unwrap_or(Answer { approved: false, always: false }),
     };
+    if answer.always {
+        if let Some(action) = action {
+            if task.policy.allow(action).is_some() {
+                remember(&task.policy);
+            }
+        }
+    }
     task.set_state(State::Running, crate::now());
     let _ = store.save(task);
-    Ok(answer)
+    Ok(answer.approved)
 }
 
 async fn work(
@@ -432,9 +525,10 @@ async fn work(
             Request::WebRead { url } => known_urls.contains(web::public_url(url)?.as_str()),
             _ => false,
         };
-        let verdict = match policy_action(&request, known) {
+        let action = policy_action(&request, known);
+        let verdict = match &action {
             Some(action) => task.policy.decide(
-                &action,
+                action,
                 &helix_task::Context {
                     model_local: model.local,
                     private,
@@ -450,7 +544,7 @@ async fn work(
                 continue;
             }
             Verdict::Ask(reason) => {
-                if !ask_person(app, task, store, &reason, &input, cancel).await? {
+                if !ask_person(app, task, store, &reason, &input, action.as_ref(), cancel).await? {
                     finish(
                         task,
                         false,

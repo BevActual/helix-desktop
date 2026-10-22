@@ -135,6 +135,31 @@ impl Policy {
         }
     }
 
+    /// "Always allow this": widens the policy by exactly what the action needed, and says what it now allows (`None` when there is nothing safe to
+    /// remember: a risky or chained command, an edit that is not a plain path, anything that is not a command, an edit or an app).
+    pub fn allow(&mut self, action: &Action) -> Option<String> {
+        match action {
+            Action::Command(command) => {
+                let prefix = crate::command_prefix(command)?;
+                if !self.allow_commands.contains(&prefix) {
+                    self.allow_commands.push(prefix.clone());
+                }
+                Some(format!("Run `{prefix}` without asking"))
+            }
+            Action::Edit { path } if edit_path_is_plain(path) => {
+                self.auto_edits = true;
+                Some("Edit files in the folder without asking".into())
+            }
+            Action::Launch(app) if !app.trim().is_empty() => {
+                if !self.apps.iter().any(|a| a.eq_ignore_ascii_case(app.trim())) {
+                    self.apps.push(app.trim().to_string());
+                }
+                Some(format!("Open {} without asking", app.trim()))
+            }
+            _ => None,
+        }
+    }
+
     /// Whether a model may be used at all under this policy.
     pub fn allows_model(&self, local: bool) -> bool {
         local || self.cloud != CloudUse::Never
@@ -459,6 +484,45 @@ mod tests {
         for a in [Action::Input, Action::Look, Action::Launch("x".into())] {
             assert!(matches!(p.decide(&a, &LOCAL), Verdict::Deny(_)));
         }
+    }
+
+    #[test]
+    fn always_allow_widens_the_policy_by_exactly_what_was_asked() {
+        let mut p = Policy::chat("/p");
+        assert!(matches!(cmd(&p, "cargo fmt --all"), Verdict::Ask(_)));
+        assert_eq!(
+            p.allow(&Action::Command("cargo fmt --all".into())).unwrap(),
+            "Run `cargo fmt` without asking"
+        );
+        assert_eq!(cmd(&p, "cargo fmt -p x"), Verdict::Allow);
+        assert!(
+            matches!(cmd(&p, "cargo publish"), Verdict::Ask(_)),
+            "only that command"
+        );
+        assert!(p.allow(&Action::Command("sudo ls".into())).is_none());
+        assert!(p.allow(&Action::Command("ls | sh".into())).is_none());
+        assert!(p
+            .allow(&Action::Edit {
+                path: "../x".into()
+            })
+            .is_none());
+        assert!(!p.auto_edits);
+        assert!(
+            p.allow(&Action::Edit {
+                path: "src/a.rs".into()
+            })
+            .is_some()
+                && p.auto_edits
+        );
+        assert!(p.allow(&Action::Launch("Firefox".into())).is_some());
+        assert_eq!(
+            p.decide(&Action::Launch("firefox".into()), &LOCAL),
+            Verdict::Allow
+        );
+        assert!(p.allow(&Action::WebSearch).is_none());
+        let before = p.allow_commands.len();
+        p.allow(&Action::Command("cargo fmt".into()));
+        assert_eq!(p.allow_commands.len(), before, "no duplicates");
     }
 
     #[test]

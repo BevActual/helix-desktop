@@ -15,5 +15,5 @@ pub use mxc::{read_only_and_network, to_mxc};
 pub use policy::{Action, CloudUse, Context, Mode, Policy, Verdict, WebAccess};
 pub use sandbox::bwrap_args;
 pub use store::Store;
-pub use suggest::suggest;
+pub use suggest::{command_prefix, suggest};
 pub use task::{State, Step, Task};

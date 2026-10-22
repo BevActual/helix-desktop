@@ -145,4 +145,32 @@ wait_id "agent-task-discard-$SIX"
 click_id "agent-task-discard-$SIX"
 for _ in $(seq 1 40); do [ "$(python3 -c "import json;print(json.load(open('$TASKS/$SIX.json'))['review'])")" = discarded ] && break; sleep 0.25; done
 [ "$(cat "$REPO/a.txt")" = two ] || { echo 'FAIL: discarding changed the project'; exit 1; }
-echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, and review a git project's changes on a copy (apply and discard)"
+
+# 7. "Always allow" remembers the step for the folder: the next task there runs it without asking.
+printf '[{"tool":"terminal","command":"touch always1.txt"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+sleep 1; wtype 'Make a file.'
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$SIX" ] && break; sleep 0.25; done
+SEVEN=$(newest_task)
+wait_state "$SEVEN" waiting
+wait_id "agent-task-always-$SEVEN"
+click_id "agent-task-always-$SEVEN"
+wait_state "$SEVEN" done
+printf '[{"tool":"terminal","command":"touch always2.txt"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+sleep 1; wtype 'Make another file.'
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$SEVEN" ] && break; sleep 0.25; done
+EIGHT=$(newest_task)
+wait_state "$EIGHT" done
+python3 - "$TASKS/$EIGHT.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['steps'][0]['tool']=='terminal' and t['steps'][0]['ok'] and 'touch' in t['policy']['allow_commands'][-1],t['policy']['allow_commands']
+PY
+echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), and remember Always allow per folder"

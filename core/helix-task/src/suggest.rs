@@ -1,7 +1,7 @@
 use crate::{Mode, Policy, Task};
 
 /// The first two words of a plain command (`cargo test`, `git status`), which is what a policy allows by.
-fn command_prefix(command: &str) -> Option<String> {
+pub fn command_prefix(command: &str) -> Option<String> {
     if command.chars().any(|c| {
         matches!(
             c,

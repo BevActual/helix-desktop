@@ -40,6 +40,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const goalBox = useRef<HTMLTextAreaElement>(null);
   const [diffText, setDiffText] = useState("");
   const [diffOf, setDiffOf] = useState("");
+  const [allSteps, setAllSteps] = useState("");
   const load = useCallback(() => invoke<AgentTask[]>("agent_tasks").then(setTasks, () => setTasks([])), []);
   useEffect(() => { register({ open: () => { setError(""); setShown(true); visible(true); load(); }, close: () => { setShown(false); visible(false); } }); }, [register, visible, load]);
   useEffect(() => { if (!shown) return; const timer = setInterval(load, 2500); return () => clearInterval(timer); }, [shown, load]);
@@ -113,7 +114,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
       {!["running", "waiting", "queued"].includes(task.state.state) && <button type="button" className="mini" data-test={`agent-task-delete-${task.id}`} onClick={() => { setSelected(""); call("agent_task_delete", { id: task.id }); }}>Delete</button>}
     </div>
     <h4>Steps</h4>
-    {task.steps.length === 0 ? <p className="sheet-note">Nothing yet.</p> : <ol className="task-steps agents-steps" data-test="agent-task-steps">{task.steps.map((s) => <li key={s.n} className={s.ok ? "" : "bad"}>
+    {task.steps.length === 0 ? <p className="sheet-note">Nothing yet.</p> : <ol className="task-steps agents-steps" data-test="agent-task-steps">{task.steps.length > 6 && allSteps !== task.id && <li className="agents-more"><button type="button" className="link" data-test="agent-task-earlier" onClick={() => setAllSteps(task.id)}>{task.steps.length - 5} earlier steps</button></li>}{(allSteps === task.id || task.steps.length <= 6 ? task.steps : task.steps.slice(-5)).map((s) => <li key={s.n} className={s.ok ? "" : "bad"}>
       <strong>{TOOLS[s.tool] ?? s.tool}</strong>{s.place !== "local" && <span className="agents-badge remote">{s.place}</span>}
       {s.input ? <code>{s.input.slice(0, 200)}</code> : null}
       <span>{s.ok ? "" : "Failed: "}{s.outcome.slice(0, 300)}</span>
@@ -133,7 +134,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
         {sorted.length === 0 && <p className="sheet-note">No tasks yet.</p>}
         {GROUPS.map((name, g) => { const rows = sorted.filter((t) => group(t) === g); return rows.length ? <div key={name} className="agents-group"><h5>{name}</h5>{rows.map((t) => <div key={t.id} className={`agents-row${selected === t.id ? " on" : ""}`}>
           <button type="button" className="agents-row-main" data-test={`agent-task-${t.id}`} onClick={() => setSelected(t.id)}><span className={`agents-dot ${t.state.state}`} /><strong>{t.goal.slice(0, 90)}</strong><span>{label(t)} · {t.steps.length} step{t.steps.length === 1 ? "" : "s"} · {ago(t.updated)}</span></button>
-          {t.state.state === "waiting" && <span className="agents-row-actions"><button type="button" className="mini primary" data-test={`agent-task-approve-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: true })}>Allow</button><button type="button" className="mini" data-test={`agent-task-decline-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: false })}>Decline</button></span>}
+          {t.state.state === "waiting" && <span className="agents-row-actions"><button type="button" className="mini primary" data-test={`agent-task-approve-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: true })}>Allow</button>{/^(Run a command|Edit a file|Open )/.test(t.state.why) && <button type="button" className="mini" data-test={`agent-task-always-${t.id}`} title="Allow this kind of step without asking, in this folder, from now on" onClick={() => call("agent_task_review", { id: t.id, approved: true, always: true })}>Always allow</button>}<button type="button" className="mini" data-test={`agent-task-decline-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: false })}>Decline</button></span>}
           {(t.state.state === "running" || t.state.state === "waiting") && <span className="agents-row-actions"><button type="button" className="mini" data-test={`agent-task-stop-${t.id}`} onClick={() => call("agent_task_stop", { id: t.id })}>Stop</button></span>}
         </div>)}</div> : null; })}
       </nav>
