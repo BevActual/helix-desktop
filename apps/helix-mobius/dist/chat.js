@@ -3044,7 +3044,7 @@ const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
 const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
 const reactScheduled = window.HelixMobiusReact?.scheduled($("scheduled-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-scheduled").onclick = () => reactScheduled?.open();
-const reactAgentTasks = window.HelixMobiusReact?.agentTasks($("agent-tasks-host"));
+const reactAgentTasks = window.HelixMobiusReact?.agentTasks($("agent-tasks-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-tasks").onclick = () => reactAgentTasks?.open();
 // A chat begun from the Projects page joins its project once it has its first message (an empty chat is not kept, so it cannot be moved yet).
 let pendingProject = "";

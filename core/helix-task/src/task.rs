@@ -50,6 +50,9 @@ pub struct Task {
     pub steps: Vec<Step>,
     /// What the task wrote down for itself to keep going after the early steps have been dropped from its context.
     pub notes: String,
+    /// The chat holding the answer and the steps, once the task is done.
+    #[serde(default)]
+    pub result_chat: String,
     pub created: u64,
     pub updated: u64,
 }
@@ -69,6 +72,7 @@ impl Task {
             policy,
             state: State::Queued,
             steps: vec![],
+            result_chat: String::new(),
             notes: String::new(),
             created: now,
             updated: now,

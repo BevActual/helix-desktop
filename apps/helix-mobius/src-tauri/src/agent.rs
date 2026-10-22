@@ -11,6 +11,9 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::sync::{oneshot, watch};
 
+pub(crate) mod background;
+pub use background::Background;
+
 const PLAN: &str = r#"You are choosing the next step in Mobius Tools mode. Return ONE JSON object, no prose, no reasoning, no markdown fences.
 Allowed forms:
 {"tool":"web_search","query":"public search words"}
@@ -327,7 +330,16 @@ impl Model {
     async fn call(
         &self,
         messages: &[(&'static str, String)],
+        cancelled: watch::Receiver<bool>,
+    ) -> Result<String, String> {
+        self.call_with(messages, cancelled, 512).await
+    }
+    /// Like `call`, with room for a longer reply (a final answer rather than a tool choice).
+    async fn call_with(
+        &self,
+        messages: &[(&'static str, String)],
         mut cancelled: watch::Receiver<bool>,
+        max_tokens: u32,
     ) -> Result<String, String> {
         if *cancelled.borrow() {
             return Err("Tools task stopped.".into());
@@ -336,10 +348,19 @@ impl Model {
             return tokio::select! {
                 biased;
                 _ = cancelled.changed() => Err("Tools task stopped.".into()),
-                result = crate::lan::chat_completions(&self.base, &self.model, messages, self.key.as_deref(), crate::lan::RemoteOptions { temperature: 0.0, max_tokens: 512, timeout_secs: 60 }) => result,
+                result = crate::lan::chat_completions(&self.base, &self.model, messages, self.key.as_deref(), crate::lan::RemoteOptions { temperature: 0.0, max_tokens, timeout_secs: 120 }) => result,
             };
         }
-        local_call(messages, &[], &self.task, &self.model, 512, 90, cancelled).await
+        local_call(
+            messages,
+            &[],
+            &self.task,
+            &self.model,
+            max_tokens,
+            180,
+            cancelled,
+        )
+        .await
     }
 }
 

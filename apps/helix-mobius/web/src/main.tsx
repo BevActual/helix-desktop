@@ -81,8 +81,8 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
     const run = handled<ScheduledHandle>(host, (register) => <Scheduled register={register} onOpenChat={onOpenChat} />);
     return { open: () => run((h) => h.open()) };
   },
-  agentTasks: (host: HTMLElement) => {
-    const run = handled<AgentTasksHandle>(host, (register) => <AgentTasks register={register} />);
+  agentTasks: (host: HTMLElement, onOpenChat: (id: string) => void) => {
+    const run = handled<AgentTasksHandle>(host, (register) => <AgentTasks register={register} onOpenChat={onOpenChat} />);
     return { open: () => run((h) => h.open()) };
   },
   memory: (host: HTMLElement) => {

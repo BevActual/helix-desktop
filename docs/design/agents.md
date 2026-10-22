@@ -48,7 +48,10 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    deny for each action; Tools mode now runs as a task under the "ask me first" policy, so nothing changes for the person yet but every run is recorded.
    A chat's Tools panel now offers **Ask first** or **Work in the folder** (the balanced policy: checks such as tests and `git status`, and edits inside the
    folder, run without asking).
-   Still to do: running in the background, a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
+   **Background tasks:** the Tasks sheet starts a task (goal, folder, how much to ask) that runs on its own (up to three at once) under the same loop and
+   policy; a question to the person shows in the sheet with Allow/Decline and a notification, the answer lands in a new chat with every step, and Stop works
+   at any point.
+   Still to do: a nested end-to-end test of a background task (needs a scripted model), a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.
 4. **Memory and skills the agent writes for itself**, local and editable (the knowledge store), after the Hermes pattern.
