@@ -220,4 +220,41 @@ import json,sys
 t=json.load(open(sys.argv[1]))
 assert t['goal']=='Tidy the project.',t['goal']
 PY
-echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, and start a task from a chat message"
+
+# 10. Save as skill from a finished task; a later task reads it; the skills page deletes it.
+click_id agents-back
+click_id mode-tasks
+sleep 3
+click_id "agent-task-$ONE"
+wait_id "agent-task-skill-$ONE"
+click_id "agent-task-skill-$ONE"
+wait_id skill-save
+click_id skill-save
+SKILLS="$SCRATCH/data/helix/mobius/skills"
+for _ in $(seq 1 40); do ls "$SKILLS"/*.json >/dev/null 2>&1 && break; sleep 0.25; done
+SKILL=$(basename "$(ls "$SKILLS"/*.json | head -1)" .json)
+python3 - "$SKILLS/$SKILL.json" <<'PY'
+import json,sys
+k=json.load(open(sys.argv[1]))
+assert k['description'] and 'terminal' in k['body'],k
+PY
+printf '[{"tool":"skill_read","name":"%s"},{"tool":"finish"}]' "$SKILL" > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+sleep 1; wtype 'Use the skill.'
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$TEN" ] && break; sleep 0.25; done
+ELEVEN=$(newest_task)
+wait_state "$ELEVEN" done
+python3 - "$TASKS/$ELEVEN.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['steps'][0]['tool']=='skill_read' and t['steps'][0]['ok'] and 'terminal' in t['steps'][0]['outcome'],t['steps']
+PY
+click_id agent-skills
+wait_id "skill-delete-$SKILL"
+click_id "skill-delete-$SKILL"
+for _ in $(seq 1 40); do [ ! -e "$SKILLS/$SKILL.json" ] && break; sleep 0.25; done
+[ ! -e "$SKILLS/$SKILL.json" ] || { echo 'FAIL: the skill was not deleted'; exit 1; }
+echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, start a task from a chat message, and save, use and delete a skill"

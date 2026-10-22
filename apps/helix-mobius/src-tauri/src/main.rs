@@ -30,6 +30,7 @@ mod replyprefs;
 mod rules;
 mod scheduled;
 mod secrets;
+mod skills;
 mod surface;
 mod terminal;
 mod web;
@@ -83,6 +84,10 @@ fn shared(app: &AppHandle) -> Shared {
 }
 
 // Files -------------------------------------------------------------------------------------------------------------------------------
+
+/// Tests that point the data folder somewhere of their own take turns.
+#[cfg(test)]
+pub(crate) static DATA_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn data_home() -> PathBuf {
     std::env::var_os("XDG_DATA_HOME")
@@ -4181,6 +4186,10 @@ fn main() {
             agent::background::agent_task_discard,
             agent::background::agent_task_review,
             agent::background::agent_task_plan,
+            agent::background::agent_skill_draft,
+            skills::agent_skills,
+            skills::agent_skill_save,
+            skills::agent_skill_delete,
             scheduled::scheduled_list,
             scheduled::scheduled_save,
             scheduled::scheduled_set_enabled,

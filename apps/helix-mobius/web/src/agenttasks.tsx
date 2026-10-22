@@ -7,6 +7,7 @@ interface Step { n: number; tool: string; input: string; outcome: string; ok: bo
 interface Policy { name: string; folder: string; cloud: string; display: boolean; mode?: string; network?: boolean }
 type TaskState = { state: "queued" | "running" | "stopped" } | { state: "waiting"; why: string } | { state: "done"; summary: string } | { state: "failed"; error: string };
 interface AgentTask { id: string; goal: string; plan?: string; result_chat?: string; workdir?: string; dirty?: boolean; review?: string; policy: Policy; state: TaskState; steps: Step[]; created: number; updated: number }
+interface Skill { name: string; description: string; body: string }
 export interface Prefill { goal?: string; folder?: string; policy?: string }
 export interface AgentTasksHandle { open: (prefill?: Prefill) => void; close: () => void }
 
@@ -43,6 +44,8 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const [diffOf, setDiffOf] = useState("");
   const [allSteps, setAllSteps] = useState("");
   const [planFirst, setPlanFirst] = useState(false);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skillDraft, setSkillDraft] = useState<Skill | null>(null);
   const [draft, setDraft] = useState({ id: "", text: "" });
   const load = useCallback(() => invoke<AgentTask[]>("agent_tasks").then(setTasks, () => setTasks([])), []);
   useEffect(() => { register({ open: (prefill) => { setError(""); if (prefill) { setGoal(prefill.goal ?? ""); setFolder(prefill.folder ?? ""); setPolicy(prefill.folder ? (prefill.policy ?? "") : ""); setSelected("new"); } setShown(true); visible(true); load(); }, close: () => { setShown(false); visible(false); } }); }, [register, visible, load]);
@@ -68,8 +71,13 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     setBusy(true);
     const id = await call("agent_task_start", { goal, folder, policy, practice, network, copy: onCopy, planFirst, from: null });
     setBusy(false);
-    if (typeof id === "string") { setGoal(""); setPractice(false); setSelected(id); }
+    if (typeof id === "string") { setGoal(""); setPractice(false); setPlanFirst(false); setSelected(id); }
   };
+  const loadSkills = useCallback(() => invoke<Skill[]>("agent_skills").then(setSkills, () => setSkills([])), []);
+  useEffect(() => { if (shown) loadSkills(); }, [shown, loadSkills]);
+  const draftSkill = async (id: string) => { setError(""); try { setSkillDraft(await invoke<Skill>("agent_skill_draft", { id })); } catch (reason) { setError(String(reason)); } };
+  const saveSkill = async () => { if (!skillDraft) return; setError(""); try { setSkills(await invoke<Skill[]>("agent_skill_save", { ...skillDraft })); setSkillDraft(null); } catch (reason) { setError(String(reason)); } };
+  const removeSkill = async (name: string) => { setError(""); try { setSkills(await invoke<Skill[]>("agent_skill_delete", { name })); } catch (reason) { setError(String(reason)); } };
   const settle = async (command: string, id: string) => { await call(command, { id }); setDiffOf(""); };
   const sorted = [...tasks].sort((a, b) => group(a) - group(b) || b.updated - a.updated);
   const waiting = tasks.filter((t) => t.state.state === "waiting").length;
@@ -97,6 +105,19 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     <div className="agents-compose-actions">{tasks.length > 0 && <button type="button" data-test="agent-task-cancel" onClick={() => setSelected("")}>Cancel</button>}<button type="submit" className="primary" data-test="agent-task-start" disabled={!goal.trim() || busy}>Start task</button></div>
   </form>;
 
+  const skillEditor = skillDraft && <section className="agents-plan" data-test="skill-editor">
+    <strong>Skill</strong>
+    <input data-test="skill-name" value={skillDraft.name} maxLength={40} placeholder="name-with-dashes" onChange={(e) => setSkillDraft({ ...skillDraft, name: e.target.value })} />
+    <input data-test="skill-description" value={skillDraft.description} maxLength={200} placeholder="One line: when to use it" onChange={(e) => setSkillDraft({ ...skillDraft, description: e.target.value })} />
+    <textarea data-test="skill-body" rows={9} value={skillDraft.body} onChange={(e) => setSkillDraft({ ...skillDraft, body: e.target.value })} />
+    <div className="agents-actions"><button type="button" className="mini primary" data-test="skill-save" onClick={saveSkill}>Save skill</button><button type="button" className="mini" onClick={() => setSkillDraft(null)}>Cancel</button></div>
+  </section>;
+  const skillsPanel = <article className="agents-detail" data-test="skills-panel">
+    <header><h3>Skills</h3><p className="agents-meta">Procedures kept on this computer. A task reads one when it fits; they are never sent to a remote model.</p></header>
+    {skillEditor}
+    {skills.length === 0 ? <p className="sheet-note">No skills yet. Finish a task that worked and choose Save as skill.</p> : <ul className="agents-steps">{skills.map((k) => <li key={k.name} data-test={`skill-row-${k.name}`}><strong>{k.name}</strong><span>{k.description}</span><div className="agents-actions"><button type="button" className="mini" data-test={`skill-edit-${k.name}`} onClick={() => setSkillDraft(k)}>Edit</button><button type="button" className="mini" data-test={`skill-delete-${k.name}`} onClick={() => removeSkill(k.name)}>Delete</button></div></li>)}</ul>}
+  </article>;
+
   const detail = task && <article className="agents-detail" data-test="agent-task-detail">
     <header>
       <h3>{task.goal}</h3>
@@ -120,6 +141,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     <div className="agents-actions">
       {task.result_chat ? <button type="button" className="mini" data-test={`agent-task-open-${task.id}`} onClick={() => { onOpenChat(task.result_chat!); setShown(false); visible(false); }}>Open the answer chat</button> : null}
       {task.policy.mode === "practice" && task.steps.some((s) => s.would_ask) && task.state.state !== "running" && <button type="button" className="mini primary" data-test={`agent-task-again-${task.id}`} title="Start again, allowing what the practice run needed" onClick={async () => { const id = await call("agent_task_start", { goal: task.goal, folder: task.policy.folder, policy: "", practice: false, network: !!task.policy.network, copy: true, planFirst: false, from: task.id }); if (typeof id === "string") setSelected(id); }}>Run for real</button>}
+      {!["running", "waiting", "queued"].includes(task.state.state) && task.steps.some((x) => x.ok) && <button type="button" className="mini" data-test={`agent-task-skill-${task.id}`} title="Turn what worked into a skill that later tasks can read" onClick={() => draftSkill(task.id)}>Save as skill</button>}
       {!["running", "waiting", "queued"].includes(task.state.state) && <button type="button" className="mini" data-test={`agent-task-delete-${task.id}`} onClick={() => { setSelected(""); call("agent_task_delete", { id: task.id }); }}>Delete</button>}
     </div>
     <h4>Steps</h4>
@@ -135,6 +157,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     <header className="agents-head" data-tauri-drag-region>
       <button type="button" className="icon-btn" data-test="agents-back" title="Back to chat" aria-label="Back to chat" onClick={() => { setShown(false); visible(false); }}>‹</button>
       <div><h2>Agents</h2><p>{waiting ? `${waiting} waiting for you` : "Tasks that run on their own and ask when they need you."}</p></div>
+      <button type="button" data-test="agent-skills" onClick={() => { setSelected("skills"); setSkillDraft(null); }}>Skills{skills.length ? ` (${skills.length})` : ""}</button>
       <button type="button" className="primary" data-test="agent-task-new" onClick={() => { setSelected("new"); goalBox.current?.focus(); }}>New task</button>
     </header>
     {error && <p className="sheet-warning" role="alert" data-test="agent-task-error">{error}</p>}
@@ -147,7 +170,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
           {(t.state.state === "running" || t.state.state === "waiting") && <span className="agents-row-actions"><button type="button" className="mini" data-test={`agent-task-stop-${t.id}`} onClick={() => call("agent_task_stop", { id: t.id })}>Stop</button></span>}
         </div>)}</div> : null; })}
       </nav>
-      <div className="agents-main">{selected === "new" || !task ? composer : detail}</div>
+      <div className="agents-main">{selected === "skills" ? skillsPanel : selected === "new" || !task ? composer : <>{skillEditor}{detail}</>}</div>
     </div>
   </section>;
 }

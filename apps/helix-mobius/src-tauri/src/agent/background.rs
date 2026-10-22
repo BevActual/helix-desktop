@@ -470,11 +470,16 @@ async fn work(
     } else {
         String::new()
     };
+    let skills_note = if model.local {
+        crate::skills::index_text(&crate::skills::list())
+    } else {
+        String::new()
+    };
     let mut planning = vec![
         (
             "system",
             format!(
-                "{}{memory_note}\n\n{PLAN}\n{folder_note}{rules_note}",
+                "{}{memory_note}\n\n{PLAN}\n{folder_note}{rules_note}{skills_note}",
                 helix_chat::chat::SYSTEM_PROMPT
             ),
         ),
@@ -692,6 +697,9 @@ async fn work(
                     result = display_step(&mut display, &request, &watching) => result,
                 }
             }
+            Request::SkillRead { name } => crate::skills::read(name)
+                .map(|s| format!("{}\n\n{}", s.description, s.body))
+                .ok_or_else(|| format!("There is no skill called {name}.")),
             Request::Finish => unreachable!(),
         };
         if *cancel.borrow() {
@@ -800,5 +808,88 @@ mod tests {
             "a stopped task cannot start waiting"
         );
         assert!(!b.stop("missing"));
+    }
+}
+
+/// Drafts a skill from a finished task for the person to edit and save. A model on this computer writes it; when its answer cannot be read, the
+/// skill is the steps that worked.
+#[tauri::command]
+pub async fn agent_skill_draft(id: String) -> Result<crate::skills::Skill, String> {
+    let task = task_store()
+        .load(&id)
+        .ok_or("That task no longer exists.")?;
+    if !task.state.finished() {
+        return Err("Wait until the task has finished.".into());
+    }
+    let worked: Vec<(String, String)> = task
+        .steps
+        .iter()
+        .filter(|s| s.ok)
+        .map(|s| (s.tool.clone(), s.input.clone()))
+        .collect();
+    if worked.is_empty() {
+        return Err("The task has no successful steps to learn from.".into());
+    }
+    let fallback = crate::skills::from_steps(&task.goal, &worked);
+    let model = Model::capture((String::new(), String::new()))?;
+    if !model.local {
+        return Ok(fallback);
+    }
+    let steps: String = task
+        .steps
+        .iter()
+        .take(25)
+        .map(|s| {
+            format!(
+                "- {} {}: {} ({})\n",
+                s.tool,
+                clip(&s.input, 160),
+                clip(&s.outcome, 160),
+                if s.ok { "worked" } else { "failed" }
+            )
+        })
+        .collect();
+    let messages = [
+        (
+            "system",
+            "You write short, reusable skills from finished tasks. Reply with ONE JSON object and nothing else: {\"name\":\"lower-case-words-with-dashes\",\"description\":\"one line saying when to use it\",\"body\":\"numbered steps in plain words, including the exact commands that worked and what to check\"}".to_string(),
+        ),
+        (
+            "user",
+            format!(
+                "Task: {}\nWhat it did:\n{steps}\nWrite a skill another run of this kind of task could follow. Leave out anything specific to one run (file contents, names of people, secrets).",
+                task.goal
+            ),
+        ),
+    ];
+    let text = model
+        .call_with(&messages, watch::channel(false).1, 700)
+        .await
+        .unwrap_or_default();
+    let text = helix_chat::markdown::strip_thinking(&text);
+    let trimmed = text.trim();
+    let json = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .and_then(|t| t.trim().strip_suffix("```"))
+        .unwrap_or(trimmed)
+        .trim();
+    #[derive(serde::Deserialize)]
+    struct Draft {
+        name: String,
+        description: String,
+        body: String,
+    }
+    match serde_json::from_str::<Draft>(json) {
+        Ok(draft) if !draft.description.trim().is_empty() && !draft.body.trim().is_empty() => {
+            let name = crate::skills::slug(&draft.name);
+            Ok(crate::skills::Skill {
+                name: if name.is_empty() { fallback.name } else { name },
+                description: clip(draft.description.trim(), 200),
+                body: clip(draft.body.trim(), 4000),
+                created: 0,
+            })
+        }
+        _ => Ok(fallback),
     }
 }

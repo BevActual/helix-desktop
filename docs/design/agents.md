@@ -75,6 +75,10 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    Long step lists show the latest five with the earlier ones one click away.
    **Plan first** (chip on a new task): the task writes at most six numbered steps and waits; the person edits and approves (or declines) the plan, which
    then goes into the task's prompt. Nothing runs before that.
+   **Skills** (the Hermes pattern, kept local): after a task that worked, *Save as skill* has a model on this computer draft a short procedure (or, if its
+   answer cannot be read, the steps that worked) for the person to edit and save; skills are JSON under `~/.local/share/helix/mobius/skills/`. A task sees only
+   their names and one-line descriptions and loads one with the `skill_read` tool when it fits; they and Mobius's memory are given only to models on this
+   computer. A Skills page lists, edits and deletes them. *Run as task* on a chat message hands that message to the Agents page with the chat's folder.
    Still to do: a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.

@@ -159,9 +159,6 @@ pub fn discard(copy: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    /// The tests change the process's data folder, so they take turns.
-    static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     fn sh(dir: &Path, args: &[&str]) {
         let out = Command::new("git")
             .arg("-C")
@@ -191,7 +188,7 @@ mod tests {
 
     #[test]
     fn a_copy_is_reviewed_applied_and_discarded_without_touching_the_project_first() {
-        let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+        let _turn = crate::DATA_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let data = std::env::temp_dir().join(format!("mobius-ws-data-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&data);
         std::env::set_var("XDG_DATA_HOME", &data);
@@ -232,7 +229,7 @@ mod tests {
 
     #[test]
     fn changes_that_no_longer_fit_are_refused_and_nothing_is_half_applied() {
-        let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+        let _turn = crate::DATA_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let data = std::env::temp_dir().join(format!("mobius-ws-data2-{}", std::process::id()));
         std::env::set_var("XDG_DATA_HOME", &data);
         let source = repo("conflict");
@@ -252,7 +249,7 @@ mod tests {
 
     #[test]
     fn uncommitted_changes_are_noted_and_paths_outside_the_copies_are_refused() {
-        let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+        let _turn = crate::DATA_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let data = std::env::temp_dir().join(format!("mobius-ws-data3-{}", std::process::id()));
         std::env::set_var("XDG_DATA_HOME", &data);
         let source = repo("dirty");

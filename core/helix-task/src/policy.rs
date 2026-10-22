@@ -235,6 +235,7 @@ impl Policy {
                     Verdict::Ask("Describe the screen to a remote model".into())
                 }
             }
+            Action::Skill => Verdict::Allow,
             Action::Input => {
                 if self.display {
                     Verdict::Allow
@@ -320,6 +321,8 @@ pub enum Action {
     Look,
     /// Click, type, key, scroll on the agent display.
     Input,
+    /// Read one of the person's skills (text kept on this computer).
+    Skill,
 }
 
 /// What is true of the task right now.
