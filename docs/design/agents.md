@@ -56,6 +56,9 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    `.ssh`) are empty, extra `read_only` paths must be absolute and not the machine, and the network is off unless the person turned it on for the task
    (all or nothing: the sandbox cannot filter by host). A **practice run** lets what would have asked go ahead inside the sandbox, records it on the step,
    and "Run for real" starts again with exactly those commands, edits and apps allowed (never `sudo`, `rm`, `curl`, pipes or paths outside the folder).
+   `helix_task::to_mxc` writes a policy as an MXC `1.0.0` configuration (paths, network default, command, time limit) and `read_only_and_network` reads an
+   incoming one as far as Helix can honour it (never a wider writable area). MXC's schema is young (alpha versions precede 1.0.0; third-party notes call the SDK
+   "stable enough for non-security-critical production"), so Helix's own `bwrap` builder stays the enforcer for now.
    Open question: adopt the `mxc-sdk` crate as the backend for host-filtered networking (proxy) and macOS/Windows later, once it is stable.
    Still to do: a nested end-to-end test of a background task (needs a scripted model), a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate

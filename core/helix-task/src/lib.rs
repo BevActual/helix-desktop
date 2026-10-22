@@ -4,12 +4,14 @@
 //! work inside a folder and a few commands but cannot reach beyond them. The decision is plain data in, verdict out, so the shell of the product
 //! can be tested without a model.
 
+mod mxc;
 mod policy;
 mod sandbox;
 mod store;
 mod suggest;
 mod task;
 
+pub use mxc::{read_only_and_network, to_mxc};
 pub use policy::{Action, CloudUse, Context, Mode, Policy, Verdict, WebAccess};
 pub use sandbox::bwrap_args;
 pub use store::Store;
