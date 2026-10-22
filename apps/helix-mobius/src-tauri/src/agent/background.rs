@@ -76,6 +76,9 @@ pub fn agent_task_start(
     goal: String,
     folder: String,
     policy: String,
+    practice: Option<bool>,
+    from: Option<String>,
+    network: Option<bool>,
 ) -> Result<String, String> {
     let goal = goal.trim().to_string();
     if goal.is_empty() || goal.chars().count() > 2000 {
@@ -88,11 +91,23 @@ pub fn agent_task_start(
         terminal::workspace(&folder)?.to_string_lossy().to_string()
     };
     let model = Model::capture((String::new(), String::new()))?;
-    let policy = if policy == "folder" && !folder.is_empty() {
+    let mut policy = if let Some(earlier) = from.and_then(|id| task_store().load(&id)) {
+        // Start again with what a practice run showed the task needs.
+        let mut policy = helix_task::suggest(&earlier);
+        if !folder.is_empty() {
+            policy.folder = folder.clone();
+        }
+        policy
+    } else if policy == "folder" && !folder.is_empty() {
         helix_task::Policy::balanced(&folder)
     } else {
         helix_task::Policy::chat(&folder)
     };
+    if practice == Some(true) {
+        policy.mode = helix_task::Mode::Practice;
+        policy.name = "Practice run".into();
+    }
+    policy.network = network == Some(true) && !policy.folder.is_empty();
     if !policy.allows_model(model.local) {
         return Err("This task's policy allows only models on this computer.".into());
     }
@@ -336,7 +351,9 @@ async fn work(
             ),
             None => Verdict::Allow,
         };
+        let mut practice = None;
         match verdict {
+            Verdict::Practice(reason) => practice = Some(reason),
             Verdict::Deny(reason) => {
                 finish(task, false, &reason);
                 continue;
@@ -387,7 +404,7 @@ async fn work(
             Request::Terminal { command } => {
                 private = true;
                 let folder = folder.as_ref().ok_or("No project folder.")?;
-                terminal::run(folder, command, cancel.clone(), |_| {})
+                terminal::run(folder, &task.policy, command, cancel.clone(), |_| {})
                     .await
                     .map(|o| {
                         (
@@ -438,6 +455,10 @@ async fn work(
         match result {
             Ok(output) => finish(task, true, &output),
             Err(error) => finish(task, false, &error),
+        }
+        if let Some(reason) = practice {
+            task.mark_would_ask(&reason);
+            let _ = store.save(task);
         }
     }
     let prompt = format!(

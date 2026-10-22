@@ -5,9 +5,13 @@
 //! can be tested without a model.
 
 mod policy;
+mod sandbox;
 mod store;
+mod suggest;
 mod task;
 
-pub use policy::{Action, CloudUse, Context, Policy, Verdict, WebAccess};
+pub use policy::{Action, CloudUse, Context, Mode, Policy, Verdict, WebAccess};
+pub use sandbox::bwrap_args;
 pub use store::Store;
+pub use suggest::suggest;
 pub use task::{State, Step, Task};

@@ -1012,7 +1012,7 @@ async fn execute(
                         );
                     }
                 }
-                terminal::run(folder, command, cancel.clone(), |output| {
+                terminal::run(folder, &task.policy, command, cancel.clone(), |output| {
                     activity(
                         app, generation, &id, "terminal", command, "running", &output,
                     )

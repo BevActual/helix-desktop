@@ -39,6 +39,9 @@ pub struct Step {
     pub ok: bool,
     pub place: String,
     pub at: u64,
+    /// In a practice run: what the policy would have asked about for this step (empty otherwise).
+    #[serde(default)]
+    pub would_ask: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,8 +103,16 @@ impl Task {
             ok,
             place: place.into(),
             at: now,
+            would_ask: String::new(),
         });
         self.updated = now;
+    }
+
+    /// Marks the latest step as one a practice run let through that the policy would have asked about.
+    pub fn mark_would_ask(&mut self, reason: &str) {
+        if let Some(step) = self.steps.last_mut() {
+            step.would_ask = clip(reason);
+        }
     }
 
     pub fn set_state(&mut self, state: State, now: u64) {

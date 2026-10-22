@@ -51,6 +51,12 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    **Background tasks:** the Tasks sheet starts a task (goal, folder, how much to ask) that runs on its own (up to three at once) under the same loop and
    policy; a question to the person shows in the sheet with Allow/Decline and a notification, the answer lands in a new chat with every step, and Stop works
    at any point.
+   **Policy-driven sandbox** (after Microsoft's Execution Containers, `microsoft/mxc`, MIT): the terminal's `bwrap` arguments are now built from the task's
+   policy (`helix_task::bwrap_args`): the folder is the only writable place, `protect` paths (`.git`) are read-only on top of it, `hide` paths (`.env`,
+   `.ssh`) are empty, extra `read_only` paths must be absolute and not the machine, and the network is off unless the person turned it on for the task
+   (all or nothing: the sandbox cannot filter by host). A **practice run** lets what would have asked go ahead inside the sandbox, records it on the step,
+   and "Run for real" starts again with exactly those commands, edits and apps allowed (never `sudo`, `rm`, `curl`, pipes or paths outside the folder).
+   Open question: adopt the `mxc-sdk` crate as the backend for host-filtered networking (proxy) and macOS/Windows later, once it is stable.
    Still to do: a nested end-to-end test of a background task (needs a scripted model), a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.

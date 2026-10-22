@@ -24,6 +24,18 @@ pub enum CloudUse {
     Screen,
 }
 
+/// Whether the policy decides for real or only shows what it would have decided.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    /// Asks and refusals are enforced.
+    #[default]
+    Enforce,
+    /// A practice run: what would have asked goes ahead (inside the sandbox) and is recorded, so the person can see what the task needs and turn it into
+    /// a policy. What would have been refused is still refused.
+    Practice,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Policy {
@@ -42,6 +54,15 @@ pub struct Policy {
     pub apps: Vec<String>,
     pub max_steps: u32,
     pub max_minutes: u32,
+    pub mode: Mode,
+    /// Commands may reach the network. (The sandbox cannot filter by host, so this is all or nothing.)
+    pub network: bool,
+    /// Absolute paths outside the folder that commands may read (a toolchain, a data set), never write.
+    pub read_only: Vec<String>,
+    /// Paths inside the folder commands can read but not change (`.git`).
+    pub protect: Vec<String>,
+    /// Paths inside the folder commands cannot see at all (`.env`).
+    pub hide: Vec<String>,
 }
 
 impl Default for Policy {
@@ -64,6 +85,11 @@ impl Policy {
             apps: vec![],
             max_steps: 40,
             max_minutes: 30,
+            mode: Mode::Enforce,
+            network: false,
+            read_only: vec![],
+            protect: vec![],
+            hide: vec![],
         }
     }
 
@@ -103,6 +129,8 @@ impl Policy {
             web: WebAccess::Known,
             max_steps: 80,
             max_minutes: 60,
+            protect: vec![".git".into()],
+            hide: vec![".env".into(), ".ssh".into(), ".gnupg".into()],
             ..Self::careful()
         }
     }
@@ -125,7 +153,15 @@ impl Policy {
         Ok(())
     }
 
+    /// What the policy says, then the mode: in a practice run an "ask" goes ahead and is recorded by the caller (see [`Verdict::Practice`]).
     pub fn decide(&self, action: &Action, ctx: &Context) -> Verdict {
+        match (self.decide_enforced(action, ctx), self.mode) {
+            (Verdict::Ask(why), Mode::Practice) => Verdict::Practice(why),
+            (other, _) => other,
+        }
+    }
+
+    fn decide_enforced(&self, action: &Action, ctx: &Context) -> Verdict {
         match action {
             Action::Command(command) => self.command(command),
             Action::Edit { path } => {
@@ -273,6 +309,8 @@ pub enum Verdict {
     /// Ask the person, saying what for.
     Ask(String),
     Deny(String),
+    /// Practice mode: this would have asked; it goes ahead and the reason is recorded.
+    Practice(String),
 }
 
 #[cfg(test)]
