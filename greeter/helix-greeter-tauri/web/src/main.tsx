@@ -24,6 +24,8 @@ interface Offer {
   high_contrast: boolean;
   reduced_motion: boolean;
   colors: Colors | null;
+  last_user: string;
+  last_session: string;
   wallpaper_url: string;
 }
 type Step =
@@ -61,7 +63,10 @@ function Greeter() {
   const [session, setSession] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [confirming, setConfirming] = useState<"" | "poweroff" | "reboot">("");
   const field = useRef<HTMLInputElement>(null);
+  const power_box = useRef<HTMLDivElement>(null);
+  const asked = useRef<"" | "poweroff" | "reboot">("");
 
   useEffect(() => {
     invoke<Offer>("greeter_offer").then((value) => {
@@ -90,7 +95,7 @@ function Greeter() {
         document.body.style.backgroundSize = "cover";
         document.body.style.backgroundPosition = "center";
       }
-      setSession(value.sessions[0]?.id ?? "");
+      setSession(value.last_session || value.sessions[0]?.id || "");
     });
   }, []);
 
@@ -161,8 +166,23 @@ function Greeter() {
     if (only && !user && !notice) choose(only);
   }, [only]);
 
+  // Cancelling puts the focus back on the button that was chosen, so the keyboard does not start over from the top.
+  useEffect(() => {
+    if (confirming) { asked.current = confirming; return; }
+    if (asked.current) {
+      power_box.current?.querySelector<HTMLButtonElement>(`[data-test="power-${asked.current}"]`)?.focus();
+      asked.current = "";
+    }
+  }, [confirming]);
+
+  const power = (action: "poweroff" | "reboot") => {
+    setConfirming("");
+    invoke("greeter_power", { action }).catch((error) => setNotice(String(error)));
+  };
+
   const sessions = offer?.sessions ?? [];
-  const users = offer?.users ?? [];
+  // The account that signed in last comes first.
+  const users = [...(offer?.users ?? [])].sort((a, b) => Number(b.username === offer?.last_user) - Number(a.username === offer?.last_user));
   return (
     <main className="g-stage" data-test="app">
       <Clock />
@@ -178,6 +198,7 @@ function Greeter() {
                   <button key={entry.username} className="g-user" data-test={`user-${entry.username}`} onClick={() => choose(entry)}>
                     <span className="g-avatar">{initials(entry.name)}</span>
                     <span className="g-name">{entry.name}</span>
+                    {entry.username === offer.last_user && users.length > 1 ? <span className="g-last">Last signed in</span> : null}
                   </button>
                 ))}
               </div>
@@ -224,6 +245,20 @@ function Greeter() {
         )}
         {offer && !user && notice ? <div className="g-notice error" role="status">{notice}</div> : null}
       </section>
+      <div className="g-power" data-test="power" ref={power_box}>
+        {confirming ? (
+          <>
+            <span className="g-power-ask">{confirming === "poweroff" ? "Shut down this computer?" : "Restart this computer?"}</span>
+            <button className="g-power-btn danger" data-test={`power-${confirming}-yes`} onClick={() => power(confirming)}>{confirming === "poweroff" ? "Shut down" : "Restart"}</button>
+            <button className="g-power-btn" data-test="power-cancel" autoFocus onClick={() => setConfirming("")} onKeyDown={(event) => { if (event.key === "Escape") setConfirming(""); }}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <button className="g-power-btn" data-test="power-reboot" onClick={() => setConfirming("reboot")}>Restart</button>
+            <button className="g-power-btn" data-test="power-poweroff" onClick={() => setConfirming("poweroff")}>Shut down</button>
+          </>
+        )}
+      </div>
     </main>
   );
 }

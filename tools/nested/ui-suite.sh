@@ -98,6 +98,7 @@ pick ui-theme          && run ui-theme ui-theme-test.sh system-monitor-scale-nes
 pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
 pick mobius         && run mobius mobius-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=800
 pick greeter        && run greeter greeter-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick greeter-power  && run greeter-power greeter-power-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick greeter-session && run greeter-session greeter-session-test.sh greeter-session-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software       && run software software-test.sh software-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software-real && run software-real software-real-test.sh software-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

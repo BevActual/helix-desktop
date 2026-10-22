@@ -30,3 +30,11 @@ body.greeter { background: radial-gradient(120% 120% at 30% 10%, #2a2f5a 0%, #0e
 :root[data-glass="glass"] .g-card { backdrop-filter: blur(40px) saturate(1.6); }
 :root[data-refract="1"] .g-card { backdrop-filter: blur(48px) saturate(1.8); }
 :root[data-contrast="1"] .g-card { box-shadow: inset 0 0 0 1px var(--label); }
+
+/* The account that signed in last, and restart / shut down. */
+.g-last { font-size: 11px; color: var(--label-2); margin-top: 2px; }
+.g-power { position: fixed; right: 24px; bottom: 22px; display: flex; align-items: center; gap: 8px; }
+.g-power-ask { font-size: 13px; color: var(--label-2); margin-right: 4px; }
+.g-power-btn { background: var(--fill-2, rgba(128,128,128,.22)); color: var(--label); border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 500; backdrop-filter: blur(12px); }
+.g-power-btn:hover { background: var(--fill-3, rgba(128,128,128,.34)); }
+.g-power-btn.danger { background: var(--danger, #ff453a); color: #fff; }

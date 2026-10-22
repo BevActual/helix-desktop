@@ -3,6 +3,8 @@
 
 mod appearance;
 mod greetd;
+mod power;
+mod remember;
 mod system;
 
 use appearance::Appearance;
@@ -48,6 +50,9 @@ struct Offer {
     high_contrast: bool,
     reduced_motion: bool,
     colors: Option<OfferColors>,
+    /// The account and session the last login used, when this screen lists them.
+    last_user: String,
+    last_session: String,
     /// Asset URL of the synced wallpaper, empty when there is no image the page may load.
     wallpaper_url: String,
 }
@@ -70,12 +75,27 @@ fn offer_from(app: &AppHandle, appearance: &Appearance) -> Offer {
                 .and_then(|window| window.convert_file_src(path, None).ok())
         })
         .unwrap_or_default();
+    let users = known_users();
+    let sessions: Vec<Session> = system::sessions_in(Path::new(SESSIONS))
+        .into_iter()
+        .map(|(session, _)| session)
+        .collect();
+    let last = remember::load();
+    let last_user = users
+        .iter()
+        .find(|u| u.username == last.user)
+        .map(|u| u.username.clone())
+        .unwrap_or_default();
+    let last_session = sessions
+        .iter()
+        .find(|s| s.id == last.session)
+        .map(|s| s.id.clone())
+        .unwrap_or_default();
     Offer {
-        users: known_users(),
-        sessions: system::sessions_in(Path::new(SESSIONS))
-            .into_iter()
-            .map(|(session, _)| session)
-            .collect(),
+        users,
+        sessions,
+        last_user,
+        last_session,
         dark: appearance.dark,
         font: appearance.font.clone(),
         ui_scale: appearance.ui_scale,
@@ -163,12 +183,20 @@ fn greeter_start(
     let talk = guard.as_mut().ok_or("Sign in first.")?;
     match talk.start(&cmd).map_err(|error| error.to_string())? {
         Ok(()) => {
+            if let Some(user) = login.user.lock().expect("login").clone() {
+                remember::save(&remember::Last { user, session });
+            }
             // greetd now ends this greeter and starts the session.
             app.exit(0);
             Ok(())
         }
         Err(message) => Err(message),
     }
+}
+
+#[tauri::command]
+fn greeter_power(action: String) -> Result<(), String> {
+    power::run(&action)
 }
 
 fn main() {
@@ -179,7 +207,8 @@ fn main() {
             greeter_begin,
             greeter_respond,
             greeter_cancel,
-            greeter_start
+            greeter_start,
+            greeter_power
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))

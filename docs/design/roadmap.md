@@ -33,15 +33,19 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 
 ## 2. Settings (missing pages and ghost settings)
 
-Settings has pages for Appearance, Accessibility, Displays, Network, Bluetooth, Keyboard, Wallpaper, Dock,
-Notifications, Power & lock, Privacy & agents and About. The gaps below come from `settings-audit.md` and `settings-tauri.md`.
+Settings has pages for Appearance (accent colour, animations, gaps, cursor size), Wallpaper, Accessibility, Displays (with a draggable
+arrangement and night light), Network, Bluetooth, Sound, Keyboard (typing and shortcuts), Multitasking, Mouse & touchpad, Startup apps, Default
+apps, Date & time (with automatic location), Top bar, Dock, Notifications, Power & lock (with a power mode), Privacy & agents and About. What
+each one does, and what it does not, is in `settings-audit.md`; that file is the source, this table is only the open work.
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
-| **Notifications page, next**: per-app rules (quiet hours, the on/off switch, banner time and count are done and kept in one file with Quick Settings) | M | A consumer in `helix_shell_model::notifications` | `settings-audit.md` |
-| **Night light**: temperature and schedule | L | A gamma-control client (`wlr-gamma-control` is in `protocols/`); the service only guards the setting today | `settings-audit.md`; `configuration.rs` has guards, no gamma client |
+| **Notifications page, next**: per-app rules (the on/off switch, banner time and count, quiet hours are done) | M | A consumer in `helix_shell_model::notifications` | `settings-audit.md` |
 | **Interface scale in the shell's own chrome** (bar, dock, panels follow the scale) | M | The bar and dock set layer-surface sizes and exclusive zones, so they need to follow the scale rather than be zoomed | Applications follow `accessibility.ui_scale` already; the shell does not |
-| Candidates, not yet confirmed as needed: date/time and region, default applications, pointer and touchpad | M each | Product decision | Common desktop expectations; no doc asks for them yet |
+| **Privacy**: location (on/off is in Date & time), camera and microphone permissions, and a "in use" indicator in the bar | M | The service exposes capture streams (see section 4) | Common desktop expectation |
+| **Users**: name, picture, password | M | A polkit-guarded helper; never handle the password in the page | Common desktop expectation |
+| Top bar: height and position, auto-hide, order of items | M | The bar sets a strut, so a change has to move the exclusive zone | `settings-audit.md` "Top bar" |
+| Printers, removable media, online accounts, Qt and GTK 3 following the accent | M each | Product decision | Not asked for yet |
 
 Rule for any new row (from `settings-audit.md`): nothing ships in Settings unless something running in the session
 acts on it, and a nested test asserts the exact requests sent.
@@ -54,8 +58,6 @@ acts on it, and a nested test asserts the exact requests sent.
 | Software: add and remove sources | M | Confirmation and auth for system remotes | `software-tauri.md` |
 | System Monitor: kill and renice, behind a confirmation | M | Own-process-only rule, confirm dialog | `system-monitor-tauri.md` "v1 omissions" |
 | System Monitor: cut the bar and Control Center `sysmon` widgets over | M | Monitor model shared with the shell | `system-monitor-tauri.md` |
-| Greeter: power actions (restart, shut down) | M | logind call from the greeter user, polkit | `greeter-tauri.md` "Not yet" |
-| Greeter: remember last account and session | S | State file in `/var/lib/helix-greeter` | `greeter-tauri.md` |
 | Greeter: packaging for the apply helper and a polkit rule scoped to the installed path | M | Install layout | `greeter-tauri.md`; the helper is safe to expose only at a fixed, root-owned path |
 
 ## 4. Shell

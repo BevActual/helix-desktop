@@ -44,8 +44,8 @@ Not covered: a real DRM seat as the `greetd` user and real PAM; the first real l
 ## Not yet
 
 1. ~~Wallpaper behind the card and the full appearance sync~~ — Settings **Appearance** has **Sync login screen** and **Sync greeter theme automatically**. `helix-greeter-apply-appearance` (`cargo build -p helix-desktop --bin helix-greeter-apply-appearance`) stages the payload and, when the state directory is not writable, installs it through `pkexec` (or `shell.greeter_sync.privilege_command`). Passwordless Polkit rules are still packaging.
-2. Power actions (restart, shut down) from the greeter.
-3. Remembering the last account and session.
+2. ~~Power actions (restart, shut down) from the greeter~~ — two buttons at the bottom right, each asking "Shut down this computer?" / "Restart this computer?" first. The greeter runs `systemctl poweroff` or `systemctl reboot` (fixed arguments; the page can only name one of the two), so logind and polkit decide; `packaging/50-helix-greeter-power.rules` lets the `greetd` account do exactly those two actions. A refusal is shown as the system worded it. `HELIX_GREETER_POWER_LOG=<file>` makes the greeter write the action instead of doing it (nested tests).
+3. ~~Remembering the last account and session~~ — after a successful start the greeter writes `~/.local/state/helix-greeter/last.json` (the greeter user's own file, `HELIX_GREETER_REMEMBER` to move it) with the login name and session id. The next screen lists that account first, marked "Last signed in" when there are several, and preselects that session; either is used only if the screen itself lists it.
 4. Packaging (distro packages and Nix) for the session script, the apply helper, and compositor config; today `tools/install-greeter.sh` does the session script.
 
 Do not merge the greeter into the session shell binary.

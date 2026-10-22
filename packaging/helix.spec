@@ -190,6 +190,8 @@ command = "%{_bindir}/helix-greeter-session"
 user = "greetd"
 TOML
 
+install -D -m 0644 packaging/50-helix-greeter-power.rules %{buildroot}%{_datadir}/polkit-1/rules.d/50-helix-greeter-power.rules
+
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %if %{with check}
@@ -270,6 +272,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-greeter
 %{_bindir}/helix-greeter-session
 %{_datadir}/helix-greeter
+%{_datadir}/polkit-1/rules.d/50-helix-greeter-power.rules
 
 %changelog
 * Fri Oct 16 2026 Andrew Bevington <andrewlancebevington@gmail.com> - 0.1.0-1
