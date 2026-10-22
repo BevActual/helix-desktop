@@ -69,7 +69,7 @@ input:focus { outline: none; background: var(--fill-2); box-shadow: 0 0 0 2px co
 .glass { background: var(--glass); border-radius: var(--r-panel); box-shadow: var(--shadow), inset 0 0 0 .5px var(--hairline); }
 .panel { position: fixed; display: flex; flex-direction: column; gap: 12px; padding: 16px; opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.965);
          transform-origin: top right; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
-body[data-panel="control-center"] #controls, body[data-panel="notifications"] #notifs,
+body[data-panel="control-center"] #controls, body[data-panel="notifications"] #notifs, body[data-panel="today"] #notifs,
 body[data-panel="launcher"] #launcher, body[data-panel="quick-insert"] #quickinsert, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
 /* Split shell: each process only paints its half (same HTML, role from shell-mode). */
@@ -2187,3 +2187,9 @@ html.bar-hide-battery_percent #batt-label { display: none; }
 .privacy [data-slot="priv-mic"] { color: #ff9f0a; }
 .privacy [data-slot="priv-cam"] { color: #30d158; }
 .privacy[hidden] { display: none; }
+
+/* The calendar and the notifications are two panels over one container: the clock opens the calendar alone, the bell the list alone. */
+body[data-panel="notifications"] #notifs #today { display: none; }
+body[data-panel="today"] #notifs #notif-head, body[data-panel="today"] #notifs #notif-list, body[data-panel="today"] #notifs #notif-empty { display: none; }
+body[data-panel="today"] #notifs { right: auto; left: calc(50% - 190px); width: 380px; transform-origin: top center; }
+body[data-panel="today"] #notifs #today { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }

@@ -45,7 +45,7 @@ shell renderer follows the same visual grammar and targets helix-niri only.
 5. **Accessible as a baseline.** High Contrast, Reduced Motion, and keyboard navigation work
    everywhere, not just where someone remembered.
 6. **Status and day stay split.** Connectivity, power, volume, and quick toggles open Control
-   Center; the clock and notifications open Notification Center—not one fused shade.
+   Center; the clock opens the calendar (Today) and the bell opens Notification Center—two panels, not one fused shade.
 7. **Personalize in place.** Reorder (and later add/remove) bar chrome and Quick Settings without
    a scavenger hunt through Settings; Settings remains the accessible and power path.
 8. **Motion explains origin.** Surfaces open near the click; siblings slide when rearranging;
@@ -66,8 +66,8 @@ Rules:
 
 - **Never glass on glass.** Content on a glass panel is leftover (solid), not another glass card.
 - **One compact card per tab**, and the header carries the title; do not repeat it.
-- **Widgets deep-link**, they don't grow controls. The bar clock and notifications widget open
-  Notification Center; calendar and event management stay in calendar applications.
+- **Widgets deep-link**, they don't grow controls. The bar clock opens Today and the bell
+  opens Notification Center; calendar and event management stay in calendar applications.
 
 ### Where each surface sits
 
@@ -78,7 +78,7 @@ Rules:
 | Menus and popovers (context, dock, tray, dropdowns) | Chrome | One component (see Menus). |
 | Launcher | Chrome frame, leftover results | Results are grouped-list rows. |
 | Control Center | Floating chrome, solid controls | Quick Settings only (status widgets). |
-| Notification Center | Floating chrome, leftover list | History from clock / notifications widget. |
+| Notification Center | Floating chrome, leftover list | History from the bell. The clock opens the calendar (Today), centred under it. |
 | Settings and applications | Native libadwaita chrome and solid content | Adaptive persistent windows. |
 | Notifications (toasts) | Leftover on chrome | Actions are buttons, not links. |
 | OSD (volume, brightness) | Module | Value first, glyph second. |
@@ -224,8 +224,8 @@ tooltips and the dropdown. The status capsule uses a subtle `SurfaceVariant` pil
 icons and forces icon-only even if a member has `show_label` set. Brightness stays in Control
 Center sliders by default (not in the status capsule). Left-clicking a status widget (or an
 optional Control Center glyph) opens **Control Center** (Quick Settings only). Left-clicking
-the clock or notifications widget opens **Notification Center** (history only; unread count
-badge on the bell). Both are floating dropdowns under the bar, horizontally aligned to the
+the clock opens **Today** (the calendar alone) and the bell opens **Notification Center** (history only; unread count
+badge on the bell). They share one container but never show together. Both are floating dropdowns under the bar, horizontally aligned to the
 click (open-near-click), with `floating_offset` as the gap. Right-click and scroll on status
 widgets keep the quick toggles and adjustments. Tray item menus use the same chrome menu
 system and open below the bar widget.

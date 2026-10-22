@@ -202,7 +202,7 @@ listen("shell-mode", (event) => {
   if (panel === null && !dockPrefs.auto_hide) setDock(true);
   if (panel) document.body.dataset.panel = panel;
   else delete document.body.dataset.panel;
-  if (panel === "notifications") {
+  if (panel === "today") {
     if (reactToday) reactToday.open();
     else {
       drawToday();
@@ -602,7 +602,7 @@ document.querySelectorAll("[data-mobius-mode]").forEach((btn) => {
 $("agent-stopall").onclick = () => invoke("activity_stop_all");
 $("agent-toggle").onclick = () => invoke("activity_set_enabled", { enabled: $("agent-toggle").textContent === "Turn on" });
 $("apps").onclick = () => invoke("panel_open", { id: "launcher" });
-$("clock").onclick = () => invoke("panel_open", { id: "notifications" });
+$("clock").onclick = () => invoke("panel_open", { id: "today" });
 $("controlbtn").onclick = () => invoke("panel_open", { id: "control-center" });
 
 (function buildTalkSuggestions() {
@@ -1423,7 +1423,7 @@ queueInteractive();
 // Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
-const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
+const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", today: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
 // The interface scale (Settings, Accessibility). The page is zoomed by it, so everything the page measures is in zoomed pixels; the compositor and the
 // tests want real ones, so what is reported is multiplied by it.
 let uiScale = 1;

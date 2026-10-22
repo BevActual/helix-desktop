@@ -551,6 +551,7 @@ fn control(app: &AppHandle, command: &str) {
         "control-center" => open_panel(app, "control-center"),
         "agents" => open_panel(app, "agents"),
         "notifications" => open_panel(app, "notifications"),
+        "today" => open_panel(app, "today"),
         "quick-insert" => open_panel(app, "quick-insert"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
