@@ -10,10 +10,12 @@ use std::collections::HashMap;
 const MAX_LIVE: usize = 3;
 
 /// The person's answer to a question: yes or no, and for a yes whether to remember it ("always allow this").
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Answer {
     approved: bool,
     always: bool,
+    /// The plan as the person left it (when they were asked to review one).
+    plan: Option<String>,
 }
 
 /// What the person chose to always allow in a project folder, so the next task there starts with it.
@@ -151,6 +153,7 @@ pub async fn agent_task_start(
     from: Option<String>,
     network: Option<bool>,
     copy: Option<bool>,
+    plan_first: Option<bool>,
 ) -> Result<String, String> {
     let goal = goal.trim().to_string();
     if goal.is_empty() || goal.chars().count() > 2000 {
@@ -182,6 +185,7 @@ pub async fn agent_task_start(
     if policy.mode == helix_task::Mode::Enforce {
         recall(&mut policy);
     }
+    policy.plan_first = plan_first == Some(true);
     policy.network = network == Some(true) && !policy.folder.is_empty();
     if !policy.allows_model(model.local) {
         return Err("This task's policy allows only models on this computer.".into());
@@ -300,6 +304,25 @@ pub fn agent_task_review(
         Answer {
             approved,
             always: approved && always == Some(true),
+            plan: None,
+        },
+    )
+}
+
+/// The person's answer to a plan: approve it (as written, or edited) or decline it.
+#[tauri::command]
+pub fn agent_task_plan(
+    app: AppHandle,
+    id: String,
+    plan: String,
+    approved: bool,
+) -> Result<(), String> {
+    app.state::<Background>().review(
+        &id,
+        Answer {
+            approved,
+            always: false,
+            plan: Some(clip(plan.trim(), 1500)),
         },
     )
 }
@@ -352,7 +375,7 @@ async fn ask_person(
     input: &str,
     action: Option<&helix_task::Action>,
     cancel: &mut watch::Receiver<bool>,
-) -> Result<bool, String> {
+) -> Result<Answer, String> {
     let receiver = app.state::<Background>().waiting(&task.id)?;
     task.set_state(
         State::Waiting {
@@ -369,7 +392,7 @@ async fn ask_person(
     let answer = tokio::select! {
         biased;
         _ = cancel.changed() => return Err("Task stopped.".into()),
-        result = tokio::time::timeout(Duration::from_secs(3600), receiver) => result.ok().and_then(|r| r.ok()).unwrap_or(Answer { approved: false, always: false }),
+        result = tokio::time::timeout(Duration::from_secs(3600), receiver) => result.ok().and_then(|r| r.ok()).unwrap_or(Answer { approved: false, always: false, plan: None }),
     };
     if answer.always {
         if let Some(action) = action {
@@ -380,7 +403,7 @@ async fn ask_person(
     }
     task.set_state(State::Running, crate::now());
     let _ = store.save(task);
-    Ok(answer.approved)
+    Ok(answer)
 }
 
 async fn work(
@@ -413,6 +436,32 @@ async fn work(
         .as_ref()
         .map(crate::rules::prompt)
         .unwrap_or_default();
+    if task.policy.plan_first && task.plan.is_empty() {
+        let messages = [
+            ("system", helix_chat::chat::SYSTEM_PROMPT.to_string()),
+            ("user", format!("Task: {}\n\nWrite a short plan for this task: at most 6 numbered steps, in plain words, saying what you will do and in what order. {folder_note} You can search the web and read pages, run commands and edit files in the project folder, and use a screen on the agent display. No JSON, no introduction.", task.goal)),
+        ];
+        let text = model.call_with(&messages, cancel.clone(), 500).await?;
+        task.plan = clip(helix_chat::markdown::strip_thinking(&text).trim(), 1500);
+        let _ = store.save(task);
+        let shown = task.plan.clone();
+        let answer = ask_person(app, task, store, "Review the plan", &shown, None, cancel).await?;
+        if !answer.approved {
+            return Err("You declined the plan.".into());
+        }
+        if let Some(edited) = answer.plan.filter(|p| !p.is_empty()) {
+            task.plan = edited;
+        }
+        let _ = store.save(task);
+    }
+    let plan_note = if task.plan.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n\nThe person approved this plan. Follow it, and finish when it is done:\n{}",
+            task.plan
+        )
+    };
     let mut planning = vec![
         (
             "system",
@@ -421,7 +470,7 @@ async fn work(
                 helix_chat::chat::SYSTEM_PROMPT
             ),
         ),
-        ("user", format!("Current task:\n{}", task.goal)),
+        ("user", format!("Current task:\n{}{plan_note}", task.goal)),
     ];
     let chat_id = crate::new_id();
     let mut seen = HashSet::new();
@@ -544,7 +593,10 @@ async fn work(
                 continue;
             }
             Verdict::Ask(reason) => {
-                if !ask_person(app, task, store, &reason, &input, action.as_ref(), cancel).await? {
+                if !ask_person(app, task, store, &reason, &input, action.as_ref(), cancel)
+                    .await?
+                    .approved
+                {
                     finish(
                         task,
                         false,

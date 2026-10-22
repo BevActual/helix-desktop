@@ -6,7 +6,7 @@ import { invoke } from "@helix/ui";
 interface Step { n: number; tool: string; input: string; outcome: string; ok: boolean; place: string; at: number; would_ask?: string }
 interface Policy { name: string; folder: string; cloud: string; display: boolean; mode?: string; network?: boolean }
 type TaskState = { state: "queued" | "running" | "stopped" } | { state: "waiting"; why: string } | { state: "done"; summary: string } | { state: "failed"; error: string };
-interface AgentTask { id: string; goal: string; result_chat?: string; workdir?: string; dirty?: boolean; review?: string; policy: Policy; state: TaskState; steps: Step[]; created: number; updated: number }
+interface AgentTask { id: string; goal: string; plan?: string; result_chat?: string; workdir?: string; dirty?: boolean; review?: string; policy: Policy; state: TaskState; steps: Step[]; created: number; updated: number }
 export interface AgentTasksHandle { open: () => void; close: () => void }
 
 const ago = (secs: number) => {
@@ -41,6 +41,8 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const [diffText, setDiffText] = useState("");
   const [diffOf, setDiffOf] = useState("");
   const [allSteps, setAllSteps] = useState("");
+  const [planFirst, setPlanFirst] = useState(false);
+  const [draft, setDraft] = useState({ id: "", text: "" });
   const load = useCallback(() => invoke<AgentTask[]>("agent_tasks").then(setTasks, () => setTasks([])), []);
   useEffect(() => { register({ open: () => { setError(""); setShown(true); visible(true); load(); }, close: () => { setShown(false); visible(false); } }); }, [register, visible, load]);
   useEffect(() => { if (!shown) return; const timer = setInterval(load, 2500); return () => clearInterval(timer); }, [shown, load]);
@@ -63,7 +65,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const choose = async () => { try { const path = await invoke<string | null>("tools_pick_folder"); if (path) setFolder(path); } catch (reason) { setError(String(reason)); } };
   const start = async () => {
     setBusy(true);
-    const id = await call("agent_task_start", { goal, folder, policy, practice, network, copy: onCopy, from: null });
+    const id = await call("agent_task_start", { goal, folder, policy, practice, network, copy: onCopy, planFirst, from: null });
     setBusy(false);
     if (typeof id === "string") { setGoal(""); setPractice(false); setSelected(id); }
   };
@@ -87,6 +89,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     </div>
     <div className="opt-chips" role="group" aria-label="Options">
       <button type="button" role="switch" aria-checked={onCopy} className={`opt-chip${onCopy ? " on" : ""}`} data-test="agent-task-copy" title="If the folder is a git project, the task works on its own copy of the last commit and you review its changes before anything reaches your project." onClick={() => setOnCopy(!onCopy)}>Work on a copy</button>
+      <button type="button" role="switch" aria-checked={planFirst} className={`opt-chip${planFirst ? " on" : ""}`} data-test="agent-task-planfirst" title="It writes a short plan first, and nothing happens until you approve or edit it." onClick={() => setPlanFirst(!planFirst)}>Plan first</button>
       <button type="button" role="switch" aria-checked={practice} className={`opt-chip${practice ? " on" : ""}`} data-test="agent-task-practice" title="Goes ahead without asking, inside the sandbox, and lists what it would have asked. Then run it for real with just that allowed." onClick={() => setPractice(!practice)}>Practice run</button>
       <button type="button" role="switch" aria-checked={network && !!folder} className={`opt-chip${network && folder ? " on" : ""}`} data-test="agent-task-network" disabled={!folder} title="Commands can reach the internet, for example to install packages. Needs a project folder." onClick={() => setNetwork(!network)}>Allow network</button>
     </div>
@@ -98,7 +101,12 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
       <h3>{task.goal}</h3>
       <p className="agents-meta"><span className={`agents-dot ${task.state.state}`} />{label(task)} · {task.steps.length} step{task.steps.length === 1 ? "" : "s"} · {ago(task.updated)} · {task.policy.name}{[...new Set(task.steps.filter((s) => s.place !== "local").map((s) => s.place))].map((p) => <span key={p} className="agents-badge remote" title="These steps ran on a remote model">{p}</span>)}{task.steps.every((s) => s.place === "local") && <span className="agents-badge" title="Every step ran on this computer">On this computer</span>}</p>
     </header>
-    {task.state.state === "waiting" && <p className="agents-callout" data-test="agent-task-waiting">Waiting for you: {task.state.why}</p>}
+    {task.state.state === "waiting" && task.state.why.startsWith("Review the plan") ? <section className="agents-plan" data-test="agent-task-plan">
+      <strong>Plan to approve</strong>
+      <textarea data-test="agent-task-plan-text" rows={8} value={draft.id === task.id ? draft.text : (task.plan ?? "")} onChange={(e) => setDraft({ id: task.id, text: e.target.value })} />
+      <div className="agents-actions"><button type="button" className="mini primary" data-test={`agent-task-plan-approve-${task.id}`} onClick={() => call("agent_task_plan", { id: task.id, plan: draft.id === task.id ? draft.text : (task.plan ?? ""), approved: true })}>Approve plan</button><button type="button" className="mini" data-test={`agent-task-plan-decline-${task.id}`} onClick={() => call("agent_task_plan", { id: task.id, plan: "", approved: false })}>Decline</button></div>
+    </section> : task.state.state === "waiting" && <p className="agents-callout" data-test="agent-task-waiting">Waiting for you: {task.state.why}</p>}
+    {task.plan && !(task.state.state === "waiting" && task.state.why.startsWith("Review the plan")) && <details className="agents-plan-done"><summary>Plan</summary><pre>{task.plan}</pre></details>}
     {task.state.state === "failed" && <p className="agents-callout bad">{task.state.error}</p>}
     {task.state.state === "done" && <p className="agents-answer">{task.state.summary}</p>}
     {task.review === "pending" && task.state.state !== "running" && task.state.state !== "waiting" && <section className="agents-changes" data-test="agent-task-changes">
@@ -110,7 +118,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     {task.review === "discarded" && <p className="agents-note">Changes discarded.</p>}
     <div className="agents-actions">
       {task.result_chat ? <button type="button" className="mini" data-test={`agent-task-open-${task.id}`} onClick={() => { onOpenChat(task.result_chat!); setShown(false); visible(false); }}>Open the answer chat</button> : null}
-      {task.policy.mode === "practice" && task.steps.some((s) => s.would_ask) && task.state.state !== "running" && <button type="button" className="mini primary" data-test={`agent-task-again-${task.id}`} title="Start again, allowing what the practice run needed" onClick={async () => { const id = await call("agent_task_start", { goal: task.goal, folder: task.policy.folder, policy: "", practice: false, network: !!task.policy.network, copy: true, from: task.id }); if (typeof id === "string") setSelected(id); }}>Run for real</button>}
+      {task.policy.mode === "practice" && task.steps.some((s) => s.would_ask) && task.state.state !== "running" && <button type="button" className="mini primary" data-test={`agent-task-again-${task.id}`} title="Start again, allowing what the practice run needed" onClick={async () => { const id = await call("agent_task_start", { goal: task.goal, folder: task.policy.folder, policy: "", practice: false, network: !!task.policy.network, copy: true, planFirst: false, from: task.id }); if (typeof id === "string") setSelected(id); }}>Run for real</button>}
       {!["running", "waiting", "queued"].includes(task.state.state) && <button type="button" className="mini" data-test={`agent-task-delete-${task.id}`} onClick={() => { setSelected(""); call("agent_task_delete", { id: task.id }); }}>Delete</button>}
     </div>
     <h4>Steps</h4>

@@ -53,6 +53,9 @@ pub struct Task {
     pub steps: Vec<Step>,
     /// What the task wrote down for itself to keep going after the early steps have been dropped from its context.
     pub notes: String,
+    /// The plan the task wrote before acting (and the person edited or approved), when it was asked to plan first.
+    #[serde(default)]
+    pub plan: String,
     /// The chat holding the answer and the steps, once the task is done.
     #[serde(default)]
     pub result_chat: String,
@@ -92,6 +95,7 @@ impl Task {
             dirty: false,
             review: String::new(),
             notes: String::new(),
+            plan: String::new(),
             created: now,
             updated: now,
         }

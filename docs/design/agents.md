@@ -73,7 +73,9 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    that (the first two words of a plain command, edits inside the folder, that app) to the task's policy and to a per-folder memory
    (`~/.local/share/helix/mobius/folder-policy.json`) so the next task in that folder starts with it. Risky or chained commands are never remembered.
    Long step lists show the latest five with the earlier ones one click away.
-   Still to do: plan-first (an editable plan to approve before the task acts), a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
+   **Plan first** (chip on a new task): the task writes at most six numbered steps and waits; the person edits and approves (or declines) the plan, which
+   then goes into the task's prompt. Nothing runs before that.
+   Still to do: a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.
 4. **Memory and skills the agent writes for itself**, local and editable (the knowledge store), after the Hermes pattern.

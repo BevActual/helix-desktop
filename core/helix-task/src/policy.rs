@@ -55,6 +55,8 @@ pub struct Policy {
     pub max_steps: u32,
     pub max_minutes: u32,
     pub mode: Mode,
+    /// Write a short plan first and wait for the person to approve (or edit) it before acting.
+    pub plan_first: bool,
     /// Commands may reach the network. (The sandbox cannot filter by host, so this is all or nothing.)
     pub network: bool,
     /// Absolute paths outside the folder that commands may read (a toolchain, a data set), never write.
@@ -86,6 +88,7 @@ impl Policy {
             max_steps: 40,
             max_minutes: 30,
             mode: Mode::Enforce,
+            plan_first: false,
             network: false,
             read_only: vec![],
             protect: vec![],

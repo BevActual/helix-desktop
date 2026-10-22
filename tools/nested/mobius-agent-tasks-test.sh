@@ -173,4 +173,31 @@ import json,sys
 t=json.load(open(sys.argv[1]))
 assert t['steps'][0]['tool']=='terminal' and t['steps'][0]['ok'] and 'touch' in t['policy']['allow_commands'][-1],t['policy']['allow_commands']
 PY
-echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), and remember Always allow per folder"
+
+# 8. Plan first: the task writes a plan and does nothing until it is approved; the person can edit it.
+printf '[{"tool":"terminal","command":"touch planned.txt"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+sleep 1; wtype 'Do the planned thing.'
+click_id agent-task-planfirst
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$EIGHT" ] && break; sleep 0.25; done
+NINE=$(newest_task)
+wait_state "$NINE" waiting
+wait_id "agent-task-plan-approve-$NINE"
+python3 - "$TASKS/$NINE.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['plan'] and t['steps']==[] and t['state']['why'].startswith('Review the plan'),t
+PY
+click_id agent-task-plan-text
+wtype ' Edited by me.'
+click_id "agent-task-plan-approve-$NINE"
+wait_state "$NINE" done
+python3 - "$TASKS/$NINE.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['plan'].endswith('Edited by me.'),t['plan']
+PY
+echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, and wait for a plan to be approved or edited"

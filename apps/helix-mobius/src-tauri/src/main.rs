@@ -4180,6 +4180,7 @@ fn main() {
             agent::background::agent_task_apply,
             agent::background::agent_task_discard,
             agent::background::agent_task_review,
+            agent::background::agent_task_plan,
             scheduled::scheduled_list,
             scheduled::scheduled_save,
             scheduled::scheduled_set_enabled,
