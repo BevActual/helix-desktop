@@ -1912,6 +1912,40 @@ fn display_layout() -> Vec<serde_json::Value> {
         .collect()
 }
 
+/// Flashes each display's number on that display for a few seconds (`helix-identify`), the same numbers the arrangement picture shows.
+#[tauri::command]
+fn display_identify() -> Result<(), String> {
+    let layout = display_layout();
+    if layout.len() < 2 {
+        return Err("There is only one display.".into());
+    }
+    let names: Vec<String> = layout
+        .iter()
+        .enumerate()
+        .filter_map(|(index, screen)| Some(format!("{}={}", screen["name"].as_str()?, index + 1)))
+        .collect();
+    // The helper next to this program (a build tree or an install), else the one on the path.
+    let program = std::env::var_os("HELIX_IDENTIFY_BIN")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .map(|exe| exe.with_file_name("helix-identify"))
+                .filter(|p| p.exists())
+        })
+        .unwrap_or_else(|| "helix-identify".into());
+    std::process::Command::new(program)
+        .args(["--seconds", "4"])
+        .args(&names)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|_| "helix-identify is not installed.".to_string())?;
+    eprintln!("SETTINGS identify {}", names.join(" "));
+    Ok(())
+}
+
 /// Moves one display to where it was dropped, snapped against a neighbour so the desktop stays in one piece.
 #[tauri::command]
 fn display_move(name: String, x: i32, y: i32) -> Result<Vec<serde_json::Value>, String> {
@@ -2813,6 +2847,7 @@ fn main() {
             displays_rows,
             display_layout,
             display_move,
+            display_identify,
             displays_change,
             datetime_rows,
             accent_get,

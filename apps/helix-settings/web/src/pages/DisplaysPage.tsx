@@ -135,6 +135,7 @@ export function DisplaysPage({ spec, register, initialRows, onRows, report }: { 
           <h4>Arrangement</h4>
           <div className="rows-card arrangement-card">
             <Arrangement screens={screens} onMove={moved} busy={busy} />
+            <div className="arrangement-tools"><button type="button" data-test="identify-displays" onClick={() => invoke("display_identify").catch((error) => setNote(String(error)))}>Identify</button><span className="setting-about">Shows each screen's number on that screen for a few seconds.</span></div>
             <div className="setting-about" data-test="arrangement-note">{note || "Drag a screen to where it sits on your desk, or pick one and use the arrow keys. It snaps against its neighbour so the pointer can cross."}</div>
           </div>
         </>

@@ -91,6 +91,7 @@ pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nes
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-displays && run settings-displays settings-displays-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-arrange && run settings-arrange settings-arrange-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_EXTRA_OUTPUTS=1024x768
+pick identify && run identify identify-test.sh identify-nested.sh HELIX_NESTED_EXTRA_OUTPUTS=1024x768 "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-datetime && run settings-datetime settings-datetime-test.sh settings-datetime-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-pointer && run settings-pointer settings-pointer-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-defaults && run settings-defaults settings-defaults-test.sh settings-defaults-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

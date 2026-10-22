@@ -3019,6 +3019,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-identify"
+version = "0.1.0"
+dependencies = [
+ "cairo-rs 0.21.5",
+ "pango 0.21.5",
+ "pangocairo",
+ "smithay-client-toolkit",
+ "wayland-client",
+]
+
+[[package]]
 name = "helix-idle"
 version = "0.1.0"
 dependencies = [

@@ -24,6 +24,15 @@ for _ in $(seq 1 120); do grep -q "SETTINGS bluetooth" "$LOG" && break; sleep 0.
 click_id page-displays; sleep 2
 wait_id arrange-headless-1 20 && has_id arrange-headless-2 && echo "ok: both displays are drawn in the arrangement" || fail "no arrangement: $(niri msg --json outputs | head -c 300)"
 echo "start: headless-1 $(pos headless-1), headless-2 $(pos headless-2)"
+# Identify: a badge with each screen's number on that screen, which leaves on its own.
+badges() { niri msg --json layers | python3 -c '
+import json,sys
+print(" ".join(sorted(l["output"] for l in json.load(sys.stdin) if l.get("namespace") == "helix-identify")))'; }
+click_id identify-displays; sleep 2
+[ "$(badges)" = "headless-1 headless-2" ] && echo "ok: Identify puts a badge on each screen" || fail "badges: $(badges)"
+grep -q "SETTINGS identify headless-1=1 headless-2=2" "$LOG" && echo "ok: the numbers are the ones the arrangement shows" || fail "identify log: $(grep 'SETTINGS identify' "$LOG")"
+sleep 4
+[ -z "$(badges)" ] && echo "ok: the badges left" || fail "badges stayed: $(badges)"
 shot arrange-before
 # Drag headless-2 (wherever the compositor put it) down and to the left of headless-1: it should come to rest below, touching.
 python3 - <<'PY' > "$SCRATCH/drag.txt"
