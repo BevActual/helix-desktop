@@ -12,6 +12,7 @@ ai-usage-status = "observe"
 bluetooth-status = "observe"
 brightness-list-backlight-devices = "observe"
 color-scheme-get = "observe"
+display-state = "observe"
 desktop-ai-status = "observe"
 firewall-status = "observe"
 log-level-status = "observe"
@@ -194,6 +195,7 @@ session = "blocked"
 # restore: one short setting. Record the previous value and write it back.
 # none: no before and after, and no undo. See docs/design/act-undo.md.
 [changes]
+display-state = "none"
 display-click = "none"
 display-help = "none"
 display-key = "none"

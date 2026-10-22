@@ -50,6 +50,7 @@ pub const SUPPORTED: &[&str] = &[
     "display-key",
     "display-type",
     "display-help",
+    "display-state",
 ];
 
 /// How long free text on the wire may be (`app-launch` query, `clipboard-copy` payload).
@@ -130,6 +131,8 @@ pub enum Command {
     DisplayType(String),
     /// Ask the person for help with a step only they can do; the agent waits until they say they are done.
     DisplayHelp(String),
+    /// What is on the agent display and whether it is waiting on the person (JSON; `observe`).
+    DisplayState,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -479,6 +482,10 @@ pub fn parse(line: &str) -> Result<Command, MsgError> {
         "display-screenshot" => {
             no_args(&args)?;
             Command::DisplayScreenshot
+        }
+        "display-state" => {
+            no_args(&args)?;
+            Command::DisplayState
         }
         "display-click" => match args.as_slice() {
             [x, y] => Command::DisplayClick {
@@ -905,6 +912,7 @@ mod tests {
             "display-key Return",
             "display-type hello",
             "display-help sign in",
+            "display-state",
         ];
         assert_eq!(examples.len(), SUPPORTED.len());
         for (example, name) in examples.iter().zip(SUPPORTED) {
@@ -969,6 +977,8 @@ mod tests {
             Ok(Command::DisplayHelp("sign in to the portal".into()))
         );
         assert_eq!(parse("display-screenshot"), Ok(Command::DisplayScreenshot));
+        assert_eq!(parse("display-state"), Ok(Command::DisplayState));
+        assert!(parse("display-state now").is_err());
         for bad in [
             "display-click",
             "display-click 1",

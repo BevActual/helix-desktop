@@ -371,6 +371,17 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
         Command::DisplayType(text) => {
             display_input(move || crate::agent_display::agent_type(&text)).await
         }
+        Command::DisplayState => {
+            let status = crate::agent_display::status();
+            let state = serde_json::json!({
+                "running": status.running,
+                "windows": status.windows.iter().map(|w| serde_json::json!({"app_id": w.app_id, "title": w.title})).collect::<Vec<_>>(),
+                "help": crate::agent_display::help_reason(),
+                "person_in_control": crate::agent_display::person_controlling(),
+                "size": [1280, 720],
+            });
+            Ok(format!("{state}\n"))
+        }
         Command::DisplayHelp(reason) => {
             crate::agent_display::request_help(app, &reason);
             ok()

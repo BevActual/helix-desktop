@@ -996,6 +996,14 @@
     {
       "flags": [],
       "hidden": false,
+      "name": "display-state",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "What is on the agent display, and whether it waits for the person (JSON: running, windows, help, person_in_control)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
       "name": "display-type",
       "positionals": [
         {

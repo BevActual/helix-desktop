@@ -532,6 +532,135 @@ def dnd_toggle() -> str:
     return helix_msg("notification-dnd-status")
 
 
+# ---------------------------------------------------------------------------------------------------------------------------------
+# Computer use: Helix's sandboxed computer. Everything below acts on the AGENT DISPLAY, a separate screen that only the agent's own
+# programs run on (docs/design/computer-use.md), never on the person's desktop. The person can watch it from the bar, take over, and is
+# asked for help when the agent cannot do a step (signing in, a captcha, a choice). Never type a password: ask for help instead.
+# ---------------------------------------------------------------------------------------------------------------------------------
+
+
+@mcp.tool()
+def computer_launch(application: str) -> str:
+    """Start an installed application on the agent display (its own screen, 1280x720), starting the display if needed.
+
+    application: a desktop id or name (for example firefox or org.mozilla.firefox.desktop). The person approves each launch.
+    """
+    _guard("computer_launch")
+    application = application.strip()
+    if not application:
+        return "error: application is required"
+    return helix_msg("display-launch", literal=(application,), timeout=90.0)
+
+
+def _screenshot_path(reply: str) -> str | None:
+    for line in reversed(reply.splitlines()):
+        if line.startswith("ok /"):
+            return line[3:].strip()
+    return None
+
+
+@mcp.tool()
+def computer_screenshot():
+    """Take a picture of the agent display. Coordinates for the other computer_* tools are pixels in this picture (1280x720, 0,0 top left)."""
+    _guard("computer_screenshot")
+    reply = helix_msg("display-screenshot", timeout=60.0)
+    path = _screenshot_path(reply)
+    if path is None:
+        return reply
+    try:
+        from mcp.server.fastmcp import Image
+
+        return Image(path=path)
+    except OSError as error:
+        return f"error: could not read the picture: {error}"
+
+
+@mcp.tool()
+def computer_click(x: int, y: int, button: str = "left") -> str:
+    """Click at a pixel position on the agent display. button: left (default), right or middle."""
+    _guard("computer_click")
+    if button not in ("left", "right", "middle"):
+        return "error: button is left, right or middle"
+    return helix_msg("display-click", str(int(x)), str(int(y)), button)
+
+
+@mcp.tool()
+def computer_move(x: int, y: int) -> str:
+    """Move the pointer on the agent display without clicking."""
+    _guard("computer_move")
+    return helix_msg("display-move", str(int(x)), str(int(y)))
+
+
+@mcp.tool()
+def computer_scroll(steps: int, across: int = 0) -> str:
+    """Scroll the wheel on the agent display: positive steps scroll down (and `across` to the right), negative the other way (-50 to 50)."""
+    _guard("computer_scroll")
+    if across:
+        return helix_msg("display-scroll", str(int(across)), str(int(steps)))
+    return helix_msg("display-scroll", str(int(steps)))
+
+
+@mcp.tool()
+def computer_key(key: str) -> str:
+    """Press a key on the agent display: Return, Tab, Escape, BackSpace, Delete, Left, Right, Up, Down, Home, End, Page_Up, Page_Down, F1-F12, one
+    character such as a, or a combination joined with + such as Control_L+a or Control_L+Shift_L+t."""
+    _guard("computer_key")
+    key = key.strip()
+    if not key:
+        return "error: key is required"
+    return helix_msg("display-key", key)
+
+
+@mcp.tool()
+def computer_type(text: str) -> str:
+    """Type text into whatever has the focus on the agent display (up to 800 characters, one line). Press Return with computer_key.
+
+    Never type a password or a code: use computer_ask_for_help so the person types it.
+    """
+    _guard("computer_type")
+    if not text:
+        return "error: text is required"
+    return helix_msg("display-type", literal=(text,))
+
+
+@mcp.tool()
+def computer_state() -> str:
+    """What is on the agent display: JSON with running, windows (app_id, title), help (the request waiting for the person, or null),
+    person_in_control (the person has taken over, so computer_* inputs are refused) and size."""
+    _guard("computer_state")
+    return helix_msg("display-state")
+
+
+@mcp.tool()
+def computer_ask_for_help(reason: str, wait_minutes: int = 10) -> str:
+    """Ask the person to do a step only they can (sign in, a captcha, a choice, a payment) and wait until they say they are done.
+
+    reason: what they need to do, in under 200 characters. The person sees "Agent needs your help" in the bar, can take over the display and do
+    the step, and presses Done. Returns when they have, or after wait_minutes (then your inputs stay refused until they answer). Take a new
+    screenshot afterwards: the screen will have changed.
+    """
+    _guard("computer_ask_for_help")
+    reason = reason.strip()
+    if not reason:
+        return "error: reason is required"
+    asked = helix_msg("display-help", literal=(reason[:200],))
+    if asked.startswith("error"):
+        return asked
+    import time
+
+    deadline = time.monotonic() + max(1, min(int(wait_minutes), 60)) * 60
+    while time.monotonic() < deadline:
+        time.sleep(2.0)
+        state = helix_msg("display-state")
+        try:
+            body = json.loads(state[state.index("{"):])
+        except ValueError:
+            continue
+        if not body.get("help"):
+            return "The person says they are done. Take a new screenshot to see what changed."
+    return "Still waiting for the person; your computer_* inputs stay refused until they answer."
+
+
 def main() -> None:
     mcp.run(transport="stdio")
 
