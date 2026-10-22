@@ -66,6 +66,9 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    folder (so git works inside the sandbox and two tasks cannot collide). When it finishes the sheet offers *Review changes*: the diff against the starting
    commit (committed, uncommitted and new files), then *Apply to project* (a `git apply` that is checked first, so all of it or none, left unstaged) or
    *Discard*. Uncommitted changes in the project are not in the copy and the sheet says so. Non-git folders still work in place.
+   **Agents home:** the sidebar's Agents row opens a page of its own (not a dialog): tasks on the left grouped *Needs you*, *Working*, *Ready to review*, *Earlier*,
+   with Allow, Decline and Stop on the row itself and a count badge on the sidebar row; on the right the selected task: its answer, the changes to apply or
+   discard (the diff opens by itself), and every step with a badge for where it ran. New task is a composer on the same page.
    Still to do: a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.

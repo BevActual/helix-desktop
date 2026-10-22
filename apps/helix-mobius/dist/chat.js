@@ -3044,8 +3044,20 @@ const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
 const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
 const reactScheduled = window.HelixMobiusReact?.scheduled($("scheduled-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-scheduled").onclick = () => reactScheduled?.open();
-const reactAgentTasks = window.HelixMobiusReact?.agentTasks($("agent-tasks-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
+const reactAgentTasks = window.HelixMobiusReact?.agentTasks($("agent-tasks-host"), (shown) => { document.body.classList.toggle("agents-open", shown); $("mode-tasks").classList.toggle("active", shown); $("mode-chat").classList.toggle("active", !shown); }, (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-tasks").onclick = () => reactAgentTasks?.open();
+// What is waiting for the person shows as a count on the sidebar row, whatever page is open.
+async function drawAgentsBadge() {
+  const tasks = await invoke("agent_tasks").catch(() => []);
+  const waiting = tasks.filter((t) => t.state && t.state.state === "waiting").length;
+  const badge = $("agents-badge");
+  badge.hidden = waiting === 0;
+  badge.textContent = String(waiting);
+}
+drawAgentsBadge();
+setInterval(drawAgentsBadge, 4000);
+// Opening a chat from the list leaves the Agents page.
+document.addEventListener("click", (event) => { if (event.target instanceof Element && event.target.closest("#chat-list-host, #new-chat, #mode-chat")) reactAgentTasks?.close(); }, true);
 // A chat begun from the Projects page joins its project once it has its first message (an empty chat is not kept, so it cannot be moved yet).
 let pendingProject = "";
 const reactProjects = window.HelixMobiusReact?.projects($("projects-host"), {
@@ -3082,7 +3094,7 @@ function paletteItems(query) {
   act("analyze", "Analyze software", "Inspect a Linux binary with REA and Ghidra. It is not run.", "", () => openAnalysis());
   act("side", "Side chat", "Ask something that reads this chat without touching it", "/side", () => startSideChat().catch(report));
   act("artifacts", "Artifacts", "Every document your chats made", "", () => showArtifacts(true));
-  act("agent-tasks", "Agent tasks", "What agents did, step by step", "", () => reactAgentTasks?.open());
+  act("agent-tasks", "Agents", "Tasks that run on their own, and what they did", "", () => reactAgentTasks?.open());
   act("scheduled", "Scheduled prompts", "Run a prompt by itself at a time", "", () => reactScheduled?.open());
   act("projects", "Projects", "Instructions, folder, chats and documents together", "", () => reactProjects?.open());
   act("memory", "Memory", "What Mobius remembers", "", () => openMemory());

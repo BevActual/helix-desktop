@@ -26,6 +26,7 @@ wait_state() { for _ in $(seq 1 120); do [ "$(state_of "$1" 2>/dev/null)" = "$2"
 wait_id mode
 click_id mode-tasks
 wait_id agent-tasks-panel
+sleep 4
 
 # 1. A command asks in the sheet, runs after Allow, and the answer is a chat.
 printf '[{"tool":"terminal","command":"printf bg > bg.txt"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
@@ -36,6 +37,7 @@ sleep 1; wtype 'Write a note file in the project.'
 click_id agent-task-choose
 sleep 2
 click_id agent-task-start
+sleep 1
 for _ in $(seq 1 60); do [ -n "$(newest_task)" ] && break; sleep 0.25; done
 ONE=$(newest_task)
 wait_state "$ONE" waiting
@@ -117,8 +119,7 @@ for _ in $(seq 1 60); do [ "$(newest_task)" != "$FOUR" ] && break; sleep 0.25; d
 FIVE=$(newest_task)
 wait_state "$FIVE" done
 [ "$(cat "$REPO/a.txt")" = one ] || { echo 'FAIL: the project changed before review'; exit 1; }
-wait_id "agent-task-review-$FIVE"
-click_id "agent-task-review-$FIVE"
+click_id "agent-task-$FIVE"
 wait_id agent-task-diff
 wait_id "agent-task-apply-$FIVE"
 click_id "agent-task-apply-$FIVE"
@@ -139,8 +140,7 @@ click_id agent-task-start
 for _ in $(seq 1 60); do [ "$(newest_task)" != "$FIVE" ] && break; sleep 0.25; done
 SIX=$(newest_task)
 wait_state "$SIX" done
-wait_id "agent-task-review-$SIX"
-click_id "agent-task-review-$SIX"
+click_id "agent-task-$SIX"
 wait_id "agent-task-discard-$SIX"
 click_id "agent-task-discard-$SIX"
 for _ in $(seq 1 40); do [ "$(python3 -c "import json;print(json.load(open('$TASKS/$SIX.json'))['review'])")" = discarded ] && break; sleep 0.25; done
