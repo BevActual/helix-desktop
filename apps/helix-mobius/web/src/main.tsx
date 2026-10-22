@@ -15,6 +15,7 @@ import { Stage, type StageHandle, type StageHooks } from "./workpanel";
 import { ImageStage, type ImageHandle, type ImageHooks } from "./imagestage";
 import { Projects, type ProjectsHandle, type ProjectsHooks } from "./projects";
 import { Scheduled, type ScheduledHandle } from "./scheduled";
+import { AgentTasks, type AgentTasksHandle } from "./agenttasks";
 import { Palette, type PaletteHandle, type PaletteHooks } from "./palette";
 import { Memory, type MemoryHandle } from "./memory";
 import { CreateImage, type CreateImageHandle } from "./create-image";
@@ -78,6 +79,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   scheduled: (host: HTMLElement, onOpenChat: (id: string) => void) => {
     const run = handled<ScheduledHandle>(host, (register) => <Scheduled register={register} onOpenChat={onOpenChat} />);
+    return { open: () => run((h) => h.open()) };
+  },
+  agentTasks: (host: HTMLElement) => {
+    const run = handled<AgentTasksHandle>(host, (register) => <AgentTasks register={register} />);
     return { open: () => run((h) => h.open()) };
   },
   memory: (host: HTMLElement) => {

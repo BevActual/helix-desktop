@@ -604,6 +604,23 @@ pub async fn run(app: AppHandle, mut turn: Turn, has_private_inputs: bool) {
     app.state::<Runtime>().finish(generation);
 }
 
+/// A task left running when Mobius closed did not finish.
+pub fn settle_tasks_after_start() {
+    task_store().settle_after_restart(crate::now());
+}
+#[tauri::command]
+pub fn agent_tasks() -> Vec<helix_task::Task> {
+    task_store().list().into_iter().take(50).collect()
+}
+#[tauri::command]
+pub fn agent_task_delete(id: String) -> Result<Vec<helix_task::Task>, String> {
+    let store = task_store();
+    if store.load(&id).is_some_and(|t| !t.state.finished()) {
+        return Err("That task is still running. Stop it first.".into());
+    }
+    store.delete(&id)?;
+    Ok(agent_tasks())
+}
 fn task_store() -> helix_task::Store {
     helix_task::Store::new(&crate::data_home().join("helix/mobius/tasks"))
 }

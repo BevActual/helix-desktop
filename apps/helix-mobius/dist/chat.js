@@ -3044,6 +3044,8 @@ const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
 const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
 const reactScheduled = window.HelixMobiusReact?.scheduled($("scheduled-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-scheduled").onclick = () => reactScheduled?.open();
+const reactAgentTasks = window.HelixMobiusReact?.agentTasks($("agent-tasks-host"));
+$("mode-tasks").onclick = () => reactAgentTasks?.open();
 // A chat begun from the Projects page joins its project once it has its first message (an empty chat is not kept, so it cannot be moved yet).
 let pendingProject = "";
 const reactProjects = window.HelixMobiusReact?.projects($("projects-host"), {
@@ -3080,6 +3082,7 @@ function paletteItems(query) {
   act("analyze", "Analyze software", "Inspect a Linux binary with REA and Ghidra. It is not run.", "", () => openAnalysis());
   act("side", "Side chat", "Ask something that reads this chat without touching it", "/side", () => startSideChat().catch(report));
   act("artifacts", "Artifacts", "Every document your chats made", "", () => showArtifacts(true));
+  act("agent-tasks", "Agent tasks", "What agents did, step by step", "", () => reactAgentTasks?.open());
   act("scheduled", "Scheduled prompts", "Run a prompt by itself at a time", "", () => reactScheduled?.open());
   act("projects", "Projects", "Instructions, folder, chats and documents together", "", () => reactProjects?.open());
   act("memory", "Memory", "What Mobius remembers", "", () => openMemory());

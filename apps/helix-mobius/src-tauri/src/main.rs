@@ -4163,6 +4163,8 @@ fn main() {
             inline::code_transform,
             inline::code_apply,
             inline::code_save,
+            agent::agent_tasks,
+            agent::agent_task_delete,
             scheduled::scheduled_list,
             scheduled::scheduled_save,
             scheduled::scheduled_set_enabled,
@@ -4309,6 +4311,7 @@ fn main() {
             app.manage(web::Research::default());
             act::watch(app.handle().clone());
             app.manage(agent::Runtime::default());
+            agent::settle_tasks_after_start();
             app.manage(acp::Runtime::default());
             let mut fresh = Conversation::new(&new_id(), now()).expect("a fresh id is valid");
             if let Some(turns) = take_bar_handoff() {
