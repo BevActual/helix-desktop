@@ -33,6 +33,8 @@ PY
 # A battery to show (the nested machine may have none).
 mkdir -p "$SCRATCH/power/BAT0"; printf Battery > "$SCRATCH/power/BAT0/type"; printf 64 > "$SCRATCH/power/BAT0/capacity"; printf Discharging > "$SCRATCH/power/BAT0/status"
 export HELIX_LOCK_POWER_DIR=$SCRATCH/power
+# The interface scale (the shell writes this file): the lock screen is laid out larger by it.
+mkdir -p "$XDG_RUNTIME_DIR"; printf 1.25 > "$XDG_RUNTIME_DIR/helix-ui-scale"
 export HELIX_LOCK_PAM_DIR=$PAM HELIX_LOCK_PAM_SERVICE=helix-lock-test
 sleep 3
 echo "--- locking"
@@ -42,6 +44,14 @@ sleep 1.5
 LOCKER=$(pgrep -x helix-lock | head -1)
 [ -n "$LOCKER" ] && echo "ok: the locker is running" || fail "no locker"
 snap locked-empty
+python3 - "$SCRATCH/locked-empty.png" <<'PY' && echo "ok: at an interface scale of 1.25 the avatar is $(python3 -c 'print(round(76*1.25))') px wide, not 76" || fail "the lock screen did not follow the interface scale"
+import sys
+from PIL import Image
+img = Image.open(sys.argv[1]).convert("RGB"); w, h = img.size
+xs = [x for y in range(h) for x in range(w) if img.getpixel((x, y)) == (0x0a, 0x84, 0xff)]
+width = max(xs) - min(xs) + 1
+assert abs(width - 95) <= 3, width
+PY
 echo "--- a wrong password"
 wtype "wrong horse"; sleep 0.4; snap typing; wtype -k Return; sleep 0.25; snap wrong; sleep 2
 kill -0 "$LOCKER" 2>/dev/null && echo "ok: a wrong password did not release the lock" || fail "the lock was released by a wrong password"

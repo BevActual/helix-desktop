@@ -41,7 +41,6 @@ each one does, and what it does not, is in `settings-audit.md`; that file is the
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
 | **Notifications page, next**: per-app rules (the on/off switch, banner time and count, quiet hours are done) | M | A consumer in `helix_shell_model::notifications` | `settings-audit.md` |
-| **Interface scale in the shell's own chrome** (bar, dock, panels follow the scale) | M | The bar and dock set layer-surface sizes and exclusive zones, so they need to follow the scale rather than be zoomed | Applications follow `accessibility.ui_scale` already; the shell does not |
 | **Privacy**: location (on/off is in Date & time), camera and microphone permissions, and a "in use" indicator in the bar | M | The service exposes capture streams (see section 4) | Common desktop expectation |
 | **Users**: name, picture, password | M | A polkit-guarded helper; never handle the password in the page | Common desktop expectation |
 | Top bar: height and position, auto-hide, order of items | M | The bar sets a strut, so a change has to move the exclusive zone | `settings-audit.md` "Top bar" |

@@ -194,6 +194,8 @@ impl App {
             };
             let scale = lockable.scale.max(1);
             let (pw, ph) = ((lw as i32) * scale, (lh as i32) * scale);
+            // The interface scale shrinks the logical screen the picture is laid out on, so everything on it is larger.
+            let zoom = facts::ui_scale();
             let Ok(mut canvas) = ImageSurface::create(Format::ARgb32, pw, ph) else {
                 continue;
             };
@@ -211,11 +213,11 @@ impl App {
                         let _ = c.paint();
                     }
                 }
-                c.scale(f64::from(scale), f64::from(scale));
+                c.scale(f64::from(scale) * zoom, f64::from(scale) * zoom);
                 paint::draw(
                     &c,
-                    f64::from(lw),
-                    f64::from(lh),
+                    f64::from(lw) / zoom,
+                    f64::from(lh) / zoom,
                     &Frame {
                         time: &time,
                         date: &date,

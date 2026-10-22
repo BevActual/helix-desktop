@@ -50,8 +50,13 @@ fn apply_reserve(app: &AppHandle, prefs: &helix_config::dock_prefs::DockPrefs) {
     if crate::strut::strut_unit_active() {
         return;
     }
-    let height = prefs.reserved_height();
+    let height = prefs.reserved_height().map(crate::ui_scale::scaled);
     let _ = app.run_on_main_thread(move || crate::layer::set_dock_strut(height));
+}
+
+/// Applies the dock's strip again (the interface scale changed its size).
+pub fn reapply_reserve(app: &AppHandle) {
+    apply_reserve(app, &prefs());
 }
 
 pub fn prefs() -> helix_config::dock_prefs::DockPrefs {

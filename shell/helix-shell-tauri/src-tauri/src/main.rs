@@ -36,6 +36,7 @@ mod polkit_helper;
 mod role;
 mod strut;
 mod tray;
+mod ui_scale;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -2060,6 +2061,7 @@ fn main() {
             dock::dock_prefs,
             clock::clock_format,
             bar_prefs::bar_prefs,
+            ui_scale::ui_scale,
             dock::workspaces_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
@@ -2222,6 +2224,7 @@ fn main() {
             // Every surface that draws a time (the bar, the control center) hears about the clock choice.
             clock::start(handle.clone());
             bar_prefs::start(handle.clone());
+            ui_scale::start(handle.clone());
             if role.is_bar_side() {
                 notify::serve(handle.clone());
                 tray::serve(handle.clone());

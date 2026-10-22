@@ -105,6 +105,22 @@ pub fn battery(dir: &Path) -> Option<Battery> {
     })
 }
 
+/// The interface scale from the file the shell writes (`helix-ui-scale` in the runtime directory): within 0.8 to 1.5, and 1.0 when there is none.
+pub fn ui_scale_from(text: &str) -> f64 {
+    text.trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite())
+        .map_or(1.0, |v| v.clamp(0.8, 1.5))
+}
+
+pub fn ui_scale() -> f64 {
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .map(|dir| Path::new(&dir).join("helix-ui-scale"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map_or(1.0, |text| ui_scale_from(&text))
+}
+
 /// Which PAM service to ask: the one the package installs, else the one a locker the system already has uses, else `login`.
 pub fn pam_service(exists: impl Fn(&str) -> bool) -> &'static str {
     if let Ok(service) = std::env::var("HELIX_LOCK_PAM_SERVICE") {
@@ -200,6 +216,15 @@ mod tests {
         );
         assert_eq!(battery(&dir.join("nothing")), None);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_interface_scale_is_clamped_and_defaults_to_one() {
+        assert_eq!(ui_scale_from("1.25\n"), 1.25);
+        assert_eq!(ui_scale_from("9"), 1.5);
+        assert_eq!(ui_scale_from("0.1"), 0.8);
+        assert_eq!(ui_scale_from("x"), 1.0);
+        assert_eq!(ui_scale_from("NaN"), 1.0);
     }
 
     #[test]

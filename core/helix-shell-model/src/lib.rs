@@ -17,6 +17,7 @@ pub mod quick_insert;
 pub mod shell_surface;
 pub mod surfaces;
 pub mod tray;
+pub mod ui_scale;
 
 // Modules that live in other crates but are named `crate::<module>` throughout this crate.
 pub use helix_base::display;

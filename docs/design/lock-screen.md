@@ -32,4 +32,4 @@ Unit tests cover the typing state (`entry.rs`), PAM through a real stack, the cl
 
 Per-output wallpapers are used, but the blur is the same strength everywhere. The battery (a small gauge and the percent, red when low and not charging, green while charging, from `/sys/class/power_supply`) is in the bottom right on a computer that has one. Not yet on the screen: media controls, notifications
 (count only, never text), a keyboard-layout switch, and a "switch user" or power button. A fingerprint or a security key would be a second PAM prompt
-the screen does not yet draw. The lock screen does not follow the interface scale.
+the screen does not yet draw. The lock screen follows the interface scale (it reads the file the shell writes, `helix-ui-scale` in the runtime directory).

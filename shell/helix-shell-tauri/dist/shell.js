@@ -1386,10 +1386,11 @@ function reportInteractive() {
       rects.push({ ...layoutBox($("dock-edge")), radius: 0 });
     }
   }
-  const key = JSON.stringify(rects) + window.innerWidth + "x" + window.innerHeight;
+  const real_rects = rects.map(real);
+  const key = JSON.stringify(real_rects) + realWidth() + "x" + realHeight();
   if (key === lastInteractive) return;
   lastInteractive = key;
-  invoke("report_interactive", { elements: rects, width: window.innerWidth, height: window.innerHeight });
+  invoke("report_interactive", { elements: real_rects, width: realWidth(), height: realHeight() });
 }
 function queueInteractive() {
   if (interactiveQueued) return;
@@ -1404,6 +1405,12 @@ queueInteractive();
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
 const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
+// The interface scale (Settings, Accessibility). The page is zoomed by it, so everything the page measures is in zoomed pixels; the compositor and the
+// tests want real ones, so what is reported is multiplied by it.
+let uiScale = 1;
+const real = (box) => ({ ...box, x: box.x * uiScale, y: box.y * uiScale, w: box.w * uiScale, h: box.h * uiScale, radius: (box.radius || 0) * uiScale });
+const realWidth = () => Math.round(window.innerWidth * uiScale);
+const realHeight = () => Math.round(window.innerHeight * uiScale);
 function layoutBox(element) {
   let x = 0, y = 0;
   for (let node = element; node; node = node.offsetParent) { x += node.offsetLeft; y += node.offsetTop; }
@@ -1422,11 +1429,11 @@ function reportGlass() {
   if (open && GLASS_PANEL[open]) elements.push($(GLASS_PANEL[open]));
   document.querySelectorAll("#toasts .toast").forEach((toast) => elements.push(toast));
   if (open) elements.splice(0, elements.length, ...elements.filter((el) => !(el instanceof Element) || !el.classList.contains("toast"))); // toasts are hidden while a panel is open
-  const boxes = elements.map((el) => (el instanceof Element ? layoutBox(el) : el));
-  const key = JSON.stringify(boxes) + window.innerWidth + "x" + window.innerHeight;
+  const boxes = elements.map((el) => real(el instanceof Element ? layoutBox(el) : el));
+  const key = JSON.stringify(boxes) + realWidth() + "x" + realHeight();
   if (key === lastGlass) return;
   lastGlass = key;
-  invoke("report_glass", { elements: boxes, width: window.innerWidth, height: window.innerHeight });
+  invoke("report_glass", { elements: boxes, width: realWidth(), height: realHeight() });
 }
 function queueGlass() {
   if (glassQueued) return;
@@ -1461,11 +1468,13 @@ function sendReport() {
   document.querySelectorAll("[data-test]").forEach((element) => {
     const box = element.getBoundingClientRect();
     // A closed panel is laid out but invisible (visibility is inherited): it has no controls to click.
-    if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
+    if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x * uiScale, y: box.y * uiScale, w: box.width * uiScale, h: box.height * uiScale };
   });
-  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today", reactControls && "controls", reactQuickInsert && "quick-insert", reactMobius && "mobius", reactIsland && "island", reactOsd && "osd", reactTray && "tray", reactDock && "dock"].filter(Boolean), elements } });
+  invoke("report_layout", { report: { width: realWidth(), height: realHeight(), scale: uiScale, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today", reactControls && "controls", reactQuickInsert && "quick-insert", reactMobius && "mobius", reactIsland && "island", reactOsd && "osd", reactTray && "tray", reactDock && "dock"].filter(Boolean), elements } });
 }
 window.addEventListener("resize", () => queueReport());
+invoke("ui_scale").then((value) => { uiScale = value; queueGlass(); queueInteractive(); queueReport(); }, () => undefined);
+listen("ui-scale", (event) => { uiScale = event.payload; lastGlass = ""; lastInteractive = ""; queueGlass(); queueInteractive(); queueReport(300); });
 new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 
 invoke("quick_view").then(drawQuick);
