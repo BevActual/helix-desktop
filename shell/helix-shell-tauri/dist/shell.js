@@ -30,6 +30,25 @@ let clockFormat = "auto";
 const hour12 = () => (clockFormat === "12" ? true : clockFormat === "24" ? false : undefined);
 const clockTime = (when) => when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: hour12() });
 window.helixClockTime = clockTime;
+// The microphone and camera indicator: shown only while something is capturing, in the colours people know (orange for the microphone, green for a
+// camera), with the programs' names for whoever hovers or uses a screen reader. It cannot be hidden: it is the point of it.
+function drawPrivacy(view) {
+  const mic = (view.microphone || []).length > 0;
+  const cam = (view.camera || []).length > 0;
+  const box = $("privacy");
+  box.hidden = !(mic || cam);
+  slot("priv-mic").style.display = mic ? "" : "none";
+  slot("priv-cam").style.display = cam ? "" : "none";
+  const parts = [];
+  if (mic) parts.push("Microphone in use by " + view.microphone.join(", "));
+  if (cam) parts.push("Camera in use by " + view.camera.join(", "));
+  box.title = parts.join(" · ");
+  box.setAttribute("aria-label", box.title);
+  queueGlass(); queueInteractive(); queueReport();
+}
+invoke("privacy_view").then(drawPrivacy, () => undefined);
+listen("privacy-view", (event) => drawPrivacy(event.payload));
+
 // What the bar shows (Settings, Top bar): each hidden item is a class on the page, and the style sheet does the hiding.
 let clockSeconds = false;
 let secondsTimer = null;

@@ -33,6 +33,7 @@ mod notify;
 mod panels_bridge;
 mod polkit_agent;
 mod polkit_helper;
+mod privacy;
 mod role;
 mod strut;
 mod tray;
@@ -2062,6 +2063,7 @@ fn main() {
             clock::clock_format,
             bar_prefs::bar_prefs,
             ui_scale::ui_scale,
+            privacy::privacy_view,
             dock::workspaces_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
@@ -2225,6 +2227,7 @@ fn main() {
             clock::start(handle.clone());
             bar_prefs::start(handle.clone());
             ui_scale::start(handle.clone());
+            privacy::start(handle.clone());
             if role.is_bar_side() {
                 notify::serve(handle.clone());
                 tray::serve(handle.clone());

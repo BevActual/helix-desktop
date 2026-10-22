@@ -2180,3 +2180,10 @@ html.bar-hide-battery_percent #batt-label { display: none; }
 #clock .time { font-variant-numeric: tabular-nums; }
 .arrangement-screen:focus-visible { outline: 2px solid var(--label-1, #fff); outline-offset: 2px; }
 .choice-pop.up { top: auto; bottom: calc(100% + 6px); flex-direction: column-reverse; }
+
+/* The microphone and camera indicator in the bar. */
+.privacy { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; height: 26px; }
+.privacy svg.i { width: 15px; height: 15px; }
+.privacy [data-slot="priv-mic"] { color: #ff9f0a; }
+.privacy [data-slot="priv-cam"] { color: #30d158; }
+.privacy[hidden] { display: none; }

@@ -41,7 +41,7 @@ each one does, and what it does not, is in `settings-audit.md`; that file is the
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
 | **Notifications page, next**: per-app rules (the on/off switch, banner time and count, quiet hours are done) | M | A consumer in `helix_shell_model::notifications` | `settings-audit.md` |
-| **Privacy**: location (on/off is in Date & time), camera and microphone permissions, and a "in use" indicator in the bar | M | The service exposes capture streams (see section 4) | Common desktop expectation |
+| **Privacy page**: location (on/off is in Date & time), and which programs may use the camera and microphone. The "in use" indicator in the bar is done (`tauri-rust-shell.md`) | M | Portal permission store (PipeWire alone does not hold permissions) | Common desktop expectation |
 | **Users**: name, picture, password | M | A polkit-guarded helper; never handle the password in the page | Common desktop expectation |
 | Top bar: height and position, auto-hide, order of items | M | The bar sets a strut, so a change has to move the exclusive zone | `settings-audit.md` "Top bar" |
 | Printers, removable media, online accounts, Qt and GTK 3 following the accent | M each | Product decision | Not asked for yet |
@@ -64,7 +64,6 @@ acts on it, and a nested test asserts the exact requests sent.
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
 | Finish the React slices and delete the hand-written fallbacks | M–L | None | `frontend-stack.md`: `shell.js` still owns mode, regions and glass |
-| Mic and camera in use indicator | M | Service exposes capture streams | `tauri-rust-shell.md` "Not yet" |
 | Today panel with calendar behind the date, and timers | M | A calendar source | `tauri-rust-shell.md` |
 | Extension story to replace the removed Luau plugins | L | Design doc first (sandboxed, out-of-process over D-Bus fits the contracts) | README "Scope" |
 
