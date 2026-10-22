@@ -220,6 +220,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-wallpaper
 %{_bindir}/helix-idle
 %{_bindir}/helix-lock
+%{_bindir}/helix-agent-input
 %config(noreplace) %{_sysconfdir}/pam.d/helix-lock
 %{_bindir}/helix-nightlight
 %{_bindir}/helix-settings
