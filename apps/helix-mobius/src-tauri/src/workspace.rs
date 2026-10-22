@@ -13,12 +13,26 @@ pub fn copies_dir() -> PathBuf {
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
+    // A task's copy is a repository the task worked in, so these run with the global and system git configuration off and the usual hooks and
+    // file-system monitor disabled. What really keeps the copy's own `.git/config` honest is that `.git` is read-only inside a background task's
+    // sandbox (a configured filter or diff command could otherwise run here, outside it).
     let output = Command::new("git")
+        .args([
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.pager=cat",
+            "-c",
+            "protocol.ext.allow=never",
+        ])
         .arg("-C")
         .arg(dir)
         .args(args)
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .stdin(Stdio::null())
         .output()
         .map_err(|_| "git is not installed.".to_string())?;
@@ -92,7 +106,13 @@ pub fn diff(copy: &Path, base: &str, binary: bool) -> Result<String, String> {
         return Err("The task has no starting point.".into());
     }
     git(&copy, &["add", "-A"])?;
-    let mut args = vec!["diff", "--cached", "--no-color", "--no-ext-diff"];
+    let mut args = vec![
+        "diff",
+        "--cached",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+    ];
     if binary {
         args.push("--binary");
     }

@@ -221,6 +221,10 @@ pub async fn agent_task_start(
             return Err(error);
         }
     };
+    // A task that runs on its own never changes the project's git data (hooks, configuration): reading history is enough.
+    if !policy.folder.is_empty() && !policy.protect.iter().any(|p| p == ".git") {
+        policy.protect.push(".git".into());
+    }
     let mut task = Task::new(&id, &goal, policy, crate::now());
     if let Some(copy) = copied {
         task.workdir = copy.dir.to_string_lossy().to_string();
