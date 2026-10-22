@@ -47,6 +47,35 @@ the harder one to make safe and the harder one to test.
 
 **Recommendation: A.** The agent desk workspace stays: it holds the viewer window (and any window the agent opens that is not computer use, as today).
 
+## Hybrid compute: local, LAN and cloud models
+
+Mobius is hybrid by design (`inference-fabric.md`: local slots, LAN endpoints, cloud), and agents follow. Computer use is where it matters most, because a
+screenshot is the most private thing a model can be sent. The ideas, with what they take from Hermes Agent (Nous Research: a learning loop with
+agent-curated memory and self-made skills, cross-session recall, any model endpoint, many terminal backends from local to Docker, SSH and serverless
+cloud, one gateway to messaging apps, MCP) and what Helix adds:
+
+* **Per-agent routing with a policy, not a toggle.** Each agent has a policy: *Private* (local only), *Balanced* (local by default, cloud for what local
+  cannot do, asked first), *Best* (cloud planner). The router sends the step to the cheapest model that is allowed to see it.
+* **A planner and a grounder.** The planner (often a cloud model) decides what to do from a small, scaled screenshot and the task; the **grounder**
+  (local) turns "the Export button" into coordinates on the full-resolution screen. Fewer and smaller pictures leave the machine, and the click
+  position never depends on a remote model seeing every pixel.
+* **What a cloud model can see is bounded by the architecture.** Under option A the model sees the agent display and nothing else: the person's windows,
+  files and notifications are not on it. That is what makes cloud acceptable for computer use at all.
+* **Secrets stay local.** A password field, a payment form or a page the grounder classifies as a sign-in is sent as a blurred region (or not at all),
+  and the step is handed to a local model or to the person.
+* **Always visible.** The viewer and the island carry a small cloud badge while a cloud model is in the loop; a session log says how many pictures
+  were sent, to whom, and what policy allowed it. "Stop sending" switches the session to local.
+* **The agent display is a place, not one implementation.** v1 is a nested session on this machine. The same viewer can later attach to a remote
+  place (a VM or a cloud desktop), the way Hermes has terminal backends; that is also how an agent keeps working when this computer is asleep.
+* **Memory and skills are local and the person's.** An agent's memory and the skills it writes for itself live in the knowledge store
+  (`knowledge.md`), are readable and deletable in Settings, and are never uploaded as a side effect of using a cloud model.
+* **Reach the person where they are.** A help request can arrive on a phone (a gateway, later) with the last picture and one question; anything that
+  needs real control still brings the person to the viewer.
+
+**A standing rule to settle.** Until now *Act* (the desktop assistant's control of the person's own desktop) never uses a cloud model. That stays: Act
+sees the person's desktop. Computer use on an agent display is a different surface (it sees only what the agent put on its own display), so it is
+proposed as the one place a cloud model may be used for control, per agent, opt-in, visible, and off for the person's own windows.
+
 ## What stays from the threat model, whichever way
 
 * The agent only ever acts on its own display or windows it opened (never on the person's), and **never** on a trusted surface, the lock screen, the
