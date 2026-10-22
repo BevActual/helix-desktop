@@ -72,9 +72,27 @@ cloud, one gateway to messaging apps, MCP) and what Helix adds:
 * **Reach the person where they are.** A help request can arrive on a phone (a gateway, later) with the last picture and one question; anything that
   needs real control still brings the person to the viewer.
 
-**A standing rule to settle.** Until now *Act* (the desktop assistant's control of the person's own desktop) never uses a cloud model. That stays: Act
-sees the person's desktop. Computer use on an agent display is a different surface (it sees only what the agent put on its own display), so it is
-proposed as the one place a cloud model may be used for control, per agent, opt-in, visible, and off for the person's own windows.
+**Decided (2026-10-22): Act may use cloud models too.** The old rule, "Act never uses a cloud model", is dropped as a rule and becomes a *default*:
+local stays the default and cloud is an explicit, visible opt-in, for Act and for computer use alike. What the change means, so it is built deliberately:
+
+* **Where "local only" is enforced today** (each is a place to change, in this order): `routing_save` in Mobius refuses a non-local backend for the `act`
+  profile; `cloud.rs` leaves `act` out of `ROUTED_TASKS`; `services/helix-inference` only runs local GGUF (it refuses a schema or a non-local route
+  for `act`, by design: its sandbox has no network); `mobius-settings.md` says "Act always stays on this computer". The inference service **stays
+  local**: a cloud Act turn is made by the program that already talks to remote endpoints (Mobius, which has the OpenRouter, ChatGPT-plan and LAN
+  clients), never by the sandboxed engine.
+* **Same acts, same gates.** A cloud model proposes a tool call; it goes through the same parser and Agent Surface as a local one: the tier, the grant,
+  the confirmation and the change ledger do not change. A malformed or unknown call from any model is refused. Without a grammar to force valid JSON, a
+  cloud turn is validated and, if invalid, retried once and then refused.
+* **Consent is explicit and says what leaves the machine.** Turning on a cloud route for Act shows, in plain words, what each turn sends (your request,
+  the app and window list, setting values) and what it never sends unless you add it (clipboard, notifications, screenshots, anything
+  `observe-private`). It is per backend, off by default, and revocable.
+* **Data minimised by tier.** A cloud Act turn receives only the context tiers the person allowed for cloud; `observe-private` content is withheld by
+  default and a secret is never included.
+* **Visible.** A cloud badge on the island and in Mobius while a cloud model is acting, and the audit records which model made each step.
+* **Local fallback and policy.** Policies (*Private*, *Balanced*, *Best*, above) apply to Act as well; *Private* keeps Act exactly as it is today.
+
+Nothing of this is built yet; today Act is still local-only in code. The first step is the consent and routing change in Mobius Settings together with the
+cloud Act turn, because a setting nothing acts on must not ship.
 
 ## What stays from the threat model, whichever way
 

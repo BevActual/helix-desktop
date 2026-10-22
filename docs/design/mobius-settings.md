@@ -15,7 +15,7 @@ A rail of sections beside one column of content, the way Cursor's Settings and s
 | **Agent** | **Knowledge** | Folders the agent can search while you work (see `knowledge.md`): add, read again, remove, and try a search that shows what would be found, by words and by meaning. Nothing leaves the computer |
 | **Agent** | **Memory** | Facts the person asked Mobius to remember. The same list as `/remember`. Only the person adds to it. It is sent to models on this computer only |
 | **Agent** | **Agents** | Coding agents Mobius can hand a Code project to. Each keeps its own sign-in. File writes and commands wait for approval |
-| **Setup** | **Connections** | ChatGPT plan, another computer on the network, and OpenRouter with its key in the Secret Service. Act always stays on this computer |
+| **Setup** | **Connections** | ChatGPT plan, another computer on the network, and OpenRouter with its key in the Secret Service. Act stays on this computer **by default**; the person may opt in to a cloud model for it (decided 2026-10-22, not built; `computer-use.md` "Hybrid compute") |
 | **Setup** | **Replies** | How much a reply says (concise, balanced, detailed) and whether reasoning is shown (folded, always open, hidden). Then temperature, longest reply, provider timeout, battery-saver rule |
 | **Setup** | **Experiments** | The switches for things being tried, and the routing file's path |
 
