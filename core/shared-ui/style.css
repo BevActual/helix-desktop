@@ -2193,3 +2193,40 @@ body[data-panel="notifications"] #notifs #today { display: none; }
 body[data-panel="today"] #notifs #notif-head, body[data-panel="today"] #notifs #notif-list, body[data-panel="today"] #notifs #notif-empty { display: none; }
 body[data-panel="today"] #notifs { right: auto; left: calc(50% - 190px); width: 380px; transform-origin: top center; }
 body[data-panel="today"] #notifs #today { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+
+/* The island: exactly in the middle of the bar, over the clock's place (the clock steps aside while it is there, and the island carries the time). */
+#island { position: absolute; left: 50%; top: 50%; margin: 0; translate: -50% -50%; display: inline-flex; align-items: center; gap: 2px; height: 28px; padding: 0 4px 0 12px; border-radius: 999px;
+          background: var(--fill-2); max-width: min(620px, 62vw); white-space: nowrap; z-index: 2; transform-origin: center;
+          animation: islandin 360ms cubic-bezier(.2, .9, .3, 1.15) both; transition: background .25s var(--ease), color .25s var(--ease), box-shadow .25s var(--ease); }
+#island.settled { animation: none; }
+#island.leaving { animation: islandout 200ms var(--ease) both; }
+@keyframes islandin { from { opacity: 0; scale: .78; } to { opacity: 1; scale: 1; } }
+@keyframes islandout { from { opacity: 1; scale: 1; } to { opacity: 0; scale: .8; } }
+body.island-on #center #clock { opacity: 0; pointer-events: none; transition: opacity .2s var(--ease); }
+body:not(.island-on) #center #clock { transition: opacity .25s var(--ease) .12s; }
+#island .isl-main { display: inline-flex; align-items: center; gap: 9px; min-width: 0; height: 100%; padding-right: 6px; cursor: default; }
+#island .isl-icon svg { width: 14px; height: 14px; }
+#island .isl-words { display: inline-flex; align-items: baseline; gap: 7px; min-width: 0; animation: islwords 260ms var(--ease) both; }
+@keyframes islwords { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+#island #island-text { font-weight: 600; max-width: 230px; }
+#island #island-detail { color: var(--label-2); max-width: 140px; }
+/* The equalizer: four bars that move while music plays. */
+#island .isl-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; width: 14px; flex: none; }
+#island .isl-eq i { display: block; width: 2.5px; border-radius: 2px; background: var(--accent); height: 40%; animation: eq 900ms ease-in-out infinite alternate; }
+#island .isl-eq i:nth-child(2) { animation-duration: 700ms; animation-delay: -200ms; } #island .isl-eq i:nth-child(3) { animation-duration: 1100ms; animation-delay: -450ms; } #island .isl-eq i:nth-child(4) { animation-duration: 800ms; animation-delay: -100ms; }
+@keyframes eq { from { height: 25%; } to { height: 100%; } }
+/* Music's transport opens out under the pointer or the keyboard. */
+#island .isl-controls { display: inline-flex; align-items: center; gap: 1px; max-width: 0; opacity: 0; overflow: hidden; transition: max-width .26s var(--ease), opacity .2s var(--ease); }
+#island:hover .isl-controls, #island:focus-within .isl-controls { max-width: 110px; opacity: 1; }
+#island .isl-btn { width: 26px; height: 24px; padding: 0; display: grid; place-items: center; border-radius: 999px; background: transparent; color: var(--label-1, inherit); }
+#island .isl-btn:hover { background: var(--fill-3, var(--fill-2)); } #island .isl-btn svg { width: 13px; height: 13px; }
+#island .isl-time { height: 20px; margin-left: 4px; padding: 0 10px; border-left: .5px solid var(--hairline); border-radius: 0 999px 999px 0; background: transparent; color: var(--label-2); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+#island .isl-time:hover { color: var(--label-1, inherit); }
+/* What needs you rings softly; the assistant's words shimmer while it works. */
+#island.approval { animation: islandin 360ms cubic-bezier(.2, .9, .3, 1.15) both, islring 2.4s ease-out 600ms infinite; }
+#island.approval.settled { animation: islring 2.4s ease-out infinite; }
+@keyframes islring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--warn) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
+#island.assistant #island-text { background: linear-gradient(90deg, var(--label-1, #fff) 0 38%, var(--accent) 50%, var(--label-1, #fff) 62% 100%); background-size: 260% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.8s linear infinite; }
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@media (max-width: 900px) { #island #island-detail { display: none; } }
+@media (prefers-reduced-motion: reduce) { #island, #island * { animation: none !important; transition: none !important; } }

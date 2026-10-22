@@ -489,26 +489,53 @@ $("qi-forget").onclick = () => invoke("quick_insert_forget_clipboard").then(qiSe
 
 // The live-status pill. Rust decides what (if anything) is going on; this draws it and sends the click back as the thing it stands for.
 let islandKind = "none";
+let islandLeaving = null;
 function drawIsland(view) {
-  islandKind = view.kind;
   const pill = $("island");
-  pill.hidden = view.kind === "none";
-  pill.className = "bar-btn " + view.kind;
-  if (view.kind === "none") { queueReport(); queueGlass(); return; }
+  const wasShown = !pill.hidden && islandKind !== "none";
+  islandKind = view.kind;
+  clearTimeout(islandLeaving);
+  if (view.kind === "none") {
+    document.body.classList.remove("island-on");
+    // It leaves with a short shrink rather than vanishing.
+    if (wasShown) {
+      pill.classList.add("leaving");
+      islandLeaving = setTimeout(() => { pill.hidden = true; pill.classList.remove("leaving"); queueReport(); queueGlass(); }, 220);
+    } else {
+      pill.hidden = true;
+    }
+    queueReport(); queueGlass();
+    return;
+  }
+  const entering = pill.hidden || pill.classList.contains("leaving");
+  pill.hidden = false;
+  // The kind changes the colour; the pill is not rebuilt, so a change of kind morphs instead of popping.
+  pill.className = "bar-btn " + view.kind + (entering ? "" : " settled");
   if (reactIsland) {
     reactIsland.set(view);
+    // The island carries the time, so it takes the clock's place.
+    document.body.classList.add("island-on");
   } else {
     swapIcon(slot("island-ico"), view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : view.kind === "agentdesk" ? "grid" : "sparkle");
     $("island-text").textContent = view.text;
     $("island-detail").textContent = view.detail;
   }
-  pill.title = view.detail ? view.text + " · " + view.detail : view.text;
+  // No native tooltip: the words are already on the pill.
+  pill.removeAttribute("title");
+  pill.setAttribute("aria-label", view.detail ? view.text + " · " + view.detail : view.text);
   queueReport();
   queueGlass();
+  // The pill's width changes with its words: measure again once it has settled.
+  setTimeout(() => { queueReport(); queueGlass(); }, 380);
 }
+// The transport opens and closes with a transition, which changes sizes without any change to the page: measure again when it ends.
+$("island").addEventListener("transitionend", () => { queueReport(); queueGlass(); });
+$("island").addEventListener("animationend", () => { queueReport(); });
 listen("island-view", (event) => drawIsland(event.payload));
 invoke("island_view").then(drawIsland);
-$("island").onclick = () => {
+$("island").onclick = (event) => {
+  // The transport buttons and the time have their own actions.
+  if (event.target.closest(".isl-controls, .isl-time")) return;
   if (islandKind === "approval") invoke("mobius_open", { mode: "agents" });
   else if (islandKind === "assistant") invoke("mobius_open", { mode: "act" });
   else if (islandKind === "agentdesk") invoke("agent_desk_focus");
