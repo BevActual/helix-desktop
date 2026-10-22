@@ -42,6 +42,14 @@ pub const SUPPORTED: &[&str] = &[
     "bar-show",
     "bar-hide",
     "bar-toggle",
+    "display-launch",
+    "display-screenshot",
+    "display-click",
+    "display-move",
+    "display-scroll",
+    "display-key",
+    "display-type",
+    "display-help",
 ];
 
 /// How long free text on the wire may be (`app-launch` query, `clipboard-copy` payload).
@@ -98,6 +106,30 @@ pub enum Command {
     BarShow,
     BarHide,
     BarToggle,
+    /// Computer use: everything below acts on the agent display only (`docs/design/computer-use.md`), never on the person's desktop.
+    /// Start an installed application on it (desktop id or name; starts the display when it is not running).
+    DisplayLaunch(String),
+    /// PNG of the agent display (`ok <path>\n`).
+    DisplayScreenshot,
+    DisplayClick {
+        x: i32,
+        y: i32,
+        button: String,
+    },
+    DisplayMove {
+        x: i32,
+        y: i32,
+    },
+    /// Wheel steps, positive down and to the right.
+    DisplayScroll {
+        dx: i32,
+        dy: i32,
+    },
+    /// One key by name (`Return`, `Tab`, `Escape`, `a`), or a combination with `+` (`Control_L+a`).
+    DisplayKey(String),
+    DisplayType(String),
+    /// Ask the person for help with a step only they can do; the agent waits until they say they are done.
+    DisplayHelp(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -153,6 +185,41 @@ fn level_args<'a>(args: &'a [&'a str]) -> Result<Option<&'a str>, MsgError> {
     }
 }
 
+/// A pixel position on the agent display.
+fn coordinate(text: &str) -> Result<i32, MsgError> {
+    if text.is_empty() || text.len() > 4 || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(MsgError::Usage("a position is a whole number of pixels"));
+    }
+    let value: i32 = text
+        .parse()
+        .map_err(|_| MsgError::Usage("a position is a whole number of pixels"))?;
+    if value <= 8192 {
+        Ok(value)
+    } else {
+        Err(MsgError::Usage("that is off the display"))
+    }
+}
+
+/// A whole number of `-limit..=limit`.
+fn signed(text: &str, limit: i32) -> Result<i32, MsgError> {
+    let (negative, digits) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text),
+    };
+    if digits.is_empty() || digits.len() > 3 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(MsgError::Usage("expected a whole number"));
+    }
+    let value: i32 = digits
+        .parse()
+        .map_err(|_| MsgError::Usage("expected a whole number"))?;
+    let value = if negative { -value } else { value };
+    if value.abs() <= limit {
+        Ok(value)
+    } else {
+        Err(MsgError::Usage("number out of range"))
+    }
+}
+
 fn no_args(args: &[&str]) -> Result<(), MsgError> {
     args.is_empty()
         .then_some(())
@@ -202,7 +269,10 @@ pub fn parse(line: &str) -> Result<Command, MsgError> {
         return Err(MsgError::Unknown);
     }
     // Free-text verbs take the remainder of the line (spaces kept). Everything else stays word-oriented.
-    if matches!(name, "app-launch" | "clipboard-copy") {
+    if matches!(
+        name,
+        "app-launch" | "clipboard-copy" | "display-launch" | "display-type" | "display-help"
+    ) {
         let text = literal_payload(rest.unwrap_or(""))?;
         return Ok(match name {
             "app-launch" => {
@@ -219,6 +289,24 @@ pub fn parse(line: &str) -> Result<Command, MsgError> {
                     return Err(MsgError::Usage("clipboard-copy needs text"));
                 }
                 Command::ClipboardCopy(text)
+            }
+            "display-launch" | "display-type" | "display-help" => {
+                if text.is_empty() {
+                    return Err(MsgError::Usage("that command needs text"));
+                }
+                if text.chars().any(|c| c.is_control()) {
+                    return Err(MsgError::Usage("control characters are not allowed"));
+                }
+                match name {
+                    "display-launch" => Command::DisplayLaunch(text),
+                    "display-type" => Command::DisplayType(text),
+                    _ => {
+                        if text.chars().count() > 200 {
+                            return Err(MsgError::Usage("say why in under 200 characters"));
+                        }
+                        Command::DisplayHelp(text)
+                    }
+                }
             }
             _ => unreachable!(),
         });
@@ -388,6 +476,67 @@ pub fn parse(line: &str) -> Result<Command, MsgError> {
             no_args(&args)?;
             Command::BarToggle
         }
+        "display-screenshot" => {
+            no_args(&args)?;
+            Command::DisplayScreenshot
+        }
+        "display-click" => match args.as_slice() {
+            [x, y] => Command::DisplayClick {
+                x: coordinate(x)?,
+                y: coordinate(y)?,
+                button: "left".into(),
+            },
+            [x, y, button @ ("left" | "right" | "middle")] => Command::DisplayClick {
+                x: coordinate(x)?,
+                y: coordinate(y)?,
+                button: (*button).into(),
+            },
+            _ => {
+                return Err(MsgError::Usage(
+                    "display-click takes x y and optionally left, right or middle",
+                ))
+            }
+        },
+        "display-move" => match args.as_slice() {
+            [x, y] => Command::DisplayMove {
+                x: coordinate(x)?,
+                y: coordinate(y)?,
+            },
+            _ => return Err(MsgError::Usage("display-move takes x y")),
+        },
+        "display-scroll" => match args.as_slice() {
+            [dx, dy] => Command::DisplayScroll {
+                dx: signed(dx, 50)?,
+                dy: signed(dy, 50)?,
+            },
+            [dy] => Command::DisplayScroll {
+                dx: 0,
+                dy: signed(dy, 50)?,
+            },
+            _ => {
+                return Err(MsgError::Usage(
+                    "display-scroll takes the steps down (and optionally across)",
+                ))
+            }
+        },
+        "display-key" => match args.as_slice() {
+            [key]
+                if key.len() <= 40
+                    && key.split('+').count() <= 6
+                    && key.split('+').all(|k| {
+                        !k.is_empty()
+                            && k.chars().count() <= 12
+                            && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                    }) =>
+            {
+                Command::DisplayKey((*key).to_string())
+            }
+            _ => {
+                return Err(MsgError::Usage(
+                    "display-key takes a key name such as Return, Tab, a or Control_L+a",
+                ))
+            }
+        },
         _ => return Err(MsgError::Unknown),
     })
 }
@@ -748,6 +897,14 @@ mod tests {
             "bar-show",
             "bar-hide",
             "bar-toggle",
+            "display-launch Firefox",
+            "display-screenshot",
+            "display-click 10 20",
+            "display-move 10 20",
+            "display-scroll 3",
+            "display-key Return",
+            "display-type hello",
+            "display-help sign in",
         ];
         assert_eq!(examples.len(), SUPPORTED.len());
         for (example, name) in examples.iter().zip(SUPPORTED) {
@@ -771,5 +928,66 @@ mod tests {
             Command::DesktopCapture(Some(t)) if t == "DP-1"
         ));
         assert!(parse("desktop-capture a b").is_err());
+    }
+
+    #[test]
+    fn the_computer_use_commands_are_parsed_and_bounded() {
+        assert_eq!(
+            parse("display-click 640 360"),
+            Ok(Command::DisplayClick {
+                x: 640,
+                y: 360,
+                button: "left".into()
+            })
+        );
+        assert_eq!(
+            parse("display-click 1 2 right"),
+            Ok(Command::DisplayClick {
+                x: 1,
+                y: 2,
+                button: "right".into()
+            })
+        );
+        assert_eq!(
+            parse("display-scroll -3"),
+            Ok(Command::DisplayScroll { dx: 0, dy: -3 })
+        );
+        assert_eq!(
+            parse("display-key Control_L+a"),
+            Ok(Command::DisplayKey("Control_L+a".into()))
+        );
+        assert_eq!(
+            parse("display-type hello world"),
+            Ok(Command::DisplayType("hello world".into()))
+        );
+        assert_eq!(
+            parse("display-launch org.mozilla.firefox.desktop"),
+            Ok(Command::DisplayLaunch("org.mozilla.firefox.desktop".into()))
+        );
+        assert_eq!(
+            parse("display-help sign in to the portal"),
+            Ok(Command::DisplayHelp("sign in to the portal".into()))
+        );
+        assert_eq!(parse("display-screenshot"), Ok(Command::DisplayScreenshot));
+        for bad in [
+            "display-click",
+            "display-click 1",
+            "display-click -1 5",
+            "display-click 99999 5",
+            "display-click 1 2 back",
+            "display-move a b",
+            "display-scroll 500",
+            "display-key",
+            "display-key a b",
+            "display-key a+",
+            "display-key $(id)",
+            "display-type",
+            "display-type bell\x07",
+            "display-help",
+            "display-screenshot now",
+        ] {
+            assert!(parse(bad).is_err(), "{bad:?}");
+        }
+        assert!(parse(&format!("display-help {}", "x".repeat(201))).is_err());
     }
 }

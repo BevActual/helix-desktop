@@ -417,7 +417,7 @@
   }
  },
  {
-  "catalog": "- ai-usage-localai-endpoint [capability: chat|vision|tools|transcript|tts|embeddings|image|video|sound] - Print the LocalAI base URL and the model to use, optionally for one capability\n- ai-usage-localai-open - Open the LocalAI web interface\n- ai-usage-refresh - Refetch AI usage from local tools\n- ai-usage-status - Report AI usage and the local AI models\n- annotate - Draw on the screen\n- bar-auto-hide-set <state: on|off|smart|true|false|1|0> - Make the top bar hide itself when not in use (on, off or smart)\n- bar-hide - Hide the top bar\n- bar-layer-set <layer: top|overlay> - Set one or all bar layers\n- bar-reserve-toggle - Temporarily toggle reserve space for one or all bars\n- bar-show - Show the top bar\n- bar-toggle - Show the top bar if hidden, hide it if shown\n- bluetooth-status - Report whether Bluetooth is on and what is connected\n- brightness-down - Make the screen dimmer (display brightness, not sound)\n- brightness-list-backlight-devices - Technical: list the screen backlight devices\n- brightness-osd <value> - Show the brightness indicator on screen without changing it\n- brightness-set <value: 0-100> - Set the screen brightness to a percentage\n- brightness-up - Make the screen brighter (display brightness, not sound)\n- caffeine-disable - Let the screen sleep when idle again\n- caffeine-enable - Keep the screen awake (stop it sleeping when idle)\n- caffeine-toggle - Switch keeping the screen awake on or off\n- clipboard-text - Read what is on the clipboard right now (the last text copied)\n- color-scheme-get - Report which color palette is in use\n- color-scheme-set <builtin|wallpaper|community|custom> ... - Choose a different color palette\n- config-reload - Reload the config file\n- desktop-ai-status - Report the state of the local AI features (not the desktop)\n- desktop-capture - Capture the desktop as an image for the assistant to look at\n- desktop-widgets-edit - Open the editor to rearrange the desktop widgets\n- desktop-widgets-exit - Close the desktop widgets editor\n- desktop-widgets-hide - Hide the desktop widgets that sit on the wallpaper\n- desktop-widgets-show - Show the desktop widgets that sit on the wallpaper\n- desktop-widgets-toggle - Show or hide the desktop widgets\n- desktop-widgets-toggle-edit - Toggle desktop widgets edit mode\n- dock-hide - Hide the dock (the app strip)\n- dock-reload - Reload dock configuration\n- dock-show - Show the dock (the app strip)\n- dock-toggle - Show the dock if hidden, hide it if shown\n- dpms-off - Turn the monitors off (screen sleep)\n- dpms-on - Wake the monitors up\n- effects-profile-set <kind: output|input> <profile> - Set the EasyEffects output or input profile\n- firewall-status - Report whether the firewall is running\n- keyboard-backlight-down - Make the keyboard lighting dimmer\n- keyboard-backlight-osd <value> - Show the keyboard lighting indicator without changing it\n- keyboard-backlight-set <value: 0-100> - Set the keyboard lighting to a percentage\n- keyboard-backlight-toggle - Turn the keyboard lighting on or off\n- keyboard-backlight-up - Make the keyboard lighting brighter\n- keyboard-layout-cycle - Switch to the next keyboard language layout\n- lockscreen-widgets-edit - Open the lockscreen widgets editor\n- lockscreen-widgets-exit - Close the lockscreen widgets editor\n- lockscreen-widgets-toggle-edit - Toggle lockscreen widgets edit mode\n- log-level-set <level: debug|info|warn|error> - Set the console log level\n- log-level-status - Print the current console log level\n- media <action: next|previous|toggle|play|pause|stop|raise|next-player|previous-player> - Control the music or video player: play, pause, next, previous, stop\n- mic-volume-down - Lower the microphone input level\n- mic-volume-osd - Show the microphone level indicator without changing it\n- mic-volume-set <value: 0-100> - Set the microphone input level to a percentage\n- mic-volume-up - Raise the microphone input level\n- nightlight-disable - Turn off the night light\n- nightlight-enable - Turn on the night light (warmer, blue-light-filtered colors)\n- nightlight-force-toggle - Force the night light on now, ignoring its schedule\n- nightlight-toggle - Switch the night light schedule on or off\n- notification-clear-active - Dismiss the notification popups currently on screen\n- notification-dnd-set <state: on|off|true|false|1|0> - Turn Do Not Disturb on or off (silences notification popups)\n- notification-dnd-status - Report whether Do Not Disturb is on\n- notification-dnd-toggle - Flip Do Not Disturb\n- notification-history - Show the list of past notifications (what I missed)\n- notification-show <summary> <body> - Show a custom notification with a title and a message\n- osd-disable - Turn off the on-screen popups for volume and brightness\n- osd-enable - Turn on the on-screen popups for volume and brightness\n- osd-toggle - Turn the on-screen popups on or off\n- panel-close - Close the panel that is open\n- panel-open <id> [context] - Open a panel by id: control-center (quick settings), launcher (app launcher), clipboard (clipboard history); optional context\n- panel-toggle <id> [context] - Open or close a panel by id: control-center, launcher, clipboard; optional context\n- privacy-status - Report whether the camera, microphone or screen is being used or recorded, and the location setting\n- printers-status - Report the printers and the default printer\n- power-cycle [direction: next|prev] - Step to the next power profile\n- power-set <profile> - Set the power profile: performance, balanced or power-saver (does not shut down or restart)\n- screenshot-annotate - Take a screenshot and draw on it\n- screenshot-fullscreen [mode: pick|monitor|all] - Take a screenshot of the whole screen or a monitor\n- screenshot-ocr - Select an area of the screen and copy the text recognised in it\n- screenshot-pick-color - Pick a color from the screen\n- screenshot-region - Take a screenshot of an area the user selects\n- screenshot-scan-qr - Select an area of the screen and read the QR code or barcode in it\n- session <action: lock> - Lock the screen\n- settings-close - Close the settings\n- settings-open [context] - Open the settings, optionally at a section\n- settings-open-widget - Open Control Center at a bar widget; from a widget gesture, targets that widget\n- settings-toggle [context] - Open or close the settings\n- status - Report the state of the desktop: volume, brightness, theme, do not disturb, the open panel, workspaces, and the open windows with their ids\n- tailscale-status - Report the Tailscale VPN connection\n- taskbar-cycle <direction: next|prev> - Move to the next or previous task in the taskbar\n- theme-mode-get - Report whether the desktop is in dark or light mode\n- theme-mode-set <mode: dark|light|auto> - Switch the whole desktop between dark and light appearance\n- theme-mode-toggle - Flip the desktop between dark and light appearance\n- volume-down - Make the speakers quieter (sound volume)\n- volume-mute - Mute or unmute the speakers (sound)\n- volume-osd - Show the volume indicator on screen without changing the volume\n- volume-set <value: 0-100> - Set the speaker volume to a percentage (sound)\n- volume-up - Make the speakers louder (sound volume)\n- wallpaper-get - Report which wallpaper file is set now\n- wallpaper-next - Change the background: switch to the next wallpaper\n- wallpaper-previous - Go back to the previous wallpaper (the earlier background)\n- wallpaper-random - Change the background to a random wallpaper from the library\n- wallpaper-set <path> - Set one specific image file as the wallpaper (needs a file path; to just change it use next or random)\n- wifi-status - Report the Wi-Fi connection\n- window-switcher - Show the window switcher (alt-tab style)\n- workspace-alert-add <workspace> - Add a workspace alert (by number, name, or id)\n- workspace-alert-add-window <window-id> - Add a workspace alert for a window\n- workspace-alert-clear <workspace> - Clear a workspace alert\n- workspace-alert-clear-all - Clear all workspace alerts\n- workspace-alert-status - Print workspace alerts\n- workspace-switch <direction: next|prev> - Go to the next or previous workspace\n- decline - Use this when none of the other tools can do what was asked, or it would be unsafe. Put the reason in \"reason\".\n",
+  "catalog": "- ai-usage-localai-endpoint [capability: chat|vision|tools|transcript|tts|embeddings|image|video|sound] - Print the LocalAI base URL and the model to use, optionally for one capability\n- ai-usage-localai-open - Open the LocalAI web interface\n- ai-usage-refresh - Refetch AI usage from local tools\n- ai-usage-status - Report AI usage and the local AI models\n- annotate - Draw on the screen\n- bar-auto-hide-set <state: on|off|smart|true|false|1|0> - Make the top bar hide itself when not in use (on, off or smart)\n- bar-hide - Hide the top bar\n- bar-layer-set <layer: top|overlay> - Set one or all bar layers\n- bar-reserve-toggle - Temporarily toggle reserve space for one or all bars\n- bar-show - Show the top bar\n- bar-toggle - Show the top bar if hidden, hide it if shown\n- bluetooth-status - Report whether Bluetooth is on and what is connected\n- brightness-down - Make the screen dimmer (display brightness, not sound)\n- brightness-list-backlight-devices - Technical: list the screen backlight devices\n- brightness-osd <value> - Show the brightness indicator on screen without changing it\n- brightness-set <value: 0-100> - Set the screen brightness to a percentage\n- brightness-up - Make the screen brighter (display brightness, not sound)\n- caffeine-disable - Let the screen sleep when idle again\n- caffeine-enable - Keep the screen awake (stop it sleeping when idle)\n- caffeine-toggle - Switch keeping the screen awake on or off\n- clipboard-text - Read what is on the clipboard right now (the last text copied)\n- color-scheme-get - Report which color palette is in use\n- color-scheme-set <builtin|wallpaper|community|custom> ... - Choose a different color palette\n- config-reload - Reload the config file\n- desktop-ai-status - Report the state of the local AI features (not the desktop)\n- desktop-capture - Capture the desktop as an image for the assistant to look at\n- desktop-widgets-edit - Open the editor to rearrange the desktop widgets\n- desktop-widgets-exit - Close the desktop widgets editor\n- desktop-widgets-hide - Hide the desktop widgets that sit on the wallpaper\n- desktop-widgets-show - Show the desktop widgets that sit on the wallpaper\n- desktop-widgets-toggle - Show or hide the desktop widgets\n- desktop-widgets-toggle-edit - Toggle desktop widgets edit mode\n- display-click <x> <y> [button: left|right|middle] - Click at a pixel position on the agent display (its screen is 1280 x 720; 0,0 is the top left)\n- display-help <reason> - Ask the person to do a step only they can (sign in, a captcha, a choice). The agent waits until they say they are done\n- display-key <key> - Press one key on the agent display, or a combination joined with + (Return, Tab, Escape, BackSpace, Left, a, Control_L+a)\n- display-move <x> <y> - Move the pointer on the agent display without clicking\n- display-screenshot - Take a picture of the agent display; prints ok <png-path>\n- display-scroll <steps> - Scroll the wheel on the agent display (positive scrolls down)\n- display-type <text> - Type text on the agent display, into whatever has the focus. Never type a password: ask the person with display-help\n- dock-hide - Hide the dock (the app strip)\n- dock-reload - Reload dock configuration\n- dock-show - Show the dock (the app strip)\n- dock-toggle - Show the dock if hidden, hide it if shown\n- dpms-off - Turn the monitors off (screen sleep)\n- dpms-on - Wake the monitors up\n- effects-profile-set <kind: output|input> <profile> - Set the EasyEffects output or input profile\n- firewall-status - Report whether the firewall is running\n- keyboard-backlight-down - Make the keyboard lighting dimmer\n- keyboard-backlight-osd <value> - Show the keyboard lighting indicator without changing it\n- keyboard-backlight-set <value: 0-100> - Set the keyboard lighting to a percentage\n- keyboard-backlight-toggle - Turn the keyboard lighting on or off\n- keyboard-backlight-up - Make the keyboard lighting brighter\n- keyboard-layout-cycle - Switch to the next keyboard language layout\n- lockscreen-widgets-edit - Open the lockscreen widgets editor\n- lockscreen-widgets-exit - Close the lockscreen widgets editor\n- lockscreen-widgets-toggle-edit - Toggle lockscreen widgets edit mode\n- log-level-set <level: debug|info|warn|error> - Set the console log level\n- log-level-status - Print the current console log level\n- media <action: next|previous|toggle|play|pause|stop|raise|next-player|previous-player> - Control the music or video player: play, pause, next, previous, stop\n- mic-volume-down - Lower the microphone input level\n- mic-volume-osd - Show the microphone level indicator without changing it\n- mic-volume-set <value: 0-100> - Set the microphone input level to a percentage\n- mic-volume-up - Raise the microphone input level\n- nightlight-disable - Turn off the night light\n- nightlight-enable - Turn on the night light (warmer, blue-light-filtered colors)\n- nightlight-force-toggle - Force the night light on now, ignoring its schedule\n- nightlight-toggle - Switch the night light schedule on or off\n- notification-clear-active - Dismiss the notification popups currently on screen\n- notification-dnd-set <state: on|off|true|false|1|0> - Turn Do Not Disturb on or off (silences notification popups)\n- notification-dnd-status - Report whether Do Not Disturb is on\n- notification-dnd-toggle - Flip Do Not Disturb\n- notification-history - Show the list of past notifications (what I missed)\n- notification-show <summary> <body> - Show a custom notification with a title and a message\n- osd-disable - Turn off the on-screen popups for volume and brightness\n- osd-enable - Turn on the on-screen popups for volume and brightness\n- osd-toggle - Turn the on-screen popups on or off\n- panel-close - Close the panel that is open\n- panel-open <id> [context] - Open a panel by id: control-center (quick settings), launcher (app launcher), clipboard (clipboard history); optional context\n- panel-toggle <id> [context] - Open or close a panel by id: control-center, launcher, clipboard; optional context\n- privacy-status - Report whether the camera, microphone or screen is being used or recorded, and the location setting\n- printers-status - Report the printers and the default printer\n- power-cycle [direction: next|prev] - Step to the next power profile\n- power-set <profile> - Set the power profile: performance, balanced or power-saver (does not shut down or restart)\n- screenshot-annotate - Take a screenshot and draw on it\n- screenshot-fullscreen [mode: pick|monitor|all] - Take a screenshot of the whole screen or a monitor\n- screenshot-ocr - Select an area of the screen and copy the text recognised in it\n- screenshot-pick-color - Pick a color from the screen\n- screenshot-region - Take a screenshot of an area the user selects\n- screenshot-scan-qr - Select an area of the screen and read the QR code or barcode in it\n- session <action: lock> - Lock the screen\n- settings-close - Close the settings\n- settings-open [context] - Open the settings, optionally at a section\n- settings-open-widget - Open Control Center at a bar widget; from a widget gesture, targets that widget\n- settings-toggle [context] - Open or close the settings\n- status - Report the state of the desktop: volume, brightness, theme, do not disturb, the open panel, workspaces, and the open windows with their ids\n- tailscale-status - Report the Tailscale VPN connection\n- taskbar-cycle <direction: next|prev> - Move to the next or previous task in the taskbar\n- theme-mode-get - Report whether the desktop is in dark or light mode\n- theme-mode-set <mode: dark|light|auto> - Switch the whole desktop between dark and light appearance\n- theme-mode-toggle - Flip the desktop between dark and light appearance\n- volume-down - Make the speakers quieter (sound volume)\n- volume-mute - Mute or unmute the speakers (sound)\n- volume-osd - Show the volume indicator on screen without changing the volume\n- volume-set <value: 0-100> - Set the speaker volume to a percentage (sound)\n- volume-up - Make the speakers louder (sound volume)\n- wallpaper-get - Report which wallpaper file is set now\n- wallpaper-next - Change the background: switch to the next wallpaper\n- wallpaper-previous - Go back to the previous wallpaper (the earlier background)\n- wallpaper-random - Change the background to a random wallpaper from the library\n- wallpaper-set <path> - Set one specific image file as the wallpaper (needs a file path; to just change it use next or random)\n- wifi-status - Report the Wi-Fi connection\n- window-switcher - Show the window switcher (alt-tab style)\n- workspace-alert-add <workspace> - Add a workspace alert (by number, name, or id)\n- workspace-alert-add-window <window-id> - Add a workspace alert for a window\n- workspace-alert-clear <workspace> - Clear a workspace alert\n- workspace-alert-clear-all - Clear all workspace alerts\n- workspace-alert-status - Print workspace alerts\n- workspace-switch <direction: next|prev> - Go to the next or previous workspace\n- decline - Use this when none of the other tools can do what was asked, or it would be unsafe. Put the reason in \"reason\".\n",
   "name": "observe+act_decline_hints",
   "schema": {
    "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1318,6 +1318,233 @@
       },
       "tool": {
        "const": "desktop-widgets-toggle-edit"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 3,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "enum": [
+          "left",
+          "right",
+          "middle"
+         ],
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-click"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+       },
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-help"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 1,
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-key"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-move"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 0,
+       "minItems": 0,
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-screenshot"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 1,
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-scroll"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+       },
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-type"
       }
      },
      "required": [
@@ -3701,7 +3928,7 @@
   }
  },
  {
-  "catalog": "- ai-usage-localai-delete <name> - Remove an installed LocalAI model\n- ai-usage-localai-endpoint [capability: chat|vision|tools|transcript|tts|embeddings|image|video|sound] - Print the LocalAI base URL and the model to use, optionally for one capability\n- ai-usage-localai-install <id> - Install a model from the LocalAI gallery\n- ai-usage-localai-model <name> - Persist a LocalAI model as the desktop's default chat model\n- ai-usage-localai-open - Open the LocalAI web interface\n- ai-usage-localai-start - Start the local LocalAI server\n- ai-usage-localai-stop - Stop the local LocalAI server\n- ai-usage-ollama-cancel - Cancel an in-progress Ollama model download\n- ai-usage-ollama-delete <name> - Remove an installed Ollama model\n- ai-usage-ollama-model <name> - Load an Ollama model and persist it as the selected model\n- ai-usage-ollama-pull <name> - Download an Ollama model from the library\n- ai-usage-ollama-start - Start the local Ollama daemon\n- ai-usage-ollama-stop - Stop the local Ollama daemon\n- ai-usage-refresh - Refetch AI usage from local tools\n- ai-usage-status - Print AI usage and local inference status\n- app-launch <query> - Launch an installed application by desktop id or name\n- annotate - Draw on the screen over running apps, or annotate an image file; press F or the Freeze button to capture the background\n- bar-auto-hide-set <state: on|off|smart|true|false|1|0> - Set auto-hide state for a bar\n- bar-hide - Hide one or all bars and release their layout gaps\n- bar-layer-set <layer: top|overlay> - Set one or all bar layers\n- bar-reserve-toggle - Temporarily toggle reserve space for one or all bars\n- bar-show - Show one or all bars\n- bar-toggle - Toggle visibility for one or all bars\n- bluetooth-disable - Disable Bluetooth\n- bluetooth-enable - Enable Bluetooth\n- bluetooth-status - Print Bluetooth state\n- bluetooth-toggle - Toggle Bluetooth\n- brightness-down - Decrease brightness (defaults to current monitor)\n- brightness-list-backlight-devices - List available sysfs backlight device names\n- brightness-osd <value> - Show brightness OSD without changing brightness\n- brightness-set <value: 0-100> - Set brightness (defaults to current monitor)\n- brightness-up - Increase brightness (defaults to current monitor)\n- caffeine-disable - Disable caffeine (idle inhibitor)\n- caffeine-enable - Enable caffeine (idle inhibitor)\n- caffeine-toggle - Toggle caffeine (idle inhibitor)\n- clipboard-clear - Clear clipboard history\n- clipboard-copy <text> - Copy text to the clipboard\n- clipboard-text - Print the most recent clipboard text (empty when the selection holds no text)\n- color-scheme-get - Print active color scheme: <source> <name> (source is builtin, wallpaper, community, or custom)\n- color-scheme-set <builtin|wallpaper|community|custom> ... - Set palette source and selection in settings.toml (builtin name, wallpaper generator scheme, community id, or custom scheme folder name)\n- config-reload - Reload the config file\n- desktop-ai-describe <path> - Describe a screenshot with the LocalAI vision model\n- desktop-ai-dictate - Start or stop microphone dictation through LocalAI\n- desktop-ai-read <path> - Read the text in an image with the LocalAI vision model\n- desktop-ai-rewrite - Rewrite the clipboard text with LocalAI and copy the result\n- desktop-ai-speak - Read the clipboard text aloud with LocalAI\n- desktop-ai-status - Print the desktop LocalAI action state and last result\n- desktop-ai-summarize - Summarize the clipboard text with LocalAI and copy the result\n- desktop-ai-translate - Translate the clipboard text with LocalAI and copy the result\n- desktop-capture - Capture the desktop for agents (non-interactive); prints ok <png-path>\n- desktop-widgets-edit - Open the desktop widgets editor\n- desktop-widgets-exit - Close the desktop widgets editor\n- desktop-widgets-hide - Hide desktop widgets now (runtime only; does not change the saved setting)\n- desktop-widgets-show - Show desktop widgets now (runtime only; does not change the saved setting)\n- desktop-widgets-toggle - Toggle desktop widgets visibility (runtime only; does not change the saved setting)\n- desktop-widgets-toggle-edit - Toggle desktop widgets edit mode\n- dock-hide - Hide the dock (persists override)\n- dock-reload - Reload dock configuration\n- dock-show - Show the dock (persists override)\n- dock-toggle - Toggle dock visibility (persists override)\n- dpms-off - Turn monitors off\n- dpms-on - Turn monitors on\n- effects-profile-set <kind: output|input> <profile> - Set the EasyEffects output or input profile\n- firewall-status - Print firewalld status, default zone, and panic mode\n- greeter-sync - Sync wallpaper, colors, and monitor layout to Helix Greeter\n- keyboard-backlight-down - Decrease all keyboard backlights by one level\n- keyboard-backlight-osd <value> - Show keyboard backlight OSD without changing brightness\n- keyboard-backlight-set <value: 0-100> - Set all keyboard backlights (0-100 percentage)\n- keyboard-backlight-toggle - Toggle all keyboard backlights on/off\n- keyboard-backlight-up - Increase all keyboard backlights by one level\n- keyboard-layout-cycle - Switch to the next keyboard layout\n- lockscreen-widgets-edit - Open the lockscreen widgets editor\n- lockscreen-widgets-exit - Close the lockscreen widgets editor\n- lockscreen-widgets-toggle-edit - Toggle lockscreen widgets edit mode\n- log-level-set <level: debug|info|warn|error> - Set the console log level\n- log-level-status - Print the current console log level\n- media <action: next|previous|toggle|play|pause|stop|raise|next-player|previous-player> - Control active media playback\n- mic-mute - Toggle microphone mute\n- mic-volume-down - Decrease microphone volume\n- mic-volume-osd - Show the microphone volume OSD without changing volume (defaults to the current volume)\n- mic-volume-set <value: 0-100> - Set microphone volume\n- mic-volume-up - Increase microphone volume\n- network-toggle - Disconnect the active network, or reconnect when nothing is connected\n- nightlight-disable - Disable night light schedule\n- nightlight-enable - Enable night light schedule\n- nightlight-force-toggle - Toggle forced night light mode\n- nightlight-toggle - Toggle night light schedule\n- notification-clear-active - Dismiss all currently active notifications\n- notification-clear-history - Clear notification history\n- notification-dnd-set <state: on|off|true|false|1|0> - Set notification Do Not Disturb state\n- notification-dnd-status - Print notification Do Not Disturb state\n- notification-dnd-toggle - Toggle notification Do Not Disturb state\n- notification-history - Print recent notification history as JSON\n- notification-invoke-latest - Invoke the default action of the most recent active notification\n- notification-show <summary> <body> - Show an internal Helix notification\n- osd-disable - Disable OSD popups\n- osd-enable - Enable OSD popups\n- osd-toggle - Toggle OSD popups\n- panel-close - Close the active panel, or close the named panel if it is active\n- panel-open <id> [context] - Open a panel by id, optionally with context (e.g. launcher /emo, control-center audio)\n- panel-toggle <id> [context] - Toggle a panel by id, optionally with context (e.g. launcher /emo, control-center audio)\n- privacy-status - Print capture activity plus telemetry and location mode\n- printers-start - Start the CUPS printing service\n- printers-status - Print CUPS status and default printer\n- power-cycle [direction: next|prev] - Step through UPower's ordered profile list, forward by default (wraps)\n- power-set <profile> - Set the UPower power profile (e.g. performance, balanced, power-saver)\n- screen-record-replay-save - Save the last N seconds from the running replay buffer\n- screen-record-replay-start [source: focused|portal] - Start the gpu-screen-recorder replay buffer on the focused output or portal picker\n- screen-record-replay-stop - Stop the replay buffer without saving\n- screen-record-replay-toggle [source: focused|portal] - Start or stop the replay buffer (optional source: focused or portal)\n- screen-record-start [source: focused|portal|region] - Start screen recording of the focused output, a region, or a portal picker\n- screen-record-stop - Stop the current screen recording\n- screen-record-toggle [source: focused|portal|region] - Start or stop screen recording (optional source: focused, portal, or region)\n- screenshot-annotate - Freeze the screen and annotate it, then copy or save\n- screenshot-fullscreen [mode: pick|monitor|all] - Capture the focused monitor by default, pick interactively with pick, or all outputs with all\n- screenshot-ocr - Select a region and copy recognized text to the clipboard\n- screenshot-pick-color - Freeze the screen and copy the color under the click\n- screenshot-region - Start an interactive region screenshot\n- screenshot-scan-qr - Select a region and copy a QR code or barcode to the clipboard\n- session <action: lock|lock-and-suspend|suspend> - Run a built-in session action\n- settings-close - Close Control Center if it is open on a settings page\n- settings-open [context] - Open Control Center on a settings page, optionally at a specific section\n- settings-open-widget - Open Control Center at a bar widget; from a widget gesture, targets that widget\n- settings-toggle [context] - Toggle Control Center on a settings page, optionally at a specific section\n- status - Print current state as JSON\n- tailscale-down - Disconnect this machine from the Tailscale network\n- tailscale-status - Print Tailscale connection status\n- tailscale-toggle - Connect or disconnect this machine from Tailscale\n- tailscale-up - Connect this machine to the Tailscale network\n- taskbar-cycle <direction: next|prev> - Step to the adjacent task or workspace group in the invoking taskbar\n- templates-apply - Apply configured theme templates for the current palette\n- theme-mode-get - Print the current resolved theme mode\n- theme-mode-set <mode: dark|light|auto> - Set theme mode and persist to settings.toml\n- theme-mode-toggle - Toggle theme mode between dark and light\n- volume-down - Decrease speaker volume\n- volume-mute - Toggle speaker mute\n- volume-osd - Show the volume OSD without changing volume (defaults to the current volume)\n- volume-set <value: 0-100> - Set speaker volume\n- volume-up - Increase speaker volume\n- wallpaper-get - Print default wallpaper path, or effective path for an output\n- wallpaper-next - Switch to the next wallpaper immediately\n- wallpaper-previous - Switch to the previous wallpaper immediately\n- wallpaper-random - Switch to a random wallpaper immediately\n- wallpaper-set <path> - Set wallpaper for all or a specific output (persisted)\n- wifi-disable - Disable Wi-Fi\n- wifi-enable - Enable Wi-Fi\n- wifi-status - Print Wi-Fi state\n- wifi-toggle - Toggle Wi-Fi\n- window-close - Close the focused window, or a compositor window id\n- window-switcher - Open or close the window switcher overlay\n- workspace-alert-add <workspace> - Add a workspace alert (by number, name, or id)\n- workspace-alert-add-window <window-id> - Add a workspace alert for a window\n- workspace-alert-clear <workspace> - Clear a workspace alert\n- workspace-alert-clear-all - Clear all workspace alerts\n- workspace-alert-status - Print workspace alerts\n- workspace-switch <direction: next|prev> - Switch to the adjacent workspace on the target monitor (stops at both ends)\n- decline - Use this when none of the other tools can do what was asked, or it would be unsafe. Put the reason in \"reason\".\n",
+  "catalog": "- ai-usage-localai-delete <name> - Remove an installed LocalAI model\n- ai-usage-localai-endpoint [capability: chat|vision|tools|transcript|tts|embeddings|image|video|sound] - Print the LocalAI base URL and the model to use, optionally for one capability\n- ai-usage-localai-install <id> - Install a model from the LocalAI gallery\n- ai-usage-localai-model <name> - Persist a LocalAI model as the desktop's default chat model\n- ai-usage-localai-open - Open the LocalAI web interface\n- ai-usage-localai-start - Start the local LocalAI server\n- ai-usage-localai-stop - Stop the local LocalAI server\n- ai-usage-ollama-cancel - Cancel an in-progress Ollama model download\n- ai-usage-ollama-delete <name> - Remove an installed Ollama model\n- ai-usage-ollama-model <name> - Load an Ollama model and persist it as the selected model\n- ai-usage-ollama-pull <name> - Download an Ollama model from the library\n- ai-usage-ollama-start - Start the local Ollama daemon\n- ai-usage-ollama-stop - Stop the local Ollama daemon\n- ai-usage-refresh - Refetch AI usage from local tools\n- ai-usage-status - Print AI usage and local inference status\n- app-launch <query> - Launch an installed application by desktop id or name\n- annotate - Draw on the screen over running apps, or annotate an image file; press F or the Freeze button to capture the background\n- bar-auto-hide-set <state: on|off|smart|true|false|1|0> - Set auto-hide state for a bar\n- bar-hide - Hide one or all bars and release their layout gaps\n- bar-layer-set <layer: top|overlay> - Set one or all bar layers\n- bar-reserve-toggle - Temporarily toggle reserve space for one or all bars\n- bar-show - Show one or all bars\n- bar-toggle - Toggle visibility for one or all bars\n- bluetooth-disable - Disable Bluetooth\n- bluetooth-enable - Enable Bluetooth\n- bluetooth-status - Print Bluetooth state\n- bluetooth-toggle - Toggle Bluetooth\n- brightness-down - Decrease brightness (defaults to current monitor)\n- brightness-list-backlight-devices - List available sysfs backlight device names\n- brightness-osd <value> - Show brightness OSD without changing brightness\n- brightness-set <value: 0-100> - Set brightness (defaults to current monitor)\n- brightness-up - Increase brightness (defaults to current monitor)\n- caffeine-disable - Disable caffeine (idle inhibitor)\n- caffeine-enable - Enable caffeine (idle inhibitor)\n- caffeine-toggle - Toggle caffeine (idle inhibitor)\n- clipboard-clear - Clear clipboard history\n- clipboard-copy <text> - Copy text to the clipboard\n- clipboard-text - Print the most recent clipboard text (empty when the selection holds no text)\n- color-scheme-get - Print active color scheme: <source> <name> (source is builtin, wallpaper, community, or custom)\n- color-scheme-set <builtin|wallpaper|community|custom> ... - Set palette source and selection in settings.toml (builtin name, wallpaper generator scheme, community id, or custom scheme folder name)\n- config-reload - Reload the config file\n- desktop-ai-describe <path> - Describe a screenshot with the LocalAI vision model\n- desktop-ai-dictate - Start or stop microphone dictation through LocalAI\n- desktop-ai-read <path> - Read the text in an image with the LocalAI vision model\n- desktop-ai-rewrite - Rewrite the clipboard text with LocalAI and copy the result\n- desktop-ai-speak - Read the clipboard text aloud with LocalAI\n- desktop-ai-status - Print the desktop LocalAI action state and last result\n- desktop-ai-summarize - Summarize the clipboard text with LocalAI and copy the result\n- desktop-ai-translate - Translate the clipboard text with LocalAI and copy the result\n- desktop-capture - Capture the desktop for agents (non-interactive); prints ok <png-path>\n- desktop-widgets-edit - Open the desktop widgets editor\n- desktop-widgets-exit - Close the desktop widgets editor\n- desktop-widgets-hide - Hide desktop widgets now (runtime only; does not change the saved setting)\n- desktop-widgets-show - Show desktop widgets now (runtime only; does not change the saved setting)\n- desktop-widgets-toggle - Toggle desktop widgets visibility (runtime only; does not change the saved setting)\n- desktop-widgets-toggle-edit - Toggle desktop widgets edit mode\n- display-click <x> <y> [button: left|right|middle] - Click at a pixel position on the agent display (its screen is 1280 x 720; 0,0 is the top left)\n- display-help <reason> - Ask the person to do a step only they can (sign in, a captcha, a choice). The agent waits until they say they are done\n- display-key <key> - Press one key on the agent display, or a combination joined with + (Return, Tab, Escape, BackSpace, Left, a, Control_L+a)\n- display-launch <application> - Start an installed application on the agent display (the agent's own screen, never the person's desktop); starts the display if it is not running\n- display-move <x> <y> - Move the pointer on the agent display without clicking\n- display-screenshot - Take a picture of the agent display; prints ok <png-path>\n- display-scroll <steps> - Scroll the wheel on the agent display (positive scrolls down)\n- display-type <text> - Type text on the agent display, into whatever has the focus. Never type a password: ask the person with display-help\n- dock-hide - Hide the dock (persists override)\n- dock-reload - Reload dock configuration\n- dock-show - Show the dock (persists override)\n- dock-toggle - Toggle dock visibility (persists override)\n- dpms-off - Turn monitors off\n- dpms-on - Turn monitors on\n- effects-profile-set <kind: output|input> <profile> - Set the EasyEffects output or input profile\n- firewall-status - Print firewalld status, default zone, and panic mode\n- greeter-sync - Sync wallpaper, colors, and monitor layout to Helix Greeter\n- keyboard-backlight-down - Decrease all keyboard backlights by one level\n- keyboard-backlight-osd <value> - Show keyboard backlight OSD without changing brightness\n- keyboard-backlight-set <value: 0-100> - Set all keyboard backlights (0-100 percentage)\n- keyboard-backlight-toggle - Toggle all keyboard backlights on/off\n- keyboard-backlight-up - Increase all keyboard backlights by one level\n- keyboard-layout-cycle - Switch to the next keyboard layout\n- lockscreen-widgets-edit - Open the lockscreen widgets editor\n- lockscreen-widgets-exit - Close the lockscreen widgets editor\n- lockscreen-widgets-toggle-edit - Toggle lockscreen widgets edit mode\n- log-level-set <level: debug|info|warn|error> - Set the console log level\n- log-level-status - Print the current console log level\n- media <action: next|previous|toggle|play|pause|stop|raise|next-player|previous-player> - Control active media playback\n- mic-mute - Toggle microphone mute\n- mic-volume-down - Decrease microphone volume\n- mic-volume-osd - Show the microphone volume OSD without changing volume (defaults to the current volume)\n- mic-volume-set <value: 0-100> - Set microphone volume\n- mic-volume-up - Increase microphone volume\n- network-toggle - Disconnect the active network, or reconnect when nothing is connected\n- nightlight-disable - Disable night light schedule\n- nightlight-enable - Enable night light schedule\n- nightlight-force-toggle - Toggle forced night light mode\n- nightlight-toggle - Toggle night light schedule\n- notification-clear-active - Dismiss all currently active notifications\n- notification-clear-history - Clear notification history\n- notification-dnd-set <state: on|off|true|false|1|0> - Set notification Do Not Disturb state\n- notification-dnd-status - Print notification Do Not Disturb state\n- notification-dnd-toggle - Toggle notification Do Not Disturb state\n- notification-history - Print recent notification history as JSON\n- notification-invoke-latest - Invoke the default action of the most recent active notification\n- notification-show <summary> <body> - Show an internal Helix notification\n- osd-disable - Disable OSD popups\n- osd-enable - Enable OSD popups\n- osd-toggle - Toggle OSD popups\n- panel-close - Close the active panel, or close the named panel if it is active\n- panel-open <id> [context] - Open a panel by id, optionally with context (e.g. launcher /emo, control-center audio)\n- panel-toggle <id> [context] - Toggle a panel by id, optionally with context (e.g. launcher /emo, control-center audio)\n- privacy-status - Print capture activity plus telemetry and location mode\n- printers-start - Start the CUPS printing service\n- printers-status - Print CUPS status and default printer\n- power-cycle [direction: next|prev] - Step through UPower's ordered profile list, forward by default (wraps)\n- power-set <profile> - Set the UPower power profile (e.g. performance, balanced, power-saver)\n- screen-record-replay-save - Save the last N seconds from the running replay buffer\n- screen-record-replay-start [source: focused|portal] - Start the gpu-screen-recorder replay buffer on the focused output or portal picker\n- screen-record-replay-stop - Stop the replay buffer without saving\n- screen-record-replay-toggle [source: focused|portal] - Start or stop the replay buffer (optional source: focused or portal)\n- screen-record-start [source: focused|portal|region] - Start screen recording of the focused output, a region, or a portal picker\n- screen-record-stop - Stop the current screen recording\n- screen-record-toggle [source: focused|portal|region] - Start or stop screen recording (optional source: focused, portal, or region)\n- screenshot-annotate - Freeze the screen and annotate it, then copy or save\n- screenshot-fullscreen [mode: pick|monitor|all] - Capture the focused monitor by default, pick interactively with pick, or all outputs with all\n- screenshot-ocr - Select a region and copy recognized text to the clipboard\n- screenshot-pick-color - Freeze the screen and copy the color under the click\n- screenshot-region - Start an interactive region screenshot\n- screenshot-scan-qr - Select a region and copy a QR code or barcode to the clipboard\n- session <action: lock|lock-and-suspend|suspend> - Run a built-in session action\n- settings-close - Close Control Center if it is open on a settings page\n- settings-open [context] - Open Control Center on a settings page, optionally at a specific section\n- settings-open-widget - Open Control Center at a bar widget; from a widget gesture, targets that widget\n- settings-toggle [context] - Toggle Control Center on a settings page, optionally at a specific section\n- status - Print current state as JSON\n- tailscale-down - Disconnect this machine from the Tailscale network\n- tailscale-status - Print Tailscale connection status\n- tailscale-toggle - Connect or disconnect this machine from Tailscale\n- tailscale-up - Connect this machine to the Tailscale network\n- taskbar-cycle <direction: next|prev> - Step to the adjacent task or workspace group in the invoking taskbar\n- templates-apply - Apply configured theme templates for the current palette\n- theme-mode-get - Print the current resolved theme mode\n- theme-mode-set <mode: dark|light|auto> - Set theme mode and persist to settings.toml\n- theme-mode-toggle - Toggle theme mode between dark and light\n- volume-down - Decrease speaker volume\n- volume-mute - Toggle speaker mute\n- volume-osd - Show the volume OSD without changing volume (defaults to the current volume)\n- volume-set <value: 0-100> - Set speaker volume\n- volume-up - Increase speaker volume\n- wallpaper-get - Print default wallpaper path, or effective path for an output\n- wallpaper-next - Switch to the next wallpaper immediately\n- wallpaper-previous - Switch to the previous wallpaper immediately\n- wallpaper-random - Switch to a random wallpaper immediately\n- wallpaper-set <path> - Set wallpaper for all or a specific output (persisted)\n- wifi-disable - Disable Wi-Fi\n- wifi-enable - Enable Wi-Fi\n- wifi-status - Print Wi-Fi state\n- wifi-toggle - Toggle Wi-Fi\n- window-close - Close the focused window, or a compositor window id\n- window-switcher - Open or close the window switcher overlay\n- workspace-alert-add <workspace> - Add a workspace alert (by number, name, or id)\n- workspace-alert-add-window <window-id> - Add a workspace alert for a window\n- workspace-alert-clear <workspace> - Clear a workspace alert\n- workspace-alert-clear-all - Clear all workspace alerts\n- workspace-alert-status - Print workspace alerts\n- workspace-switch <direction: next|prev> - Switch to the adjacent workspace on the target monitor (stops at both ends)\n- decline - Use this when none of the other tools can do what was asked, or it would be unsafe. Put the reason in \"reason\".\n",
   "name": "all_decline",
   "schema": {
    "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5227,6 +5454,266 @@
       },
       "tool": {
        "const": "desktop-widgets-toggle-edit"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 3,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "enum": [
+          "left",
+          "right",
+          "middle"
+         ],
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-click"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+       },
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-help"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 1,
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-key"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+       },
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-launch"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-move"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 0,
+       "minItems": 0,
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-screenshot"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": false,
+       "maxItems": 1,
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-scroll"
+      }
+     },
+     "required": [
+      "tool",
+      "args"
+     ],
+     "type": "object"
+    },
+    {
+     "additionalProperties": false,
+     "properties": {
+      "args": {
+       "items": {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+       },
+       "minItems": 1,
+       "prefixItems": [
+        {
+         "maxLength": 500,
+         "minLength": 1,
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "reason": {
+       "maxLength": 200,
+       "type": "string"
+      },
+      "tool": {
+       "const": "display-type"
       }
      },
      "required": [

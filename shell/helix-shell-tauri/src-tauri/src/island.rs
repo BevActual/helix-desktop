@@ -8,7 +8,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use helix_compositor::agent_desk::glance_from_niri;
-use helix_shell_model::island::{choose, parse_media_line, with_agent_display, IslandView};
+use helix_shell_model::island::{
+    choose, parse_media_line, with_agent_display, with_agent_help, IslandView,
+};
 use tauri::{AppHandle, Emitter};
 
 use crate::{phase_name, shell_state};
@@ -28,7 +30,8 @@ fn compute(app: &AppHandle) -> IslandView {
         shell.media.as_ref(),
     );
     drop(shell);
-    with_agent_display(view, crate::agent_display::window_count())
+    let view = with_agent_display(view, crate::agent_display::window_count());
+    with_agent_help(view, crate::agent_display::help_reason().as_deref())
 }
 
 /// Recomputes the pill and tells the page if it changed.

@@ -131,8 +131,16 @@ cloud Act turn, because a setting nothing acts on must not ship.
    display, outlines the picture, and **pauses the agent**: `agent_display::agent_input` (the way every agent act will reach the display) refuses with
    "the person is in control" until **Hand back**. Closing the panel hands back. `agent-display-test.sh` proves the chain with real input: a click and typing
    through the helper, the agent refused while the person is in control, the person's click in the picture reaching the display, and the agent able to
-   act again after Hand back. Not yet: agent acts as Agent Surface tools (with the first-use confirmation, rate limit and audit), the help request,
-   the cloud badge, and the physical-input pause when the person uses the display's own window instead of the viewer.
+   act again after Hand back. **Agent acts and the help request (phases 2 and 3) are built:** eight commands in the shell's command socket, so they pass through Agent Surface like every other
+   act (`helix_agent::agent_msg`, `msg-risk.toml`, `msg_schema.json`, goldens regenerated): `display-launch` (**confirm** tier: starting software needs the person's
+   say-so each time; starts the display if needed), `display-screenshot` (**observe-private**: a picture, written to a 0600 file of the person's runtime
+   directory), and `display-click`, `display-move`, `display-scroll`, `display-key`, `display-type` and `display-help` (**act**). Every one acts on the agent display
+   and nothing else. Refused: while the person is in control, while a help request is open (with the reason), and past 12 inputs a second; what the agent
+   types or asks for is never written to the log (only how much). `display-help <reason>` stops the agent: the island turns orange ("Agent needs your help",
+   with the reason), the viewer shows the request with **Done, carry on**, and the person either presses that or **takes over, does the step and hands back**
+   (which also counts as done). `tools/nested/agent-computer-use-test.sh` runs it through the command socket exactly as the service would. Not yet: the
+   confirmation after the agent reads private content (taint, T5) and an arming delay on the first input of a session, the cloud badge and model routing,
+   the physical-input pause when the person uses the display's own window instead of the viewer, and a notification (not only the island) for a help request.
    (A quiet `HelixPeekWindow` in the compositor was tried and dropped: the display's own compositor has its own clipboard and no notifications of
    the person's to disturb.)
 1. **Watch.** The agent desk viewer and the island entry; live line of the agent's latest step from the activity feed. Under A: the Agent Display

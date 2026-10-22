@@ -2242,3 +2242,8 @@ body:not(.island-on) #center #clock { transition: opacity .25s var(--ease) .12s;
 #av-foot { color: var(--label-3, var(--label-2)); font-size: 12px; }
 body.taking #av-frame { cursor: none; outline: 2px solid var(--accent); outline-offset: -2px; }
 body.taking #av-foot { color: var(--accent); font-weight: 600; }
+/* The agent asked for help. */
+#island.agenthelp { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); animation: islandin 360ms cubic-bezier(.2, .9, .3, 1.15) both, islring 2.4s ease-out 600ms infinite; }
+#island.agenthelp.settled { animation: islring 2.4s ease-out infinite; }
+#av-help { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--label-1, inherit); font-size: 13px; font-weight: 500; }
+#av-help[hidden] { display: none; } #av-help-text { flex: 1; }

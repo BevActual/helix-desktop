@@ -235,12 +235,129 @@ pub fn input(command: &str) -> Result<(), String> {
     }
 }
 
+/// The agent asked the person for help and is waiting: what it asked.
+static HELP: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn help_reason() -> Option<String> {
+    HELP.lock().expect("agent display help").clone()
+}
+
+/// Asks the person for help with a step only they can do. The agent's commands wait (are refused with the reason) until they say they are done, or
+/// take over and hand back. The island says so and the viewer shows the request.
+pub fn request_help(app: &AppHandle, reason: &str) {
+    *HELP.lock().expect("agent display help") = Some(reason.to_string());
+    eprintln!("AGENT-DISPLAY help requested");
+    crate::island::publish(app);
+    let _ = app.emit("agent-display-help", Some(reason.to_string()));
+}
+
+/// The person is done (or handed back after helping): the agent may go on.
+pub fn clear_help(app: &AppHandle) {
+    if HELP.lock().expect("agent display help").take().is_some() {
+        eprintln!("AGENT-DISPLAY help done");
+        crate::island::publish(app);
+        let _ = app.emit("agent-display-help", None::<String>);
+    }
+}
+
+/// At most this many input commands from the agent in any one second: a mistake cannot become a flood before the person can react.
+const AGENT_INPUTS_PER_SECOND: usize = 12;
+
+fn allowed_now() -> bool {
+    use std::collections::VecDeque;
+    static RECENT: Mutex<VecDeque<Instant>> = Mutex::new(VecDeque::new());
+    let mut recent = RECENT.lock().expect("agent display rate");
+    let now = Instant::now();
+    while recent
+        .front()
+        .is_some_and(|t| now.duration_since(*t) > Duration::from_secs(1))
+    {
+        recent.pop_front();
+    }
+    if recent.len() >= AGENT_INPUTS_PER_SECOND {
+        return false;
+    }
+    recent.push_back(now);
+    true
+}
+
 /// A command from the agent: refused while the person has the display. (The viewer's own input, `input`, is the person's and is never refused.)
 pub fn agent_input(command: &str) -> Result<(), String> {
     if person_controlling() {
         return Err("the person is in control of the display".into());
     }
+    if let Some(reason) = help_reason() {
+        return Err(format!("waiting for the person's help: {reason}"));
+    }
+    if !allowed_now() {
+        return Err(format!(
+            "slow down: at most {AGENT_INPUTS_PER_SECOND} inputs a second"
+        ));
+    }
     input(command)
+}
+
+/// What an agent's `display-*` command does, in one place: the commands in `helix_agent::agent_msg` map onto the display's hands.
+pub fn agent_click(x: i32, y: i32, button: &str) -> Result<(), String> {
+    agent_input(&json!({"op": "click", "button": button, "x": x, "y": y}).to_string())
+}
+
+pub fn agent_move(x: i32, y: i32) -> Result<(), String> {
+    agent_input(&json!({"op": "move", "x": x, "y": y}).to_string())
+}
+
+pub fn agent_scroll(dx: i32, dy: i32) -> Result<(), String> {
+    agent_input(&json!({"op": "scroll", "dx": dx, "dy": dy}).to_string())
+}
+
+/// `Return`, or a combination such as `Control_L+a`.
+pub fn agent_key(key: &str) -> Result<(), String> {
+    let keys: Vec<&str> = key.split('+').collect();
+    let command = if keys.len() == 1 {
+        json!({"op": "key", "name": key})
+    } else {
+        json!({"op": "combo", "keys": keys})
+    };
+    agent_input(&command.to_string())
+}
+
+pub fn agent_type(text: &str) -> Result<(), String> {
+    agent_input(&json!({"op": "text", "text": text}).to_string())
+}
+
+/// Starts an installed application (by id or name) on the display, starting the display first when it is not running.
+pub fn agent_launch(app: &AppHandle, query: &str) -> Result<String, String> {
+    start(app)?;
+    let apps = apps::scan();
+    let entry = helix_shell_model::launcher::resolve_launch(&apps, query)
+        .cloned()
+        .ok_or("no matching application")?;
+    launch(&entry.id)?;
+    Ok(entry.id)
+}
+
+/// A picture of the display for the agent, in a private file of the person's runtime directory: `ok <path>`.
+pub fn agent_screenshot() -> Result<String, String> {
+    let bytes = frame()?;
+    let path = person_runtime()?.join(format!(
+        "helix-capture-agent-display-{}.png",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|e| e.to_string())?;
+        file.write_all(&bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(format!("ok {}\n", path.display()))
 }
 
 /// Stops the display; every program on it goes with it.
@@ -410,6 +527,17 @@ pub async fn agent_display_start(app: AppHandle) -> Result<Status, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// The person says they have done what the agent asked.
+#[tauri::command]
+pub fn agent_display_help_done(app: AppHandle) {
+    clear_help(&app);
+}
+
+#[tauri::command]
+pub fn agent_display_help() -> Option<String> {
+    help_reason()
+}
+
 /// One command for the display's hands: a move, a button, a scroll, a key or some text. The helper checks it.
 #[tauri::command]
 pub async fn agent_display_input(command: serde_json::Value) -> Result<(), String> {
@@ -422,7 +550,11 @@ pub async fn agent_display_input(command: serde_json::Value) -> Result<(), Strin
 /// The viewer says the person has taken over (or handed back).
 #[tauri::command]
 pub fn agent_display_control(app: AppHandle, on: bool) {
-    PERSON_CONTROLLING.store(on, std::sync::atomic::Ordering::SeqCst);
+    let was = PERSON_CONTROLLING.swap(on, std::sync::atomic::Ordering::SeqCst);
+    // Handing back after helping is "I am done".
+    if was && !on {
+        clear_help(&app);
+    }
     eprintln!(
         "AGENT-DISPLAY person {}",
         if on { "in control" } else { "handed back" }

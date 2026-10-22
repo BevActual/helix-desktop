@@ -858,6 +858,161 @@
     {
       "flags": [],
       "hidden": false,
+      "name": "display-click",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Pixels from the left",
+          "joinRemaining": false,
+          "name": "x",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "Pixels from the top",
+          "joinRemaining": false,
+          "name": "y",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [
+            "left",
+            "right",
+            "middle"
+          ],
+          "description": "left (default), right or middle",
+          "joinRemaining": false,
+          "name": "button",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Click at a pixel position on the agent display (its screen is 1280 x 720; 0,0 is the top left)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "display-help",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "What the person needs to do, in under 200 characters",
+          "joinRemaining": true,
+          "name": "reason",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Ask the person to do a step only they can (sign in, a captcha, a choice). The agent waits until they say they are done"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "display-key",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Key name or combination",
+          "joinRemaining": false,
+          "name": "key",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Press one key on the agent display, or a combination joined with + (Return, Tab, Escape, BackSpace, Left, a, Control_L+a)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "display-launch",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Desktop id or name of an installed application",
+          "joinRemaining": true,
+          "name": "application",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Start an installed application on the agent display (the agent's own screen, never the person's desktop); starts the display if it is not running"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "display-move",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Pixels from the left",
+          "joinRemaining": false,
+          "name": "x",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "choices": [],
+          "description": "Pixels from the top",
+          "joinRemaining": false,
+          "name": "y",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Move the pointer on the agent display without clicking"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "display-screenshot",
+      "positionals": [],
+      "subcommands": [],
+      "summary": "Take a picture of the agent display; prints ok <png-path>"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "display-scroll",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "Wheel steps, -50 to 50",
+          "joinRemaining": false,
+          "name": "steps",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Scroll the wheel on the agent display (positive scrolls down)"
+    },
+    {
+      "flags": [],
+      "hidden": false,
+      "name": "display-type",
+      "positionals": [
+        {
+          "choices": [],
+          "description": "The text to type",
+          "joinRemaining": true,
+          "name": "text",
+          "required": true,
+          "variadic": false
+        }
+      ],
+      "subcommands": [],
+      "summary": "Type text on the agent display, into whatever has the focus. Never type a password: ask the person with display-help"
+    },
+    {
+      "flags": [],
+      "hidden": false,
       "name": "dock-hide",
       "positionals": [],
       "subcommands": [],

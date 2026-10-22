@@ -29,7 +29,7 @@ export function IslandBody({ register }: { register: (set: (view: IslandView) =>
     if (key !== last.current) { last.current = key; setSwap((n) => n + 1); }
   }, [view]);
   const media = view.kind === "media";
-  const icon = view.kind === "approval" ? "shield" : view.kind === "agentdesk" ? "grid" : view.kind === "agentdisplay" ? "eye" : "sparkle";
+  const icon = view.kind === "approval" ? "shield" : view.kind === "agentdesk" ? "grid" : view.kind === "agentdisplay" ? "eye" : view.kind === "agenthelp" ? "alert" : "sparkle";
   const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
   return (
     <>

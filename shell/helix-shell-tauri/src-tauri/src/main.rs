@@ -2115,6 +2115,8 @@ fn main() {
             agent_display::agent_display_launch,
             agent_display::agent_display_input,
             agent_display::agent_display_control,
+            agent_display::agent_display_help_done,
+            agent_display::agent_display_help,
             agent_display::agent_display_frame,
             dock::workspaces_view,
             dock::workspace_focus,

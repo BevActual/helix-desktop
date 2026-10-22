@@ -516,7 +516,15 @@ async function viewerLoop() {
     await new Promise((resolve) => setTimeout(resolve, running ? 200 : 800));
   }
 }
-function startViewer() { if (viewerOn) return; viewerOn = true; viewerLoop(); }
+// The agent asked for help: the request, and how to say it is done (or take over, do the step, and hand back).
+function drawHelp(reason) {
+  $("av-help").hidden = !reason;
+  $("av-help-text").textContent = reason ? "The agent needs your help: " + reason : "";
+  queueReport();
+}
+listen("agent-display-help", (event) => drawHelp(event.payload));
+$("av-done").onclick = () => invoke("agent_display_help_done");
+function startViewer() { if (viewerOn) return; viewerOn = true; invoke("agent_display_help").then(drawHelp, () => undefined); viewerLoop(); }
 function stopViewer() { viewerOn = false; if (taking) handBack(); }
 
 // Taking over: the person's mouse and keyboard over the picture go to the agent display. The agent is paused for as long as that lasts.
@@ -649,7 +657,7 @@ $("island").onclick = (event) => {
   if (islandKind === "approval") invoke("mobius_open", { mode: "agents" });
   else if (islandKind === "assistant") invoke("mobius_open", { mode: "act" });
   else if (islandKind === "agentdesk") invoke("agent_desk_focus");
-  else if (islandKind === "agentdisplay") invoke("panel_open", { id: "agent-display" });
+  else if (islandKind === "agentdisplay" || islandKind === "agenthelp") invoke("panel_open", { id: "agent-display" });
   else if (islandKind === "media") invoke("media_toggle");
 };
 
