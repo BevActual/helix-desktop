@@ -28,6 +28,7 @@ Allowed forms:
 {"tool":"display_scroll","steps":3}
 {"tool":"display_help","reason":"Sign in to the site, then press Done"}
 {"tool":"skill_read","name":"skill-name"}
+{"tool":"mcp","server":"server-name","name":"tool-name","args":{"argument":"value"}}
 {"tool":"finish"}
 Use web tools when the request needs current online information or a page. Prefer reading the relevant result before finishing.
 To change a file use edit_file, not a shell command: old must match the file exactly and appear once (include a line or two around it); the person reviews the diff first. Use terminal only for a task in the selected project folder. Every command requires the person's review. Commands can change files in /workspace; host home/session and direct network connections are unavailable. Never use terminal for desktop settings or applications; those use Act.
@@ -74,6 +75,13 @@ pub enum Request {
     SkillRead {
         name: String,
     },
+    /// A tool of one of the person's tool servers (MCP).
+    Mcp {
+        server: String,
+        name: String,
+        #[serde(default)]
+        args: serde_json::Value,
+    },
     Finish,
 }
 impl Request {
@@ -91,6 +99,7 @@ impl Request {
             Self::DisplayScroll { .. } => "display_scroll",
             Self::DisplayHelp { .. } => "display_help",
             Self::SkillRead { .. } => "skill_read",
+            Self::Mcp { .. } => "mcp",
             Self::Finish => "answer",
         }
     }
@@ -111,6 +120,7 @@ impl Request {
             Self::DisplayScroll { steps } => steps.to_string().into(),
             Self::DisplayHelp { reason } => reason.into(),
             Self::SkillRead { name } => name.into(),
+            Self::Mcp { server, name, .. } => format!("{server}: {name}").into(),
             Self::Finish => "".into(),
         }
     }
@@ -215,6 +225,22 @@ fn parse(raw: &str) -> Result<Request, String> {
         Request::SkillRead { name } => {
             if !crate::skills::valid_name(name) {
                 return Err("A skill name is lower-case words joined with dashes.".into());
+            }
+        }
+        Request::Mcp { server, name, args } => {
+            if !crate::skills::valid_name(server) {
+                return Err("A server name is lower-case words joined with dashes.".into());
+            }
+            if name.is_empty()
+                || name.len() > 80
+                || !name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+            {
+                return Err("That is not a tool name.".into());
+            }
+            if !(args.is_object() || args.is_null()) || args.to_string().len() > 4000 {
+                return Err("Tool arguments are one object of up to 4000 characters.".into());
             }
         }
         Request::Finish => {}
@@ -715,6 +741,10 @@ fn policy_action(request: &Request, known_url: bool) -> Option<helix_task::Actio
         | Request::DisplayScroll { .. }
         | Request::DisplayHelp { .. } => Action::Input,
         Request::SkillRead { .. } => Action::Skill,
+        Request::Mcp { server, name, .. } => Action::Tool {
+            server: server.clone(),
+            tool: name.clone(),
+        },
         Request::Finish => return None,
     })
 }
@@ -1091,6 +1121,9 @@ async fn execute(
                     result = display_step(&mut display, &request, &watching) => result,
                 }
             }
+            Request::Mcp { .. } => {
+                Err("Tool servers are used by tasks started from the Agents page.".into())
+            }
             Request::SkillRead { name } => crate::skills::read(name)
                 .map(|s| format!("{}\n\n{}", s.description, s.body))
                 .ok_or_else(|| format!("There is no skill called {name}.")),
@@ -1248,6 +1281,26 @@ pub async fn pick_folder() -> Result<Option<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn tool_server_calls_are_checked_before_they_are_made() {
+        let ok =
+            parse(r#"{"tool":"mcp","server":"calc","name":"add","args":{"a":1,"b":2}}"#).unwrap();
+        assert!(matches!(ok, Request::Mcp { .. }) && ok.input() == "calc: add");
+        assert!(
+            parse(r#"{"tool":"mcp","server":"calc","name":"add"}"#).is_ok(),
+            "no arguments"
+        );
+        for bad in [
+            r#"{"tool":"mcp","server":"../x","name":"add"}"#,
+            r#"{"tool":"mcp","server":"calc","name":"a b"}"#,
+            r#"{"tool":"mcp","server":"calc","name":"add","args":[1]}"#,
+            r#"{"tool":"mcp","server":"calc","name":"add","args":"x"}"#,
+            r#"{"tool":"mcp","server":"calc","name":"add","extra":1}"#,
+        ] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+    }
+
     #[test]
     fn display_tools_are_checked_before_they_reach_the_desktop() {
         for good in [

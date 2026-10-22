@@ -279,14 +279,6 @@ pub fn index_text(found: &[(String, Vec<Tool>)]) -> String {
     format!("\n\nTool servers the person added. Call one with {{\"tool\":\"mcp\",\"server\":\"name\",\"name\":\"tool\",\"args\":{{...}}}}; * marks a required argument. Each call asks the person first unless they allowed it:\n{text}")
 }
 
-#[derive(Serialize)]
-pub struct ServerView {
-    #[serde(flatten)]
-    server: Server,
-    tools: Vec<Tool>,
-    error: String,
-}
-
 #[tauri::command]
 pub fn mcp_servers() -> Vec<Server> {
     servers()

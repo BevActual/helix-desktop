@@ -274,4 +274,40 @@ import json,sys
 t=json.load(open(sys.argv[1]))
 assert t['policy']['cloud']=='never',t['policy']
 PY
-echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, start a task from a chat message, save, use and delete a skill, and keep a private task on this computer"
+
+# 12. A tool server added on the page: its tools are listed, a task calls one after asking, and Always allow remembers it.
+cp "$ROOT/tools/nested/fake-mcp.py" "$SCRATCH/state/fake-mcp.py"
+click_id agent-servers
+wait_id server-name
+sleep 1.5
+click_id server-name; wtype 'calc'
+click_id server-command; wtype 'python3'
+click_id server-args; wtype "$SCRATCH/state/fake-mcp.py"
+click_id server-add
+wait_id server-row-calc
+click_id server-test-calc
+wait_id server-tools-calc
+printf '[{"tool":"mcp","server":"calc","name":"add","args":{"a":2,"b":40}},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+sleep 1; wtype 'Add two numbers with the calculator.'
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$TWELVE" ] && break; sleep 0.25; done
+THIRTEEN=$(newest_task)
+wait_state "$THIRTEEN" waiting
+python3 - "$TASKS/$THIRTEEN.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['state']['why'].startswith('Use calc: add'),t['state']
+PY
+wait_id "agent-task-always-$THIRTEEN"
+click_id "agent-task-always-$THIRTEEN"
+wait_state "$THIRTEEN" done
+python3 - "$TASKS/$THIRTEEN.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['steps'][0]['tool']=='mcp' and t['steps'][0]['ok'] and 'sum=42' in t['steps'][0]['outcome'],t['steps']
+assert 'calc/add' in t['policy']['allow_tools'],t['policy']['allow_tools']
+PY
+echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, start a task from a chat message, save, use and delete a skill, keep a private task on this computer, and call a tool server's tool after asking"

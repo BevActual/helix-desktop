@@ -7,6 +7,8 @@ interface Step { n: number; tool: string; input: string; outcome: string; ok: bo
 interface Policy { name: string; folder: string; cloud: string; display: boolean; mode?: string; network?: boolean }
 type TaskState = { state: "queued" | "running" | "stopped" } | { state: "waiting"; why: string } | { state: "done"; summary: string } | { state: "failed"; error: string };
 interface AgentTask { id: string; goal: string; plan?: string; result_chat?: string; workdir?: string; dirty?: boolean; review?: string; policy: Policy; state: TaskState; steps: Step[]; created: number; updated: number }
+interface McpServer { name: string; command: string; args: string[]; enabled: boolean }
+interface McpTool { name: string; description: string; arguments: string[] }
 interface Skill { name: string; description: string; body: string }
 export interface Prefill { goal?: string; folder?: string; policy?: string }
 export interface AgentTasksHandle { open: (prefill?: Prefill) => void; close: () => void }
@@ -46,6 +48,9 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const [planFirst, setPlanFirst] = useState(false);
   const [models, setModels] = useState("balanced");
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [servers, setServers] = useState<McpServer[]>([]);
+  const [serverForm, setServerForm] = useState({ name: "", command: "", args: "" });
+  const [serverTools, setServerTools] = useState<Record<string, McpTool[] | string>>({});
   const [skillDraft, setSkillDraft] = useState<Skill | null>(null);
   const [draft, setDraft] = useState({ id: "", text: "" });
   const load = useCallback(() => invoke<AgentTask[]>("agent_tasks").then(setTasks, () => setTasks([])), []);
@@ -76,6 +81,10 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   };
   const loadSkills = useCallback(() => invoke<Skill[]>("agent_skills").then(setSkills, () => setSkills([])), []);
   useEffect(() => { if (shown) loadSkills(); }, [shown, loadSkills]);
+  useEffect(() => { if (shown) invoke<McpServer[]>("mcp_servers").then(setServers, () => setServers([])); }, [shown]);
+  const addServer = async () => { setError(""); try { setServers(await invoke<McpServer[]>("mcp_server_save", { server: { name: serverForm.name.trim(), command: serverForm.command.trim(), args: serverForm.args.split(/\s+/).filter(Boolean), enabled: true } })); setServerForm({ name: "", command: "", args: "" }); } catch (reason) { setError(String(reason)); } };
+  const removeServer = async (name: string) => { setError(""); try { setServers(await invoke<McpServer[]>("mcp_server_delete", { name })); } catch (reason) { setError(String(reason)); } };
+  const testServer = async (name: string) => { setServerTools({ ...serverTools, [name]: "Starting…" }); try { setServerTools({ ...serverTools, [name]: await invoke<McpTool[]>("mcp_server_test", { name }) }); } catch (reason) { setServerTools({ ...serverTools, [name]: String(reason) }); } };
   const draftSkill = async (id: string) => { setError(""); try { setSkillDraft(await invoke<Skill>("agent_skill_draft", { id })); } catch (reason) { setError(String(reason)); } };
   const saveSkill = async () => { if (!skillDraft) return; setError(""); try { setSkills(await invoke<Skill[]>("agent_skill_save", { ...skillDraft })); setSkillDraft(null); } catch (reason) { setError(String(reason)); } };
   const removeSkill = async (name: string) => { setError(""); try { setSkills(await invoke<Skill[]>("agent_skill_delete", { name })); } catch (reason) { setError(String(reason)); } };
@@ -125,6 +134,20 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     {skills.length === 0 ? <p className="sheet-note">No skills yet. Finish a task that worked and choose Save as skill.</p> : <ul className="agents-steps">{skills.map((k) => <li key={k.name} data-test={`skill-row-${k.name}`}><strong>{k.name}</strong><span>{k.description}</span><div className="agents-actions"><button type="button" className="mini" data-test={`skill-edit-${k.name}`} onClick={() => setSkillDraft(k)}>Edit</button><button type="button" className="mini" data-test={`skill-delete-${k.name}`} onClick={() => removeSkill(k.name)}>Delete</button></div></li>)}</ul>}
   </article>;
 
+  const serversPanel = <article className="agents-detail" data-test="servers-panel">
+    <header><h3>Tool servers</h3><p className="agents-meta">Programs you add that give tasks more tools (calendar, mail, git hosts and so on, through MCP). A task starts them for its length and asks you before each call, unless you allowed that tool. They run as you, outside the sandbox, with a minimal environment: add only ones you trust.</p></header>
+    {servers.length === 0 ? <p className="sheet-note">None yet.</p> : <ul className="agents-steps">{servers.map((k) => <li key={k.name} data-test={`server-row-${k.name}`}><strong>{k.name}</strong><code>{[k.command, ...k.args].join(" ")}</code>
+      {Array.isArray(serverTools[k.name]) ? <span data-test={`server-tools-${k.name}`}>{(serverTools[k.name] as McpTool[]).length ? (serverTools[k.name] as McpTool[]).map((t) => `${t.name}(${t.arguments.join(", ")})`).join(" · ") : "No tools."}</span> : serverTools[k.name] ? <span>{serverTools[k.name] as string}</span> : null}
+      <div className="agents-actions"><button type="button" className="mini" data-test={`server-test-${k.name}`} onClick={() => testServer(k.name)}>See its tools</button><button type="button" className="mini" data-test={`server-delete-${k.name}`} onClick={() => removeServer(k.name)}>Remove</button></div></li>)}</ul>}
+    <form className="agents-compose" onSubmit={(e) => { e.preventDefault(); addServer(); }}>
+      <h4>Add a server</h4>
+      <input data-test="server-name" placeholder="name-with-dashes" value={serverForm.name} maxLength={40} onChange={(e) => setServerForm({ ...serverForm, name: e.target.value })} />
+      <input data-test="server-command" placeholder="Program, for example npx" value={serverForm.command} onChange={(e) => setServerForm({ ...serverForm, command: e.target.value })} />
+      <input data-test="server-args" placeholder="Arguments, separated by spaces" value={serverForm.args} onChange={(e) => setServerForm({ ...serverForm, args: e.target.value })} />
+      <div className="agents-compose-actions"><button type="submit" className="primary" data-test="server-add" disabled={!serverForm.name.trim() || !serverForm.command.trim()}>Add server</button></div>
+    </form>
+  </article>;
+
   const detail = task && <article className="agents-detail" data-test="agent-task-detail">
     <header>
       <h3>{task.goal}</h3>
@@ -164,6 +187,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     <header className="agents-head" data-tauri-drag-region>
       <button type="button" className="icon-btn" data-test="agents-back" title="Back to chat" aria-label="Back to chat" onClick={() => { setShown(false); visible(false); }}>‹</button>
       <div><h2>Agents</h2><p>{waiting ? `${waiting} waiting for you` : "Tasks that run on their own and ask when they need you."}</p></div>
+      <button type="button" data-test="agent-servers" onClick={() => { setSelected("servers"); setSkillDraft(null); }}>Tool servers{servers.length ? ` (${servers.length})` : ""}</button>
       <button type="button" data-test="agent-skills" onClick={() => { setSelected("skills"); setSkillDraft(null); }}>Skills{skills.length ? ` (${skills.length})` : ""}</button>
       <button type="button" className="primary" data-test="agent-task-new" onClick={() => { setSelected("new"); goalBox.current?.focus(); }}>New task</button>
     </header>
@@ -173,11 +197,11 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
         {sorted.length === 0 && <p className="sheet-note">No tasks yet.</p>}
         {GROUPS.map((name, g) => { const rows = sorted.filter((t) => group(t) === g); return rows.length ? <div key={name} className="agents-group"><h5>{name}</h5>{rows.map((t) => <div key={t.id} className={`agents-row${selected === t.id ? " on" : ""}`}>
           <button type="button" className="agents-row-main" data-test={`agent-task-${t.id}`} onClick={() => setSelected(t.id)}><span className={`agents-dot ${t.state.state}`} /><strong>{t.goal.slice(0, 90)}</strong><span>{label(t)} · {t.steps.length} step{t.steps.length === 1 ? "" : "s"} · {ago(t.updated)}</span></button>
-          {t.state.state === "waiting" && <span className="agents-row-actions"><button type="button" className="mini primary" data-test={`agent-task-approve-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: true })}>Allow</button>{/^(Run a command|Edit a file|Open )/.test(t.state.why) && <button type="button" className="mini" data-test={`agent-task-always-${t.id}`} title="Allow this kind of step without asking, in this folder, from now on" onClick={() => call("agent_task_review", { id: t.id, approved: true, always: true })}>Always allow</button>}<button type="button" className="mini" data-test={`agent-task-decline-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: false })}>Decline</button></span>}
+          {t.state.state === "waiting" && <span className="agents-row-actions"><button type="button" className="mini primary" data-test={`agent-task-approve-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: true })}>Allow</button>{/^(Run a command|Edit a file|Open |Use )/.test(t.state.why) && <button type="button" className="mini" data-test={`agent-task-always-${t.id}`} title="Allow this kind of step without asking, in this folder, from now on" onClick={() => call("agent_task_review", { id: t.id, approved: true, always: true })}>Always allow</button>}<button type="button" className="mini" data-test={`agent-task-decline-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: false })}>Decline</button></span>}
           {(t.state.state === "running" || t.state.state === "waiting") && <span className="agents-row-actions"><button type="button" className="mini" data-test={`agent-task-stop-${t.id}`} onClick={() => call("agent_task_stop", { id: t.id })}>Stop</button></span>}
         </div>)}</div> : null; })}
       </nav>
-      <div className="agents-main">{selected === "skills" ? skillsPanel : selected === "new" || !task ? composer : <>{skillEditor}{detail}</>}</div>
+      <div className="agents-main">{selected === "servers" ? serversPanel : selected === "skills" ? skillsPanel : selected === "new" || !task ? composer : <>{skillEditor}{detail}</>}</div>
     </div>
   </section>;
 }

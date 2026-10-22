@@ -25,6 +25,7 @@ struct Remembered {
     allow_commands: Vec<String>,
     auto_edits: bool,
     apps: Vec<String>,
+    allow_tools: Vec<String>,
 }
 type FolderMemory = std::collections::BTreeMap<String, Remembered>;
 
@@ -53,6 +54,11 @@ fn remember(policy: &helix_task::Policy) {
         }
     }
     entry.auto_edits |= policy.auto_edits;
+    for tool in &policy.allow_tools {
+        if !entry.allow_tools.contains(tool) && entry.allow_tools.len() < 100 {
+            entry.allow_tools.push(tool.clone());
+        }
+    }
     for app in &policy.apps {
         if !entry.apps.contains(app) && entry.apps.len() < 30 {
             entry.apps.push(app.clone());
@@ -75,6 +81,11 @@ fn recall(policy: &mut helix_task::Policy) {
         }
     }
     policy.auto_edits |= entry.auto_edits;
+    for tool in entry.allow_tools {
+        if !policy.allow_tools.contains(&tool) {
+            policy.allow_tools.push(tool);
+        }
+    }
     for app in entry.apps {
         if !policy.apps.contains(&app) {
             policy.apps.push(app);
@@ -482,6 +493,23 @@ async fn work(
     } else {
         String::new()
     };
+    // The person's tool servers, started for the length of the task.
+    let mut tool_sessions: std::collections::HashMap<String, crate::mcp::Session> =
+        Default::default();
+    let mut found: Vec<(String, Vec<crate::mcp::Tool>)> = Vec::new();
+    for server in crate::mcp::servers()
+        .into_iter()
+        .filter(|s| s.enabled)
+        .take(8)
+    {
+        if let Ok(mut session) = crate::mcp::Session::start(&server).await {
+            if let Ok(tools) = session.tools().await {
+                found.push((server.name.clone(), tools));
+                tool_sessions.insert(server.name, session);
+            }
+        }
+    }
+    let tools_note = crate::mcp::index_text(&found);
     let skills_note = if model.local {
         crate::skills::index_text(&crate::skills::list())
     } else {
@@ -491,7 +519,7 @@ async fn work(
         (
             "system",
             format!(
-                "{}{memory_note}\n\n{PLAN}\n{folder_note}{rules_note}{skills_note}",
+                "{}{memory_note}\n\n{PLAN}\n{folder_note}{rules_note}{skills_note}{tools_note}",
                 helix_chat::chat::SYSTEM_PROMPT
             ),
         ),
@@ -543,7 +571,11 @@ async fn work(
             break;
         }
         let input = request.input().to_string();
-        if !seen.insert(format!("{}|{}", request.name(), input.trim())) {
+        if !seen.insert(format!(
+            "{}|{}",
+            request.name(),
+            serde_json::to_string(&request).unwrap_or_else(|_| input.clone())
+        )) {
             observations.push_str("\nA repeated request was stopped.\n");
             break;
         }
@@ -599,6 +631,10 @@ async fn work(
             Request::WebRead { url } => known_urls.contains(web::public_url(url)?.as_str()),
             _ => false,
         };
+        let ask_input = match &request {
+            Request::Mcp { server, name, args } => clip(&format!("{server}: {name} {args}"), 300),
+            _ => input.clone(),
+        };
         let action = policy_action(&request, known);
         let verdict = match &action {
             Some(action) => task.policy.decide(
@@ -618,9 +654,17 @@ async fn work(
                 continue;
             }
             Verdict::Ask(reason) => {
-                if !ask_person(app, task, store, &reason, &input, action.as_ref(), cancel)
-                    .await?
-                    .approved
+                if !ask_person(
+                    app,
+                    task,
+                    store,
+                    &reason,
+                    &ask_input,
+                    action.as_ref(),
+                    cancel,
+                )
+                .await?
+                .approved
                 {
                     finish(
                         task,
@@ -707,6 +751,26 @@ async fn work(
                     biased;
                     _ = cancel.changed() => return Err("Task stopped.".into()),
                     result = display_step(&mut display, &request, &watching) => result,
+                }
+            }
+            Request::Mcp { server, name, args } => {
+                private = true;
+                match tool_sessions.get_mut(server) {
+                    None => Err(format!(
+                        "There is no tool server called {server}, or it did not start."
+                    )),
+                    Some(session) => {
+                        let args = if args.is_null() {
+                            serde_json::json!({})
+                        } else {
+                            args.clone()
+                        };
+                        tokio::select! {
+                            biased;
+                            _ = cancel.changed() => return Err("Task stopped.".into()),
+                            result = session.call(name, args, 60) => result,
+                        }
+                    }
                 }
             }
             Request::SkillRead { name } => crate::skills::read(name)
