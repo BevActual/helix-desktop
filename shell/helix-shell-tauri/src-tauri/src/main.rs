@@ -352,11 +352,14 @@ fn apply_panel_plan(app: &AppHandle, plan: helix_shell_model::shell_surface::Pla
     match ShellRole::from_env() {
         ShellRole::Bar => layer::apply(app, BAR_PLAN),
         ShellRole::Panels => {
-            let plan = if plan.input == helix_shell_model::shell_surface::InputRegion::Whole {
-                plan
-            } else {
-                PANEL_CLOSED
-            };
+            let opening = plan.input == helix_shell_model::shell_surface::InputRegion::Whole;
+            let plan = if opening { plan } else { PANEL_CLOSED };
+            if opening {
+                // A panel opens on the screen that has the focus: the compositor moves the surface there (a no-op where it already is).
+                let _ = niri_query::request_line(
+                    r#"{"HelixMoveLayerToFocusedOutput":{"namespace":"helix-panels"}}"#,
+                );
+            }
             layer::apply(app, plan);
         }
         ShellRole::Monolith => layer::apply(app, plan),

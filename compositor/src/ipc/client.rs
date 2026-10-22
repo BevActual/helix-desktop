@@ -587,7 +587,10 @@ pub fn handle_msg(mut msg: Msg, json: bool, print_request: bool) -> anyhow::Resu
             println!("trusted-surfaces: {}", caps.trusted_surfaces);
             println!("agent-desk: {}", caps.agent_desk);
             if !caps.liquid_glass_params.is_empty() {
-                println!("liquid-glass params: {}", caps.liquid_glass_params.join(" "));
+                println!(
+                    "liquid-glass params: {}",
+                    caps.liquid_glass_params.join(" ")
+                );
             }
         }
         Msg::RawRequest => {

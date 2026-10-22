@@ -1,7 +1,7 @@
 //! Helix agent desk: a named workspace for agent-side windows.
 
-use niri_config::{Workspace, WorkspaceReference};
 use niri_config::workspace::WorkspaceName;
+use niri_config::{Workspace, WorkspaceReference};
 use niri_ipc::HelixAgentDesk;
 
 use crate::layout::workspace::WorkspaceId;

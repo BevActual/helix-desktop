@@ -57,6 +57,15 @@ pub fn suggest(task: &Task) -> Policy {
                 }
             }
             "edit_file" => policy.auto_edits = true,
+            "mcp" => {
+                // The step's input is "server: tool"; a practice run that needed it suggests allowing exactly that tool.
+                if let Some((server, tool)) = step.input.split_once(": ") {
+                    let rule = format!("{}/{}", server.trim(), tool.trim());
+                    if !policy.allow_tools.contains(&rule) {
+                        policy.allow_tools.push(rule);
+                    }
+                }
+            }
             "display_launch" => {
                 let app = step.input.trim().to_string();
                 if !app.is_empty() && !policy.apps.iter().any(|a| a.eq_ignore_ascii_case(&app)) {

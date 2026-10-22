@@ -759,7 +759,11 @@ impl GammaControlHandler for State {
                     ramp[511],
                     ramp[767]
                 ),
-                Some(ramp) => info!("HELIX gamma output={} bad-length={}", output.name(), ramp.len()),
+                Some(ramp) => info!(
+                    "HELIX gamma output={} bad-length={}",
+                    output.name(),
+                    ramp.len()
+                ),
                 None => info!("HELIX gamma output={} reset", output.name()),
             }
             return Some(());

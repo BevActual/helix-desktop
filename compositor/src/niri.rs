@@ -1724,7 +1724,8 @@ impl State {
         if config.debug.liquid_glass_shader.is_some()
             || old_config.debug.liquid_glass_shader.is_some()
         {
-            let src = shaders::read_liquid_glass_shader(config.debug.liquid_glass_shader.as_deref());
+            let src =
+                shaders::read_liquid_glass_shader(config.debug.liquid_glass_shader.as_deref());
             self.backend.with_primary_renderer(|renderer| {
                 shaders::set_custom_glass_program(renderer, src.as_deref());
             });
@@ -3205,7 +3206,12 @@ impl Niri {
 
             // The frame the compositor draws around a trusted surface: THICKNESS logical pixels along each edge.
             const THICKNESS: f64 = 4.;
-            let rim_color = self.config.borrow().trusted_surface.rim_color.to_array_unpremul();
+            let rim_color = self
+                .config
+                .borrow()
+                .trusted_surface
+                .rim_color
+                .to_array_unpremul();
             let (w, h) = (output_size.w, output_size.h);
             for (buffer, size) in state.trusted_rim.iter_mut().zip([
                 (w, THICKNESS),
@@ -3515,7 +3521,9 @@ impl Niri {
         let Some(client) = layer.wl_surface().client() else {
             return false;
         };
-        let Some(credentials) = crate::utils::get_credentials_for_client(&self.display_handle, &client) else {
+        let Some(credentials) =
+            crate::utils::get_credentials_for_client(&self.display_handle, &client)
+        else {
             return false;
         };
         let Ok(exe) = std::fs::read_link(format!("/proc/{}/exe", credentials.pid)) else {
@@ -3547,7 +3555,9 @@ impl Niri {
 
     /// Whether any output shows a trusted surface now.
     pub fn trusted_surface_open(&self) -> bool {
-        self.layout.outputs().any(|output| self.trusted_layer_on(output).is_some())
+        self.layout
+            .outputs()
+            .any(|output| self.trusted_layer_on(output).is_some())
     }
 
     /// Input that did not come from a device must not reach a trusted surface unless the config allows it.
@@ -6576,11 +6586,7 @@ impl Niri {
         let pixels = copy.to_vec();
 
         let path = path_override
-            .or_else(|| {
-                make_screenshot_path(&self.config.borrow())
-                    .ok()
-                    .flatten()
-            })
+            .or_else(|| make_screenshot_path(&self.config.borrow()).ok().flatten())
             .unwrap_or_else(|| {
                 let mut path = env::temp_dir();
                 path.push("screenshot.png");

@@ -24,6 +24,7 @@ mod inline;
 mod knowledge;
 mod lan;
 mod library;
+mod mcp;
 mod output;
 mod picker;
 mod replyprefs;
@@ -4187,6 +4188,10 @@ fn main() {
             agent::background::agent_task_review,
             agent::background::agent_task_plan,
             agent::background::agent_skill_draft,
+            mcp::mcp_servers,
+            mcp::mcp_server_save,
+            mcp::mcp_server_delete,
+            mcp::mcp_server_test,
             skills::agent_skills,
             skills::agent_skill_save,
             skills::agent_skill_delete,

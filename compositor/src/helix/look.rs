@@ -124,7 +124,9 @@ pub fn overlay(config: &mut Config, look: &HelixLook) {
         config.cursor.xcursor_size = size;
     }
     if let Some(on) = look.focus_follows_mouse {
-        config.input.focus_follows_mouse = on.then_some(FocusFollowsMouse { max_scroll_amount: None });
+        config.input.focus_follows_mouse = on.then_some(FocusFollowsMouse {
+            max_scroll_amount: None,
+        });
     }
     if let Some(on) = look.hot_corner {
         config.gestures.hot_corners.off = !on;
@@ -152,7 +154,12 @@ pub fn effective(config: &Config) -> HelixLook {
         animations: Some(!config.animations.off),
         window_gaps: Some(config.layout.gaps.clamp(0.0, 64.0).round() as u16),
         cursor_size: Some(config.cursor.xcursor_size),
-        focus_color: Some(format!("#{:02x}{:02x}{:02x}", byte(c.r), byte(c.g), byte(c.b))),
+        focus_color: Some(format!(
+            "#{:02x}{:02x}{:02x}",
+            byte(c.r),
+            byte(c.g),
+            byte(c.b)
+        )),
         focus_follows_mouse: Some(config.input.focus_follows_mouse.is_some()),
         hot_corner: Some(!config.gestures.hot_corners.off),
         center_focused: Some(center_name(config.layout.center_focused_column).to_string()),
@@ -207,34 +214,98 @@ mod tests {
     fn overrides_replace_only_what_they_name() {
         let mut config = Config::default();
         let gaps = config.layout.gaps;
-        overlay(&mut config, &HelixLook { animations: Some(false), cursor_size: Some(32), focus_color: Some("#bf5af2".into()), ..HelixLook::default() });
+        overlay(
+            &mut config,
+            &HelixLook {
+                animations: Some(false),
+                cursor_size: Some(32),
+                focus_color: Some("#bf5af2".into()),
+                ..HelixLook::default()
+            },
+        );
         assert!(config.animations.off);
         assert_eq!(config.cursor.xcursor_size, 32);
         assert_eq!(config.layout.gaps, gaps, "untouched");
         let seen = effective(&config);
         assert_eq!(seen.focus_color.as_deref(), Some("#bf5af2"));
         assert_eq!(seen.animations, Some(false));
-        overlay(&mut config, &HelixLook { window_gaps: Some(8), animations: Some(true), ..HelixLook::default() });
+        overlay(
+            &mut config,
+            &HelixLook {
+                window_gaps: Some(8),
+                animations: Some(true),
+                ..HelixLook::default()
+            },
+        );
         assert_eq!((config.layout.gaps, config.animations.off), (8.0, false));
-        overlay(&mut config, &HelixLook { focus_follows_mouse: Some(true), hot_corner: Some(false), center_focused: Some("always".into()), workspace_back_and_forth: Some(false), ..HelixLook::default() });
+        overlay(
+            &mut config,
+            &HelixLook {
+                focus_follows_mouse: Some(true),
+                hot_corner: Some(false),
+                center_focused: Some("always".into()),
+                workspace_back_and_forth: Some(false),
+                ..HelixLook::default()
+            },
+        );
         let seen = effective(&config);
-        assert_eq!((seen.focus_follows_mouse, seen.hot_corner, seen.workspace_back_and_forth), (Some(true), Some(false), Some(false)));
+        assert_eq!(
+            (
+                seen.focus_follows_mouse,
+                seen.hot_corner,
+                seen.workspace_back_and_forth
+            ),
+            (Some(true), Some(false), Some(false))
+        );
         assert_eq!(seen.center_focused.as_deref(), Some("always"));
-        overlay(&mut config, &HelixLook { focus_follows_mouse: Some(false), ..HelixLook::default() });
+        overlay(
+            &mut config,
+            &HelixLook {
+                focus_follows_mouse: Some(false),
+                ..HelixLook::default()
+            },
+        );
         assert_eq!(effective(&config).focus_follows_mouse, Some(false));
     }
 
     #[test]
     fn only_sane_values_are_stored() {
-        assert!(validate(&HelixLook { window_gaps: Some(64), cursor_size: Some(16), focus_color: Some("#0a84ff".into()), ..HelixLook::default() }).is_ok());
+        assert!(validate(&HelixLook {
+            window_gaps: Some(64),
+            cursor_size: Some(16),
+            focus_color: Some("#0a84ff".into()),
+            ..HelixLook::default()
+        })
+        .is_ok());
         for bad in [
-            HelixLook { window_gaps: Some(65), ..HelixLook::default() },
-            HelixLook { cursor_size: Some(8), ..HelixLook::default() },
-            HelixLook { cursor_size: Some(200), ..HelixLook::default() },
-            HelixLook { focus_color: Some("blue".into()), ..HelixLook::default() },
-            HelixLook { focus_color: Some("#12345".into()), ..HelixLook::default() },
-            HelixLook { focus_color: Some("#12345g".into()), ..HelixLook::default() },
-            HelixLook { center_focused: Some("sometimes".into()), ..HelixLook::default() },
+            HelixLook {
+                window_gaps: Some(65),
+                ..HelixLook::default()
+            },
+            HelixLook {
+                cursor_size: Some(8),
+                ..HelixLook::default()
+            },
+            HelixLook {
+                cursor_size: Some(200),
+                ..HelixLook::default()
+            },
+            HelixLook {
+                focus_color: Some("blue".into()),
+                ..HelixLook::default()
+            },
+            HelixLook {
+                focus_color: Some("#12345".into()),
+                ..HelixLook::default()
+            },
+            HelixLook {
+                focus_color: Some("#12345g".into()),
+                ..HelixLook::default()
+            },
+            HelixLook {
+                center_focused: Some("sometimes".into()),
+                ..HelixLook::default()
+            },
         ] {
             assert!(validate(&bad).is_err(), "{bad:?}");
         }

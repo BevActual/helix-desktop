@@ -85,8 +85,18 @@ fn named(outputs: &[IpcOutput]) -> Vec<(String, &IpcOutput)> {
         .iter()
         .zip(&names)
         .map(|(output, name)| {
-            let twins = names.iter().filter(|other| other.eq_ignore_ascii_case(name)).count();
-            (if twins > 1 { output.name.clone() } else { name.clone() }, output)
+            let twins = names
+                .iter()
+                .filter(|other| other.eq_ignore_ascii_case(name))
+                .count();
+            (
+                if twins > 1 {
+                    output.name.clone()
+                } else {
+                    name.clone()
+                },
+                output,
+            )
         })
         .collect()
 }
@@ -198,12 +208,9 @@ impl State {
                     });
                     config.modeline = None;
                 }
-                config.position = saved
-                    .position
-                    .map(|(x, y)| niri_config::Position { x, y });
-                config.variable_refresh_rate = saved
-                    .vrr
-                    .then_some(niri_config::Vrr { on_demand: false });
+                config.position = saved.position.map(|(x, y)| niri_config::Position { x, y });
+                config.variable_refresh_rate =
+                    saved.vrr.then_some(niri_config::Vrr { on_demand: false });
             });
         }
         self.reload_output_config();
@@ -269,6 +276,9 @@ mod tests {
     fn the_set_is_the_same_whichever_order_the_displays_are_found_in() {
         let a = output("DP-3", "Dell", "U27", Some("1"));
         let b = output("DP-4", "LG", "TV", Some("2"));
-        assert_eq!(set_of(&named(&[a.clone(), b.clone()])), set_of(&named(&[b, a])));
+        assert_eq!(
+            set_of(&named(&[a.clone(), b.clone()])),
+            set_of(&named(&[b, a]))
+        );
     }
 }

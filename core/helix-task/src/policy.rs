@@ -46,6 +46,8 @@ pub struct Policy {
     pub allow_commands: Vec<String>,
     /// Apply edits inside the folder without asking.
     pub auto_edits: bool,
+    /// Tools of the person's own tool servers that run without asking: "server/tool", or "server/*" for all of a server's tools.
+    pub allow_tools: Vec<String>,
     pub web: WebAccess,
     pub cloud: CloudUse,
     /// May the task operate the agent display?
@@ -81,6 +83,7 @@ impl Policy {
             folder: String::new(),
             allow_commands: vec![],
             auto_edits: false,
+            allow_tools: vec![],
             web: WebAccess::Ask,
             cloud: CloudUse::Planner,
             display: true,
@@ -159,6 +162,13 @@ impl Policy {
                 }
                 Some(format!("Open {} without asking", app.trim()))
             }
+            Action::Tool { server, tool } => {
+                let rule = format!("{server}/{tool}");
+                if !self.allow_tools.contains(&rule) && self.allow_tools.len() < 100 {
+                    self.allow_tools.push(rule);
+                }
+                Some(format!("Use {server}: {tool} without asking"))
+            }
             _ => None,
         }
     }
@@ -236,6 +246,17 @@ impl Policy {
                 }
             }
             Action::Skill => Verdict::Allow,
+            Action::Tool { server, tool } => {
+                if self
+                    .allow_tools
+                    .iter()
+                    .any(|t| t == &format!("{server}/{tool}") || t == &format!("{server}/*"))
+                {
+                    Verdict::Allow
+                } else {
+                    Verdict::Ask(format!("Use {server}: {tool}"))
+                }
+            }
             Action::Input => {
                 if self.display {
                     Verdict::Allow
@@ -323,6 +344,11 @@ pub enum Action {
     Input,
     /// Read one of the person's skills (text kept on this computer).
     Skill,
+    /// Call a tool of one of the person's tool servers (MCP).
+    Tool {
+        server: String,
+        tool: String,
+    },
 }
 
 /// What is true of the task right now.
@@ -529,6 +555,46 @@ mod tests {
         let before = p.allow_commands.len();
         p.allow(&Action::Command("cargo fmt".into()));
         assert_eq!(p.allow_commands.len(), before, "no duplicates");
+    }
+
+    #[test]
+    fn a_tool_of_the_persons_tool_servers_asks_until_it_is_allowed() {
+        let mut p = Policy::balanced("/p");
+        let call = |p: &Policy, s: &str, t: &str| {
+            p.decide(
+                &Action::Tool {
+                    server: s.into(),
+                    tool: t.into(),
+                },
+                &LOCAL,
+            )
+        };
+        assert!(matches!(call(&p, "git", "status"), Verdict::Ask(_)));
+        assert_eq!(
+            p.allow(&Action::Tool {
+                server: "git".into(),
+                tool: "status".into()
+            })
+            .unwrap(),
+            "Use git: status without asking"
+        );
+        assert_eq!(call(&p, "git", "status"), Verdict::Allow);
+        assert!(
+            matches!(call(&p, "git", "push"), Verdict::Ask(_)),
+            "only that tool"
+        );
+        assert!(
+            matches!(call(&p, "other", "status"), Verdict::Ask(_)),
+            "only that server"
+        );
+        p.allow_tools.push("calendar/*".into());
+        assert_eq!(call(&p, "calendar", "anything"), Verdict::Allow);
+        let mut practice = Policy::chat("/p");
+        practice.mode = Mode::Practice;
+        assert!(matches!(
+            call(&practice, "git", "status"),
+            Verdict::Practice(_)
+        ));
     }
 
     #[test]

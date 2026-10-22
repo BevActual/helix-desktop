@@ -41,7 +41,9 @@ fn save(overrides: &HelixInput) -> Result<(), String> {
 /// Refuses anything outside what niri itself accepts, before it is stored.
 pub fn validate(input: &HelixInput) -> Result<(), String> {
     let speed = |name: &str, value: Option<f64>| match value {
-        Some(v) if !v.is_finite() || !(-1.0..=1.0).contains(&v) => Err(format!("{name} is -1 to 1")),
+        Some(v) if !v.is_finite() || !(-1.0..=1.0).contains(&v) => {
+            Err(format!("{name} is -1 to 1"))
+        }
         _ => Ok(()),
     };
     speed("touchpad speed", input.touchpad_speed)?;
@@ -56,16 +58,24 @@ pub fn validate(input: &HelixInput) -> Result<(), String> {
             return Err("acceleration is adaptive or flat".into());
         }
     }
-    if input.keyboard_repeat_delay.is_some_and(|d| !(100..=2000).contains(&d)) {
+    if input
+        .keyboard_repeat_delay
+        .is_some_and(|d| !(100..=2000).contains(&d))
+    {
         return Err("repeat delay is 100 to 2000 ms".into());
     }
-    if input.keyboard_repeat_rate.is_some_and(|r| !(1..=100).contains(&r)) {
+    if input
+        .keyboard_repeat_rate
+        .is_some_and(|r| !(1..=100).contains(&r))
+    {
         return Err("repeat rate is 1 to 100 a second".into());
     }
     if let Some(layout) = &input.keyboard_layout {
         let ok = !layout.is_empty()
             && layout.chars().count() <= 64
-            && layout.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ',' | '_' | '-'));
+            && layout
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, ',' | '_' | '-'));
         if !ok {
             return Err("a layout is letters, digits and commas".into());
         }
@@ -79,9 +89,18 @@ fn merge(base: &mut HelixInput, change: &HelixInput) {
         ($($field:ident),*) => {$( if change.$field.is_some() { base.$field = change.$field.clone(); } )*};
     }
     take!(
-        touchpad_tap, touchpad_natural_scroll, touchpad_speed, touchpad_disable_while_typing, touchpad_click_method,
-        mouse_natural_scroll, mouse_speed, mouse_accel_profile, mouse_left_handed,
-        keyboard_repeat_delay, keyboard_repeat_rate, keyboard_layout
+        touchpad_tap,
+        touchpad_natural_scroll,
+        touchpad_speed,
+        touchpad_disable_while_typing,
+        touchpad_click_method,
+        mouse_natural_scroll,
+        mouse_speed,
+        mouse_accel_profile,
+        mouse_left_handed,
+        keyboard_repeat_delay,
+        keyboard_repeat_rate,
+        keyboard_layout
     );
 }
 
@@ -138,11 +157,13 @@ pub fn overlay(input: &mut Input, o: &HelixInput) {
 /// What is in effect, every field set.
 pub fn effective(input: &Input) -> HelixInput {
     let click = |m: Option<ClickMethod>| {
-        Some(match m {
-            Some(ClickMethod::ButtonAreas) => "button-areas",
-            _ => "clickfinger",
-        }
-        .to_string())
+        Some(
+            match m {
+                Some(ClickMethod::ButtonAreas) => "button-areas",
+                _ => "clickfinger",
+            }
+            .to_string(),
+        )
     };
     HelixInput {
         touchpad_tap: Some(input.touchpad.tap),
@@ -250,11 +271,17 @@ mod tests {
                 ..HelixInput::default()
             },
         );
-        assert!(input.touchpad.tap && input.touchpad.natural_scroll, "untouched fields stay");
+        assert!(
+            input.touchpad.tap && input.touchpad.natural_scroll,
+            "untouched fields stay"
+        );
         assert_eq!(input.touchpad.accel_speed.0, 0.5);
         assert!(input.mouse.left_handed);
         assert_eq!(input.mouse.accel_profile, Some(AccelProfile::Flat));
-        assert_eq!((input.keyboard.repeat_rate, input.keyboard.repeat_delay), (40, 600));
+        assert_eq!(
+            (input.keyboard.repeat_rate, input.keyboard.repeat_delay),
+            (40, 600)
+        );
         assert_eq!(input.keyboard.xkb.layout, "us,de");
         let seen = effective(&input);
         assert_eq!(seen.touchpad_tap, Some(true));
@@ -264,24 +291,71 @@ mod tests {
 
     #[test]
     fn later_changes_win_and_the_rest_are_kept() {
-        let mut stored = HelixInput { touchpad_tap: Some(true), mouse_speed: Some(0.2), ..HelixInput::default() };
-        merge(&mut stored, &HelixInput { mouse_speed: Some(-0.4), keyboard_repeat_delay: Some(300), ..HelixInput::default() });
-        assert_eq!((stored.touchpad_tap, stored.mouse_speed, stored.keyboard_repeat_delay), (Some(true), Some(-0.4), Some(300)));
+        let mut stored = HelixInput {
+            touchpad_tap: Some(true),
+            mouse_speed: Some(0.2),
+            ..HelixInput::default()
+        };
+        merge(
+            &mut stored,
+            &HelixInput {
+                mouse_speed: Some(-0.4),
+                keyboard_repeat_delay: Some(300),
+                ..HelixInput::default()
+            },
+        );
+        assert_eq!(
+            (
+                stored.touchpad_tap,
+                stored.mouse_speed,
+                stored.keyboard_repeat_delay
+            ),
+            (Some(true), Some(-0.4), Some(300))
+        );
     }
 
     #[test]
     fn only_what_niri_accepts_is_stored() {
-        let ok = HelixInput { touchpad_speed: Some(1.0), keyboard_repeat_delay: Some(250), keyboard_layout: Some("us,de".into()), ..HelixInput::default() };
+        let ok = HelixInput {
+            touchpad_speed: Some(1.0),
+            keyboard_repeat_delay: Some(250),
+            keyboard_layout: Some("us,de".into()),
+            ..HelixInput::default()
+        };
         assert!(validate(&ok).is_ok());
         for bad in [
-            HelixInput { touchpad_speed: Some(1.5), ..HelixInput::default() },
-            HelixInput { mouse_speed: Some(f64::NAN), ..HelixInput::default() },
-            HelixInput { touchpad_click_method: Some("tripleclick".into()), ..HelixInput::default() },
-            HelixInput { mouse_accel_profile: Some("turbo".into()), ..HelixInput::default() },
-            HelixInput { keyboard_repeat_delay: Some(5), ..HelixInput::default() },
-            HelixInput { keyboard_repeat_rate: Some(0), ..HelixInput::default() },
-            HelixInput { keyboard_layout: Some("us; rm -rf".into()), ..HelixInput::default() },
-            HelixInput { keyboard_layout: Some(String::new()), ..HelixInput::default() },
+            HelixInput {
+                touchpad_speed: Some(1.5),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                mouse_speed: Some(f64::NAN),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                touchpad_click_method: Some("tripleclick".into()),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                mouse_accel_profile: Some("turbo".into()),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                keyboard_repeat_delay: Some(5),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                keyboard_repeat_rate: Some(0),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                keyboard_layout: Some("us; rm -rf".into()),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                keyboard_layout: Some(String::new()),
+                ..HelixInput::default()
+            },
         ] {
             assert!(validate(&bad).is_err(), "{bad:?}");
         }

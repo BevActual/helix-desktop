@@ -140,6 +140,9 @@ pub enum Request {
     /// Helix: change pointer and keyboard settings. Only the fields that are `Some` change; they take effect at once, are remembered, and are applied
     /// again whenever the configuration is loaded.
     HelixSetInput(HelixInput),
+    /// Helix: move the layer surfaces with this namespace to the output that has the focus (a panel opens on the screen the person is working on).
+    /// Nothing moves if one has the keyboard grabbed (an open panel) or is already there.
+    HelixMoveLayerToFocusedOutput { namespace: String },
     /// Helix: how things look in effect now (the overrides Settings made, over `config.kdl`).
     HelixLook,
     /// Helix: change how things look: animations, the gap between windows, the cursor size and the colour of the focus ring. Only the `Some` fields change; they

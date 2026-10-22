@@ -485,9 +485,9 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                     Request::HelixSaveDisplayProfile => state
                         .helix_save_display_profile()
                         .map(|()| Response::Handled),
-                    Request::HelixApplyDisplayProfile => {
-                        state.helix_apply_display_profile().map(|_| Response::Handled)
-                    }
+                    Request::HelixApplyDisplayProfile => state
+                        .helix_apply_display_profile()
+                        .map(|_| Response::Handled),
                     Request::HelixForgetDisplayProfile => state
                         .helix_forget_display_profile()
                         .map(|()| Response::Handled),
@@ -511,6 +511,16 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                 .await
                 .map_err(|_| String::from("input settings query failed"))?;
             Response::HelixInput(input)
+        }
+        Request::HelixMoveLayerToFocusedOutput { namespace } => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_move_layer_to_focused_output(&namespace));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("moving the layer surface failed"))?;
+            Response::Handled
         }
         Request::HelixLook => {
             let (tx, rx) = async_channel::bounded(1);
@@ -560,7 +570,10 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                 let info = state.helix_agent_desk_info();
                 let _ = tx.send_blocking(info);
             });
-            let info = rx.recv().await.map_err(|_| String::from("agent desk query failed"))?;
+            let info = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("agent desk query failed"))?;
             Response::HelixAgentDesk(info)
         }
     };
