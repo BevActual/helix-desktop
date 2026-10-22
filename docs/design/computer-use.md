@@ -109,8 +109,15 @@ cloud Act turn, because a setting nothing acts on must not ship.
 
 ## Phases (each useful alone)
 
-0. **Done:** `HelixPeekWindow` (compositor): a picture of one window written to a file with no clipboard copy, no notification and no event, so a live
-   view does not spam the person. Useful for the viewer under either architecture.
+0. **Done (2026-10-22):** the agent display itself. `helix_agent::agent_display` (what it is, what a program on it inherits) and
+   `shell/helix-shell-tauri/src-tauri/src/agent_display.rs` (start, stop, launch an installed application onto it, take a picture). It is a headless Helix
+   compositor under a private runtime directory (mode 700) with its own session bus and its own home; nothing of the person's session reaches a program
+   on it (no compositor socket, no shell socket, no audio server, no stored login). `tools/nested/agent-display-test.sh` proves it: a program launched onto
+   it is a window there and nowhere on the person's desktop, its environment names only the display's own directories, a picture shows it drawn, and
+   stopping the display takes the program with it. The viewer is **frames plus forwarded input**, not a second window of the compositor, so it works
+   without a GPU window and the same viewer can attach to a remote place later. Not yet: the viewer panel, agent acts, and the help request.
+   (A quiet `HelixPeekWindow` in the compositor was tried and dropped: the display's own compositor has its own clipboard and no notifications of
+   the person's to disturb.)
 1. **Watch.** The agent desk viewer and the island entry; live line of the agent's latest step from the activity feed. Under A: the Agent Display
    window. No input yet.
 2. **Help request.** The `request-help` act, the "needs you" island state, the notification, "Done, carry on". Works with today's semantic acts and

@@ -81,6 +81,11 @@ pub struct HelixCaps {
 
 pub fn request_json(line: &str) -> Option<Value> {
     let path = std::env::var_os("NIRI_SOCKET")?;
+    request_json_at(std::path::Path::new(&path), line)
+}
+
+/// The same, to a compositor other than the one this process runs on (the agent display's).
+pub fn request_json_at(path: &std::path::Path, line: &str) -> Option<Value> {
     let mut stream = UnixStream::connect(path).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
     stream

@@ -36,6 +36,7 @@ pick ctl            && run ctl shell-control-test.sh tauri-shell.sh
 pick bar-prefs       && run bar-prefs shell-bar-prefs-test.sh tauri-shell.sh
 pick shell-ui-scale && run shell-ui-scale shell-ui-scale-test.sh tauri-fake-desktop.sh HELIX_FAKE_UI_SCALE=1.5
 pick privacy       && run privacy shell-privacy-test.sh tauri-shell.sh HELIX_PW_DUMP=tools/nested/fake-pw-dump.sh HELIX_PRIVACY_DEV=/nonexistent
+pick agent-display && run agent-display agent-display-test.sh tauri-shell.sh "HELIX_AGENT_DISPLAY_NIRI=$ROOT/target/fast/niri"
 pick settings-topbar && run settings-topbar settings-topbar-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-startup && run settings-startup settings-startup-test.sh settings-startup-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick cc             && run cc control-center-test.sh tauri-shell.sh HELIX_NESTED_PRIVATE_AUDIO=1

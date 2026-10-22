@@ -11,6 +11,7 @@
 
 mod act_feed;
 mod admin_auth;
+mod agent_display;
 mod agent_ipc;
 mod apps;
 mod backlight;
@@ -552,6 +553,33 @@ fn control(app: &AppHandle, command: &str) {
         "agents" => open_panel(app, "agents"),
         "notifications" => open_panel(app, "notifications"),
         "today" => open_panel(app, "today"),
+        // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): drive the agent display without the viewer.
+        "agent-display-start" => {
+            std::thread::spawn(|| {
+                if let Err(error) = agent_display::start() {
+                    eprintln!("AGENT-DISPLAY start failed: {error}");
+                }
+            });
+        }
+        "agent-display-stop" => agent_display::stop(),
+        other if other.starts_with("agent-display-frame ") => {
+            let path = other["agent-display-frame ".len()..].trim().to_string();
+            std::thread::spawn(move || match agent_display::frame() {
+                Ok(bytes) => {
+                    let _ = std::fs::write(&path, bytes);
+                    eprintln!("AGENT-DISPLAY frame written");
+                }
+                Err(error) => eprintln!("AGENT-DISPLAY frame failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-launch ") => {
+            let id = other["agent-display-launch ".len()..].trim().to_string();
+            std::thread::spawn(move || {
+                if let Err(error) = agent_display::launch(&id) {
+                    eprintln!("AGENT-DISPLAY launch failed: {error}");
+                }
+            });
+        }
         "quick-insert" => open_panel(app, "quick-insert"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
@@ -2065,6 +2093,11 @@ fn main() {
             bar_prefs::bar_prefs,
             ui_scale::ui_scale,
             privacy::privacy_view,
+            agent_display::agent_display_status,
+            agent_display::agent_display_start,
+            agent_display::agent_display_stop,
+            agent_display::agent_display_launch,
+            agent_display::agent_display_frame,
             dock::workspaces_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
