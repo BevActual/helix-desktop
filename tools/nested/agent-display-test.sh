@@ -47,6 +47,20 @@ assert (w, h) == (1280, 720), (w, h)
 colours = {img.getpixel((x, y)) for x in range(0, w, 40) for y in range(0, h, 40)}
 assert len(colours) > 6, len(colours)
 PY
+echo "--- watching it"
+wait_log "ISLAND AgentDisplay" 20 && echo "ok: the island says an agent display has windows" || fail "no island for the agent display: $(grep ISLAND "$LOG" | tail -2)"
+echo agent-display >> "$CONTROL"
+wait_log "AGENT-DISPLAY viewer frame 1" 40 && echo "ok: the viewer asked for pictures of it" || fail "no viewer frames"
+sleep 2
+python3 - "$SCRATCH/state/layout.json" <<'PY' && echo "ok: the viewer shows the picture in the panel" || fail "no picture in the viewer panel"
+import json, sys
+d = json.load(open(sys.argv[1]))
+e = d["elements"].get("av-frame")
+assert d.get("panel") == "agent-display", d.get("panel")
+assert e and e["w"] > 400 and e["h"] > 200, e
+PY
+sleep 2; niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/viewer.png"
+wtype -k Escape; sleep 1
 echo "--- stop"
 echo agent-display-stop >> "$CONTROL"
 wait_log "AGENT-DISPLAY stopped" 20 && echo "ok: stopped" || fail "no stop"

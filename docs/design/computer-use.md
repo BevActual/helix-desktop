@@ -56,6 +56,11 @@ cloud, one gateway to messaging apps, MCP) and what Helix adds:
 
 * **Per-agent routing with a policy, not a toggle.** Each agent has a policy: *Private* (local only), *Balanced* (local by default, cloud for what local
   cannot do, asked first), *Best* (cloud planner). The router sends the step to the cheapest model that is allowed to see it.
+* **Three places a model can run, one surface.** LM Studio's Bionic (July 2026: an agent app for open models, with Work and Code projects) runs a model
+  three ways: on this machine, over *LM Link* to another machine the person owns, or against cloud inference, with zero retention promised. That is the
+  shape Mobius already has (local slots, LAN endpoints, cloud), and it is the right reference for how a person is shown the choice: one agent, the
+  venue named plainly, switchable per task. Helix's addition is that the agent can also operate a screen (above), and that the screen is a *place* just
+  as the model is.
 * **A planner and a grounder.** The planner (often a cloud model) decides what to do from a small, scaled screenshot and the task; the **grounder**
   (local) turns "the Export button" into coordinates on the full-resolution screen. Fewer and smaller pictures leave the machine, and the click
   position never depends on a remote model seeing every pixel.
@@ -115,7 +120,11 @@ cloud Act turn, because a setting nothing acts on must not ship.
    on it (no compositor socket, no shell socket, no audio server, no stored login). `tools/nested/agent-display-test.sh` proves it: a program launched onto
    it is a window there and nowhere on the person's desktop, its environment names only the display's own directories, a picture shows it drawn, and
    stopping the display takes the program with it. The viewer is **frames plus forwarded input**, not a second window of the compositor, so it works
-   without a GPU window and the same viewer can attach to a remote place later. Not yet: the viewer panel, agent acts, and the help request.
+   without a GPU window and the same viewer can attach to a remote place later. 
+   **Watch (phase 1) is done too:** the island says "Agent display · N windows" (a new island kind, below approvals and the assistant, above music) and a click
+   opens the **Agent display** panel, a live picture of the display refreshed about five times a second while it is open, with Start and Stop. The picture
+   is PNG frames from the display's own compositor (`ScreenshotScreen` with the pointer shown, so the agent's cursor is visible). Not yet: taking over
+   (forwarded input), agent acts, and the help request.
    (A quiet `HelixPeekWindow` in the compositor was tried and dropped: the display's own compositor has its own clipboard and no notifications of
    the person's to disturb.)
 1. **Watch.** The agent desk viewer and the island entry; live line of the agent's latest step from the activity feed. Under A: the Agent Display

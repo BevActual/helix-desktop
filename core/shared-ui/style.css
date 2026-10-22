@@ -69,13 +69,14 @@ input:focus { outline: none; background: var(--fill-2); box-shadow: 0 0 0 2px co
 .glass { background: var(--glass); border-radius: var(--r-panel); box-shadow: var(--shadow), inset 0 0 0 .5px var(--hairline); }
 .panel { position: fixed; display: flex; flex-direction: column; gap: 12px; padding: 16px; opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.965);
          transform-origin: top right; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
-body[data-panel="control-center"] #controls, body[data-panel="notifications"] #notifs, body[data-panel="today"] #notifs,
+body[data-panel="control-center"] #controls, body[data-panel="notifications"] #notifs, body[data-panel="today"] #notifs, body[data-panel="agent-display"] #agentview,
 body[data-panel="launcher"] #launcher, body[data-panel="quick-insert"] #quickinsert, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
 /* Split shell: each process only paints its half (same HTML, role from shell-mode). */
 body[data-role="bar"] #panel,
 body[data-role="bar"] #controls,
 body[data-role="bar"] #notifs,
+body[data-role="bar"] #agentview,
 body[data-role="bar"] #launcher,
 body[data-role="bar"] #quickinsert,
 body[data-role="bar"] #scrim { display: none !important; }
@@ -2230,3 +2231,12 @@ body:not(.island-on) #center #clock { transition: opacity .25s var(--ease) .12s;
 @keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 @media (max-width: 900px) { #island #island-detail { display: none; } }
 @media (prefers-reduced-motion: reduce) { #island, #island * { animation: none !important; transition: none !important; } }
+
+/* The agent display viewer. */
+#agentview { left: 50%; top: 50px; translate: -50% 0; width: min(960px, calc(100vw - 48px)); transform-origin: top center; gap: 10px; }
+#av-head { display: flex; align-items: center; gap: 10px; } #av-head h3 { margin: 0; font-size: 15px; }
+#av-state { color: var(--label-2); font-size: 12px; } .av-spacer { flex: 1; }
+#av-stage { position: relative; border-radius: 12px; overflow: hidden; background: var(--fill-1); min-height: 160px; display: grid; place-items: center; }
+#av-frame { display: block; width: 100%; height: auto; } #av-frame[hidden] { display: none; }
+#av-empty { color: var(--label-2); font-size: 13px; padding: 40px 24px; text-align: center; max-width: 420px; } #av-empty[hidden] { display: none; }
+#av-foot { color: var(--label-3, var(--label-2)); font-size: 12px; }

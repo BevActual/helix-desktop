@@ -14,6 +14,7 @@ use helix_agent::agent_display::{
 use helix_compositor::compositor_ipc::request_json_at;
 use serde::Serialize;
 use serde_json::{json, Value};
+use tauri::{AppHandle, Emitter};
 
 use crate::apps;
 
@@ -68,7 +69,7 @@ fn clean(command: &mut Command) {
 }
 
 /// Starts the display if it is not running. Returns once its compositor says where it listens.
-pub fn start() -> Result<Status, String> {
+pub fn start(app: &AppHandle) -> Result<Status, String> {
     {
         let guard = RUNNING.lock().expect("agent display");
         if guard.is_some() {
@@ -146,6 +147,7 @@ pub fn start() -> Result<Status, String> {
         started,
         places,
     });
+    watch(app.clone());
     Ok(status())
 }
 
@@ -197,6 +199,31 @@ pub fn status() -> Status {
         running: true,
         windows,
     }
+}
+
+/// How many windows are on the display, or `None` when it is not running (the island says nothing then).
+pub fn window_count() -> Option<usize> {
+    let status = status();
+    status.running.then_some(status.windows.len())
+}
+
+/// Looks at the display once a second while it runs and tells the island and the viewer when what is on it changes.
+fn watch(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut last: Option<Status> = None;
+        loop {
+            std::thread::sleep(Duration::from_secs(1));
+            let now = status();
+            if last.as_ref() != Some(&now) {
+                last = Some(now.clone());
+                crate::island::publish(&app);
+                let _ = app.emit("agent-display-status", now.clone());
+            }
+            if !now.running {
+                return;
+            }
+        }
+    });
 }
 
 /// Starts an installed application (by desktop id, like the launcher) on the display, never on the person's desktop.
@@ -281,15 +308,17 @@ pub fn agent_display_status() -> Status {
 }
 
 #[tauri::command]
-pub async fn agent_display_start() -> Result<Status, String> {
-    tauri::async_runtime::spawn_blocking(start)
+pub async fn agent_display_start(app: AppHandle) -> Result<Status, String> {
+    tauri::async_runtime::spawn_blocking(move || start(&app))
         .await
         .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn agent_display_stop() {
+pub fn agent_display_stop(app: AppHandle) {
     stop();
+    crate::island::publish(&app);
+    let _ = app.emit("agent-display-status", status());
 }
 
 #[tauri::command]
@@ -303,6 +332,11 @@ pub async fn agent_display_launch(id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn agent_display_frame() -> Result<String, String> {
     use base64::Engine;
+    static SERVED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = SERVED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    if n == 1 || n.is_multiple_of(50) {
+        eprintln!("AGENT-DISPLAY viewer frame {n}");
+    }
     let bytes = tauri::async_runtime::spawn_blocking(frame)
         .await
         .map_err(|e| e.to_string())??;

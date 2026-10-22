@@ -202,6 +202,7 @@ listen("shell-mode", (event) => {
   if (panel === null && !dockPrefs.auto_hide) setDock(true);
   if (panel) document.body.dataset.panel = panel;
   else delete document.body.dataset.panel;
+  if (panel === "agent-display") startViewer(); else stopViewer();
   if (panel === "today") {
     if (reactToday) reactToday.open();
     else {
@@ -487,6 +488,38 @@ document.querySelectorAll(".qi-tab").forEach((tab) => tab.addEventListener("clic
 $("qi-forget").onclick = () => invoke("quick_insert_forget_clipboard").then(qiSearch);
 
 
+// The agent display viewer: a picture of the agent's own screen, refreshed a few times a second while the panel is open.
+let viewerOn = false;
+function drawViewerState(status) {
+  $("av-state").textContent = status.running ? (status.windows.length === 1 ? "1 window" : status.windows.length + " windows") : "Not running";
+  $("av-start").hidden = status.running;
+  $("av-stop").hidden = !status.running;
+  $("av-empty").textContent = status.running ? "Waiting for the first picture…" : "The agent display is not running. It is the agent's own screen: nothing on it is your desktop.";
+  $("av-empty").hidden = status.running && !$("av-frame").hidden;
+  if (!status.running) $("av-frame").hidden = true;
+  queueReport();
+}
+async function viewerLoop() {
+  while (viewerOn) {
+    let running = false;
+    try {
+      const status = await invoke("agent_display_status");
+      running = status.running;
+      drawViewerState(status);
+      if (running) {
+        const picture = await invoke("agent_display_frame");
+        if (viewerOn) { $("av-frame").src = picture; $("av-frame").hidden = false; $("av-empty").hidden = true; queueReport(); }
+      }
+    } catch (error) { /* the display went away between the two questions */ }
+    await new Promise((resolve) => setTimeout(resolve, running ? 200 : 800));
+  }
+}
+function startViewer() { if (viewerOn) return; viewerOn = true; viewerLoop(); }
+function stopViewer() { viewerOn = false; }
+$("av-start").onclick = () => invoke("agent_display_start").then(() => undefined, () => undefined);
+$("av-stop").onclick = () => invoke("agent_display_stop");
+listen("agent-display-status", (event) => { if (viewerOn) drawViewerState(event.payload); });
+
 // The live-status pill. Rust decides what (if anything) is going on; this draws it and sends the click back as the thing it stands for.
 let islandKind = "none";
 let islandLeaving = null;
@@ -539,6 +572,7 @@ $("island").onclick = (event) => {
   if (islandKind === "approval") invoke("mobius_open", { mode: "agents" });
   else if (islandKind === "assistant") invoke("mobius_open", { mode: "act" });
   else if (islandKind === "agentdesk") invoke("agent_desk_focus");
+  else if (islandKind === "agentdisplay") invoke("panel_open", { id: "agent-display" });
   else if (islandKind === "media") invoke("media_toggle");
 };
 
@@ -1450,7 +1484,7 @@ queueInteractive();
 // Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
-const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", today: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
+const GLASS_PANEL = { "agent-display": "agentview", "control-center": "controls", notifications: "notifs", today: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
 // The interface scale (Settings, Accessibility). The page is zoomed by it, so everything the page measures is in zoomed pixels; the compositor and the
 // tests want real ones, so what is reported is multiplied by it.
 let uiScale = 1;

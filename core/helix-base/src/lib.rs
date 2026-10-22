@@ -17,6 +17,7 @@ pub const PANELS: &[&str] = &[
     "agents",
     "notifications",
     "today",
+    "agent-display",
     "quick-insert",
 ];
 

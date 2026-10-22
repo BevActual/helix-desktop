@@ -102,6 +102,11 @@
 <div id="tray-menu" class="glass"></div>
 <div id="toasts"></div>
 <div id="osd"><i data-icon="volume" data-slot="osd-ico"></i><div id="osd-bar"><div id="osd-fill"></div></div><span id="osd-val"></span><span id="osd-text"></span></div>
+<div id="agentview" class="panel glass" data-test="agentview">
+  <div id="av-head"><h3>Agent display</h3><span id="av-state" data-test="av-state"></span><span class="av-spacer"></span><button id="av-start" data-test="av-start" hidden>Start</button><button id="av-stop" data-test="av-stop" hidden>Stop</button></div>
+  <div id="av-stage"><img id="av-frame" data-test="av-frame" alt="What the agent sees" hidden><div id="av-empty" data-test="av-empty">The agent display is not running. It is the agent's own screen: nothing on it is your desktop.</div></div>
+  <div id="av-foot">You are watching. Taking over, and asking you for help, come next.</div>
+</div>
 <div id="notifs" class="panel glass">
   <div id="today">
     <div id="today-head"><div id="today-weekday"></div><div id="today-date"></div></div>

@@ -554,9 +554,11 @@ fn control(app: &AppHandle, command: &str) {
         "notifications" => open_panel(app, "notifications"),
         "today" => open_panel(app, "today"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): drive the agent display without the viewer.
+        "agent-display" => open_panel(app, "agent-display"),
         "agent-display-start" => {
-            std::thread::spawn(|| {
-                if let Err(error) = agent_display::start() {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                if let Err(error) = agent_display::start(&app) {
                     eprintln!("AGENT-DISPLAY start failed: {error}");
                 }
             });
