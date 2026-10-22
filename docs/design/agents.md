@@ -46,7 +46,9 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    *Also built:* `core/helix-task`: a task (goal, state, steps with where each ran, notes) saved as JSON under `~/.local/share/helix/mobius/tasks`, and a
    **policy** (folder, allowed command prefixes, automatic edits, web, cloud use, display and apps, step and time limits) that decides allow, ask or
    deny for each action; Tools mode now runs as a task under the "ask me first" policy, so nothing changes for the person yet but every run is recorded.
-   Still to do: the Agents home,  a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
+   A chat's Tools panel now offers **Ask first** or **Work in the folder** (the balanced policy: checks such as tests and `git status`, and edits inside the
+   folder, run without asking).
+   Still to do: running in the background, a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.
 4. **Memory and skills the agent writes for itself**, local and editable (the knowledge store), after the Hermes pattern.

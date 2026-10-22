@@ -1984,7 +1984,7 @@ function setComposerMode(next) {
   drawComposerMeta();
   const enabled = next === "agent";
   const pending = enabled !== !!view.tools_enabled
-    ? invoke("tools_configure", { chatId: view.id, enabled, workspace: view.workspace || "" }).catch(report)
+    ? invoke("tools_configure", { chatId: view.id, enabled, workspace: view.workspace || "", policy: view.tools_policy || "" }).catch(report)
     : Promise.resolve();
   input.focus();
   return pending;

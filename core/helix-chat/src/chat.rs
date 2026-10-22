@@ -222,6 +222,8 @@ pub struct Conversation {
     pub brief: String,
     pub tools_enabled: bool,
     pub workspace: String,
+    /// How freely Tools mode works in the folder: empty = ask about everything, "folder" = work in the folder without asking for checks and edits.
+    pub tools_policy: String,
     /// The backend and model this chat was set to (a backend id such as `local`, and a model id; both empty = the default routing). Chosen
     /// from the model menu, so one chat can use a different model from another.
     pub route_backend: String,
@@ -394,6 +396,7 @@ impl Conversation {
             brief: String::new(),
             tools_enabled: false,
             workspace: String::new(),
+            tools_policy: String::new(),
             route_backend: String::new(),
             route_model: String::new(),
             tasks: Vec::new(),
@@ -653,6 +656,7 @@ impl Conversation {
         next.brief = self.brief.clone();
         next.tools_enabled = self.tools_enabled;
         next.workspace = self.workspace.clone();
+        next.tools_policy = self.tools_policy.clone();
         next.route_backend = self.route_backend.clone();
         next.route_model = self.route_model.clone();
         if self.messages.is_empty() {
@@ -708,6 +712,7 @@ impl Conversation {
             "brief": self.brief,
             "tools_enabled": self.tools_enabled,
             "workspace": self.workspace,
+            "tools_policy": self.tools_policy,
             "route_backend": self.route_backend,
             "route_model": self.route_model,
             "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text, "images": m.images, "sources": m.sources, "activities": m.activities, "stats": m.stats})).collect::<Vec<_>>(),
@@ -951,6 +956,12 @@ impl Conversation {
                 .get("tools_enabled")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            tools_policy: value
+                .get("tools_policy")
+                .and_then(Value::as_str)
+                .filter(|p| *p == "folder")
+                .unwrap_or_default()
+                .to_string(),
             workspace: value
                 .get("workspace")
                 .and_then(Value::as_str)
@@ -1089,6 +1100,8 @@ pub struct ChatView {
     pub brief: String,
     pub tools_enabled: bool,
     pub workspace: String,
+    /// How freely Tools mode works in the folder: empty = ask about everything, "folder" = work in the folder without asking for checks and edits.
+    pub tools_policy: String,
     /// This chat's own model choice; empty = the default routing.
     pub route_backend: String,
     pub route_model: String,
@@ -1695,6 +1708,7 @@ impl Chat {
             brief: self.conversation.brief.clone(),
             tools_enabled: self.conversation.tools_enabled,
             workspace: self.conversation.workspace.clone(),
+            tools_policy: self.conversation.tools_policy.clone(),
             route_backend: self.conversation.route_backend.clone(),
             route_model: self.conversation.route_model.clone(),
             tasks: self

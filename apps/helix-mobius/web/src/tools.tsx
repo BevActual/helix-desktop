@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
-interface Snapshot { id: string; tools_enabled: boolean; workspace: string; streaming: boolean; craft?: string }
+interface Snapshot { id: string; tools_enabled: boolean; workspace: string; tools_policy?: string; streaming: boolean; craft?: string }
 /** Named operations of one craft. The buttons a person presses and the steps a model proposes are this same list. A terminal command always waits, the way a terminal agent does. */
 const CRAFTS: Record<string, { title: string; note: string; tools: [string, string][] }> = {
   write: {
@@ -42,6 +42,7 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
   const [view, setView] = useState<Snapshot | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [folder, setFolder] = useState("");
+  const [policy, setPolicy] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [rules, setRules] = useState<{ file: string; text: string; total_chars: number } | null>(null);
@@ -49,9 +50,9 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
     if (!folder) { setRules(null); return; }
     invoke<{ file: string; text: string; total_chars: number } | null>("tools_rules", { folder }).then(setRules, () => setRules(null));
   }, [folder]);
-  useEffect(() => { register({ open: (snapshot) => { setView(snapshot); setEnabled(snapshot.tools_enabled); setFolder(snapshot.workspace || ""); setError(""); dialog.current?.showModal(); } }); }, [register]);
+  useEffect(() => { register({ open: (snapshot) => { setView(snapshot); setEnabled(snapshot.tools_enabled); setFolder(snapshot.workspace || ""); setPolicy(snapshot.tools_policy || ""); setError(""); dialog.current?.showModal(); } }); }, [register]);
   const choose = async () => { setBusy(true); setError(""); try { const path = await invoke<string | null>("tools_pick_folder"); if (path) setFolder(path); } catch (reason) { setError(String(reason)); } finally { setBusy(false); } };
-  const save = async () => { if (!view) return; setBusy(true); setError(""); try { await invoke("tools_configure", { chatId: view.id, enabled, workspace: folder }); dialog.current?.close(); } catch (reason) { setError(String(reason)); } finally { setBusy(false); } };
+  const save = async () => { if (!view) return; setBusy(true); setError(""); try { await invoke("tools_configure", { chatId: view.id, enabled, workspace: folder, policy }); dialog.current?.close(); } catch (reason) { setError(String(reason)); } finally { setBusy(false); } };
   return <dialog ref={dialog} className="sheet" data-test="tools-panel" aria-labelledby="tools-title"><div className="sheet-body">
     <header className="sheet-head"><h3 id="tools-title">Tools for this chat</h3></header>
     <div className="sheet-scroll">
@@ -62,6 +63,13 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
       <div className="tools-row tools-folder">
         <span className="tools-row-text"><strong>Project folder</strong><code data-test="tools-folder">{folder || "None: web only"}</code></span>
         <span className="tools-row-actions"><button type="button" data-test="tools-choose" disabled={busy || view?.streaming} onClick={choose}>Choose…</button><button type="button" disabled={!folder || busy || view?.streaming} onClick={() => setFolder("")}>Clear</button></span>
+      </div>
+      <div className="tools-row" role="radiogroup" aria-label="How much to ask">
+        <span className="tools-row-text"><strong>How much to ask</strong><span>{policy === "folder" ? "Checks like tests and git status run, and edits inside the folder apply, without asking. Everything else still asks." : "Every command and every edit waits for you."}</span></span>
+        <span className="route-seg">
+          <button type="button" role="radio" aria-checked={policy !== "folder"} className={policy !== "folder" ? "on" : ""} data-test="tools-policy-ask" disabled={busy || view?.streaming} onClick={() => setPolicy("")}>Ask first</button>
+          <button type="button" role="radio" aria-checked={policy === "folder"} className={policy === "folder" ? "on" : ""} data-test="tools-policy-folder" disabled={busy || view?.streaming || !folder} title={folder ? "" : "Choose a project folder first"} onClick={() => setPolicy("folder")}>Work in the folder</button>
+        </span>
       </div>
       {rules && <details className="tools-rules" data-test="tools-rules">
         <summary><strong>Project rules</strong> · {rules.file} · {rules.total_chars.toLocaleString()} characters{rules.total_chars > rules.text.length ? " (the first 4,000 are used)" : ""}</summary>

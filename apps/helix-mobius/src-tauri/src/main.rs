@@ -1412,6 +1412,7 @@ fn tools_configure(
     chat_id: String,
     enabled: bool,
     workspace: String,
+    policy: Option<String>,
 ) -> Result<(), String> {
     let folder = if workspace.is_empty() {
         String::new()
@@ -1435,12 +1436,19 @@ fn tools_configure(
         let old = (
             state.chat.conversation.tools_enabled,
             state.chat.conversation.workspace.clone(),
+            state.chat.conversation.tools_policy.clone(),
         );
         state.chat.conversation.tools_enabled = enabled;
         state.chat.conversation.workspace = folder;
+        state.chat.conversation.tools_policy = if policy.as_deref() == Some("folder") {
+            "folder".into()
+        } else {
+            String::new()
+        };
         if !state.chat.temporary && !save(&state.chat.conversation) {
             state.chat.conversation.tools_enabled = old.0;
             state.chat.conversation.workspace = old.1;
+            state.chat.conversation.tools_policy = old.2;
             return Err("The tools settings could not be saved.".into());
         }
     }

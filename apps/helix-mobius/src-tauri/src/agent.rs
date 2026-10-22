@@ -669,6 +669,7 @@ async fn execute(
 ) -> Result<(), String> {
     let generation = turn.generation;
     let model = Model::capture(crate::chat_route_of(app))?;
+    let folder_policy;
     let folder = {
         let shared = crate::shared(app);
         let state = shared.lock().expect("state");
@@ -683,6 +684,7 @@ async fn execute(
             .messages
             .iter()
             .any(|m| m.activities.iter().any(|a| a.tool == "terminal"));
+        folder_policy = state.chat.conversation.tools_policy == "folder";
         if state.chat.conversation.workspace.is_empty() {
             None
         } else {
@@ -741,12 +743,15 @@ async fn execute(
         None => None,
     };
     let tasks = task_store();
-    let policy = helix_task::Policy::chat(
-        &folder
-            .as_ref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_default(),
-    );
+    let folder_text = folder
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let policy = if folder_policy && folder.is_some() {
+        helix_task::Policy::balanced(&folder_text)
+    } else {
+        helix_task::Policy::chat(&folder_text)
+    };
     let mut task = helix_task::Task::new(task_id, goal, policy, crate::now());
     task.set_state(helix_task::State::Running, crate::now());
     let _ = tasks.save(&task);
