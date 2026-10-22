@@ -1307,7 +1307,16 @@ fn read_notification_prefs() -> helix_config::notification_prefs::NotificationPr
 /// The Notifications page: do not disturb, quiet hours, banner time and count, kept in a file the shell watches.
 #[tauri::command]
 fn notifications_rows() -> Vec<RowView> {
-    read_notification_prefs().rows()
+    read_notification_prefs().rows_with_apps(&read_seen_notification_apps())
+}
+
+/// The applications that have sent a notification (written by the shell), so each can be given a rule.
+fn read_seen_notification_apps() -> Vec<String> {
+    notification_prefs_file()
+        .map(|p| p.with_file_name("notification-apps.json"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1320,6 +1329,7 @@ fn notifications_change(id: String, change: serde_json::Value) -> Result<Vec<Row
     ) {
         (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
         (Some("switch"), Some(v)) => Change::Switch(v.as_bool().ok_or("not a boolean")?),
+        (Some("choice"), Some(v)) => Change::Choice(v.as_str().ok_or("not text")?.to_string()),
         _ => return Err("unknown change".into()),
     };
     let next = read_notification_prefs()
@@ -1341,7 +1351,7 @@ fn notifications_change(id: String, change: serde_json::Value) -> Result<Vec<Row
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     eprintln!("SETTINGS notifications {id} changed");
-    Ok(next.rows())
+    Ok(next.rows_with_apps(&read_seen_notification_apps()))
 }
 
 fn idle_prefs_file() -> Option<std::path::PathBuf> {

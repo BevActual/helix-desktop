@@ -16,6 +16,7 @@ print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
+mkdir -p "$(dirname "$FILE")"; echo '["Chat","Mail"]' > "$(dirname "$FILE")/notification-apps.json"
 click_id page-notifications; sleep 1.5; shot settings-notifications
 for id in dnd quiet quiet_start quiet_end toast_seconds max_toasts; do has_id "set-$id" && echo "ok: $id is on the page" || fail "no row for $id"; done
 has_id set-notification.position && fail "a setting the shell ignores is still listed" || echo "ok: nothing the shell ignores"
@@ -40,5 +41,13 @@ grep -q '"quiet":true' "$FILE" && grep -q '"quiet_start":9' "$FILE" && grep -q '
 click_id set-quiet_start-number; wtype "24"; wtype -k Return; sleep 0.6
 grep -q '"quiet_start":9' "$FILE" && echo "ok: an hour past 23 is not kept" || fail "hour 24 accepted: $(cat "$FILE")"
 [ "$(stat -c %a "$FILE")" = 600 ] && echo "ok: file is private" || fail "file mode"
+echo "--- per-application rules, for the applications that have sent a notification"
+has_id "set-app:chat-quiet" && has_id "set-app:mail-off" && echo "ok: each application seen has a rule row" || fail "no application rows"
+click_id "set-app:chat-quiet"; sleep 1
+grep -q '"app_rules":{"chat":"quiet"}' "$FILE" && grep -q '"toast_seconds":10' "$FILE" && echo "ok: a Quiet rule is written with the other settings" || fail "rule not written: $(cat "$FILE")"
+click_id "set-app:mail-off"; sleep 1
+grep -q '"mail":"off"' "$FILE" && grep -q '"chat":"quiet"' "$FILE" && echo "ok: a second rule keeps the first" || fail "second rule: $(cat "$FILE")"
+click_id "set-app:chat-banners"; sleep 1
+grep -q '"chat"' "$FILE" && fail "Banners left an entry: $(cat "$FILE")" || echo "ok: Banners is the default and is not written"
 shot settings-notifications-after
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

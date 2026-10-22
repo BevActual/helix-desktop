@@ -89,6 +89,8 @@ struct Item {
     live: bool,
     toast_until: Option<u64>,
     read: bool,
+    /// The application is set to Quiet: kept in the list, never a banner (unless urgent).
+    quiet_app: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -102,6 +104,10 @@ pub struct Notifications {
     /// What the person chose in Settings; `None` means the defaults above.
     default_toast_ms: Option<u64>,
     max_toasts: Option<usize>,
+    /// What the person chose per application (lower-cased name): `true` is Off (dropped), `false` is Quiet (listed, no banner).
+    app_rules: std::collections::HashMap<String, bool>,
+    /// Applications that have sent a notification, most recent last, so Settings can offer a rule for each.
+    seen_apps: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -214,6 +220,12 @@ impl Notifications {
     pub fn notify(&mut self, incoming: Incoming, now: u64) -> (u32, Vec<Event>) {
         let mut events = Vec::new();
         let app = sanitize_for_display(&incoming.app, 40);
+        self.note_app(&app);
+        let rule = self.app_rules.get(&app.trim().to_lowercase()).copied();
+        // Off: not kept at all. An urgent one is never silenced by a rule.
+        if rule == Some(true) && incoming.urgency != Urgency::Critical {
+            return (self.fresh_id(), events);
+        }
         // Only the connection that posted a notification can replace it.
         let replaced = incoming.replaces != 0
             && self
@@ -275,6 +287,7 @@ impl Notifications {
             live: true,
             toast_until: Some(now.saturating_add(toast_for)),
             read: false,
+            quiet_app: rule == Some(false) && incoming.urgency != Urgency::Critical,
         };
         if replaced {
             if let Some(slot) = self.items.iter_mut().find(|existing| existing.id == id) {
@@ -378,6 +391,36 @@ impl Notifications {
         self.max_toasts = Some(max_toasts.clamp(1, MAX_TOASTS));
     }
 
+    /// Per-application rules from Settings: (application name, `true` for Off or `false` for Quiet).
+    pub fn set_app_rules(&mut self, rules: impl IntoIterator<Item = (String, bool)>) {
+        self.app_rules = rules
+            .into_iter()
+            .map(|(name, off)| (name.trim().to_lowercase(), off))
+            .collect();
+    }
+
+    fn note_app(&mut self, app: &str) {
+        if app.is_empty() || self.seen_apps.iter().any(|a| a.eq_ignore_ascii_case(app)) {
+            return;
+        }
+        self.seen_apps.push(app.to_string());
+        if self.seen_apps.len() > 100 {
+            self.seen_apps.remove(0);
+        }
+    }
+
+    /// The applications that have sent a notification since the shell started (and any the host added back from its last run).
+    pub fn seen_apps(&self) -> &[String] {
+        &self.seen_apps
+    }
+
+    /// Remembers applications seen in an earlier run.
+    pub fn remember_apps(&mut self, apps: impl IntoIterator<Item = String>) {
+        for app in apps {
+            self.note_app(&app);
+        }
+    }
+
     pub fn set_dnd(&mut self, on: bool) {
         self.dnd = on;
     }
@@ -450,6 +493,7 @@ impl Notifications {
                 item.toast_until.is_some_and(|until| until > now)
                     && (!(self.dnd || self.quiet) || item.urgency == Urgency::Critical)
                     && item.urgency != Urgency::Low
+                    && !item.quiet_app
             })
             .take(self.max_toasts.unwrap_or(MAX_TOASTS).clamp(1, MAX_TOASTS))
             .map(|item| row(item))
@@ -606,6 +650,33 @@ mod tests {
         assert!(view.items[0].actions.is_empty());
         assert_eq!(n.invoke(id, 1, 0), Err(RequestError::NotLive));
         assert!(view.toasts.is_empty());
+    }
+
+    #[test]
+    fn a_quiet_application_is_listed_but_never_a_banner_and_an_off_one_is_dropped() {
+        let mut n = Notifications::new();
+        n.set_app_rules([("Chat".to_string(), false), ("Spam".to_string(), true)]);
+        n.notify(incoming("Chat", "hi"), 1_000);
+        n.notify(incoming("Spam", "buy"), 1_000);
+        n.notify(incoming("Mail", "you have mail"), 1_000);
+        let view = n.view(1_500);
+        let apps = |items: &[ItemView]| items.iter().map(|i| i.app.clone()).collect::<Vec<_>>();
+        assert_eq!(apps(&view.items), ["Mail", "Chat"], "Spam is not kept");
+        assert_eq!(
+            apps(&view.toasts),
+            ["Mail"],
+            "Chat is listed but is not a banner"
+        );
+        // An urgent one is never silenced by a rule.
+        let mut urgent = incoming("Spam", "disk is full");
+        urgent.urgency = Urgency::Critical;
+        n.notify(urgent, 2_000);
+        let view = n.view(2_500);
+        assert!(apps(&view.toasts).contains(&"Spam".to_string()));
+        // All three are offered in Settings.
+        assert_eq!(n.seen_apps().len(), 3);
+        n.remember_apps(["Old".to_string(), "chat".to_string()]);
+        assert_eq!(n.seen_apps().len(), 4, "a known name is not added twice");
     }
 
     #[test]

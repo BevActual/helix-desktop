@@ -4,10 +4,12 @@
 //! listed here. Quiet hours are a window on the 24-hour clock; the shell decides each hour whether that window is open. The older
 //! `notification_rules` rows are not read by anything and stay out of the page.
 
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use crate::catalog::{Change, Control, RowView};
+use crate::catalog::{Change, Choice, Control, RowView};
 
 pub const SECONDS_MIN: u32 = 2;
 pub const SECONDS_MAX: u32 = 15;
@@ -17,6 +19,48 @@ pub const TOASTS_MAX: u32 = 3;
 pub const TOASTS_DEFAULT: u32 = 3;
 pub const QUIET_START_DEFAULT: u32 = 22;
 pub const QUIET_END_DEFAULT: u32 = 7;
+
+/// What one application's notifications do. Banners is the default and is not written down.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AppRule {
+    /// Banners as usual.
+    Banners,
+    /// Kept in the notification list, never a banner (an urgent one still shows).
+    Quiet,
+    /// Not kept at all (an urgent one still shows).
+    Off,
+}
+
+impl AppRule {
+    pub fn parse(text: &str) -> Option<AppRule> {
+        match text {
+            "banners" => Some(AppRule::Banners),
+            "quiet" => Some(AppRule::Quiet),
+            "off" => Some(AppRule::Off),
+            _ => None,
+        }
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AppRule::Banners => "banners",
+            AppRule::Quiet => "quiet",
+            AppRule::Off => "off",
+        }
+    }
+}
+
+/// How an application is named in the rules: the way notifications show it, lower-cased, so a rule survives a change of capital letters.
+pub fn app_key(name: &str) -> String {
+    name.chars()
+        .filter(|c| !c.is_control())
+        .take(40)
+        .collect::<String>()
+        .trim()
+        .to_lowercase()
+}
+
+pub const MAX_APP_RULES: usize = 200;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct NotificationPrefs {
@@ -32,6 +76,8 @@ pub struct NotificationPrefs {
     pub quiet_start: u32,
     /// Hour on the 24-hour clock when quiet hours end (0–23). The window ends at the start of this hour.
     pub quiet_end: u32,
+    /// Rules by application (see [`app_key`]); an application with no entry gets banners.
+    pub app_rules: BTreeMap<String, AppRule>,
 }
 
 impl Default for NotificationPrefs {
@@ -43,6 +89,7 @@ impl Default for NotificationPrefs {
             quiet: false,
             quiet_start: QUIET_START_DEFAULT,
             quiet_end: QUIET_END_DEFAULT,
+            app_rules: BTreeMap::new(),
         }
     }
 }
@@ -89,7 +136,43 @@ impl NotificationPrefs {
         if let Some(n) = value.get("quiet_end").and_then(Value::as_u64) {
             prefs.quiet_end = (n % 24) as u32;
         }
+        if let Some(rules) = value.get("app_rules").and_then(Value::as_object) {
+            for (name, rule) in rules.iter().take(MAX_APP_RULES) {
+                let key = app_key(name);
+                if let Some(rule) = rule.as_str().and_then(AppRule::parse) {
+                    if !key.is_empty() && rule != AppRule::Banners {
+                        prefs.app_rules.insert(key, rule);
+                    }
+                }
+            }
+        }
         prefs
+    }
+
+    /// The rule for an application.
+    pub fn rule_for(&self, app: &str) -> AppRule {
+        self.app_rules
+            .get(&app_key(app))
+            .copied()
+            .unwrap_or(AppRule::Banners)
+    }
+
+    /// Sets the rule for an application. Banners removes the entry; the list is bounded.
+    pub fn with_rule(&self, app: &str, rule: AppRule) -> Result<NotificationPrefs, PrefsError> {
+        let key = app_key(app);
+        if key.is_empty() {
+            return Err(PrefsError::BadValue);
+        }
+        let mut next = self.clone();
+        if rule == AppRule::Banners {
+            next.app_rules.remove(&key);
+        } else {
+            if !next.app_rules.contains_key(&key) && next.app_rules.len() >= MAX_APP_RULES {
+                return Err(PrefsError::BadValue);
+            }
+            next.app_rules.insert(key, rule);
+        }
+        Ok(next)
     }
 
     /// Quiet hours are on, and `hour` (0–23) is inside the window.
@@ -106,6 +189,7 @@ impl NotificationPrefs {
             "quiet": self.quiet,
             "quiet_start": self.quiet_start,
             "quiet_end": self.quiet_end,
+            "app_rules": self.app_rules.iter().map(|(k, v)| (k.clone(), v.as_str())).collect::<BTreeMap<_, _>>(),
         })
         .to_string()
     }
@@ -145,6 +229,11 @@ impl NotificationPrefs {
 
     /// The rows the Notifications page draws, in order.
     pub fn rows(&self) -> Vec<RowView> {
+        self.rows_with_apps(&[])
+    }
+
+    /// The same, with a row for each application that has sent a notification (or has a rule): Banners, Quiet or Off.
+    pub fn rows_with_apps(&self, seen: &[String]) -> Vec<RowView> {
         let row =
             |group: &str, id: &str, title: &str, description: &str, control: Control| RowView {
                 id: id.into(),
@@ -154,7 +243,7 @@ impl NotificationPrefs {
                 overridden: false,
                 control,
             };
-        vec![
+        let mut rows = vec![
             row(
                 "Quiet",
                 "dnd",
@@ -197,13 +286,41 @@ impl NotificationPrefs {
                 "More than this wait in the notification list.",
                 Control::Slider { min: TOASTS_MIN as f64, max: TOASTS_MAX as f64, integer: true, value: self.max_toasts as f64 },
             ),
-        ]
+        ];
+        // Applications, by the name their notifications carry; the ones with a rule are listed even if they have not sent anything lately.
+        let mut apps: BTreeMap<String, String> = BTreeMap::new();
+        for name in seen {
+            apps.entry(app_key(name)).or_insert_with(|| name.clone());
+        }
+        for key in self.app_rules.keys() {
+            apps.entry(key.clone()).or_insert_with(|| key.clone());
+        }
+        for (key, name) in apps.into_iter().filter(|(k, _)| !k.is_empty()) {
+            let choices = [("banners", "Banners"), ("quiet", "Quiet"), ("off", "Off")]
+                .map(|(value, label)| Choice {
+                    value: value.into(),
+                    label: label.into(),
+                })
+                .to_vec();
+            rows.push(row(
+                "Applications",
+                &format!("app:{key}"),
+                &name,
+                "Banners: as usual. Quiet: kept in the list, no banner. Off: not kept. Urgent ones always show.",
+                Control::Choice { options: choices, current: self.rule_for(&key).as_str().into() },
+            ));
+        }
+        rows
     }
 
     /// A change made on the page, as the page sent it.
     pub fn apply(&self, id: &str, change: &Change) -> Result<NotificationPrefs, PrefsError> {
         match (id, change) {
             ("dnd" | "quiet", Change::Switch(on)) => self.set(id, &json!(on)),
+            (id, Change::Choice(value)) if id.starts_with("app:") => {
+                let rule = AppRule::parse(value).ok_or(PrefsError::BadValue)?;
+                self.with_rule(&id[4..], rule)
+            }
             (_, Change::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => {
                 self.set(id, &json!(*n as u64))
             }
@@ -215,6 +332,74 @@ impl NotificationPrefs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_application_can_be_made_quiet_or_off_and_back() {
+        let p = NotificationPrefs::default();
+        assert_eq!(p.rule_for("Slack"), AppRule::Banners);
+        let quiet = p
+            .apply("app:slack", &Change::Choice("quiet".into()))
+            .unwrap();
+        assert_eq!(
+            quiet.rule_for("SLACK"),
+            AppRule::Quiet,
+            "capital letters do not matter"
+        );
+        let off = quiet
+            .apply("app:slack", &Change::Choice("off".into()))
+            .unwrap();
+        assert_eq!(off.rule_for("slack"), AppRule::Off);
+        let back = off
+            .apply("app:slack", &Change::Choice("banners".into()))
+            .unwrap();
+        assert!(back.app_rules.is_empty(), "the default is not written down");
+        assert_eq!(
+            p.apply("app:slack", &Change::Choice("loud".into())),
+            Err(PrefsError::BadValue)
+        );
+        assert_eq!(
+            p.apply("app:", &Change::Choice("off".into())),
+            Err(PrefsError::BadValue)
+        );
+    }
+
+    #[test]
+    fn rules_survive_a_round_trip_and_bad_ones_are_ignored() {
+        let p = NotificationPrefs::default()
+            .with_rule("Mail", AppRule::Off)
+            .unwrap()
+            .with_rule("Chat", AppRule::Quiet)
+            .unwrap();
+        let again = NotificationPrefs::parse(&p.to_json());
+        assert_eq!(again, p);
+        let odd = NotificationPrefs::parse(
+            r#"{"app_rules": {"x": "loud", "": "off", "ok": "quiet", "y": 5, "z": "banners"}}"#,
+        );
+        assert_eq!(odd.app_rules.len(), 1);
+        assert_eq!(odd.rule_for("ok"), AppRule::Quiet);
+    }
+
+    #[test]
+    fn the_page_lists_the_applications_that_were_seen_and_those_with_rules() {
+        let p = NotificationPrefs::default()
+            .with_rule("Old App", AppRule::Off)
+            .unwrap();
+        let rows = p.rows_with_apps(&["Slack".into(), "slack".into(), "Mail".into()]);
+        let apps: Vec<&str> = rows
+            .iter()
+            .filter(|r| r.group == "Applications")
+            .map(|r| r.title.as_str())
+            .collect();
+        assert_eq!(apps, ["Mail", "old app", "Slack"]);
+        assert_eq!(rows.len(), NotificationPrefs::default().rows().len() + 3);
+        let limit = (0..MAX_APP_RULES).fold(NotificationPrefs::default(), |p, i| {
+            p.with_rule(&format!("a{i}"), AppRule::Off).unwrap()
+        });
+        assert_eq!(
+            limit.with_rule("one more", AppRule::Off),
+            Err(PrefsError::BadValue)
+        );
+    }
 
     #[test]
     fn a_missing_or_broken_file_means_the_defaults() {
@@ -315,6 +500,7 @@ mod tests {
             quiet: true,
             quiet_start: 22,
             quiet_end: 7,
+            ..Default::default()
         };
         assert_eq!(NotificationPrefs::parse(&p.to_json()), p);
     }

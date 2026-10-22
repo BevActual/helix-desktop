@@ -66,4 +66,22 @@ for _ in $(seq 1 20); do NOW=$(grep -c 'dnd=false quiet=false' "$LOG" || true); 
 [ "$NOW" -gt "$OUTSIDE" ] && echo "ok: quiet hours are outside this hour" || fail "quiet hours stayed on: $(grep 'NOTIFICATIONS settings' "$LOG" | tail -2)"
 probe send Outside "shown" "x" 1 -1 >/dev/null
 wait_log "toasts=2 items=$((ITEMS + 3))" 20 && echo "ok: an ordinary banner shows outside quiet hours" || fail "banner stayed hidden: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+echo "--- 6. per-application rules: Quiet is listed but never a banner, Off is not kept, an urgent one always shows"
+sleep 7
+printf '{"version":1,"toast_seconds":6,"max_toasts":3,"app_rules":{"chat":"quiet","spam":"off"}}\n' > "$FILE"
+sleep 2
+ITEMS=$(grep 'NOTIFICATIONS view' "$LOG" | tail -1 | sed -n 's/.*items=\([0-9]*\).*/\1/p')
+probe send Chat "quiet one" "x" 1 -1 >/dev/null
+wait_log "toasts=0 items=$((ITEMS + 1))" 20 && echo "ok: a Quiet application is listed with no banner" || fail "quiet app: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+probe send Spam "dropped" "x" 1 -1 >/dev/null
+sleep 2
+[ "$(grep 'NOTIFICATIONS view' "$LOG" | tail -1 | sed -n 's/.*items=\([0-9]*\).*/\1/p')" = "$((ITEMS + 1))" ] && echo "ok: an Off application is not kept" || fail "off app kept: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+probe send Spam "disk full" "x" 2 -1 >/dev/null
+wait_log "toasts=1 items=$((ITEMS + 2))" 20 && echo "ok: an urgent one from an Off application still shows" || fail "urgent spam: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+APPS=$SCRATCH/config/helix/notification-apps.json
+python3 - "$APPS" <<'PY' && echo "ok: the applications seen are written for Settings" || fail "notification-apps.json: $(cat "$APPS" 2>&1)"
+import json, sys
+seen = [a.lower() for a in json.load(open(sys.argv[1]))]
+assert {"chat", "spam", "mail"} <= set(seen), seen
+PY
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

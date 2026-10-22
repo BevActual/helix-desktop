@@ -61,11 +61,20 @@ impl Server {
             timeout_ms: expire_timeout,
         };
         let state = shell_state(&self.app);
+        let mut new_apps: Option<Vec<String>> = None;
         let (id, events) = {
             let mut shell = state.lock().expect("shell state");
             let now = now_ms(shell.started);
-            shell.notifications.notify(incoming, now)
+            let before = shell.notifications.seen_apps().len();
+            let result = shell.notifications.notify(incoming, now);
+            if shell.notifications.seen_apps().len() != before {
+                new_apps = Some(shell.notifications.seen_apps().to_vec());
+            }
+            result
         };
+        if let Some(apps) = new_apps {
+            write_seen_apps(&apps);
+        }
         eprintln!(
             "NOTIFY stored id={id} replaces={replaces_id} app={:?}",
             app_label
@@ -205,6 +214,31 @@ fn prefs_path() -> Option<std::path::PathBuf> {
     Some(base.join("helix/notification-settings.json"))
 }
 
+/// The applications that have sent a notification, for Settings to offer a rule for each (`notification-apps.json` beside the settings).
+fn seen_apps_path() -> Option<std::path::PathBuf> {
+    prefs_path().map(|p| p.with_file_name("notification-apps.json"))
+}
+
+fn read_seen_apps() -> Vec<String> {
+    seen_apps_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
+        .unwrap_or_default()
+}
+
+fn write_seen_apps(apps: &[String]) {
+    let Some(path) = seen_apps_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let temporary = path.with_extension("tmp");
+    if std::fs::write(&temporary, serde_json::to_vec(apps).unwrap_or_default()).is_ok() {
+        let _ = std::fs::rename(&temporary, &path);
+    }
+}
+
 fn read_prefs() -> helix_config::notification_prefs::NotificationPrefs {
     prefs_path()
         .and_then(|path| std::fs::read_to_string(path).ok())
@@ -273,6 +307,15 @@ fn apply_prefs(app: &AppHandle) -> bool {
         );
         shell.notifications.set_dnd(prefs.dnd);
         shell.notifications.set_quiet(quiet);
+        shell.notifications.remember_apps(read_seen_apps());
+        shell
+            .notifications
+            .set_app_rules(prefs.app_rules.iter().map(|(name, rule)| {
+                (
+                    name.clone(),
+                    *rule == helix_config::notification_prefs::AppRule::Off,
+                )
+            }));
     }
     eprintln!(
         "NOTIFICATIONS settings seconds={} toasts={} dnd={} quiet={}",
