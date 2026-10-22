@@ -71,6 +71,40 @@ pub fn who() -> (String, String) {
     }
 }
 
+/// What the battery says: the charge in percent and whether it is charging.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Battery {
+    pub percent: u8,
+    pub charging: bool,
+}
+
+/// From the text of a power supply's `capacity` and `status` files.
+pub fn parse_battery(capacity: &str, status: &str) -> Option<Battery> {
+    let percent = capacity.trim().parse::<u8>().ok().filter(|p| *p <= 100)?;
+    let charging = matches!(status.trim(), "Charging" | "Full");
+    Some(Battery { percent, charging })
+}
+
+/// The first battery under `dir` (`/sys/class/power_supply`), if the computer has one.
+pub fn battery(dir: &Path) -> Option<Battery> {
+    let mut names: Vec<_> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .collect();
+    names.sort();
+    names.into_iter().find_map(|path| {
+        let kind = std::fs::read_to_string(path.join("type")).ok()?;
+        if kind.trim() != "Battery" {
+            return None;
+        }
+        parse_battery(
+            &std::fs::read_to_string(path.join("capacity")).ok()?,
+            &std::fs::read_to_string(path.join("status")).unwrap_or_default(),
+        )
+    })
+}
+
 /// Which PAM service to ask: the one the package installs, else the one a locker the system already has uses, else `login`.
 pub fn pam_service(exists: impl Fn(&str) -> bool) -> &'static str {
     if let Ok(service) = std::env::var("HELIX_LOCK_PAM_SERVICE") {
@@ -130,6 +164,42 @@ mod tests {
         );
         assert_eq!(clock_text(0, 7, true, "Monday", "May", 3).0, "12:07 AM");
         assert_eq!(clock_text(15, 30, true, "Monday", "May", 3).0, "3:30 PM");
+    }
+
+    #[test]
+    fn the_battery_is_read_from_its_files_and_nonsense_is_nothing() {
+        assert_eq!(
+            parse_battery("79\n", "Discharging\n"),
+            Some(Battery {
+                percent: 79,
+                charging: false
+            })
+        );
+        assert_eq!(
+            parse_battery("100", "Full"),
+            Some(Battery {
+                percent: 100,
+                charging: true
+            })
+        );
+        assert_eq!(parse_battery("101", "Charging"), None);
+        assert_eq!(parse_battery("x", "Charging"), None);
+        let dir = std::env::temp_dir().join(format!("helix-lock-bat-{}", std::process::id()));
+        for (name, kind) in [("AC", "Mains"), ("BAT0", "Battery")] {
+            std::fs::create_dir_all(dir.join(name)).unwrap();
+            std::fs::write(dir.join(name).join("type"), kind).unwrap();
+        }
+        std::fs::write(dir.join("BAT0/capacity"), "42").unwrap();
+        std::fs::write(dir.join("BAT0/status"), "Charging").unwrap();
+        assert_eq!(
+            battery(&dir),
+            Some(Battery {
+                percent: 42,
+                charging: true
+            })
+        );
+        assert_eq!(battery(&dir.join("nothing")), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

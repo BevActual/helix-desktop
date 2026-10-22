@@ -108,6 +108,13 @@ fn now_parts() -> (u32, u32, String, String, u32) {
     }
 }
 
+/// Where the battery files are (`HELIX_LOCK_POWER_DIR` lets a test supply its own).
+fn power_dir() -> PathBuf {
+    std::env::var_os("HELIX_LOCK_POWER_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/sys/class/power_supply"))
+}
+
 /// Whether the clock is written 12-hour: the person's choice in Settings, else the language's habit.
 fn twelve_hour() -> bool {
     let home = std::env::var("HOME").unwrap_or_default();
@@ -180,6 +187,7 @@ impl App {
         let shake = self.entry.shake(now);
         let checking = self.entry.phase == Phase::Checking;
         let initials = initials(&self.name);
+        let battery = facts::battery(&power_dir());
         for lockable in &self.lockables {
             let Some((lw, lh)) = lockable.size else {
                 continue;
@@ -219,6 +227,7 @@ impl App {
                         shake,
                         accent: self.accent,
                         checking,
+                        battery,
                     },
                 );
             }

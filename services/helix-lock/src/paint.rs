@@ -20,6 +20,8 @@ pub struct Frame<'a> {
     pub shake: f64,
     pub accent: [u8; 3],
     pub checking: bool,
+    /// The battery, on a computer that has one.
+    pub battery: Option<crate::facts::Battery>,
 }
 
 const FONT: &str = "Inter";
@@ -154,6 +156,44 @@ pub fn draw(c: &Context, w: f64, h: f64, frame: &Frame) {
         }
         centred(c, frame.message, cx, fy + fh + 16.0, 14.0, "Regular");
     }
+    if let Some(battery) = frame.battery {
+        // A small battery in the bottom right corner, with the number.
+        let text = if battery.charging {
+            format!("{}% · Charging", battery.percent)
+        } else {
+            format!("{}%", battery.percent)
+        };
+        let low = battery.percent <= 15 && !battery.charging;
+        let layout = pangocairo::functions::create_layout(c);
+        let mut description = pango::FontDescription::from_string(&format!("{FONT} Regular"));
+        description.set_absolute_size(13.0 * f64::from(pango::SCALE));
+        layout.set_font_description(Some(&description));
+        layout.set_text(&text);
+        let (text_w, _) = layout.pixel_size();
+        // Flush right: the number ends 28 px from the edge and the gauge sits before it.
+        let (bw, bh) = (22.0, 11.0);
+        let bx = w - 28.0 - f64::from(text_w) - 10.0 - bw - 3.5;
+        let by = h - 46.0;
+        c.set_line_width(1.2);
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.55);
+        rounded(c, bx, by, bw, bh, 2.5);
+        let _ = c.stroke();
+        c.rectangle(bx + bw + 1.5, by + 3.5, 2.0, bh - 7.0);
+        let _ = c.fill();
+        if low {
+            c.set_source_rgba(1.0, 0.27, 0.23, 0.95);
+        } else if battery.charging {
+            c.set_source_rgba(0.19, 0.82, 0.35, 0.95);
+        } else {
+            c.set_source_rgba(1.0, 1.0, 1.0, 0.85);
+        }
+        let fill = (bw - 3.0) * f64::from(battery.percent) / 100.0;
+        rounded(c, bx + 1.5, by + 1.5, fill.max(1.5), bh - 3.0, 1.5);
+        let _ = c.fill();
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.6);
+        c.move_to(bx + bw + 10.0, by - 2.5);
+        pangocairo::functions::show_layout(c, &layout);
+    }
     // A quiet note at the bottom, so the screen says what it is.
     c.set_source_rgba(1.0, 1.0, 1.0, 0.38);
     centred(c, "Locked", cx, h - 44.0, 13.0, "Regular");
@@ -262,6 +302,10 @@ mod tests {
             shake: 0.0,
             accent: [0x0a, 0x84, 0xff],
             checking: false,
+            battery: Some(crate::facts::Battery {
+                percent: 64,
+                charging: false,
+            }),
         }
     }
 

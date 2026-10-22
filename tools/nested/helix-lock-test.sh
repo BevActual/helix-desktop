@@ -30,6 +30,9 @@ for i in range(12):
     d.ellipse([100 + i * 120, 150 + (i % 4) * 160, 260 + i * 120, 310 + (i % 4) * 160], fill=(255 - i * 12, 200, 60 + i * 15))
 img.save(sys.argv[1])
 PY
+# A battery to show (the nested machine may have none).
+mkdir -p "$SCRATCH/power/BAT0"; printf Battery > "$SCRATCH/power/BAT0/type"; printf 64 > "$SCRATCH/power/BAT0/capacity"; printf Discharging > "$SCRATCH/power/BAT0/status"
+export HELIX_LOCK_POWER_DIR=$SCRATCH/power
 export HELIX_LOCK_PAM_DIR=$PAM HELIX_LOCK_PAM_SERVICE=helix-lock-test
 sleep 3
 echo "--- locking"
