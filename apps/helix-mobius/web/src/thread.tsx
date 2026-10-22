@@ -231,7 +231,7 @@ function Step({ activity, streaming, hooks }: { activity: Activity; streaming: b
           {activity.tool === "edit_file" ? <Diff text={activity.input} testId="tool-command" /> : <pre data-test="tool-command">{activity.input}</pre>}
           <p className="sheet-note">{activity.output}</p>
           <div className="tool-review">
-            <button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : activity.tool === "agent_permission" ? "Allow once" : "Allow lookup"}</button>
+            <button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : activity.tool === "agent_permission" ? "Allow once" : activity.tool === "display_launch" ? "Open app" : activity.tool === "display_look" ? "Allow look" : "Allow lookup"}</button>
             <button data-test="tool-decline" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: false }).catch(hooks.report)}>Skip</button>
           </div>
         </div>

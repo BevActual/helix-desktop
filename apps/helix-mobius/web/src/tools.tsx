@@ -76,7 +76,7 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
       </section>}
       <details className="tools-desk">
         <summary>Agent desk</summary>
-        <p className="sheet-note">Desktop changes still use Act. With agent-desk placement on, the first approved command also opens a terminal there.</p>
+        <p className="sheet-note">With Tools on, a task can also open apps and click and type on the agent display, which you can watch and take over from the bar. It reads the screen with a model on this computer; only that description goes to the chat model. Desktop settings changes still use Act. With agent-desk placement on, the first approved command also opens a terminal there.</p>
         <div className="sheet-actions">
           <button type="button" data-test="tools-show-desk" disabled={busy} onClick={() => invoke("agent_desk_focus").catch((reason) => setError(String(reason)))}>Show agent desk</button>
           <button type="button" data-test="tools-open-desk-terminal" disabled={busy || !folder} onClick={() => invoke("tools_open_desk_terminal").catch((reason) => setError(String(reason)))}>Open folder on agent desk</button>
