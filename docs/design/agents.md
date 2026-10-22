@@ -62,6 +62,10 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    Open question: adopt the `mxc-sdk` crate as the backend for host-filtered networking (proxy) and macOS/Windows later, once it is stable.
    `tools/nested/ui-suite.sh mobius-agent-tasks` drives it end to end with the scripted planner: Allow in the sheet, the folder policy running a check without
    asking, a practice run recording what it would have asked, and Stop while waiting.
+   **Review on a copy** (the Codex/Cursor pattern): a background task on a git project works in its own `git clone` of the last commit, kept outside Mobius's data
+   folder (so git works inside the sandbox and two tasks cannot collide). When it finishes the sheet offers *Review changes*: the diff against the starting
+   commit (committed, uncommitted and new files), then *Apply to project* (a `git apply` that is checked first, so all of it or none, left unstaged) or
+   *Discard*. Uncommitted changes in the project are not in the copy and the sheet says so. Non-git folders still work in place.
    Still to do: a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.

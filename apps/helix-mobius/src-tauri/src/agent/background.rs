@@ -71,7 +71,7 @@ impl Background {
 }
 
 #[tauri::command]
-pub fn agent_task_start(
+pub async fn agent_task_start(
     app: AppHandle,
     goal: String,
     folder: String,
@@ -79,6 +79,7 @@ pub fn agent_task_start(
     practice: Option<bool>,
     from: Option<String>,
     network: Option<bool>,
+    copy: Option<bool>,
 ) -> Result<String, String> {
     let goal = goal.trim().to_string();
     if goal.is_empty() || goal.chars().count() > 2000 {
@@ -112,8 +113,34 @@ pub fn agent_task_start(
         return Err("This task's policy allows only models on this computer.".into());
     }
     let id = crate::new_id();
-    let cancel = app.state::<Background>().add(&id)?;
+    // A task on a git project works on its own copy by default; the person's project is untouched until they apply the changes.
+    let mut copied = None;
+    if !policy.folder.is_empty() && copy != Some(false) {
+        let source = std::path::PathBuf::from(&policy.folder);
+        if crate::workspace::is_repo(&source) {
+            let make_id = id.clone();
+            copied = Some(
+                tokio::task::spawn_blocking(move || crate::workspace::make_copy(&make_id, &source))
+                    .await
+                    .map_err(|e| e.to_string())??,
+            );
+        }
+    }
+    let cancel = match app.state::<Background>().add(&id) {
+        Ok(cancel) => cancel,
+        Err(error) => {
+            if let Some(copy) = &copied {
+                let _ = crate::workspace::discard(&copy.dir);
+            }
+            return Err(error);
+        }
+    };
     let mut task = Task::new(&id, &goal, policy, crate::now());
+    if let Some(copy) = copied {
+        task.workdir = copy.dir.to_string_lossy().to_string();
+        task.base = copy.base;
+        task.dirty = copy.dirty;
+    }
     task.set_state(State::Running, crate::now());
     if let Err(error) = task_store().save(&task) {
         app.state::<Background>().remove(&id);
@@ -122,6 +149,60 @@ pub fn agent_task_start(
     let (app, run_id) = (app.clone(), id.clone());
     tauri::async_runtime::spawn(async move { run(app, run_id, cancel).await });
     Ok(id)
+}
+
+/// A finished task whose changes are waiting for the person.
+fn reviewable(id: &str) -> Result<Task, String> {
+    let task = task_store().load(id).ok_or("That task no longer exists.")?;
+    if task.review != "pending" || !task.state.finished() || task.workdir.is_empty() {
+        return Err("That task has no changes waiting for review.".into());
+    }
+    Ok(task)
+}
+
+/// What the task changed in its copy of the project, as a unified diff.
+#[tauri::command]
+pub async fn agent_task_diff(id: String) -> Result<String, String> {
+    let task = reviewable(&id)?;
+    tokio::task::spawn_blocking(move || {
+        crate::workspace::diff(std::path::Path::new(&task.workdir), &task.base, false)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Puts the task's changes into the person's project (all of them or none), then removes the copy.
+#[tauri::command]
+pub async fn agent_task_apply(id: String) -> Result<Vec<Task>, String> {
+    let mut task = reviewable(&id)?;
+    let (source, copy, base) = (
+        std::path::PathBuf::from(&task.policy.folder),
+        std::path::PathBuf::from(&task.workdir),
+        task.base.clone(),
+    );
+    tokio::task::spawn_blocking(move || crate::workspace::apply(&source, &copy, &base))
+        .await
+        .map_err(|e| e.to_string())??;
+    let _ = crate::workspace::discard(std::path::Path::new(&task.workdir));
+    task.review = "applied".into();
+    task.workdir.clear();
+    task.updated = crate::now();
+    let store = task_store();
+    store.save(&task)?;
+    Ok(store.list().into_iter().take(50).collect())
+}
+
+/// Throws the task's changes away.
+#[tauri::command]
+pub async fn agent_task_discard(id: String) -> Result<Vec<Task>, String> {
+    let mut task = reviewable(&id)?;
+    let _ = crate::workspace::discard(std::path::Path::new(&task.workdir));
+    task.review = "discarded".into();
+    task.workdir.clear();
+    task.updated = crate::now();
+    let store = task_store();
+    store.save(&task)?;
+    Ok(store.list().into_iter().take(50).collect())
 }
 
 #[tauri::command]
@@ -161,6 +242,9 @@ async fn run(app: AppHandle, id: String, mut cancel: watch::Receiver<bool>) {
         ),
     };
     task.set_state(state, crate::now());
+    if !task.workdir.is_empty() && task.review.is_empty() {
+        task.review = "pending".into();
+    }
     let _ = store.save(&task);
     app.state::<Background>().remove(&id);
     crate::scheduled::desktop_notify(
@@ -218,7 +302,9 @@ async fn work(
     } else {
         model.label.clone()
     };
-    let folder = if task.policy.folder.is_empty() {
+    let folder = if !task.workdir.is_empty() {
+        Some(terminal::workspace(&task.workdir)?)
+    } else if task.policy.folder.is_empty() {
         None
     } else {
         Some(terminal::workspace(&task.policy.folder)?)

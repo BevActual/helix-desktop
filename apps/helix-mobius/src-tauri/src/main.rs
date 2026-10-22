@@ -33,6 +33,7 @@ mod secrets;
 mod surface;
 mod terminal;
 mod web;
+mod workspace;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -4175,6 +4176,9 @@ fn main() {
             agent::agent_task_delete,
             agent::background::agent_task_start,
             agent::background::agent_task_stop,
+            agent::background::agent_task_diff,
+            agent::background::agent_task_apply,
+            agent::background::agent_task_discard,
             agent::background::agent_task_review,
             scheduled::scheduled_list,
             scheduled::scheduled_save,

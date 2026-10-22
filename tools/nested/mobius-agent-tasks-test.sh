@@ -71,7 +71,6 @@ click_id agent-task-new
 wait_id agent-task-goal
 sleep 1.5
 sleep 1; wtype 'Practise writing a file.'
-click_id agent-task-more
 click_id agent-task-practice
 click_id agent-task-start
 for _ in $(seq 1 60); do [ "$(newest_task)" != "$TWO" ] && break; sleep 0.25; done
@@ -100,4 +99,50 @@ sleep 1
 click_id "agent-task-stop-$FOUR"
 wait_state "$FOUR" stopped
 [ ! -e "$PROJECT/stopped.txt" ] || { echo 'FAIL: a stopped task ran its command'; exit 1; }
-echo 'PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, and leave a chat with the steps'
+
+# 5. On a git project the task works on its own copy: the project is untouched until the changes are reviewed and applied.
+REPO="$SCRATCH/home/repo"
+mkdir -p "$REPO" && git -C "$REPO" init -q && git -C "$REPO" config user.email t@t && git -C "$REPO" config user.name t
+printf 'one\n' > "$REPO/a.txt" && git -C "$REPO" add . && git -C "$REPO" commit -qm first
+printf '#!/bin/bash\nprintf "%%s/repo\\n" "$HOME"\n' > "$SCRATCH/state/tools-bin/zenity"
+printf '[{"tool":"edit_file","path":"a.txt","old":"one","new":"two"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+sleep 1; wtype 'Change one to two.'
+click_id agent-task-choose
+sleep 2
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$FOUR" ] && break; sleep 0.25; done
+FIVE=$(newest_task)
+wait_state "$FIVE" done
+[ "$(cat "$REPO/a.txt")" = one ] || { echo 'FAIL: the project changed before review'; exit 1; }
+wait_id "agent-task-review-$FIVE"
+click_id "agent-task-review-$FIVE"
+wait_id agent-task-diff
+wait_id "agent-task-apply-$FIVE"
+click_id "agent-task-apply-$FIVE"
+for _ in $(seq 1 40); do [ "$(cat "$REPO/a.txt")" = two ] && break; sleep 0.25; done
+[ "$(cat "$REPO/a.txt")" = two ] || { echo 'FAIL: applying did not change the project'; exit 1; }
+python3 - "$TASKS/$FIVE.json" <<'PY'
+import json,sys,os
+t=json.load(open(sys.argv[1]))
+assert t['review']=='applied' and t['workdir']=='',t
+PY
+# Discarding leaves the project as it was.
+printf '[{"tool":"edit_file","path":"a.txt","old":"two","new":"three"},{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+wtype 'Change two to three.'
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$FIVE" ] && break; sleep 0.25; done
+SIX=$(newest_task)
+wait_state "$SIX" done
+wait_id "agent-task-review-$SIX"
+click_id "agent-task-review-$SIX"
+wait_id "agent-task-discard-$SIX"
+click_id "agent-task-discard-$SIX"
+for _ in $(seq 1 40); do [ "$(python3 -c "import json;print(json.load(open('$TASKS/$SIX.json'))['review'])")" = discarded ] && break; sleep 0.25; done
+[ "$(cat "$REPO/a.txt")" = two ] || { echo 'FAIL: discarding changed the project'; exit 1; }
+echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, and review a git project's changes on a copy (apply and discard)"

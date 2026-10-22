@@ -660,6 +660,11 @@ pub fn agent_task_delete(id: String) -> Result<Vec<helix_task::Task>, String> {
     if store.load(&id).is_some_and(|t| !t.state.finished()) {
         return Err("That task is still running. Stop it first.".into());
     }
+    if let Some(task) = store.load(&id) {
+        if !task.workdir.is_empty() {
+            let _ = crate::workspace::discard(std::path::Path::new(&task.workdir));
+        }
+    }
     store.delete(&id)?;
     Ok(agent_tasks())
 }

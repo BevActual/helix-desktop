@@ -5,7 +5,14 @@ import { invoke } from "@helix/ui";
 interface Step { n: number; tool: string; input: string; outcome: string; ok: boolean; place: string; at: number; would_ask?: string }
 interface Policy { name: string; folder: string; cloud: string; display: boolean; mode?: string; network?: boolean }
 type TaskState = { state: "queued" | "running" | "stopped" } | { state: "waiting"; why: string } | { state: "done"; summary: string } | { state: "failed"; error: string };
-interface AgentTask { id: string; goal: string; result_chat?: string; policy: Policy; state: TaskState; steps: Step[]; created: number; updated: number }
+interface AgentTask { id: string; goal: string; result_chat?: string; workdir?: string; dirty?: boolean; review?: string; policy: Policy; state: TaskState; steps: Step[]; created: number; updated: number }
+/** A unified diff, line by line. */
+function DiffView({ text }: { text: string }) {
+  const lines = text.replace(/\n$/, "").split("\n");
+  const kind = (line: string) => line.startsWith("@@") || line.startsWith("diff --git") ? "diff-head" : line.startsWith("+") && !line.startsWith("+++") ? "diff-add" : line.startsWith("-") && !line.startsWith("---") ? "diff-del" : "";
+  return <pre className="diff" data-test="agent-task-diff">{lines.map((line, i) => <span key={i} className={kind(line)}>{line || " "}</span>)}</pre>;
+}
+
 export interface AgentTasksHandle { open: () => void }
 
 const ago = (secs: number) => {
@@ -26,41 +33,32 @@ export function AgentTasks({ register, onOpenChat }: { register: (handle: AgentT
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   // Back to the top when the form closes, so the task that was just started (and anything waiting for you) is in view.
-  useEffect(() => { if (!adding) scroller.current?.scrollTo(0, 0); }, [adding]);
+  useEffect(() => { if (adding) formRef.current?.scrollIntoView({ block: "nearest" }); else scroller.current?.scrollTo(0, 0); }, [adding]);
   const [practice, setPractice] = useState(false);
   const [network, setNetwork] = useState(false);
+  const [onCopy, setOnCopy] = useState(true);
+  const [diffOf, setDiffOf] = useState("");
+  const [diffText, setDiffText] = useState("");
   const load = () => invoke<AgentTask[]>("agent_tasks").then(setTasks, () => setTasks([]));
   useEffect(() => { register({ open: () => { setError(""); setAdding(false); load(); dialog.current?.showModal(); } }); }, [register]);
   useEffect(() => { const timer = setInterval(() => { if (dialog.current?.open) load(); }, 3000); return () => clearInterval(timer); }, []);
   const remove = async (id: string) => { setError(""); try { setTasks(await invoke<AgentTask[]>("agent_task_delete", { id })); } catch (reason) { setError(String(reason)); } };
   const call = async (command: string, args: Record<string, unknown>) => { setError(""); try { await invoke(command, args); await load(); } catch (reason) { setError(String(reason)); } };
+  const review = async (id: string) => {
+    if (diffOf === id) { setDiffOf(""); return; }
+    setError("");
+    try { setDiffText(await invoke<string>("agent_task_diff", { id })); setDiffOf(id); } catch (reason) { setError(String(reason)); }
+  };
+  const settle = async (command: string, id: string) => { setError(""); try { setTasks(await invoke<AgentTask[]>(command, { id })); setDiffOf(""); } catch (reason) { setError(String(reason)); } };
   const choose = async () => { try { const path = await invoke<string | null>("tools_pick_folder"); if (path) setFolder(path); } catch (reason) { setError(String(reason)); } };
-  const start = async () => { setBusy(true); await call("agent_task_start", { goal, folder, policy, practice, network, from: null }); setBusy(false); setGoal(""); setPractice(false); setAdding(false); };
+  const start = async () => { setBusy(true); await call("agent_task_start", { goal, folder, policy, practice, network, copy: onCopy, from: null }); setBusy(false); setGoal(""); setPractice(false); setAdding(false); };
   return <dialog ref={dialog} className="sheet" data-test="agent-tasks-panel" aria-labelledby="agent-tasks-title"><div className="sheet-body">
     <header className="sheet-head"><h3 id="agent-tasks-title">Agent tasks</h3><p className="sheet-note">Start a task and carry on: it works by itself and tells you when it is done or needs you. Every Tools run in a chat is kept here too. A step marked with a model's name ran on that remote model; the rest ran on this computer.</p></header>
     <div className="sheet-scroll" ref={scroller}>
-      {tasks.length === 0 ? <p className="sheet-note" data-test="agent-tasks-empty">No tasks yet. Turn on Tools in a chat and ask for something.</p> : <ul className="sched-list">{tasks.map((t) => {
-        const remote = new Set(t.steps.filter((s) => s.place !== "local").map((s) => s.place));
-        return <li key={t.id} data-test={`agent-task-${t.id}`}>
-          <div className="sched-main">
-            <strong>{t.goal.slice(0, 140) || "Task"}</strong>
-            <span>{label(t.state)} · {t.steps.length} step{t.steps.length === 1 ? "" : "s"} · {ago(t.updated)} · {t.policy.name}{remote.size ? ` · used ${[...remote].join(", ")}` : " · all on this computer"}</span>
-            {t.state.state === "waiting" && <span className="sched-error" data-test="agent-task-waiting">{t.state.why}</span>}
-            {t.state.state === "failed" && <span className="sched-error">{t.state.error}</span>}
-            {open === t.id && <ol className="task-steps" data-test="agent-task-steps">{t.steps.map((s) => <li key={s.n} className={s.ok ? "" : "sched-error"}><strong>{TOOLS[s.tool] ?? s.tool}</strong>{s.input ? <code>{s.input.slice(0, 160)}</code> : null}<span>{s.ok ? "" : "Failed: "}{s.outcome.slice(0, 200)}{s.place !== "local" ? ` · ${s.place}` : ""}</span>{s.would_ask ? <span className="sched-error" data-test="agent-task-would-ask">Would have asked: {s.would_ask}</span> : null}</li>)}</ol>}
-          </div>
-          <div className="sched-actions">
-            {t.state.state === "waiting" && <><button type="button" className="mini primary" data-test={`agent-task-approve-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: true })}>Allow</button><button type="button" className="mini" data-test={`agent-task-decline-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: false })}>Decline</button></>}
-            {(t.state.state === "running" || t.state.state === "waiting") && <button type="button" className="mini" data-test={`agent-task-stop-${t.id}`} onClick={() => call("agent_task_stop", { id: t.id })}>Stop</button>}
-            {t.policy.mode === "practice" && t.steps.some((s) => s.would_ask) && t.state.state !== "running" && <button type="button" className="mini primary" data-test={`agent-task-again-${t.id}`} title="Start again, allowing what the practice run needed" onClick={() => call("agent_task_start", { goal: t.goal, folder: t.policy.folder, policy: "", practice: false, network: !!t.policy.network, from: t.id })}>Run for real</button>}
-            {t.result_chat ? <button type="button" className="mini" data-test={`agent-task-open-${t.id}`} onClick={() => { dialog.current?.close(); onOpenChat(t.result_chat!); }}>Open answer</button> : null}
-            <button type="button" className="mini" data-test={`agent-task-toggle-${t.id}`} onClick={() => setOpen(open === t.id ? "" : t.id)}>{open === t.id ? "Hide steps" : "Steps"}</button>
-            <button type="button" className="mini" data-test={`agent-task-delete-${t.id}`} onClick={() => remove(t.id)}>Delete</button>
-          </div></li>;
-      })}</ul>}
       <div className="sheet-actions">{adding ? null : <button type="button" className="mini primary" data-test="agent-task-new" onClick={() => setAdding(true)}>New task</button>}</div>
-      {adding ?       <form className="sched-form" ref={(node) => node?.scrollIntoView({ block: "end" })} onSubmit={(e) => { e.preventDefault(); start(); }}>
+      {adding ?       <form className="sched-form" ref={formRef} onSubmit={(e) => { e.preventDefault(); start(); }}>
         <textarea data-test="agent-task-goal" autoFocus rows={2} maxLength={2000} placeholder="What should it do? For example: make the failing tests in this project pass." value={goal} onChange={(e) => setGoal(e.target.value)} />
         <div className="tools-row tools-folder">
           <span className="tools-row-text"><strong>Project folder</strong><code data-test="agent-task-folder">{folder || "None: web and the agent display only"}</code></span>
@@ -73,12 +71,37 @@ export function AgentTasks({ register, onOpenChat }: { register: (handle: AgentT
             <button type="button" role="radio" aria-checked={policy === "folder"} className={policy === "folder" ? "on" : ""} data-test="agent-task-policy-folder" disabled={!folder} onClick={() => setPolicy("folder")}>Work in the folder</button>
           </span>
         </div>
-        <details className="tools-more" open={practice || network}><summary data-test="agent-task-more">More options</summary>
-        <label className="tools-row"><span className="tools-row-text"><strong>Practice run</strong><span>Goes ahead without asking, inside the sandbox, and lists what it would have asked. Then run it for real with just that allowed.</span></span><input type="checkbox" className="switch" data-test="agent-task-practice" checked={practice} onChange={(e) => setPractice(e.target.checked)} /></label>
-        <label className="tools-row"><span className="tools-row-text"><strong>Allow network for commands</strong><span>Commands can reach the internet, for example to install packages. Needs a project folder.</span></span><input type="checkbox" className="switch" data-test="agent-task-network" checked={network && !!folder} disabled={!folder} onChange={(e) => setNetwork(e.target.checked)} /></label>
-        </details>
-        <div className="sheet-actions"><span className="sheet-actions-spacer" /><button type="button" data-test="agent-task-cancel" onClick={() => setAdding(false)}>Cancel</button><button type="submit" className="primary" data-test="agent-task-start" disabled={!goal.trim() || busy}>Start task</button></div>
+        <div className="opt-chips" role="group" aria-label="Options">
+          <button type="button" role="switch" aria-checked={onCopy} className={`opt-chip${onCopy ? " on" : ""}`} data-test="agent-task-copy" title="If the folder is a git project, the task works on its own copy of the last commit and you review its changes before anything reaches your project." onClick={() => setOnCopy(!onCopy)}>Work on a copy</button>
+          <button type="button" role="switch" aria-checked={practice} className={`opt-chip${practice ? " on" : ""}`} data-test="agent-task-practice" title="Goes ahead without asking, inside the sandbox, and lists what it would have asked. Then run it for real with just that allowed." onClick={() => setPractice(!practice)}>Practice run</button>
+          <button type="button" role="switch" aria-checked={network && !!folder} className={`opt-chip${network && folder ? " on" : ""}`} data-test="agent-task-network" disabled={!folder} title="Commands can reach the internet, for example to install packages. Needs a project folder." onClick={() => setNetwork(!network)}>Allow network</button>
+        </div>
+        <div className="sheet-actions form-actions"><span className="sheet-actions-spacer" /><button type="button" data-test="agent-task-cancel" onClick={() => setAdding(false)}>Cancel</button><button type="submit" className="primary" data-test="agent-task-start" disabled={!goal.trim() || busy}>Start task</button></div>
       </form> : null}
+      {tasks.length === 0 ? <p className="sheet-note" data-test="agent-tasks-empty">No tasks yet. Turn on Tools in a chat and ask for something.</p> : <ul className="sched-list">{tasks.map((t) => {
+        const remote = new Set(t.steps.filter((s) => s.place !== "local").map((s) => s.place));
+        return <li key={t.id} data-test={`agent-task-${t.id}`}>
+          <div className="sched-main">
+            <strong>{t.goal.slice(0, 140) || "Task"}</strong>
+            <span>{label(t.state)} · {t.steps.length} step{t.steps.length === 1 ? "" : "s"} · {ago(t.updated)} · {t.policy.name}{remote.size ? ` · used ${[...remote].join(", ")}` : " · all on this computer"}</span>
+            {t.state.state === "waiting" && <span className="sched-error" data-test="agent-task-waiting">{t.state.why}</span>}
+            {t.review === "pending" && <span data-test="agent-task-review-note">Changes are waiting in a copy of your project.{t.dirty ? " Your project had uncommitted changes that are not in the copy." : ""}</span>}
+            {t.review === "applied" && <span>Changes applied to your project.</span>}
+            {t.review === "discarded" && <span>Changes discarded.</span>}
+            {diffOf === t.id && <><div className="sheet-actions"><span className="sheet-actions-spacer" /><button type="button" className="mini" data-test={`agent-task-discard-${t.id}`} onClick={() => settle("agent_task_discard", t.id)}>Discard</button><button type="button" className="mini primary" data-test={`agent-task-apply-${t.id}`} disabled={!diffText.trim()} onClick={() => settle("agent_task_apply", t.id)}>Apply to project</button></div><DiffView text={diffText} /></>}
+            {t.state.state === "failed" && <span className="sched-error">{t.state.error}</span>}
+            {open === t.id && <ol className="task-steps" data-test="agent-task-steps">{t.steps.map((s) => <li key={s.n} className={s.ok ? "" : "sched-error"}><strong>{TOOLS[s.tool] ?? s.tool}</strong>{s.input ? <code>{s.input.slice(0, 160)}</code> : null}<span>{s.ok ? "" : "Failed: "}{s.outcome.slice(0, 200)}{s.place !== "local" ? ` · ${s.place}` : ""}</span>{s.would_ask ? <span className="sched-error" data-test="agent-task-would-ask">Would have asked: {s.would_ask}</span> : null}</li>)}</ol>}
+          </div>
+          <div className="sched-actions">
+            {t.state.state === "waiting" && <><button type="button" className="mini primary" data-test={`agent-task-approve-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: true })}>Allow</button><button type="button" className="mini" data-test={`agent-task-decline-${t.id}`} onClick={() => call("agent_task_review", { id: t.id, approved: false })}>Decline</button></>}
+            {(t.state.state === "running" || t.state.state === "waiting") && <button type="button" className="mini" data-test={`agent-task-stop-${t.id}`} onClick={() => call("agent_task_stop", { id: t.id })}>Stop</button>}
+            {t.policy.mode === "practice" && t.steps.some((s) => s.would_ask) && t.state.state !== "running" && <button type="button" className="mini primary" data-test={`agent-task-again-${t.id}`} title="Start again, allowing what the practice run needed" onClick={() => call("agent_task_start", { goal: t.goal, folder: t.policy.folder, policy: "", practice: false, network: !!t.policy.network, copy: true, from: t.id })}>Run for real</button>}
+            {t.review === "pending" && t.state.state !== "running" && t.state.state !== "waiting" && <button type="button" className="mini primary" data-test={`agent-task-review-${t.id}`} onClick={() => review(t.id)}>{diffOf === t.id ? "Hide changes" : "Review changes"}</button>}
+            {t.result_chat ? <button type="button" className="mini" data-test={`agent-task-open-${t.id}`} onClick={() => { dialog.current?.close(); onOpenChat(t.result_chat!); }}>Open answer</button> : null}
+            <button type="button" className="mini" data-test={`agent-task-toggle-${t.id}`} onClick={() => setOpen(open === t.id ? "" : t.id)}>{open === t.id ? "Hide steps" : "Steps"}</button>
+            <button type="button" className="mini" data-test={`agent-task-delete-${t.id}`} onClick={() => remove(t.id)}>Delete</button>
+          </div></li>;
+      })}</ul>}
       {error && <p className="sheet-warning" role="alert">{error}</p>}
     </div>
     <footer className="sheet-actions"><span className="sheet-actions-spacer" /><button type="button" className="primary" data-test="agent-tasks-done" onClick={() => dialog.current?.close()}>Done</button></footer>

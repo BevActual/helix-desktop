@@ -1770,6 +1770,9 @@ body.chat.stage-open .mode-row#mode-artifacts { display: none; }
 .sched-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .sched-main span { font-size: 12px; color: var(--label-2); } .sched-error { color: var(--danger) !important; }
 .sched-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .sched-form { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--hairline); padding-top: 10px; } .sched-form h4 { margin: 0; font-size: 13px; }
+.opt-chips { display: flex; flex-wrap: wrap; gap: 6px; } .opt-chip { padding: 5px 12px; border-radius: 999px; font-size: 12.5px; background: var(--fill, rgba(255,255,255,.08)); color: var(--label); border: .5px solid var(--hairline); } .opt-chip.on { background: var(--accent, #0a84ff); color: #fff; border-color: transparent; } .opt-chip:disabled { opacity: .45; }
+/* The buttons of a long form stay in view while it scrolls. */
+.sched-form .form-actions { position: sticky; bottom: 0; background: var(--glass-solid); padding: 10px 0 0; border-top: 0; }
 .sched-when { display: flex; gap: 8px; flex-wrap: wrap; } .sched-days { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12.5px; } .sched-days label { display: flex; gap: 4px; align-items: center; }
 .link { background: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
 body.chat dialog.projects-sheet { width: min(780px, calc(100vw - 32px)); max-width: min(780px, calc(100vw - 32px)); }

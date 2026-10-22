@@ -56,6 +56,17 @@ pub struct Task {
     /// The chat holding the answer and the steps, once the task is done.
     #[serde(default)]
     pub result_chat: String,
+    /// A private copy of the project the task works in (empty: it works in the project itself), the commit it was copied at, and whether the project
+    /// had changes that were not committed (and so are not in the copy).
+    #[serde(default)]
+    pub workdir: String,
+    #[serde(default)]
+    pub base: String,
+    #[serde(default)]
+    pub dirty: bool,
+    /// What happened to the copy's changes: empty (no copy), "pending" (waiting for the person), "applied" or "discarded".
+    #[serde(default)]
+    pub review: String,
     pub created: u64,
     pub updated: u64,
 }
@@ -76,6 +87,10 @@ impl Task {
             state: State::Queued,
             steps: vec![],
             result_chat: String::new(),
+            workdir: String::new(),
+            base: String::new(),
+            dirty: false,
+            review: String::new(),
             notes: String::new(),
             created: now,
             updated: now,
