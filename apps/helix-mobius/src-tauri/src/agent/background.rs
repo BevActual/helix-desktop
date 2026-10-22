@@ -691,6 +691,19 @@ async fn work(
 mod tests {
     use super::*;
 
+    fn yes() -> Answer {
+        Answer {
+            approved: true,
+            always: false,
+        }
+    }
+    fn no() -> Answer {
+        Answer {
+            approved: false,
+            always: false,
+        }
+    }
+
     #[test]
     fn at_most_three_tasks_run_at_once() {
         let b = Background::default();
@@ -706,12 +719,12 @@ mod tests {
     async fn an_answer_reaches_only_a_task_that_is_waiting() {
         let b = Background::default();
         let _cancel = b.add("t").unwrap();
-        assert!(b.review("t", true).is_err(), "nothing is waiting yet");
+        assert!(b.review("t", yes()).is_err(), "nothing is waiting yet");
         let waiting = b.waiting("t").unwrap();
-        b.review("t", false).unwrap();
-        assert!(!waiting.await.unwrap());
-        assert!(b.review("t", true).is_err(), "an answer is used once");
-        assert!(b.review("missing", true).is_err());
+        b.review("t", no()).unwrap();
+        assert!(!waiting.await.unwrap().approved);
+        assert!(b.review("t", yes()).is_err(), "an answer is used once");
+        assert!(b.review("missing", yes()).is_err());
     }
 
     #[test]
