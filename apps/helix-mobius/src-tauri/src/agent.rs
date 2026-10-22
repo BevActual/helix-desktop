@@ -109,6 +109,27 @@ impl Request {
         }
     }
 }
+/// In a nested test session, the planner's reply for this step from the file `HELIX_TOOLS_TEST_RESPONSES` (finish once it runs out).
+async fn scripted_step(step: usize) -> Result<Option<String>, String> {
+    if !helix_base::nested_test_session() {
+        return Ok(None);
+    }
+    let Some(path) = std::env::var_os("HELIX_TOOLS_TEST_RESPONSES") else {
+        return Ok(None);
+    };
+    let body = tokio::fs::read_to_string(path)
+        .await
+        .map_err(|e| e.to_string())?;
+    let values: Vec<serde_json::Value> = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    Ok(Some(
+        values
+            .get(step)
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"tool":"finish"}))
+            .to_string(),
+    ))
+}
+
 /// The agent display's size in pixels (`docs/design/computer-use.md`).
 const DISPLAY_WIDTH: i32 = 1280;
 const DISPLAY_HEIGHT: i32 = 720;
@@ -816,26 +837,7 @@ async fn execute(
                 }
             ),
         );
-        let scripted = if helix_base::nested_test_session() {
-            if let Some(path) = std::env::var_os("HELIX_TOOLS_TEST_RESPONSES") {
-                let body = tokio::fs::read_to_string(path)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                let values: Vec<serde_json::Value> =
-                    serde_json::from_str(&body).map_err(|e| e.to_string())?;
-                Some(
-                    values
-                        .get(step)
-                        .cloned()
-                        .unwrap_or_else(|| serde_json::json!({"tool":"finish"}))
-                        .to_string(),
-                )
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let scripted = scripted_step(step).await?;
         let text = if let Some(scripted) = scripted {
             scripted
         } else {

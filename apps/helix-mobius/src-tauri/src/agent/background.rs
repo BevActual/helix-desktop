@@ -258,6 +258,7 @@ async fn work(
     let mut display: Option<surface::Surface> = None;
     let mut private = false;
     let research = app.state::<web::Research>();
+    let mut planned = 0usize;
     loop {
         if *cancel.borrow() {
             return Err("Task stopped.".into());
@@ -269,7 +270,11 @@ async fn work(
             observations.push_str(&format!("\n{limit} The task stopped here, unfinished.\n"));
             break;
         }
-        let text = model.call(&planning, cancel.clone()).await?;
+        let text = match scripted_step(planned).await? {
+            Some(text) => text,
+            None => model.call(&planning, cancel.clone()).await?,
+        };
+        planned += 1;
         let request = match parse(&text) {
             Ok(request) => request,
             Err(_) => {

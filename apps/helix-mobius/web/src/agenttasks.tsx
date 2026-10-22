@@ -24,36 +24,22 @@ export function AgentTasks({ register, onOpenChat }: { register: (handle: AgentT
   const [folder, setFolder] = useState("");
   const [policy, setPolicy] = useState("");
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  // Back to the top when the form closes, so the task that was just started (and anything waiting for you) is in view.
+  useEffect(() => { if (!adding) scroller.current?.scrollTo(0, 0); }, [adding]);
   const [practice, setPractice] = useState(false);
   const [network, setNetwork] = useState(false);
   const load = () => invoke<AgentTask[]>("agent_tasks").then(setTasks, () => setTasks([]));
-  useEffect(() => { register({ open: () => { setError(""); load(); dialog.current?.showModal(); } }); }, [register]);
+  useEffect(() => { register({ open: () => { setError(""); setAdding(false); load(); dialog.current?.showModal(); } }); }, [register]);
   useEffect(() => { const timer = setInterval(() => { if (dialog.current?.open) load(); }, 3000); return () => clearInterval(timer); }, []);
   const remove = async (id: string) => { setError(""); try { setTasks(await invoke<AgentTask[]>("agent_task_delete", { id })); } catch (reason) { setError(String(reason)); } };
   const call = async (command: string, args: Record<string, unknown>) => { setError(""); try { await invoke(command, args); await load(); } catch (reason) { setError(String(reason)); } };
   const choose = async () => { try { const path = await invoke<string | null>("tools_pick_folder"); if (path) setFolder(path); } catch (reason) { setError(String(reason)); } };
-  const start = async () => { setBusy(true); await call("agent_task_start", { goal, folder, policy, practice, network, from: null }); setBusy(false); if (!error) setGoal(""); };
+  const start = async () => { setBusy(true); await call("agent_task_start", { goal, folder, policy, practice, network, from: null }); setBusy(false); setGoal(""); setPractice(false); setAdding(false); };
   return <dialog ref={dialog} className="sheet" data-test="agent-tasks-panel" aria-labelledby="agent-tasks-title"><div className="sheet-body">
     <header className="sheet-head"><h3 id="agent-tasks-title">Agent tasks</h3><p className="sheet-note">Start a task and carry on: it works by itself and tells you when it is done or needs you. Every Tools run in a chat is kept here too. A step marked with a model's name ran on that remote model; the rest ran on this computer.</p></header>
-    <div className="sheet-scroll">
-      <form className="sched-form" onSubmit={(e) => { e.preventDefault(); start(); }}>
-        <h4>New task</h4>
-        <textarea data-test="agent-task-goal" rows={3} maxLength={2000} placeholder="What should it do? For example: make the failing tests in this project pass." value={goal} onChange={(e) => setGoal(e.target.value)} />
-        <div className="tools-row tools-folder">
-          <span className="tools-row-text"><strong>Project folder</strong><code data-test="agent-task-folder">{folder || "None: web and the agent display only"}</code></span>
-          <span className="tools-row-actions"><button type="button" data-test="agent-task-choose" onClick={choose}>Choose…</button><button type="button" disabled={!folder} onClick={() => { setFolder(""); setPolicy(""); }}>Clear</button></span>
-        </div>
-        <div className="tools-row" role="radiogroup" aria-label="How much to ask">
-          <span className="tools-row-text"><strong>How much to ask</strong><span>{policy === "folder" ? "Checks and edits in the folder run without asking." : "Every command and edit waits for you."}</span></span>
-          <span className="route-seg">
-            <button type="button" role="radio" aria-checked={policy !== "folder"} className={policy !== "folder" ? "on" : ""} onClick={() => setPolicy("")}>Ask first</button>
-            <button type="button" role="radio" aria-checked={policy === "folder"} className={policy === "folder" ? "on" : ""} disabled={!folder} onClick={() => setPolicy("folder")}>Work in the folder</button>
-          </span>
-        </div>
-        <label className="tools-row"><span className="tools-row-text"><strong>Practice run</strong><span>It goes ahead without asking, still inside the sandbox, and lists everything it would have asked about. Then you can start again with just those things allowed.</span></span><input type="checkbox" className="switch" data-test="agent-task-practice" checked={practice} onChange={(e) => setPractice(e.target.checked)} /></label>
-        <label className="tools-row"><span className="tools-row-text"><strong>Allow network for commands</strong><span>Commands can reach the internet, for example to install packages. Off by default; needs a project folder.</span></span><input type="checkbox" className="switch" data-test="agent-task-network" checked={network && !!folder} disabled={!folder} onChange={(e) => setNetwork(e.target.checked)} /></label>
-        <div className="sheet-actions"><span className="sheet-actions-spacer" /><button type="submit" className="primary" data-test="agent-task-start" disabled={!goal.trim() || busy}>Start task</button></div>
-      </form>
+    <div className="sheet-scroll" ref={scroller}>
       {tasks.length === 0 ? <p className="sheet-note" data-test="agent-tasks-empty">No tasks yet. Turn on Tools in a chat and ask for something.</p> : <ul className="sched-list">{tasks.map((t) => {
         const remote = new Set(t.steps.filter((s) => s.place !== "local").map((s) => s.place));
         return <li key={t.id} data-test={`agent-task-${t.id}`}>
@@ -73,6 +59,26 @@ export function AgentTasks({ register, onOpenChat }: { register: (handle: AgentT
             <button type="button" className="mini" data-test={`agent-task-delete-${t.id}`} onClick={() => remove(t.id)}>Delete</button>
           </div></li>;
       })}</ul>}
+      <div className="sheet-actions">{adding ? null : <button type="button" className="mini primary" data-test="agent-task-new" onClick={() => setAdding(true)}>New task</button>}</div>
+      {adding ?       <form className="sched-form" ref={(node) => node?.scrollIntoView({ block: "end" })} onSubmit={(e) => { e.preventDefault(); start(); }}>
+        <textarea data-test="agent-task-goal" autoFocus rows={2} maxLength={2000} placeholder="What should it do? For example: make the failing tests in this project pass." value={goal} onChange={(e) => setGoal(e.target.value)} />
+        <div className="tools-row tools-folder">
+          <span className="tools-row-text"><strong>Project folder</strong><code data-test="agent-task-folder">{folder || "None: web and the agent display only"}</code></span>
+          <span className="tools-row-actions"><button type="button" data-test="agent-task-choose" onClick={choose}>Choose…</button><button type="button" disabled={!folder} onClick={() => { setFolder(""); setPolicy(""); }}>Clear</button></span>
+        </div>
+        <div className="tools-row" role="radiogroup" aria-label="How much to ask">
+          <span className="tools-row-text"><strong>How much to ask</strong><span>{policy === "folder" ? "Checks and edits in the folder run without asking." : "Every command and edit waits for you."}</span></span>
+          <span className="route-seg">
+            <button type="button" role="radio" aria-checked={policy !== "folder"} className={policy !== "folder" ? "on" : ""} onClick={() => setPolicy("")}>Ask first</button>
+            <button type="button" role="radio" aria-checked={policy === "folder"} className={policy === "folder" ? "on" : ""} data-test="agent-task-policy-folder" disabled={!folder} onClick={() => setPolicy("folder")}>Work in the folder</button>
+          </span>
+        </div>
+        <details className="tools-more" open={practice || network}><summary data-test="agent-task-more">More options</summary>
+        <label className="tools-row"><span className="tools-row-text"><strong>Practice run</strong><span>Goes ahead without asking, inside the sandbox, and lists what it would have asked. Then run it for real with just that allowed.</span></span><input type="checkbox" className="switch" data-test="agent-task-practice" checked={practice} onChange={(e) => setPractice(e.target.checked)} /></label>
+        <label className="tools-row"><span className="tools-row-text"><strong>Allow network for commands</strong><span>Commands can reach the internet, for example to install packages. Needs a project folder.</span></span><input type="checkbox" className="switch" data-test="agent-task-network" checked={network && !!folder} disabled={!folder} onChange={(e) => setNetwork(e.target.checked)} /></label>
+        </details>
+        <div className="sheet-actions"><span className="sheet-actions-spacer" /><button type="button" data-test="agent-task-cancel" onClick={() => setAdding(false)}>Cancel</button><button type="submit" className="primary" data-test="agent-task-start" disabled={!goal.trim() || busy}>Start task</button></div>
+      </form> : null}
       {error && <p className="sheet-warning" role="alert">{error}</p>}
     </div>
     <footer className="sheet-actions"><span className="sheet-actions-spacer" /><button type="button" className="primary" data-test="agent-tasks-done" onClick={() => dialog.current?.close()}>Done</button></footer>

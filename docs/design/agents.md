@@ -60,7 +60,9 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    incoming one as far as Helix can honour it (never a wider writable area). MXC's schema is young (alpha versions precede 1.0.0; third-party notes call the SDK
    "stable enough for non-security-critical production"), so Helix's own `bwrap` builder stays the enforcer for now.
    Open question: adopt the `mxc-sdk` crate as the backend for host-filtered networking (proxy) and macOS/Windows later, once it is stable.
-   Still to do: a nested end-to-end test of a background task (needs a scripted model), a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
+   `tools/nested/ui-suite.sh mobius-agent-tasks` drives it end to end with the scripted planner: Allow in the sheet, the folder policy running a check without
+   asking, a practice run recording what it would have asked, and Stop while waiting.
+   Still to do: a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.
 4. **Memory and skills the agent writes for itself**, local and editable (the knowledge store), after the Hermes pattern.
