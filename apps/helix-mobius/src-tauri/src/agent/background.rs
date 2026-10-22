@@ -747,12 +747,14 @@ mod tests {
         Answer {
             approved: true,
             always: false,
+            plan: None,
         }
     }
     fn no() -> Answer {
         Answer {
             approved: false,
             always: false,
+            plan: None,
         }
     }
 
