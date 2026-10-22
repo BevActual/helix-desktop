@@ -21,6 +21,9 @@ audio_log_path = os.path.join(state_dir, "fake-audio-actions.log")
 settings = {"theme.mode": "dark", "theme.accent": "blue", "nightlight.enabled": False, "theme.pure_black_dark": False, "accessibility.ui_scale": 1.0,
             "location.custom_schedule": False, "location.sunset": "19:00", "location.sunrise": "07:00",
             "location.latitude": 51.5, "location.longitude": -0.12, "location.auto_locate": False, "location.address": ""}
+# A test can start the desktop with a larger interface (HELIX_FAKE_UI_SCALE=2).
+if os.environ.get("HELIX_FAKE_UI_SCALE"):
+    settings["accessibility.ui_scale"] = float(os.environ["HELIX_FAKE_UI_SCALE"])
 # A test can start the desktop in the light look (HELIX_FAKE_THEME=light).
 if os.environ.get("HELIX_FAKE_THEME") in ("dark", "light"):
     settings["theme.mode"] = os.environ["HELIX_FAKE_THEME"]

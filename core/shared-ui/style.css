@@ -393,7 +393,7 @@ body:not(.dock-show) #dock, body.open #dock { transform: translate(-50%, calc(10
 
 /* Settings app (shared stylesheet: the shell simply never has these elements) */
 body.settings { background: transparent; }
-body.settings #app { height: 100vh; display: grid; grid-template-columns: 240px 1fr; background: var(--glass-solid); border-radius: 18px; overflow: hidden; box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.settings #app { height: 100vh; display: grid; grid-template-columns: clamp(190px, 30vw, 240px) 1fr; background: var(--glass-solid); border-radius: 18px; overflow: hidden; box-shadow: inset 0 0 0 .5px var(--hairline); }
 body.settings #side { background: var(--fill-1); display: flex; flex-direction: column; padding: 0 10px 12px; }
 #titlebar { height: 46px; display: flex; align-items: center; }
 .win-btn { width: 26px; height: 26px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--fill-2); } .win-btn svg { width: 12px; height: 12px; stroke-width: 2.2; }
@@ -426,11 +426,12 @@ body.settings h2 { font-size: 26px; }
 .settings-page h4:first-child { margin-top: 6px; }
 .search-page { margin: 26px 0 -10px 14px; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .rows-card { background: var(--fill-1); border-radius: 12px; padding: 2px 16px; box-shadow: inset 0 0 0 .5px var(--hairline); }
-.setting-row { display: flex; align-items: center; gap: 24px; padding: 11px 0; justify-content: space-between; min-height: 24px; }
+.setting-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 11px 0; justify-content: space-between; min-height: 24px; }
 .setting-row > .pkg-action { flex: none; margin-right: auto; }
 .setting-row > .pkg-action { flex: none; margin-right: auto; }
+.setting-row > :not(.setting-text) { margin-left: auto; }
 .setting-row + .setting-row { border-top: .5px solid var(--hairline); }
-.setting-text { min-width: 0; }
+.setting-text { min-width: 0; flex: 1 1 11em; }
 .setting-title { font-weight: 500; font-size: 14px; } .setting-about { color: var(--label-2); font-size: 12px; margin-top: 2px; line-height: 1.35; }
 .segments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px; padding: 2px; background: var(--fill-2); border-radius: 9px; flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .segment { border: 0; background: transparent; color: var(--label-2); padding: 4px 14px; border-radius: 7px; font: inherit; font-size: 13px; font-weight: 500; }
@@ -2158,7 +2159,8 @@ button.view-tab-x:hover { background: var(--fill-3, var(--fill-1)); color: var(-
 .accent-swatch[data-accent="blue"] { background: #0a84ff; } .accent-swatch[data-accent="purple"] { background: #bf5af2; } .accent-swatch[data-accent="pink"] { background: #ff375f; }
 .accent-swatch[data-accent="red"] { background: #ff453a; } .accent-swatch[data-accent="orange"] { background: #ff9f0a; } .accent-swatch[data-accent="yellow"] { background: #ffd60a; }
 .accent-swatch[data-accent="green"] { background: #30d158; } .accent-swatch[data-accent="graphite"] { background: #98989d; }
-.setting-row.stacked { flex-direction: column; align-items: flex-start; gap: 12px; }
+.setting-row.stacked { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 12px; }
+.setting-row.stacked > * { margin-left: 0; flex: none; }
 
 /* Displays: the arrangement picture. */
 .arrangement-card { padding: 14px 16px 10px; }
@@ -2175,3 +2177,4 @@ html.bar-hide-wifi #status [data-slot="wifi"], html.bar-hide-bluetooth #status [
 html.bar-hide-battery_percent #batt-label { display: none; }
 #clock .time { font-variant-numeric: tabular-nums; }
 .arrangement-screen:focus-visible { outline: 2px solid var(--label-1, #fff); outline-offset: 2px; }
+.choice-pop.up { top: auto; bottom: calc(100% + 6px); flex-direction: column-reverse; }

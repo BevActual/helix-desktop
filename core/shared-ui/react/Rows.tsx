@@ -1,6 +1,6 @@
 // The Helix settings row family. The markup and class names are the same as the hand-written pages use, so both look identical and the
 // nested tests find the same controls by `data-test`. Text only ever goes through React children (never as HTML).
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Choice } from "./bindings/Choice";
 import type { RowView } from "./bindings/RowView";
 
@@ -78,13 +78,21 @@ export function Segments({ id, options, current, onChange }: { id: string; optio
 export function ChoiceList({ id, options, current, onChange }: { id: string; options: Choice[]; current: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const [needle, setNeedle] = useState("");
+  // The list opens upward when there is no room for it below the button (a row at the bottom of the page).
+  const [up, setUp] = useState(false);
+  const holder = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!open || !holder.current) return;
+    const rect = holder.current.getBoundingClientRect();
+    setUp(window.innerHeight - rect.bottom < 330 && rect.top > 330);
+  }, [open]);
   const shown = options.filter((o) => !needle || `${o.label} ${o.value}`.toLowerCase().includes(needle.toLowerCase())).slice(0, 80);
   const label = options.find((o) => o.value === current)?.label ?? (current || "Choose…");
   return (
-    <div className="choice-list">
+    <div className="choice-list" ref={holder}>
       <button type="button" className="choice-current" aria-expanded={open} data-test={`set-${id}`} onClick={() => setOpen(!open)}>{label}<span aria-hidden="true"> ▾</span></button>
       {open ? (
-        <div className="choice-pop" role="listbox" aria-label={id}>
+        <div className={`choice-pop${up ? " up" : ""}`} role="listbox" aria-label={id}>
           <input type="search" autoFocus placeholder="Type to find" spellCheck={false} data-test={`set-${id}-filter`} value={needle} onChange={(e) => setNeedle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} />
           <ul>
             {shown.map((o) => (
