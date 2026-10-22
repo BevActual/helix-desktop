@@ -3093,6 +3093,7 @@ dependencies = [
  "helix-desktop-api",
  "helix-embed",
  "helix-knowledge",
+ "helix-task",
  "image",
  "keyring",
  "libc",
@@ -3271,6 +3272,14 @@ name = "helix-system-upgrade"
 version = "0.1.0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "helix-task"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

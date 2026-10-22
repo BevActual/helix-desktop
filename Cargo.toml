@@ -9,6 +9,7 @@ members = [
     "core/helix-config",
     "core/helix-config-export",
     "core/helix-models",
+    "core/helix-task",
     "core/helix-monitor-model",
     "core/helix-shell-model",
     "core/helix-software-model",
@@ -64,6 +65,7 @@ helix-chat = { path = "core/helix-chat" }
 helix-compositor = { path = "core/helix-compositor" }
 helix-config = { path = "core/helix-config" }
 helix-config-export = { path = "core/helix-config-export" }
+helix-task = { path = "core/helix-task" }
 helix-models = { path = "core/helix-models" }
 helix-monitor-model = { path = "core/helix-monitor-model" }
 helix-shell-model = { path = "core/helix-shell-model" }

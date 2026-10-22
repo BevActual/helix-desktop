@@ -43,7 +43,10 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    confirmation and audit stay in the shell. The planner can be a cloud model; `display_look` is described by the **local** vision model and only that
    text goes to the planner (pictures never leave the computer), and with a remote planner each look is reviewed first. Opening an app is reviewed;
    after anything on the display the person's later web requests are reviewed too; the step budget is 40 once a display tool is used. Still to do:
-   the Agents home, a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
+   *Also built:* `core/helix-task`: a task (goal, state, steps with where each ran, notes) saved as JSON under `~/.local/share/helix/mobius/tasks`, and a
+   **policy** (folder, allowed command prefixes, automatic edits, web, cloud use, display and apps, step and time limits) that decides allow, ask or
+   deny for each action; Tools mode now runs as a task under the "ask me first" policy, so nothing changes for the person yet but every run is recorded.
+   Still to do: the Agents home,  a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.
 4. **Memory and skills the agent writes for itself**, local and editable (the knowledge store), after the Hermes pattern.

@@ -594,11 +594,53 @@ pub async fn run(app: AppHandle, mut turn: Turn, has_private_inputs: bool) {
     {
         app.state::<Runtime>().cancel();
     }
-    let result = execute(&app, &mut turn, has_private_inputs, &mut cancel).await;
+    let task_id = crate::new_id();
+    let result = execute(&app, &mut turn, has_private_inputs, &mut cancel, &task_id).await;
+    let stopped = *cancel.borrow();
+    settle_task(&task_id, &result, stopped);
     if let Err(error) = result {
-        ended_early(&app, generation, &error, *cancel.borrow());
+        ended_early(&app, generation, &error, stopped);
     }
     app.state::<Runtime>().finish(generation);
+}
+
+fn task_store() -> helix_task::Store {
+    helix_task::Store::new(&crate::data_home().join("helix/mobius/tasks"))
+}
+/// Writes how a task ended into its record.
+fn settle_task(id: &str, result: &Result<(), String>, stopped: bool) {
+    let store = task_store();
+    if let Some(mut task) = store.load(id) {
+        let state = match result {
+            Ok(()) => helix_task::State::Done {
+                summary: "Handed the results to the conversation.".into(),
+            },
+            Err(_) if stopped => helix_task::State::Stopped,
+            Err(error) => helix_task::State::Failed {
+                error: error.clone(),
+            },
+        };
+        task.set_state(state, crate::now());
+        let _ = store.save(&task);
+    }
+}
+/// What a request asks the policy about (`None` for the final answer).
+fn policy_action(request: &Request, known_url: bool) -> Option<helix_task::Action> {
+    use helix_task::Action;
+    Some(match request {
+        Request::WebSearch { .. } => Action::WebSearch,
+        Request::WebRead { .. } => Action::WebRead { known: known_url },
+        Request::Terminal { command } => Action::Command(command.clone()),
+        Request::EditFile { path, .. } => Action::Edit { path: path.clone() },
+        Request::DisplayLaunch { app } => Action::Launch(app.clone()),
+        Request::DisplayLook => Action::Look,
+        Request::DisplayClick { .. }
+        | Request::DisplayType { .. }
+        | Request::DisplayKey { .. }
+        | Request::DisplayScroll { .. }
+        | Request::DisplayHelp { .. } => Action::Input,
+        Request::Finish => return None,
+    })
 }
 
 async fn execute(
@@ -606,6 +648,7 @@ async fn execute(
     turn: &mut Turn,
     mut private: bool,
     cancel: &mut watch::Receiver<bool>,
+    task_id: &str,
 ) -> Result<(), String> {
     let generation = turn.generation;
     let model = Model::capture(crate::chat_route_of(app))?;
@@ -679,6 +722,24 @@ async fn execute(
             .await
             .ok(),
         None => None,
+    };
+    let tasks = task_store();
+    let policy = helix_task::Policy::chat(
+        &folder
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
+    );
+    let mut task = helix_task::Task::new(task_id, goal, policy, crate::now());
+    task.set_state(helix_task::State::Running, crate::now());
+    let _ = tasks.save(&task);
+    if !task.policy.allows_model(model.local) {
+        return Err("This task's policy allows only models on this computer.".into());
+    }
+    let place = if model.local {
+        "local".to_string()
+    } else {
+        model.label.clone()
     };
     let mut taken = 0usize;
     let mut budget = 6usize;
@@ -794,13 +855,35 @@ async fn execute(
             // Operating a screen takes many small steps; the person watches the display and can stop or take over at any time.
             budget = 40;
         }
-        let web = matches!(request, Request::WebSearch { .. } | Request::WebRead { .. });
-        let needs_review = matches!(request, Request::Terminal { .. } | Request::EditFile { .. })
-            // Opening an app, and anything a remote model would learn about the screen, is the person's call; a click is not.
-            || matches!(request, Request::DisplayLaunch { .. })
-            || (matches!(request, Request::DisplayLook) && !model.local)
-            || (private && web)
-            || matches!(&request, Request::WebRead { url } if !known_urls.contains(web::public_url(url)?.as_str()));
+        let known = match &request {
+            Request::WebRead { url } => known_urls.contains(web::public_url(url)?.as_str()),
+            _ => false,
+        };
+        let verdict = match policy_action(&request, known) {
+            Some(action) => task.policy.decide(
+                &action,
+                &helix_task::Context {
+                    model_local: model.local,
+                    private,
+                },
+            ),
+            None => helix_task::Verdict::Allow,
+        };
+        if let helix_task::Verdict::Deny(reason) = &verdict {
+            activity(
+                app,
+                generation,
+                &id,
+                request.name(),
+                &request.input(),
+                "failed",
+                reason,
+            );
+            planning.push(("assistant", serde_json::to_string(&request).unwrap()));
+            planning.push(("user", reason.clone()));
+            continue;
+        }
+        let needs_review = matches!(verdict, helix_task::Verdict::Ask(_));
         let destination = format!("Project folder: {}. Results are returned to {} · {}. Project commands can change files in the selected folder; direct network and host home/session access are blocked.", folder.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "none".into()), model.label, if model.model.is_empty() { "Auto" } else { &model.model });
         if needs_review
             && !review(app, generation, &id, &request, cancel.clone(), &destination).await?
@@ -959,6 +1042,15 @@ async fn execute(
             state,
             &output,
         );
+        task.record(
+            request.name(),
+            &request.input(),
+            &output,
+            state == "completed",
+            &place,
+            crate::now(),
+        );
+        let _ = tasks.save(&task);
         let observation = terminal::display(&output, 4000);
         planning.push(("assistant", serde_json::to_string(&request).unwrap()));
         planning.push((
