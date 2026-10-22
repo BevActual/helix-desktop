@@ -44,6 +44,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const [diffOf, setDiffOf] = useState("");
   const [allSteps, setAllSteps] = useState("");
   const [planFirst, setPlanFirst] = useState(false);
+  const [models, setModels] = useState("balanced");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillDraft, setSkillDraft] = useState<Skill | null>(null);
   const [draft, setDraft] = useState({ id: "", text: "" });
@@ -69,7 +70,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const choose = async () => { try { const path = await invoke<string | null>("tools_pick_folder"); if (path) setFolder(path); } catch (reason) { setError(String(reason)); } };
   const start = async () => {
     setBusy(true);
-    const id = await call("agent_task_start", { goal, folder, policy, practice, network, copy: onCopy, planFirst, from: null });
+    const id = await call("agent_task_start", { goal, folder, policy, practice, network, copy: onCopy, planFirst, models, from: null });
     setBusy(false);
     if (typeof id === "string") { setGoal(""); setPractice(false); setPlanFirst(false); setSelected(id); }
   };
@@ -94,6 +95,12 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
       <span className="route-seg">
         <button type="button" role="radio" aria-checked={policy !== "folder"} className={policy !== "folder" ? "on" : ""} onClick={() => setPolicy("")}>Ask first</button>
         <button type="button" role="radio" aria-checked={policy === "folder"} className={policy === "folder" ? "on" : ""} data-test="agent-task-policy-folder" disabled={!folder} onClick={() => setPolicy("folder")}>Work in the folder</button>
+      </span>
+    </div>
+    <div className="tools-row" role="radiogroup" aria-label="Models">
+      <span className="tools-row-text"><strong>Models</strong><span>{models === "private" ? "Only models on this computer. Nothing leaves it." : models === "best" ? "A remote model may plan and be told what is on the screen (a description, never the picture)." : "A remote model may plan; the screen is described to it only when you allow."}</span></span>
+      <span className="route-seg">
+        {["private", "balanced", "best"].map((m) => <button key={m} type="button" role="radio" aria-checked={models === m} className={models === m ? "on" : ""} data-test={`agent-task-models-${m}`} onClick={() => setModels(m)}>{m[0].toUpperCase() + m.slice(1)}</button>)}
       </span>
     </div>
     <div className="opt-chips" role="group" aria-label="Options">
@@ -121,7 +128,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const detail = task && <article className="agents-detail" data-test="agent-task-detail">
     <header>
       <h3>{task.goal}</h3>
-      <p className="agents-meta"><span className={`agents-dot ${task.state.state}`} />{label(task)} · {task.steps.length} step{task.steps.length === 1 ? "" : "s"} · {ago(task.updated)} · {task.policy.name}{[...new Set(task.steps.filter((s) => s.place !== "local").map((s) => s.place))].map((p) => <span key={p} className="agents-badge remote" title="These steps ran on a remote model">{p}</span>)}{task.steps.every((s) => s.place === "local") && <span className="agents-badge" title="Every step ran on this computer">On this computer</span>}</p>
+      <p className="agents-meta"><span className={`agents-dot ${task.state.state}`} />{label(task)} · {task.steps.length} step{task.steps.length === 1 ? "" : "s"} · {ago(task.updated)} · {task.policy.name} · {task.policy.cloud === "never" ? "Private" : task.policy.cloud === "screen" ? "Best" : "Balanced"}{[...new Set(task.steps.filter((s) => s.place !== "local").map((s) => s.place))].map((p) => <span key={p} className="agents-badge remote" title="These steps ran on a remote model">{p}</span>)}{task.steps.every((s) => s.place === "local") && <span className="agents-badge" title="Every step ran on this computer">On this computer</span>}</p>
     </header>
     {task.state.state === "waiting" && task.state.why.startsWith("Review the plan") ? <section className="agents-plan" data-test="agent-task-plan">
       <strong>Plan to approve</strong>
@@ -140,7 +147,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     {task.review === "discarded" && <p className="agents-note">Changes discarded.</p>}
     <div className="agents-actions">
       {task.result_chat ? <button type="button" className="mini" data-test={`agent-task-open-${task.id}`} onClick={() => { onOpenChat(task.result_chat!); setShown(false); visible(false); }}>Open the answer chat</button> : null}
-      {task.policy.mode === "practice" && task.steps.some((s) => s.would_ask) && task.state.state !== "running" && <button type="button" className="mini primary" data-test={`agent-task-again-${task.id}`} title="Start again, allowing what the practice run needed" onClick={async () => { const id = await call("agent_task_start", { goal: task.goal, folder: task.policy.folder, policy: "", practice: false, network: !!task.policy.network, copy: true, planFirst: false, from: task.id }); if (typeof id === "string") setSelected(id); }}>Run for real</button>}
+      {task.policy.mode === "practice" && task.steps.some((s) => s.would_ask) && task.state.state !== "running" && <button type="button" className="mini primary" data-test={`agent-task-again-${task.id}`} title="Start again, allowing what the practice run needed" onClick={async () => { const id = await call("agent_task_start", { goal: task.goal, folder: task.policy.folder, policy: "", practice: false, network: !!task.policy.network, copy: true, planFirst: false, models: task.policy.cloud === "never" ? "private" : task.policy.cloud === "screen" ? "best" : "balanced", from: task.id }); if (typeof id === "string") setSelected(id); }}>Run for real</button>}
       {!["running", "waiting", "queued"].includes(task.state.state) && task.steps.some((x) => x.ok) && <button type="button" className="mini" data-test={`agent-task-skill-${task.id}`} title="Turn what worked into a skill that later tasks can read" onClick={() => draftSkill(task.id)}>Save as skill</button>}
       {!["running", "waiting", "queued"].includes(task.state.state) && <button type="button" className="mini" data-test={`agent-task-delete-${task.id}`} onClick={() => { setSelected(""); call("agent_task_delete", { id: task.id }); }}>Delete</button>}
     </div>

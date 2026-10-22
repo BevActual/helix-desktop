@@ -154,6 +154,7 @@ pub async fn agent_task_start(
     network: Option<bool>,
     copy: Option<bool>,
     plan_first: Option<bool>,
+    models: Option<String>,
 ) -> Result<String, String> {
     let goal = goal.trim().to_string();
     if goal.is_empty() || goal.chars().count() > 2000 {
@@ -186,9 +187,16 @@ pub async fn agent_task_start(
         recall(&mut policy);
     }
     policy.plan_first = plan_first == Some(true);
+    // Private: only models on this computer. Balanced: a remote model may plan, but nothing on the screen is described to it unless asked.
+    // Best: a remote model may plan and be told what is on the screen (the description, never the picture).
+    policy.cloud = match models.as_deref() {
+        Some("private") => helix_task::CloudUse::Never,
+        Some("best") => helix_task::CloudUse::Screen,
+        _ => helix_task::CloudUse::Planner,
+    };
     policy.network = network == Some(true) && !policy.folder.is_empty();
     if !policy.allows_model(model.local) {
-        return Err("This task's policy allows only models on this computer.".into());
+        return Err(format!("Private tasks only use a model on this computer, and the chat model is {}. Choose Balanced, or pick a local model in Settings.", model.label));
     }
     let id = crate::new_id();
     // A task on a git project works on its own copy by default; the person's project is untouched until they apply the changes.

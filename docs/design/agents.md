@@ -79,7 +79,10 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    answer cannot be read, the steps that worked) for the person to edit and save; skills are JSON under `~/.local/share/helix/mobius/skills/`. A task sees only
    their names and one-line descriptions and loads one with the `skill_read` tool when it fits; they and Mobius's memory are given only to models on this
    computer. A Skills page lists, edits and deletes them. *Run as task* on a chat message hands that message to the Agents page with the chat's folder.
-   Still to do: a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
+   **Model policy** on a new task: *Private* (only models on this computer; a task whose chat model is remote is refused with the reason), *Balanced* (a remote
+   model may plan; a look at the screen is described to it only when the person allows it) and *Best* (a remote model may plan and be told what is on the
+   screen, as text). The task shows its policy and which models it used.
+   Still to do: taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.
 4. **Memory and skills the agent writes for itself**, local and editable (the knowledge store), after the Hermes pattern.

@@ -257,4 +257,21 @@ wait_id "skill-delete-$SKILL"
 click_id "skill-delete-$SKILL"
 for _ in $(seq 1 40); do [ ! -e "$SKILLS/$SKILL.json" ] && break; sleep 0.25; done
 [ ! -e "$SKILLS/$SKILL.json" ] || { echo 'FAIL: the skill was not deleted'; exit 1; }
-echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, start a task from a chat message, and save, use and delete a skill"
+
+# 11. Private tasks only use models on this computer; the policy is on the task.
+printf '[{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id agent-task-new
+wait_id agent-task-goal
+sleep 1.5
+sleep 1; wtype 'A private one.'
+click_id agent-task-models-private
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$ELEVEN" ] && break; sleep 0.25; done
+TWELVE=$(newest_task)
+wait_state "$TWELVE" done
+python3 - "$TASKS/$TWELVE.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['policy']['cloud']=='never',t['policy']
+PY
+echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, start a task from a chat message, save, use and delete a skill, and keep a private task on this computer"
