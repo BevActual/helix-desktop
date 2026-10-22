@@ -200,4 +200,24 @@ import json,sys
 t=json.load(open(sys.argv[1]))
 assert t['plan'].endswith('Edited by me.'),t['plan']
 PY
-echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, and wait for a plan to be approved or edited"
+
+# 9. "Run as task" on a chat message opens a new task with that message as the goal, in the chat's folder.
+click_id agents-back
+click_id new-chat
+sleep 1
+paste_id input 'Tidy the project.'
+click_id send
+for _ in $(seq 1 60); do ! has_id stop && has_id msg-0 && break; sleep 0.25; done
+printf '[{"tool":"finish"}]' > "$SCRATCH/state/tools-steps.json"
+click_id task-0
+wait_id agent-task-goal
+sleep 1.5
+click_id agent-task-start
+for _ in $(seq 1 60); do [ "$(newest_task)" != "$NINE" ] && break; sleep 0.25; done
+TEN=$(newest_task)
+python3 - "$TASKS/$TEN.json" <<'PY'
+import json,sys
+t=json.load(open(sys.argv[1]))
+assert t['goal']=='Tidy the project.',t['goal']
+PY
+echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, and start a task from a chat message"

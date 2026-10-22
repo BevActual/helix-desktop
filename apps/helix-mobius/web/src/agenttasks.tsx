@@ -7,7 +7,8 @@ interface Step { n: number; tool: string; input: string; outcome: string; ok: bo
 interface Policy { name: string; folder: string; cloud: string; display: boolean; mode?: string; network?: boolean }
 type TaskState = { state: "queued" | "running" | "stopped" } | { state: "waiting"; why: string } | { state: "done"; summary: string } | { state: "failed"; error: string };
 interface AgentTask { id: string; goal: string; plan?: string; result_chat?: string; workdir?: string; dirty?: boolean; review?: string; policy: Policy; state: TaskState; steps: Step[]; created: number; updated: number }
-export interface AgentTasksHandle { open: () => void; close: () => void }
+export interface Prefill { goal?: string; folder?: string; policy?: string }
+export interface AgentTasksHandle { open: (prefill?: Prefill) => void; close: () => void }
 
 const ago = (secs: number) => {
   const d = Math.max(0, Date.now() / 1000 - secs);
@@ -44,7 +45,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const [planFirst, setPlanFirst] = useState(false);
   const [draft, setDraft] = useState({ id: "", text: "" });
   const load = useCallback(() => invoke<AgentTask[]>("agent_tasks").then(setTasks, () => setTasks([])), []);
-  useEffect(() => { register({ open: () => { setError(""); setShown(true); visible(true); load(); }, close: () => { setShown(false); visible(false); } }); }, [register, visible, load]);
+  useEffect(() => { register({ open: (prefill) => { setError(""); if (prefill) { setGoal(prefill.goal ?? ""); setFolder(prefill.folder ?? ""); setPolicy(prefill.folder ? (prefill.policy ?? "") : ""); setSelected("new"); } setShown(true); visible(true); load(); }, close: () => { setShown(false); visible(false); } }); }, [register, visible, load]);
   useEffect(() => { if (!shown) return; const timer = setInterval(load, 2500); return () => clearInterval(timer); }, [shown, load]);
   // Nothing chosen: show what needs you, else the newest, else the empty page with the form.
   useEffect(() => {

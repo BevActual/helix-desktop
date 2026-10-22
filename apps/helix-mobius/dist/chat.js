@@ -3046,6 +3046,8 @@ const reactScheduled = window.HelixMobiusReact?.scheduled($("scheduled-host"), (
 $("mode-scheduled").onclick = () => reactScheduled?.open();
 const reactAgentTasks = window.HelixMobiusReact?.agentTasks($("agent-tasks-host"), (shown) => { document.body.classList.toggle("agents-open", shown); $("mode-tasks").classList.toggle("active", shown); $("mode-chat").classList.toggle("active", !shown); }, (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-tasks").onclick = () => reactAgentTasks?.open();
+// "Run as task" on a message hands it to the Agents page, with this chat's project folder.
+window.addEventListener("mobius-run-as-task", (event) => reactAgentTasks?.open({ goal: event.detail.goal, folder: view.workspace || "", policy: view.tools_policy || "" }));
 // What is waiting for the person shows as a count on the sidebar row, whatever page is open.
 async function drawAgentsBadge() {
   const tasks = await invoke("agent_tasks").catch(() => []);

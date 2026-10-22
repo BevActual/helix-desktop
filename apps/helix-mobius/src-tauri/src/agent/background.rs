@@ -462,11 +462,19 @@ async fn work(
             task.plan
         )
     };
+    // What Mobius remembers about the person helps a task that runs on this computer; it never goes to a remote model.
+    let memory_note = if model.local {
+        helix_chat::memory::Memory::load(&crate::memory_file())
+            .prompt_text()
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
     let mut planning = vec![
         (
             "system",
             format!(
-                "{}\n\n{PLAN}\n{folder_note}{rules_note}",
+                "{}{memory_note}\n\n{PLAN}\n{folder_note}{rules_note}",
                 helix_chat::chat::SYSTEM_PROMPT
             ),
         ),

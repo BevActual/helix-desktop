@@ -83,7 +83,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   agentTasks: (host: HTMLElement, visible: (shown: boolean) => void, onOpenChat: (id: string) => void) => {
     const run = handled<AgentTasksHandle>(host, (register) => <AgentTasks register={register} visible={visible} onOpenChat={onOpenChat} />);
-    return { open: () => run((h) => h.open()), close: () => run((h) => h.close()) };
+    return { open: (prefill?: { goal?: string; folder?: string; policy?: string }) => run((h) => h.open(prefill)), close: () => run((h) => h.close()) };
   },
   memory: (host: HTMLElement) => {
     const run = handled<MemoryHandle>(host, (register) => <Memory register={register} />);

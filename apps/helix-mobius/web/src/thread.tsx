@@ -550,6 +550,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               {editing !== index && <div className="msg-actions">
                   {!message.text.startsWith("/image ") && !message.sources?.length && !messages[index + 1]?.activities?.length && <button className="mini" data-test={`edit-${index}`} onClick={() => setEditing(index)}>Edit</button>}
                   <button className="mini" data-test={`act-${index}`} title="Have Mobius change the desktop using this" onClick={() => hooks.act(message.text)}>Act</button>
+                  <button className="mini" data-test={`task-${index}`} title="Give this to an agent as a task that runs on its own" onClick={() => window.dispatchEvent(new CustomEvent("mobius-run-as-task", { detail: { goal: message.text } }))}>Run as task</button>
                   <button className="mini" data-test={`quote-${index}`} title="Insert into the composer" onClick={() => hooks.quote(message.text)}>Quote</button>
                   {!streaming ? <button className="mini" data-test={`fork-user-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
                 </div>}
