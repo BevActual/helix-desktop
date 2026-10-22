@@ -1607,6 +1607,10 @@ mod tests {
             },
             helix: Helix {
                 agent_desk_name: "Helix Agent",
+                summon_app_id: "org.helix.Mobius",
+                summon_command: [
+                    "helix-mobius",
+                ],
             },
             config_notification: ConfigNotification {
                 disable_failed: false,

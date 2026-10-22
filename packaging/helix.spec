@@ -65,6 +65,7 @@ BuildRequires:  pkgconfig(wayland-server)
 BuildRequires:  pkgconfig(systemd)
 BuildRequires:  pkgconfig(pangocairo)
 BuildRequires:  pkgconfig(cairo-gobject)
+BuildRequires:  pam-devel
 
 # The compositor is the one Helix needs, and the shell's approval dialog is only protected by it.
 Recommends:     helix-niri = %{version}-%{release}
@@ -155,6 +156,7 @@ rm -f %{buildroot}%{_bindir}/helix-transcribe %{buildroot}%{_bindir}/helix-image
 # The user preset for the session units.
 install -Dm644 packaging/90-helix.preset %{buildroot}%{_prefix}/lib/systemd/user-preset/90-helix.preset
 install -Dm644 packaging/90-helix-geoclue.conf %{buildroot}%{_sysconfdir}/geoclue/conf.d/90-helix.conf
+install -Dm644 packaging/helix-lock.pam %{buildroot}%{_sysconfdir}/pam.d/helix-lock
 
 # The compositor, laid out the way the distribution's own niri package does.
 NIRI="%{?helix_target}%{!?helix_target:target}/%{helix_profile}/niri"
@@ -217,6 +219,8 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-shell-strut
 %{_bindir}/helix-wallpaper
 %{_bindir}/helix-idle
+%{_bindir}/helix-lock
+%config(noreplace) %{_sysconfdir}/pam.d/helix-lock
 %{_bindir}/helix-nightlight
 %{_bindir}/helix-settings
 %{_bindir}/helix-mobius

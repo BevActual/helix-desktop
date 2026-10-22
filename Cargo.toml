@@ -21,6 +21,7 @@ members = [
     "core/helix-theme",
     "services/helix-wallpaper",
     "services/helix-idle",
+    "services/helix-lock",
     "services/helix-nightlight",
     "services/helix-desktop",
     "services/helix-assistant",

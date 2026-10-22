@@ -49,6 +49,7 @@ pick dock           && run dock dock-test.sh dock-nested.sh
 pick ws             && run ws workspaces-test.sh tauri-fake-desktop.sh
 pick tray           && run tray tray-test.sh tauri-fake-desktop.sh
 pick idle           && run idle idle-test.sh idle-nested.sh
+pick helix-lock    && run helix-lock helix-lock-test.sh idle-program.sh
 pick nightlight    && run nightlight nightlight-test.sh nightlight-nested.sh HELIX_NESTED_GAMMA=1
 pick nightlight-sun && run nightlight-sun nightlight-sun-test.sh nightlight-sun-nested.sh HELIX_NESTED_GAMMA=1
 pick island         && run island island-test.sh tauri-shell.sh

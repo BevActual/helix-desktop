@@ -2,7 +2,7 @@
 
 **Path:** `greeter/helix-greeter-tauri` · **crate:** `helix-greeter` · **product notes:** `greeter/HELIX.md`
 
-Login UI started by greetd. Same visual grammar as the lock screen (chrome over wallpaper; leftover form). Shares `core/shared-ui/` tokens with the shell and apps.
+Login UI started by greetd. Same visual grammar as the lock screen (`lock-screen.md`: chrome over wallpaper; leftover form). Shares `core/shared-ui/` tokens with the shell and apps.
 
 ## Stack
 

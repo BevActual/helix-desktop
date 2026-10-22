@@ -269,7 +269,11 @@ fn do_action(app: &AppHandle, action: Action) {
 /// the session is already locked is refused by the compositor and exits, and nothing is inferred from a process name (any program can
 /// call itself "swaylock", which would otherwise stop the real lock from ever being taken).
 pub fn lock_session() {
-    let _ = Command::new("swaylock")
-        .args(["--daemonize", "--color", "0e1028"])
-        .status();
+    // The Helix lock screen; the system's own only when it is not installed or cannot start (exit 2). Exit 1 means the session is already locked.
+    let helix = Command::new("helix-lock").arg("--daemonize").status();
+    if !matches!(helix, Ok(status) if status.code() != Some(2)) {
+        let _ = Command::new("swaylock")
+            .args(["--daemonize", "--color", "0e1028"])
+            .status();
+    }
 }

@@ -54,3 +54,4 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 ## Archive
 
 `archive/` holds retired dumps and old handoffs. Do not treat it as current structure.
+- `lock-screen.md` — the Helix lock screen: ext-session-lock client, PAM, how it is tested.
