@@ -38,6 +38,12 @@ while they do something else. Helix should be good at *that*, and treat desktop 
    the agent display embedded; Stop, take over, hand back; results saved and resumable. (Tools mode and the Code stage are its first two kinds of run.)
 2. **One tool-calling loop with a model router** that can use local, LAN or cloud models, with the tool providers above. This is also where a cloud
    model gets to use the agent display (planner and grounder), and it retires the special local-only Act loop for everything except the settings tool.
+   *Built (first slice):* Mobius's Tools-mode loop already routes to local, LAN or cloud models; it now has seven `display_*` tools (launch, look, click,
+   type, key, scroll, help) that go through the desktop's Agent Surface like any other client (`surface.rs`: Hello, RequestAccess, Action), so tiers,
+   confirmation and audit stay in the shell. The planner can be a cloud model; `display_look` is described by the **local** vision model and only that
+   text goes to the planner (pictures never leave the computer), and with a remote planner each look is reviewed first. Opening an app is reviewed;
+   after anything on the display the person's later web requests are reviewed too; the step budget is 40 once a display tool is used. Still to do:
+   the Agents home, a Private/Balanced/Best policy with a cloud badge, taint confirmation, and a nested test driving the loop against the display.
 3. **A browser on the agent display** (installed browser launched onto it, its own profile) with the take-over and sign-in handoff, because most "operate
    it for me" tasks are web tasks.
 4. **Memory and skills the agent writes for itself**, local and editable (the knowledge store), after the Hermes pattern.

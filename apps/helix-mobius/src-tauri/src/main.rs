@@ -30,6 +30,7 @@ mod replyprefs;
 mod rules;
 mod scheduled;
 mod secrets;
+mod surface;
 mod terminal;
 mod web;
 
