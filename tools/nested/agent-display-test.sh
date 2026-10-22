@@ -47,6 +47,43 @@ assert (w, h) == (1280, 720), (w, h)
 colours = {img.getpixel((x, y)) for x in range(0, w, 40) for y in range(0, h, 40)}
 assert len(colours) > 6, len(colours)
 PY
+echo "--- hands: a click and some typing"
+frame() { rm -f "$SCRATCH/$1.png"; echo "agent-display-frame $SCRATCH/$1.png" >> "$CONTROL"; for _ in $(seq 1 40); do [ -s "$SCRATCH/$1.png" ] && break; sleep 0.5; done; sleep 0.3; }
+pill_y() { python3 - "$SCRATCH/$1.png" <<'PY'
+import sys
+from PIL import Image
+img = Image.open(sys.argv[1]).convert("RGB")
+ys = [y for y in range(img.size[1]) if img.getpixel((100, y)) == (0x0a, 0x84, 0xff)]
+print(round(sum(ys) / len(ys)) if ys else -1)
+PY
+}
+before=$(pill_y frame)
+echo 'agent-display-input {"op":"click","button":"left","x":80,"y":352}' >> "$CONTROL"
+wait_log "AGENT-DISPLAY input ok" 40 && echo "ok: the click was delivered" || fail "no click: $(grep 'AGENT-DISPLAY input' "$LOG")"
+# The page answers a click after a moment on a display with no GPU: look again until the highlight has moved.
+after=$before
+for _ in $(seq 1 12); do sleep 1; frame after-click; after=$(pill_y after-click); [ "$after" != "$before" ] && break; done
+[ "$before" -lt 150 ] && [ "$after" -gt 330 ] && [ "$after" -lt 375 ] && echo "ok: the click chose Keyboard in the sidebar (highlight moved from y=$before to y=$after)" || fail "highlight $before -> $after"
+echo 'agent-display-input {"op":"click","button":"left","x":120,"y":67}' >> "$CONTROL"; sleep 1
+frame before-typing
+echo 'agent-display-input {"op":"text","text":"dock"}' >> "$CONTROL"
+for _ in $(seq 1 8); do sleep 1; frame after-typing; python3 - "$SCRATCH/before-typing.png" "$SCRATCH/after-typing.png" <<'PY' && break
+import sys
+from PIL import Image, ImageChops
+a = Image.open(sys.argv[1]).convert("RGB").crop((14, 50, 228, 86)); b = Image.open(sys.argv[2]).convert("RGB").crop((14, 50, 228, 86))
+diff = ImageChops.difference(a, b).convert("L")
+sys.exit(0 if sum(1 for p in diff.getdata() if p > 60) > 40 else 1)
+PY
+done
+python3 - "$SCRATCH/before-typing.png" "$SCRATCH/after-typing.png" <<'PY' && echo "ok: typing changed the search field" || fail "typing did nothing"
+import sys
+from PIL import Image, ImageChops
+a = Image.open(sys.argv[1]).convert("RGB").crop((14, 50, 228, 86)); b = Image.open(sys.argv[2]).convert("RGB").crop((14, 50, 228, 86))
+diff = ImageChops.difference(a, b).convert("L")
+assert sum(1 for p in diff.getdata() if p > 60) > 40, "no visible change"
+PY
+echo 'agent-display-input {"op":"key","name":"nonsense-key"}' >> "$CONTROL"
+wait_log "AGENT-DISPLAY input failed: unknown key" 20 && echo "ok: an unknown key is refused by the helper" || fail "no refusal: $(grep 'AGENT-DISPLAY input' "$LOG" | tail -2)"
 echo "--- watching it"
 wait_log "ISLAND AgentDisplay" 20 && echo "ok: the island says an agent display has windows" || fail "no island for the agent display: $(grep ISLAND "$LOG" | tail -2)"
 echo agent-display >> "$CONTROL"
@@ -60,6 +97,35 @@ assert d.get("panel") == "agent-display", d.get("panel")
 assert e and e["w"] > 400 and e["h"] > 200, e
 PY
 sleep 2; niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/viewer.png"
+echo "--- taking over"
+PT="$ROOT/tools/nested/wl-pointer/wl-pointer"
+click_element() { read -r fx fy <<< "$(python3 - "$SCRATCH/state/layout.json" "$1" "${2:-0.5}" "${3:-0.5}" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); e = d["elements"][sys.argv[2]]
+print(f'{(e["x"] + e["w"] * float(sys.argv[3])) / d["width"]:.4f} {(e["y"] + e["h"] * float(sys.argv[4])) / d["height"]:.4f}')
+PY
+)"; "$PT" "$fx" "$fy" click; }
+click_element av-take; sleep 1
+wait_log "AGENT-DISPLAY person in control" 20 && echo "ok: Take over put the display in the person's hands" || fail "no takeover: $(grep 'AGENT-DISPLAY person' "$LOG")"
+echo 'agent-display-agent-input {"op":"move","x":10,"y":10}' >> "$CONTROL"
+wait_log "AGENT-DISPLAY agent input failed: the person is in control" 20 && echo "ok: an agent's command is refused while the person is in control" || fail "agent not refused: $(grep 'agent input' "$LOG")"
+# The person clicks Appearance in the picture (the sidebar's first item, at x 80, y 113 of the display), which goes to the display.
+[ "$(pill_y after-click)" -gt 330 ] || fail "precondition: Keyboard was selected"
+python3 - "$SCRATCH/state/layout.json" <<'PY' > "$SCRATCH/picture-point"
+import json, sys
+d = json.load(open(sys.argv[1])); e = d["elements"]["av-frame"]
+# The picture is the display at 1280 x 720 scaled into the element.
+x = e["x"] + e["w"] * (80 / 1280); y = e["y"] + e["h"] * (113 / 720)
+print(f'{x / d["width"]:.4f} {y / d["height"]:.4f}')
+PY
+read -r px py < "$SCRATCH/picture-point"; "$PT" "$px" "$py" click
+again=$(pill_y after-click)
+for _ in $(seq 1 12); do sleep 1; frame taken; again=$(pill_y taken); [ "$again" -lt 150 ] && break; done
+[ "$again" -lt 150 ] && echo "ok: a click in the picture reached the display (the highlight went back to Appearance)" || fail "the person's click did not reach the display: $again"
+click_element av-back; sleep 1
+wait_log "AGENT-DISPLAY person handed back" 20 && echo "ok: Hand back" || fail "no hand back"
+echo 'agent-display-agent-input {"op":"move","x":20,"y":20}' >> "$CONTROL"
+wait_log "AGENT-DISPLAY agent input ok" 20 && echo "ok: and the agent can act again" || fail "agent still refused: $(grep 'agent input' "$LOG" | tail -2)"
 wtype -k Escape; sleep 1
 echo "--- stop"
 echo agent-display-stop >> "$CONTROL"

@@ -18,14 +18,31 @@ use tauri::{AppHandle, Emitter};
 
 use crate::apps;
 
+/// The display's hands: the input helper process, written to line by line and answering line by line.
+struct Hands {
+    child: Child,
+    stdin: std::process::ChildStdin,
+    answers: std::sync::mpsc::Receiver<String>,
+}
+
 struct Running {
     niri: Child,
     bus: Child,
+    hands: Option<Hands>,
     started: Started,
     places: Places,
 }
 
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
+
+/// The person has the display's mouse and keyboard (in the viewer). Everything that would act for the agent checks this and waits: a person's hand on the
+/// display always wins.
+static PERSON_CONTROLLING: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+pub fn person_controlling() -> bool {
+    PERSON_CONTROLLING.load(std::sync::atomic::Ordering::SeqCst)
+}
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 pub struct WindowFact {
@@ -141,9 +158,11 @@ pub fn start(app: &AppHandle) -> Result<Status, String> {
         std::thread::sleep(Duration::from_millis(100));
     };
     eprintln!("AGENT-DISPLAY started on {}", started.wayland_display);
+    let hands = start_hands(&places, &started);
     *RUNNING.lock().expect("agent display") = Some(Running {
         niri,
         bus,
+        hands,
         started,
         places,
     });
@@ -151,9 +170,86 @@ pub fn start(app: &AppHandle) -> Result<Status, String> {
     Ok(status())
 }
 
+/// Starts the input helper for this display. Without it the display can still be watched; it just cannot be driven.
+fn start_hands(places: &Places, started: &Started) -> Option<Hands> {
+    let program = std::env::var("HELIX_AGENT_INPUT").unwrap_or_else(|_| "helix-agent-input".into());
+    let mut command = Command::new(program);
+    clean(&mut command);
+    for (key, value) in program_env(places, &started.wayland_display) {
+        command.env(key, value);
+    }
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let stdin = child.stdin.take()?;
+    let stdout = child.stdout.take()?;
+    let (sender, answers) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::io::BufRead;
+        for line in std::io::BufReader::new(stdout)
+            .lines()
+            .map_while(Result::ok)
+        {
+            if sender.send(line).is_err() {
+                return;
+            }
+        }
+    });
+    let hands = Hands {
+        child,
+        stdin,
+        answers,
+    };
+    // The first line is `ready` once it is connected to the display.
+    match hands.answers.recv_timeout(Duration::from_secs(5)) {
+        Ok(line) if line == "ready" => Some(hands),
+        _ => {
+            let mut hands = hands;
+            let _ = hands.child.kill();
+            None
+        }
+    }
+}
+
+/// Sends one command (a JSON object, checked by the helper) to the display's hands and waits for its answer.
+pub fn input(command: &str) -> Result<(), String> {
+    use std::io::Write;
+    if command.len() > 64 * 1024 || command.contains('\n') {
+        return Err("that is not one command".into());
+    }
+    let mut guard = RUNNING.lock().expect("agent display");
+    let running = guard.as_mut().ok_or("the agent display is not running")?;
+    let hands = running
+        .hands
+        .as_mut()
+        .ok_or("the display has no input helper")?;
+    while hands.answers.try_recv().is_ok() {}
+    writeln!(hands.stdin, "{command}").map_err(|e| format!("the input helper is gone: {e}"))?;
+    match hands.answers.recv_timeout(Duration::from_secs(10)) {
+        Ok(line) if line == "ok" => Ok(()),
+        Ok(line) => Err(line.strip_prefix("error: ").unwrap_or(&line).to_string()),
+        Err(_) => Err("the input helper did not answer".into()),
+    }
+}
+
+/// A command from the agent: refused while the person has the display. (The viewer's own input, `input`, is the person's and is never refused.)
+pub fn agent_input(command: &str) -> Result<(), String> {
+    if person_controlling() {
+        return Err("the person is in control of the display".into());
+    }
+    input(command)
+}
+
 /// Stops the display; every program on it goes with it.
 pub fn stop() {
     if let Some(mut running) = RUNNING.lock().expect("agent display").take() {
+        if let Some(mut hands) = running.hands.take() {
+            let _ = hands.child.kill();
+            let _ = hands.child.wait();
+        }
         let _ = running.niri.kill();
         let _ = running.niri.wait();
         let _ = running.bus.kill();
@@ -312,6 +408,26 @@ pub async fn agent_display_start(app: AppHandle) -> Result<Status, String> {
     tauri::async_runtime::spawn_blocking(move || start(&app))
         .await
         .map_err(|e| e.to_string())?
+}
+
+/// One command for the display's hands: a move, a button, a scroll, a key or some text. The helper checks it.
+#[tauri::command]
+pub async fn agent_display_input(command: serde_json::Value) -> Result<(), String> {
+    let line = command.to_string();
+    tauri::async_runtime::spawn_blocking(move || input(&line))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// The viewer says the person has taken over (or handed back).
+#[tauri::command]
+pub fn agent_display_control(app: AppHandle, on: bool) {
+    PERSON_CONTROLLING.store(on, std::sync::atomic::Ordering::SeqCst);
+    eprintln!(
+        "AGENT-DISPLAY person {}",
+        if on { "in control" } else { "handed back" }
+    );
+    let _ = app.emit("agent-display-control", on);
 }
 
 #[tauri::command]

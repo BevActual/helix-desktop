@@ -564,6 +564,20 @@ fn control(app: &AppHandle, command: &str) {
             });
         }
         "agent-display-stop" => agent_display::stop(),
+        other if other.starts_with("agent-display-agent-input ") => {
+            let line = other["agent-display-agent-input ".len()..].to_string();
+            std::thread::spawn(move || match agent_display::agent_input(&line) {
+                Ok(()) => eprintln!("AGENT-DISPLAY agent input ok"),
+                Err(error) => eprintln!("AGENT-DISPLAY agent input failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-input ") => {
+            let line = other["agent-display-input ".len()..].to_string();
+            std::thread::spawn(move || match agent_display::input(&line) {
+                Ok(()) => eprintln!("AGENT-DISPLAY input ok"),
+                Err(error) => eprintln!("AGENT-DISPLAY input failed: {error}"),
+            });
+        }
         other if other.starts_with("agent-display-frame ") => {
             let path = other["agent-display-frame ".len()..].trim().to_string();
             std::thread::spawn(move || match agent_display::frame() {
@@ -2099,6 +2113,8 @@ fn main() {
             agent_display::agent_display_start,
             agent_display::agent_display_stop,
             agent_display::agent_display_launch,
+            agent_display::agent_display_input,
+            agent_display::agent_display_control,
             agent_display::agent_display_frame,
             dock::workspaces_view,
             dock::workspace_focus,

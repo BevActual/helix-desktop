@@ -123,8 +123,16 @@ cloud Act turn, because a setting nothing acts on must not ship.
    without a GPU window and the same viewer can attach to a remote place later. 
    **Watch (phase 1) is done too:** the island says "Agent display · N windows" (a new island kind, below approvals and the assistant, above music) and a click
    opens the **Agent display** panel, a live picture of the display refreshed about five times a second while it is open, with Start and Stop. The picture
-   is PNG frames from the display's own compositor (`ScreenshotScreen` with the pointer shown, so the agent's cursor is visible). Not yet: taking over
-   (forwarded input), agent acts, and the help request.
+   is PNG frames from the display's own compositor (`ScreenshotScreen` with the pointer shown, so the agent's cursor is visible). **Hands and take-over (phase 4, the person's half) are done:** `services/helix-agent-input` is a small process (one per display, started by the shell
+   with the display's environment) that turns JSON-line commands into virtual pointer and virtual keyboard events on the display: move, button, click,
+   scroll, key, text and combo. Text and keys are typed through a keymap generated for exactly the keysyms a command needs (so any character types,
+   whatever the layout, and a key name is only ever a name from a short list or one character: nothing else reaches the keymap text), and every
+   command is validated before anything is sent. In the viewer, **Take over** forwards the person's mouse, wheel and keyboard over the picture to the
+   display, outlines the picture, and **pauses the agent**: `agent_display::agent_input` (the way every agent act will reach the display) refuses with
+   "the person is in control" until **Hand back**. Closing the panel hands back. `agent-display-test.sh` proves the chain with real input: a click and typing
+   through the helper, the agent refused while the person is in control, the person's click in the picture reaching the display, and the agent able to
+   act again after Hand back. Not yet: agent acts as Agent Surface tools (with the first-use confirmation, rate limit and audit), the help request,
+   the cloud badge, and the physical-input pause when the person uses the display's own window instead of the viewer.
    (A quiet `HelixPeekWindow` in the compositor was tried and dropped: the display's own compositor has its own clipboard and no notifications of
    the person's to disturb.)
 1. **Watch.** The agent desk viewer and the island entry; live line of the agent's latest step from the activity feed. Under A: the Agent Display

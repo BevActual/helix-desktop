@@ -494,6 +494,8 @@ function drawViewerState(status) {
   $("av-state").textContent = status.running ? (status.windows.length === 1 ? "1 window" : status.windows.length + " windows") : "Not running";
   $("av-start").hidden = status.running;
   $("av-stop").hidden = !status.running;
+  $("av-take").hidden = !status.running || taking;
+  $("av-back").hidden = !taking;
   $("av-empty").textContent = status.running ? "Waiting for the first picture…" : "The agent display is not running. It is the agent's own screen: nothing on it is your desktop.";
   $("av-empty").hidden = status.running && !$("av-frame").hidden;
   if (!status.running) $("av-frame").hidden = true;
@@ -515,7 +517,82 @@ async function viewerLoop() {
   }
 }
 function startViewer() { if (viewerOn) return; viewerOn = true; viewerLoop(); }
-function stopViewer() { viewerOn = false; }
+function stopViewer() { viewerOn = false; if (taking) handBack(); }
+
+// Taking over: the person's mouse and keyboard over the picture go to the agent display. The agent is paused for as long as that lasts.
+let taking = false;
+let lastMove = 0;
+const sendInput = (command) => invoke("agent_display_input", { command }).catch(() => undefined);
+function displayPoint(event) {
+  const frame = $("av-frame");
+  const box = frame.getBoundingClientRect();
+  if (!frame.naturalWidth || box.width === 0) return null;
+  const x = (event.clientX - box.left) / box.width * frame.naturalWidth;
+  const y = (event.clientY - box.top) / box.height * frame.naturalHeight;
+  return x >= 0 && y >= 0 && x < frame.naturalWidth && y < frame.naturalHeight ? { x, y } : null;
+}
+const BUTTONS = ["left", "middle", "right"];
+const KEYS = { Enter: "Return", Tab: "Tab", Escape: "Escape", Backspace: "BackSpace", Delete: "Delete", Home: "Home", End: "End", PageUp: "Page_Up", PageDown: "Page_Down", ArrowLeft: "Left", ArrowRight: "Right", ArrowUp: "Up", ArrowDown: "Down", Insert: "Insert", " ": "space" };
+function takeoverKey(event) {
+  if (!taking) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  if (event.type !== "keydown" || ["Control", "Shift", "Alt", "Meta"].includes(event.key)) return;
+  const name = KEYS[event.key] || (/^F([1-9]|1[0-2])$/.test(event.key) ? event.key : (event.key.length === 1 ? event.key : null));
+  if (!name) return;
+  if (event.ctrlKey || event.altKey || event.metaKey) {
+    const keys = [];
+    if (event.ctrlKey) keys.push("Control_L"); if (event.altKey) keys.push("Alt_L"); if (event.metaKey) keys.push("Super_L"); if (event.shiftKey && name.length > 1) keys.push("Shift_L");
+    sendInput({ op: "combo", keys: [...keys, event.key.length === 1 ? event.key.toLowerCase() : name] });
+  } else if (event.key.length === 1) {
+    sendInput({ op: "text", text: event.key });
+  } else {
+    sendInput({ op: "key", name });
+  }
+}
+function takeOver() {
+  if (taking) return;
+  taking = true;
+  invoke("agent_display_control", { on: true });
+  document.body.classList.add("taking");
+  $("av-take").hidden = true; $("av-back").hidden = false;
+  $("av-foot").textContent = "You are in control of the agent display. The agent is paused. Your mouse and keyboard go to it.";
+  window.addEventListener("keydown", takeoverKey, true); window.addEventListener("keyup", takeoverKey, true);
+  queueReport();
+}
+function handBack() {
+  if (!taking) return;
+  taking = false;
+  invoke("agent_display_control", { on: false });
+  document.body.classList.remove("taking");
+  $("av-take").hidden = false; $("av-back").hidden = true;
+  $("av-foot").textContent = "You are watching.";
+  window.removeEventListener("keydown", takeoverKey, true); window.removeEventListener("keyup", takeoverKey, true);
+  queueReport();
+}
+$("av-take").onclick = takeOver;
+$("av-back").onclick = handBack;
+$("av-frame").addEventListener("mousemove", (event) => {
+  if (!taking || Date.now() - lastMove < 40) return;
+  const point = displayPoint(event);
+  if (point) { lastMove = Date.now(); sendInput({ op: "move", ...point }); }
+});
+for (const type of ["mousedown", "mouseup"]) {
+  $("av-frame").addEventListener(type, (event) => {
+    if (!taking) return;
+    event.preventDefault();
+    const point = displayPoint(event);
+    if (!point) return;
+    sendInput({ op: "move", ...point });
+    sendInput({ op: "button", button: BUTTONS[event.button] || "left", down: type === "mousedown" });
+  });
+}
+$("av-frame").addEventListener("wheel", (event) => {
+  if (!taking) return;
+  event.preventDefault();
+  sendInput({ op: "scroll", dx: Math.max(-5, Math.min(5, Math.round(event.deltaX / 40))), dy: Math.max(-5, Math.min(5, Math.round(event.deltaY / 40))) });
+}, { passive: false });
+$("av-frame").addEventListener("contextmenu", (event) => { if (taking) event.preventDefault(); });
+$("av-frame").addEventListener("dragstart", (event) => event.preventDefault());
 $("av-start").onclick = () => invoke("agent_display_start").then(() => undefined, () => undefined);
 $("av-stop").onclick = () => invoke("agent_display_stop");
 listen("agent-display-status", (event) => { if (viewerOn) drawViewerState(event.payload); });

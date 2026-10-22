@@ -2240,3 +2240,5 @@ body:not(.island-on) #center #clock { transition: opacity .25s var(--ease) .12s;
 #av-frame { display: block; width: 100%; height: auto; } #av-frame[hidden] { display: none; }
 #av-empty { color: var(--label-2); font-size: 13px; padding: 40px 24px; text-align: center; max-width: 420px; } #av-empty[hidden] { display: none; }
 #av-foot { color: var(--label-3, var(--label-2)); font-size: 12px; }
+body.taking #av-frame { cursor: none; outline: 2px solid var(--accent); outline-offset: -2px; }
+body.taking #av-foot { color: var(--accent); font-weight: 600; }
