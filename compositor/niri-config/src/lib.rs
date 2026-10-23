@@ -714,6 +714,22 @@ mod tests {
     }
 
     #[test]
+    fn parse_helix_shell_bind() {
+        let parsed = do_parse(
+            r#"
+            binds {
+                Mod+D { helix-shell "launcher"; }
+            }
+            "#,
+        );
+        assert!(parsed
+            .binds
+            .0
+            .iter()
+            .any(|bind| matches!(&bind.action, Action::HelixShell(c) if c == "launcher")));
+    }
+
+    #[test]
     fn parse_on_xdg_activate() {
         let parsed = do_parse(
             r#"

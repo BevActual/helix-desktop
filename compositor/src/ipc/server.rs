@@ -473,6 +473,7 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             summon: true,
             input_settings: true,
             look_settings: true,
+            shell_action: true,
         }),
         Request::HelixSaveDisplayProfile
         | Request::HelixApplyDisplayProfile

@@ -394,6 +394,9 @@ pub struct HelixCapabilities {
     /// Whether `HelixLook` and `HelixSetLook` are available.
     #[serde(default)]
     pub look_settings: bool,
+    /// Whether the `helix-shell "<command>"` bind action is available.
+    #[serde(default)]
+    pub shell_action: bool,
 }
 
 /// State of the Helix agent desk workspace.
@@ -1224,6 +1227,12 @@ pub enum Action {
     HelixFocusAgentDesk {},
     /// Helix: remember which window has the keyboard, then raise Mobius (or start it).
     HelixSummon {},
+    /// Helix: ask the shell to do something, by name (`launcher`, `lock`, `volume-up`).
+    HelixShell {
+        /// What to ask for.
+        #[cfg_attr(feature = "clap", arg())]
+        command: String,
+    },
 }
 
 fn helix_default_place_count() -> u8 {

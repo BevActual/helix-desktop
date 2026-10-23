@@ -2415,6 +2415,9 @@ impl State {
             Action::HelixSummon => {
                 self.helix_summon();
             }
+            Action::HelixShell(command) => {
+                self.helix_shell(command);
+            }
             Action::LoadConfigFile(path) => {
                 if let Some(watcher) = &self.niri.config_file_watcher {
                     watcher.load_config(path);
@@ -4912,6 +4915,7 @@ fn allowed_during_screenshot(action: &Action) -> bool {
             // Intended for binds such as volume up/down, lock the screen, etc.
             | Action::Spawn(_)
             | Action::SpawnSh(_)
+            | Action::HelixShell(_)
             // The screenshot UI can handle these.
             | Action::MoveColumnLeft
             | Action::MoveColumnLeftOrToMonitorLeft

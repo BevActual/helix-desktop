@@ -107,6 +107,9 @@ pub struct HelixCaps {
     /// `HelixLook` and `HelixSetLook`.
     #[serde(default)]
     pub look_settings: bool,
+    /// The `helix-shell "<command>"` bind action.
+    #[serde(default)]
+    pub shell_action: bool,
 }
 
 pub fn request_json(line: &str) -> Option<Value> {
