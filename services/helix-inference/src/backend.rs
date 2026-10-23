@@ -18,6 +18,17 @@ pub struct ImageInput {
     pub rgb: Vec<u8>,
 }
 
+/// How OpenRouter should choose among its models and providers for one request (ignored by every other backend).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RemoteRoute {
+    /// Models to try, in order, when the first fails.
+    pub fallbacks: Vec<String>,
+    /// `price` or `speed`; empty lets the provider balance.
+    pub prefer: String,
+    /// Only providers that promise not to keep or train on the prompt.
+    pub private_only: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct ChatRequest {
     /// Verified identity of the caller, for limits and logging.
@@ -26,6 +37,9 @@ pub struct ChatRequest {
     pub model: String,
     /// Which configured backend answers (`inference-routing.toml`); empty or `local` is the on-device engine.
     pub backend: String,
+    /// For a remote backend: provider and model choice (OpenRouter), and how long to wait (0 = the service's default).
+    pub route: Option<RemoteRoute>,
+    pub timeout_secs: u64,
     /// `[{role, content}, ...]`; content is a string or a list of `{"type":"text","text":..}` / `{"type":"image","index":N}`.
     pub messages: Value,
     pub images: Vec<ImageInput>,
@@ -53,6 +67,8 @@ impl Default for ChatRequest {
             client: String::new(),
             model: String::new(),
             backend: String::new(),
+            route: None,
+            timeout_secs: 0,
             messages: Value::Null,
             images: Vec::new(),
             generate_image: false,
@@ -86,6 +102,10 @@ pub struct Outcome {
     /// Of those, how many were already in the model's memory from the previous request.
     pub cached_prompt_tokens: u32,
     pub completion_tokens: u32,
+    /// The model that really answered (a fallback, perhaps), when it said.
+    pub model: String,
+    /// What it cost, in millionths of a dollar, when the provider said.
+    pub cost_micro: Option<u64>,
     /// Transcription: the language that was spoken.
     pub language: String,
     /// Bounded base64 PNG; no worker-chosen file path crosses the bus.

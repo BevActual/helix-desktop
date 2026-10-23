@@ -696,6 +696,20 @@ pub(crate) fn absorb(
         outcome.prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0) as u32;
         outcome.completion_tokens = usage["completion_tokens"].as_u64().unwrap_or(0) as u32;
     }
+    if let Some(model) = value
+        .get("model")
+        .and_then(Value::as_str)
+        .filter(|m| !m.is_empty())
+    {
+        outcome.model = model.to_string();
+    }
+    if let Some(cost) = value
+        .pointer("/usage/cost")
+        .and_then(Value::as_f64)
+        .filter(|c| c.is_finite() && *c >= 0.0)
+    {
+        outcome.cost_micro = Some((cost * 1_000_000.0).round() as u64);
+    }
     if let Some(cached) = value.pointer("/timings/cache_n").and_then(Value::as_u64) {
         outcome.cached_prompt_tokens = cached as u32;
     }

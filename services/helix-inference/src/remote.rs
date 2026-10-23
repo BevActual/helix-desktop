@@ -109,19 +109,77 @@ fn endpoint(base_url: &str) -> Result<String, String> {
     )
 }
 
-fn request_body(request: &ChatRequest) -> Result<String, String> {
+fn is_openrouter(backend: &BackendInfo) -> bool {
+    backend.id == "openrouter"
+        || host_of(&backend.base_url)
+            .is_some_and(|h| h == "openrouter.ai" || h.ends_with(".openrouter.ai"))
+}
+
+fn request_body(request: &ChatRequest, openrouter: bool) -> Result<String, String> {
     if !request.json_schema.is_empty() {
         return Err("a model on another machine cannot be given an output grammar".into());
     }
-    Ok(json!({
-        "model": request.model,
+    let mut body = json!({
+        "model": if request.model.is_empty() { "default" } else { request.model.as_str() },
         "messages": chat_messages(&request.messages, &request.images)?,
         "stream": true,
         "stream_options": {"include_usage": true},
         "max_tokens": request.max_tokens,
         "temperature": request.temperature,
-    })
-    .to_string())
+    });
+    // OpenRouter is asked to choose among models and providers as the job's options say, and to report what the answer cost. Only OpenRouter gets these.
+    if openrouter {
+        if let Some(route) = &request.route {
+            if !route.fallbacks.is_empty() && !request.model.is_empty() {
+                let mut all = vec![request.model.clone()];
+                all.extend(
+                    route
+                        .fallbacks
+                        .iter()
+                        .filter(|f| **f != request.model)
+                        .cloned(),
+                );
+                body.as_object_mut().expect("object").remove("model");
+                body["models"] = json!(all);
+            }
+            let mut provider = serde_json::Map::new();
+            if route.private_only {
+                provider.insert("data_collection".into(), json!("deny"));
+            }
+            match route.prefer.as_str() {
+                "price" => {
+                    provider.insert("sort".into(), json!("price"));
+                }
+                "speed" => {
+                    provider.insert("sort".into(), json!("throughput"));
+                }
+                _ => {}
+            }
+            if !provider.is_empty() {
+                body["provider"] = Value::Object(provider);
+            }
+        }
+        body["usage"] = json!({"include": true});
+    }
+    Ok(body.to_string())
+}
+
+/// What a refusal means to the person, when it is one they can act on.
+fn explain_refusal(status: u16, detail: &str) -> Option<String> {
+    let lower = detail.to_lowercase();
+    if lower.contains("data policy")
+        || lower.contains("data_collection")
+        || (status == 404 && lower.contains("no endpoints found"))
+    {
+        return Some("No provider for this model promises not to keep your prompts. Allow other providers for this job in Settings → Models, or choose another model.".into());
+    }
+    match status {
+        402 => Some("The provider says the account is out of credit.".into()),
+        401 => Some(
+            "The provider did not accept the API key. Check it in Settings → Providers.".into(),
+        ),
+        _ => None,
+    }
 }
 
 enum Piece {
@@ -149,17 +207,23 @@ impl RemoteChat for OpenAiRemote {
             Ok(url) => url,
             Err(error) => return fail(error),
         };
-        let body = match request_body(request) {
+        let openrouter = is_openrouter(&backend);
+        let body = match request_body(request, openrouter) {
             Ok(body) => body,
             Err(error) => return fail(error),
         };
         let key = key_for(&backend);
-        let timeout = Duration::from_secs(
+        if key.is_none() && openrouter {
+            return fail("Add an OpenRouter API key in Settings → Models.".into());
+        }
+        let timeout = Duration::from_secs(if request.timeout_secs > 0 {
+            request.timeout_secs
+        } else {
             std::env::var("HELIX_REMOTE_TIMEOUT_SECONDS")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(120),
-        );
+                .unwrap_or(120)
+        });
         // The request runs on a thread so cancelling does not have to wait for the network; the thread ends when the connection does.
         let (send, receive) = mpsc::channel::<Piece>();
         std::thread::spawn(move || {
@@ -187,13 +251,18 @@ impl RemoteChat for OpenAiRemote {
             let status = response.status().as_u16();
             if status != 200 {
                 let text = response.body_mut().read_to_string().unwrap_or_default();
-                let message = serde_json::from_str::<Value>(&text)
+                let detail = serde_json::from_str::<Value>(&text)
                     .ok()
                     .and_then(|v| {
                         v.pointer("/error/message")
                             .and_then(Value::as_str)
                             .map(str::to_string)
                     })
+                    .unwrap_or_default();
+                // The "check your key" and "out of credit" wording is only for a hosted service the person pays for.
+                let message = explain_refusal(status, &detail)
+                    .filter(|_| openrouter || (status != 401 && status != 402))
+                    .or_else(|| (!detail.is_empty()).then_some(detail))
                     .unwrap_or_else(|| format!("the backend refused the request ({status})"));
                 let _ = send.send(Piece::Failed(message));
                 return;
@@ -284,7 +353,7 @@ mod tests {
             json_schema: "{}".into(),
             ..ChatRequest::default()
         };
-        assert!(request_body(&request).is_err());
+        assert!(request_body(&request, false).is_err());
     }
 
     #[test]
@@ -451,5 +520,87 @@ HTTPServer(("127.0.0.1", int(sys.argv[2])), H).serve_forever()
         let _ = stub.wait();
         std::env::remove_var("HELIX_STATE_HOME");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn openrouter_is_told_how_to_choose_and_to_report_the_cost_and_nothing_else_is() {
+        let mut request = ask("openrouter", "a/model");
+        request.route = Some(RemoteRoute {
+            fallbacks: vec!["b/other".into(), "a/model".into()],
+            prefer: "speed".into(),
+            private_only: true,
+        });
+        let body: Value = serde_json::from_str(&request_body(&request, true).unwrap()).unwrap();
+        assert_eq!(
+            body["models"],
+            json!(["a/model", "b/other"]),
+            "the first choice once, then the fallbacks"
+        );
+        assert!(body.get("model").is_none());
+        assert_eq!(
+            body["provider"],
+            json!({"data_collection": "deny", "sort": "throughput"})
+        );
+        assert_eq!(body["usage"], json!({"include": true}));
+        // Any other backend gets a plain request.
+        let plain: Value = serde_json::from_str(&request_body(&request, false).unwrap()).unwrap();
+        assert_eq!(plain["model"], "a/model");
+        assert!(
+            plain.get("models").is_none()
+                && plain.get("provider").is_none()
+                && plain.get("usage").is_none()
+        );
+        assert!(is_openrouter(&BackendInfo {
+            id: "x".into(),
+            base_url: "https://openrouter.ai/api/v1".into(),
+            ..BackendInfo::default()
+        }));
+        assert!(!is_openrouter(&BackendInfo {
+            id: "x".into(),
+            base_url: "https://openrouter.ai.evil.test/v1".into(),
+            ..BackendInfo::default()
+        }));
+    }
+
+    #[test]
+    fn what_answered_and_what_it_cost_are_read_from_the_stream() {
+        let mut out = Outcome::default();
+        let (mut finish, mut spoke) = (String::new(), false);
+        let mut text = String::new();
+        crate::server::absorb(
+            r#"{"model":"b/other","choices":[{"delta":{"content":"hi"}}]}"#,
+            &mut out,
+            &mut finish,
+            &mut spoke,
+            &mut |d| text.push_str(d),
+        );
+        crate::server::absorb(
+            r#"{"model":"b/other","choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2,"cost":0.000123}}"#,
+            &mut out,
+            &mut finish,
+            &mut spoke,
+            &mut |_| {},
+        );
+        assert_eq!(
+            (
+                out.model.as_str(),
+                out.cost_micro,
+                out.completion_tokens,
+                text.as_str()
+            ),
+            ("b/other", Some(123), 2, "hi")
+        );
+    }
+
+    #[test]
+    fn a_refusal_is_explained_only_when_the_person_can_act_on_it() {
+        assert!(explain_refusal(401, "x").unwrap().contains("API key"));
+        assert!(explain_refusal(402, "x").unwrap().contains("credit"));
+        assert!(
+            explain_refusal(404, "No endpoints found matching your data policy")
+                .unwrap()
+                .contains("promises not to keep")
+        );
+        assert!(explain_refusal(500, "boom").is_none());
     }
 }
