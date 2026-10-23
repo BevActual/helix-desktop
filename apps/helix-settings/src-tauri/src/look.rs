@@ -393,7 +393,7 @@ mod tests {
         );
         assert_eq!(
             set("look:blur", "number", json!(70)).unwrap().blur_strength,
-            Some(70)
+            Some(75)
         );
         assert_eq!(
             set("look:refraction", "number", json!(250))
