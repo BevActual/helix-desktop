@@ -65,6 +65,22 @@ PATH=$HOME/.local/cuda/bin:$PATH cmake -S third_party/llama.cpp-0.6.0 -B build \
 7. **Endpoint**: an optional loopback OpenAI-compatible URL so other tools use the same routing and grants. Off until turned on; per-client
    identities, so a stray local process cannot spend a cloud budget.
 
+## Later: a pool of machines, and other devices (noted, not built)
+
+* **Whole requests to a peer** (first, easy): each machine runs its own gateway and engine; a peer is any OpenAI-compatible endpoint, added as a LAN
+  backend after **pairing** (a short code on both machines, then mutual TLS between gateways; keys never cross). Routing picks by model already
+  loaded, queue depth, link speed, battery. Per-peer policy (which slots, never send private prompts or pictures); LAN is not local. A peer that
+  vanishes mid-request falls back to local or the next peer per the rules, never silently to cloud. Peers can serve model files they already have
+  to each other, checksum-verified. Discovery: mDNS plus manual entry.
+* **One model split across machines** (opt-in, "make it fit"): llama.cpp's RPC backend (`-DGGML_RPC=ON` in the vendored source). Every token
+  crosses the network, so it needs a wired link and is not the speed option. The RPC protocol is unauthenticated and unencrypted: only ever
+  reachable through the paired channel or a point-to-point link, never the open LAN.
+* **Phones and tablets**: as *clients*, through the optional loopback/LAN OpenAI-compatible endpoint (paired client identity, per-slot permissions,
+  budget; away from home only over a VPN or tunnel); optionally an Ollama-dialect on the same endpoint. As *servers* they are small-model peers at
+  best (thermal and battery), and only if the app exposes an OpenAI-compatible server. Nothing phone-specific is built: a peer is anything that
+  answers an OpenAI-compatible request.
+* To try first: one other machine running `llama-server`, added as a LAN backend, and a phone chat app pointed at the gateway.
+
 ## Order of work
 
 1. Engine: Vulkan + CUDA `llama-server` build and a benchmark against the CPU-only engine (done: built from the vendored source).
