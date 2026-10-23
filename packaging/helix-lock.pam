@@ -1,0 +1,4 @@
+#%PAM-1.0
+# The Helix lock screen asks the same questions the login does, so the same password unlocks the session.
+auth       include      system-auth
+account    include      system-auth

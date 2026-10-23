@@ -26,7 +26,7 @@ service still owns the setting (theme mode, night light, key chords, …).
 
 1. **General / Appearance**: theme mode (dark/light/auto), accent colour, wallpaper (image or colour, per monitor), text size.
    Writes `Configuration1.Update` for service-owned settings and the wallpaper settings file for the wallpaper process.
-2. **Displays**: resolution, refresh rate, scale (fractional), arrangement, night light schedule. Needs `Displays1`.
+2. **Displays**: resolution and refresh from the monitor's modes, scale, orientation, arrangement when more than one display is connected, variable refresh when the monitor supports it, and power for an extra display. Changes apply immediately and are kept in `helix-setup.kdl`. Night light is not on the page yet.
 3. **Sound**, **Network**, **Bluetooth**: the control center's models with full lists, details, and the prompt flows the control center
    cannot do (Wi-Fi password, Bluetooth pairing, VPN).
 4. **Notifications**: do not disturb (and a schedule), per-application rules, history length.

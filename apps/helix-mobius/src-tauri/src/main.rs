@@ -24,13 +24,18 @@ mod inline;
 mod knowledge;
 mod lan;
 mod library;
+mod mcp;
 mod output;
 mod picker;
+mod replyprefs;
 mod rules;
 mod scheduled;
 mod secrets;
+mod skills;
+mod surface;
 mod terminal;
 mod web;
+mod workspace;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -69,6 +74,8 @@ struct State {
     chat: Chat,
     /// Last backend label shown after a turn (local / LAN name).
     last_backend: String,
+    /// `contextTokens` from the last `GetSnapshot` on the inference service (0 when unknown).
+    inference_context_tokens: u32,
 }
 
 type Shared = Arc<Mutex<State>>;
@@ -78,6 +85,10 @@ fn shared(app: &AppHandle) -> Shared {
 }
 
 // Files -------------------------------------------------------------------------------------------------------------------------------
+
+/// Tests that point the data folder somewhere of their own take turns.
+#[cfg(test)]
+pub(crate) static DATA_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn data_home() -> PathBuf {
     std::env::var_os("XDG_DATA_HOME")
@@ -268,11 +279,20 @@ fn shell_offline() -> String {
     "Helix Shell is not running. Open the session bar and try again.".into()
 }
 
+/// What the gateway is told when a turn goes to another computer or a hosted service rather than the on-device engine.
+struct RemoteArgs {
+    backend: String,
+    timeout_secs: u32,
+    /// OpenRouter's choice among models and providers: fallbacks, `price` or `speed`, privacy.
+    route: Option<(Vec<String>, String, bool)>,
+}
+
 fn chat_args(
     messages: &[(&'static str, String)],
     pictures: &[(usize, Vec<Vec<u8>>)],
     task: &str,
     model: &str,
+    remote: Option<&RemoteArgs>,
 ) -> Result<std::collections::HashMap<&'static str, Value<'static>>, zbus::Error> {
     let variant = Signature::try_from("v").map_err(|e| zbus::Error::Failure(e.to_string()))?;
     let (string, any) = (
@@ -356,6 +376,28 @@ fn chat_args(
     args.insert("temperature", Value::F64(talk.temperature));
     args.insert("max_tokens", Value::U32(talk.max_tokens));
     args.insert("priority", Value::from("interactive".to_string()));
+    if let Some(remote) = remote {
+        args.insert("backend", Value::from(remote.backend.clone()));
+        args.insert("remote_timeout", Value::U32(remote.timeout_secs));
+        if let Some((fallbacks, prefer, private_only)) = &remote.route {
+            let mut list = Array::new(&string);
+            for model in fallbacks {
+                list.append(Value::from(model.clone()))
+                    .map_err(zbus::Error::from)?;
+            }
+            let mut route = zbus::zvariant::Dict::new(&string, &any);
+            for (key, value) in [
+                ("fallbacks", Value::Array(list)),
+                ("prefer", Value::from(prefer.clone())),
+                ("private_only", Value::Bool(*private_only)),
+            ] {
+                route
+                    .append(Value::from(key.to_string()), Value::Value(Box::new(value)))
+                    .map_err(zbus::Error::from)?;
+            }
+            args.insert("route", Value::Dict(route));
+        }
+    }
     Ok(args)
 }
 
@@ -380,8 +422,25 @@ struct HubStatus {
     left_device: bool,
 }
 
+fn enrich_context(view: &mut helix_chat::chat::ChatView, inference_context_tokens: u32) {
+    // The window of the model this chat will use: the loaded local model's, or the catalog's for a cloud model (0 when it is not known).
+    let local = view.route_backend.is_empty()
+        || view.route_backend == "local"
+        || view.route_backend == "On this computer";
+    view.context.model_context_tokens = if local {
+        inference_context_tokens
+    } else if !view.route_model.is_empty() {
+        cloud::model_context_tokens(&view.route_model)
+    } else {
+        0
+    };
+}
+
 fn emit_view(app: &AppHandle) {
-    let view = shared(app).lock().expect("state").chat.view();
+    let store = shared(app);
+    let state = store.lock().expect("state");
+    let mut view = state.chat.view();
+    enrich_context(&mut view, state.inference_context_tokens);
     let _ = app.emit("chat-view", view);
 }
 
@@ -510,6 +569,7 @@ fn auto_title(app: &AppHandle) {
                 &[],
                 &task,
                 &model,
+                None,
             )
             .map_err(|e| e.to_string())?;
             // A name is a few words, and it must never delay the person's next message.
@@ -645,7 +705,20 @@ fn follow_signals(app: AppHandle) {
                             if app.state::<Arc<dictate::Hub>>().deliver(operation, ok, result.clone()) {
                                 continue; // a transcription, not a chat reply
                             }
-                            let outcome = shared(&app).lock().expect("state").chat.complete(operation, ok, &result);
+                            let outcome = {
+                                let shared = shared(&app);
+                                let mut state = shared.lock().expect("state");
+                                // A model on another computer says which model answered (a fallback, perhaps) and what it cost.
+                                if ok && state.chat.owns_operation(operation) {
+                                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&result) {
+                                        if let Some(answered) = value["model"].as_str().filter(|m| !m.is_empty()) {
+                                            state.turn_model = answered.to_string();
+                                        }
+                                        state.chat.pending_cost = value["cost_micro"].as_u64();
+                                    }
+                                }
+                                state.chat.complete(operation, ok, &result)
+                            };
                             if let Some(outcome) = outcome {
                                 ended(&app, outcome);
                             }
@@ -760,6 +833,71 @@ fn chat_list() -> Vec<Summary> {
     summaries()
 }
 
+/// The window the person was using when they pressed the summon key, once. Shown as a chip they can remove; it goes with their next message only
+/// if they leave it. Nothing but the title, the application and the process is known, all of which the compositor lists for every window.
+#[tauri::command]
+fn summon_context() -> Option<helix_compositor::compositor_ipc::SummonContext> {
+    helix_compositor::compositor_ipc::take_summon_context()
+}
+
+/// The text selected in the window the person was using (the primary selection), read with `wl-paste` once they summoned Mobius. Text only, at most 4,000
+/// characters, and nothing when there is none or `wl-paste` is not installed. The page shows it as a chip the person can remove; it is not kept.
+fn read_primary_selection() -> Option<String> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+    let mut child = Command::new("wl-paste")
+        .args(["--primary", "--no-newline", "--type", "text/plain"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = (&mut stdout).take(32 * 1024).read_to_end(&mut bytes);
+        bytes
+    });
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => break,
+            Ok(Some(_)) | Err(_) => return None,
+            Ok(None) if started.elapsed() > Duration::from_secs(1) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+    let text = String::from_utf8_lossy(&reader.join().ok()?).into_owned();
+    let text: String = text
+        .chars()
+        .filter(|c| !c.is_control() || matches!(c, '\n' | '\t'))
+        .take(4000)
+        .collect();
+    let text = text.trim().to_string();
+    (!text.is_empty()).then_some(text)
+}
+
+#[tauri::command]
+async fn summon_selection() -> Option<String> {
+    tauri::async_runtime::spawn_blocking(read_primary_selection)
+        .await
+        .ok()
+        .flatten()
+}
+
+/// A short desktop notice when Mobius needs the person while they are elsewhere.
+#[tauri::command]
+fn mobius_notify(summary: String, body: String) {
+    tauri::async_runtime::spawn(async move {
+        scheduled::desktop_notify(&summary, &body).await;
+    });
+}
+
 #[tauri::command]
 async fn chat_status(app: AppHandle) -> HubStatus {
     let backend = shared(&app).lock().expect("state").last_backend.clone();
@@ -779,10 +917,32 @@ async fn chat_status(app: AppHandle) -> HubStatus {
             left_device,
         };
     };
+    let mut inference_context_tokens = 0u32;
     let inference = match proxy.call_method("GetSnapshot", &()).await {
-        Ok(_) => "ready",
+        Ok(reply) => {
+            if let Ok(map) = reply
+                .body()
+                .deserialize::<std::collections::HashMap<String, zbus::zvariant::OwnedValue>>()
+            {
+                inference_context_tokens = map
+                    .get("contextTokens")
+                    .map(helix_desktop_api::owned_to_json)
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0)
+                    .min(u32::MAX as u64) as u32;
+            }
+            "ready"
+        }
         Err(_) => "offline",
     };
+    {
+        let store = shared(&app);
+        let mut state = store.lock().expect("state");
+        state.inference_context_tokens = inference_context_tokens;
+        let mut view = state.chat.view();
+        enrich_context(&mut view, inference_context_tokens);
+        let _ = app.emit("chat-view", view);
+    }
     HubStatus {
         inference,
         backend,
@@ -800,8 +960,9 @@ fn error_text(error: &ChatError) -> &'static str {
     }
 }
 
-/// The system prompt for this turn: the persona's identity, then the project's instructions, then the chat's style (each layer only
-/// while its experiment is on). Composed in one place so every send, edit and regenerate agrees.
+/// The system prompt for this turn: the persona's identity, then the project's instructions, then how to answer. A style on this chat
+/// wins; otherwise the reply setting (concise or detailed) is that layer. Balanced adds nothing. Composed in one place so every send,
+/// edit and regenerate agrees.
 fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
     let using_tools = shared(app)
         .lock()
@@ -809,7 +970,7 @@ fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
         .chat
         .conversation
         .tools_enabled;
-    let tools_identity = "You are Mobius, the assistant built into the person's Helix Linux desktop. Tools mode is enabled for this conversation. You can request public web research and reviewed shell commands in a chosen project folder. Use observed results and source references; never invent tool output or claim an unapproved command ran. Desktop settings and application control still require Act mode. Explain errors and declined tools plainly.";
+    let tools_identity = "You are Mobius, the assistant built into the person's Helix Linux desktop. Agent mode is on for this conversation. You can request public web research and reviewed shell commands in a chosen project folder, then continue from what you observe. Use observed results and source references; never invent tool output or claim an unapproved command ran. Desktop settings and application control still go through Desktop mode. Explain errors and declined tools plainly.";
     let identity = if persona.system_prompt.trim().is_empty() {
         if using_tools {
             tools_identity
@@ -838,7 +999,23 @@ fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
     } else {
         String::new()
     };
-    mobius_lab::compose_system(identity, &project_text, &style_text)
+    let voice = if style_text.trim().is_empty() {
+        replyprefs::detail_instruction(&replyprefs::load().detail).to_string()
+    } else {
+        style_text
+    };
+    mobius_lab::compose_system(identity, &project_text, &voice)
+}
+
+const PLAN_NOTE: &str = "Plan mode. Do not request tools, edit files, or change the desktop. Reply with a plan the person can edit: a one-line goal, numbered steps, and the files or commands you would use. End by asking whether to build it in Agent mode.";
+
+fn prompt_for_turn(app: &AppHandle, persona: &Persona, plan: bool) -> String {
+    let base = active_prompt(app, persona);
+    if plan {
+        format!("{base}\n\n{PLAN_NOTE}")
+    } else {
+        base
+    }
 }
 
 /// The routing and persona a turn uses once the chat's own model choice is taken into account: the chat's backend and model replace what the
@@ -1002,15 +1179,11 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
     }
     emit_view(&app);
 
+    // The person's ChatGPT plan is Mobius's own sign-in flow (their token, never an API key), so that one stays here. Every other model on another
+    // computer or a hosted service is asked for through the gateway, which holds the rules (battery saver, keys, https or LAN only), the keys, the
+    // audit line and the streaming.
+    let mut remote: Option<RemoteArgs> = None;
     if !is_local {
-        if !routing.allow_remote_on_battery_saver && power_saver_active() {
-            shared(&app).lock().expect("state").chat.failed_to_start(
-                turn.generation,
-                "Battery saver is on. Turn on “Use other providers when battery saver is on” in Settings → Generation, or use a model on this computer.",
-            );
-            emit_view(&app);
-            return Ok(());
-        }
         let profile_backend = routing.route(&task).backend;
         let backend_key = if persona.backend.is_empty() {
             profile_backend.as_str()
@@ -1026,96 +1199,74 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             emit_view(&app);
             return Ok(());
         };
-        let generation = turn.generation;
-        let messages = turn.messages.clone();
-        let model = model.clone();
-        let base = backend.base_url.clone();
-        let api_key = secrets::for_backend(&backend.id, &backend.api_key_ref);
-        if base.contains("openrouter.ai") && api_key.is_none() {
-            shared(&app).lock().expect("state").chat.failed_to_start(
-                turn.generation,
-                "Add an OpenRouter API key in Settings → Models.",
-            );
-            emit_view(&app);
-            return Ok(());
-        }
         let talk = routing.talk.clamped();
-        let options = lan::RemoteOptions {
-            temperature: talk.temperature,
-            max_tokens: talk.max_tokens,
-            timeout_secs: u64::from(talk.remote_timeout_secs),
-        };
-        // OpenRouter is asked to choose among models and providers as the job's options say.
-        let route = (backend.id == "openrouter" || base.contains("openrouter.ai")).then(|| {
-            let wanted = cloud::route_options(&task);
-            lan::OpenRouterRoute {
-                fallbacks: wanted.fallbacks,
-                prefer: wanted.prefer,
-                private_only: wanted.private_only,
-            }
-        });
-        let result = if backend.id == chatgpt::BACKEND_ID {
-            // The person's ChatGPT plan: OpenAI's own API with the token they signed in with, never an API key.
-            if model.trim().is_empty() {
+        if backend.id == chatgpt::BACKEND_ID {
+            let generation = turn.generation;
+            let messages = turn.messages.clone();
+            let model = model.clone();
+            let result = if model.trim().is_empty() {
                 Err("Choose a ChatGPT model in Settings → Models.".to_string())
             } else {
-                chatgpt::respond(&model, &messages, options.max_tokens, options.timeout_secs).await
+                chatgpt::respond(
+                    &model,
+                    &messages,
+                    talk.max_tokens,
+                    u64::from(talk.remote_timeout_secs),
+                )
+                .await
+            };
+            let fake_op = generation.saturating_mul(1_000_003).saturating_add(7);
+            {
+                let shared = shared(&app);
+                let mut state = shared.lock().expect("state");
+                let _ = state.chat.started(generation, fake_op);
             }
-        } else {
-            lan::chat_completions_routed(
-                &base,
-                &model,
-                &messages,
-                api_key.as_deref(),
-                options,
-                route.as_ref(),
-            )
-            .await
-        };
-        let fake_op = generation.saturating_mul(1_000_003).saturating_add(7);
-        {
-            let shared = shared(&app);
-            let mut state = shared.lock().expect("state");
-            let _ = state.chat.started(generation, fake_op);
-        }
-        match result {
-            Ok(reply) => {
-                let outcome = {
-                    let shared = shared(&app);
-                    let mut state = shared.lock().expect("state");
-                    // The reply names the model that really answered (a fallback, perhaps) and what it cost.
-                    state.turn_model = reply.model.clone();
-                    state.chat.pending_cost = reply.cost_micro;
-                    let _ = state.chat.delta(fake_op, &reply.text);
-                    state.chat.complete(
-                        fake_op,
-                        true,
-                        &serde_json::json!({"ok": true, "text": reply.text, "backend": label, "task": task, "completion_tokens": reply.completion_tokens})
-                            .to_string(),
-                    )
-                };
-                if let Some(outcome) = outcome {
-                    ended(&app, outcome);
+            match result {
+                Ok(reply) => {
+                    let outcome = {
+                        let shared = shared(&app);
+                        let mut state = shared.lock().expect("state");
+                        state.turn_model = reply.model.clone();
+                        state.chat.pending_cost = reply.cost_micro;
+                        let _ = state.chat.delta(fake_op, &reply.text);
+                        state.chat.complete(
+                            fake_op,
+                            true,
+                            &serde_json::json!({"ok": true, "text": reply.text, "backend": label, "task": task, "completion_tokens": reply.completion_tokens})
+                                .to_string(),
+                        )
+                    };
+                    if let Some(outcome) = outcome {
+                        ended(&app, outcome);
+                    }
+                }
+                Err(reason) => {
+                    let outcome = {
+                        let shared = shared(&app);
+                        let mut state = shared.lock().expect("state");
+                        state.chat.complete(
+                            fake_op,
+                            false,
+                            &serde_json::json!({"ok": false, "error": reason}).to_string(),
+                        )
+                    };
+                    if let Some(outcome) = outcome {
+                        ended(&app, outcome);
+                    } else {
+                        emit_view(&app);
+                    }
                 }
             }
-            Err(reason) => {
-                let outcome = {
-                    let shared = shared(&app);
-                    let mut state = shared.lock().expect("state");
-                    state.chat.complete(
-                        fake_op,
-                        false,
-                        &serde_json::json!({"ok": false, "error": reason}).to_string(),
-                    )
-                };
-                if let Some(outcome) = outcome {
-                    ended(&app, outcome);
-                } else {
-                    emit_view(&app);
-                }
-            }
+            return Ok(());
         }
-        return Ok(());
+        // OpenRouter is asked to choose among models and providers as the job's options say.
+        let route = (backend.id == "openrouter" || backend.base_url.contains("openrouter.ai"))
+            .then(|| cloud::route_options(&task));
+        remote = Some(RemoteArgs {
+            backend: backend.id.clone(),
+            timeout_secs: talk.remote_timeout_secs,
+            route: route.map(|wanted| (wanted.fallbacks, wanted.prefer, wanted.private_only)),
+        });
     }
 
     let outcome = async {
@@ -1129,8 +1280,8 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             }
             pictures.push((*at, bytes));
         }
-        let args =
-            chat_args(&turn.messages, &pictures, &task, &model).map_err(|e| e.to_string())?;
+        let args = chat_args(&turn.messages, &pictures, &task, &model, remote.as_ref())
+            .map_err(|e| e.to_string())?;
         shared(&app).lock().expect("state").turn_model = model.clone();
         let operation: u64 = proxy
             .call("Action", &("chat", args))
@@ -1287,6 +1438,7 @@ fn tools_configure(
     chat_id: String,
     enabled: bool,
     workspace: String,
+    policy: Option<String>,
 ) -> Result<(), String> {
     let folder = if workspace.is_empty() {
         String::new()
@@ -1310,12 +1462,19 @@ fn tools_configure(
         let old = (
             state.chat.conversation.tools_enabled,
             state.chat.conversation.workspace.clone(),
+            state.chat.conversation.tools_policy.clone(),
         );
         state.chat.conversation.tools_enabled = enabled;
         state.chat.conversation.workspace = folder;
+        state.chat.conversation.tools_policy = if policy.as_deref() == Some("folder") {
+            "folder".into()
+        } else {
+            String::new()
+        };
         if !state.chat.temporary && !save(&state.chat.conversation) {
             state.chat.conversation.tools_enabled = old.0;
             state.chat.conversation.workspace = old.1;
+            state.chat.conversation.tools_policy = old.2;
             return Err("The tools settings could not be saved.".into());
         }
     }
@@ -1505,8 +1664,117 @@ fn tools_revert_change(app: AppHandle, activity_id: String, index: usize) -> Res
     Ok(())
 }
 
+fn tools_adjust_change_hunk(
+    app: &AppHandle,
+    activity_id: &str,
+    index: usize,
+    hunk: usize,
+    keep_only: bool,
+) -> Result<(), String> {
+    let chat_id = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Wait for the reply to finish, or stop it.".into());
+        }
+        state.chat.conversation.id.clone()
+    };
+    let store_path = edit_store(&chat_id, &format!("{activity_id}-{index}"));
+    let body = std::fs::read_to_string(&store_path)
+        .map_err(|_| "There is no restore point for that file.".to_string())?;
+    let mut checkpoint: edits::Checkpoint =
+        serde_json::from_str(&body).map_err(|_| "The restore point is damaged.".to_string())?;
+    let before = checkpoint.before.as_deref().unwrap_or("");
+    let expected = checkpoint
+        .after_present
+        .then_some(checkpoint.after.as_str());
+    let current = std::fs::read_to_string(&checkpoint.path).ok();
+    if current.as_deref() != expected {
+        return Err("The file has changed since this turn, so it was left alone.".into());
+    }
+    let next = if checkpoint.after_present {
+        if keep_only {
+            edits::after_accepting_only_hunk(before, &checkpoint.after, hunk)?
+        } else {
+            edits::after_reverting_hunk(before, &checkpoint.after, hunk)?
+        }
+    } else {
+        before.to_string()
+    };
+    if next == before && checkpoint.before.is_some() {
+        std::fs::write(&checkpoint.path, before).map_err(|e| e.to_string())?;
+        checkpoint.after = before.to_string();
+    } else if next == before {
+        std::fs::remove_file(&checkpoint.path).map_err(|e| e.to_string())?;
+        checkpoint.after.clear();
+        checkpoint.after_present = false;
+    } else {
+        std::fs::write(&checkpoint.path, &next).map_err(|e| e.to_string())?;
+        checkpoint.after = next;
+        checkpoint.after_present = true;
+    }
+    std::fs::write(
+        &store_path,
+        serde_json::to_string(&checkpoint).unwrap_or_default(),
+    )
+    .map_err(|e| format!("Could not update the restore point: {e}"))?;
+    {
+        let shared = shared(app);
+        let mut state = shared.lock().expect("state");
+        for message in state.chat.conversation.messages.iter_mut() {
+            for activity in message
+                .activities
+                .iter_mut()
+                .filter(|a| a.id == activity_id)
+            {
+                let mut list: Vec<edits::FileChange> =
+                    serde_json::from_str(&activity.input).unwrap_or_default();
+                if let Some(change) = list.get_mut(index) {
+                    edits::refresh_change(change, &checkpoint);
+                }
+                activity.input = serde_json::to_string(&list).unwrap_or_default();
+            }
+        }
+    }
+    persist(app);
+    emit_view(app);
+    Ok(())
+}
+
+/// Undoes one hunk of a file listed in a turn's Changes card, leaving the rest of that file's edits from the turn.
+#[tauri::command]
+fn tools_revert_hunk(
+    app: AppHandle,
+    activity_id: String,
+    index: usize,
+    hunk: usize,
+) -> Result<(), String> {
+    tools_adjust_change_hunk(&app, &activity_id, index, hunk, false)
+}
+
+/// Keeps only one hunk from a turn's edit on a file; the other hunks from that turn are dropped.
+#[tauri::command]
+fn tools_accept_hunk(
+    app: AppHandle,
+    activity_id: String,
+    index: usize,
+    hunk: usize,
+) -> Result<(), String> {
+    tools_adjust_change_hunk(&app, &activity_id, index, hunk, true)
+}
+
 fn memory_file() -> PathBuf {
     data_home().join("helix/mobius/memory.json")
+}
+
+#[tauri::command]
+fn reply_prefs() -> replyprefs::ReplyPrefs {
+    replyprefs::load()
+}
+
+#[tauri::command]
+fn reply_prefs_set(detail: String, thinking: String) -> Result<replyprefs::ReplyPrefs, String> {
+    replyprefs::save(&detail, &thinking)
 }
 
 #[tauri::command]
@@ -1564,6 +1832,8 @@ fn code_tree(app: AppHandle) -> Result<CodeTree, String> {
 struct CodeFile {
     text: String,
     truncated: bool,
+    /// The file exactly, when it all fits in the viewer, so an edit can be saved back. Empty when truncated.
+    source: String,
 }
 
 /// One file of the project folder for the Code stage's viewer: the first 3,000 lines. Same boundary as the edit tool (inside the folder, not
@@ -1587,6 +1857,46 @@ fn code_read(app: AppHandle, path: String) -> Result<CodeFile, String> {
     let truncated = lines.len() > 3000;
     Ok(CodeFile {
         text: terminal::display(&lines[..lines.len().min(3000)].join("\n"), usize::MAX),
+        truncated,
+        source: if truncated { String::new() } else { text },
+    })
+}
+
+#[derive(Serialize)]
+struct CodeSearchHit {
+    path: String,
+    line: u32,
+    text: String,
+}
+
+#[derive(Serialize)]
+struct CodeSearch {
+    hits: Vec<CodeSearchHit>,
+    truncated: bool,
+}
+
+/// Lines in the project folder that contain `query`. Same files and limits as the Code stage's tree.
+#[tauri::command]
+fn code_search(app: AppHandle, query: String) -> Result<CodeSearch, String> {
+    let workspace = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        state.chat.conversation.workspace.clone()
+    };
+    if workspace.is_empty() {
+        return Err("This chat has no project folder yet.".into());
+    }
+    let root = terminal::workspace(&workspace)?;
+    let (hits, truncated) = attach::search_text(&root, &query);
+    Ok(CodeSearch {
+        hits: hits
+            .into_iter()
+            .map(|hit| CodeSearchHit {
+                path: hit.path,
+                line: hit.line,
+                text: hit.text,
+            })
+            .collect(),
         truncated,
     })
 }
@@ -1796,6 +2106,7 @@ async fn chat_send(
     text: String,
     attachments: Option<Vec<AttachmentIn>>,
     pictures: Option<Vec<String>>,
+    plan: Option<bool>,
 ) -> Result<(), String> {
     if let Some(prompt) = text.trim().strip_prefix("/image ") {
         if attachments.as_ref().is_some_and(|v| !v.is_empty())
@@ -1807,7 +2118,8 @@ async fn chat_send(
     }
     let store = personas::load();
     let persona = store.active_persona().clone();
-    let prompt = active_prompt(&app, &persona);
+    let planning = plan.unwrap_or(false);
+    let prompt = prompt_for_turn(&app, &persona, planning);
     let attachments = attachments.unwrap_or_default();
     let has_attachments = !attachments.is_empty();
     let excerpts = attachments
@@ -1868,12 +2180,12 @@ async fn chat_send(
         .chat
         .conversation
         .tools_enabled;
-    if app.state::<acp::Runtime>().selected().is_some() {
-        // an agent chosen for this chat does the work; what it asks of the computer waits for the person
+    if app.state::<acp::Runtime>().selected().is_some() && !planning {
+        // an agent chosen for this chat does the work (a plan is written by the chat model: nothing is run for it); what it asks of the computer waits for the person
         emit_view(&app);
         tauri::async_runtime::spawn(acp::run(app, turn));
         Ok(())
-    } else if using_tools {
+    } else if using_tools && !planning {
         let private = has_attachments || !turn.images.is_empty();
         emit_view(&app);
         tauri::async_runtime::spawn(agent::run(app, turn, private));
@@ -2999,7 +3311,19 @@ fn knowledge_cancel() {
     knowledge::cancel();
 }
 
-/// Passages from the folders that match what the person typed. Local only: nothing leaves this computer.
+/// Passages from the person's folders that would be given to the model for this question (when knowledge in chat is on).
+#[tauri::command]
+fn knowledge_peek(query: String) -> Vec<helix_chat::chat::FileRef> {
+    knowledge::relevant(query.trim())
+        .into_iter()
+        .map(|p| helix_chat::chat::FileRef {
+            title: p.title,
+            heading: p.heading,
+            excerpt: p.text.chars().take(160).collect(),
+        })
+        .collect()
+}
+
 #[tauri::command]
 async fn knowledge_search(query: String) -> Result<Vec<knowledge::Found>, String> {
     tauri::async_runtime::spawn_blocking(move || knowledge::search(&query, 8))
@@ -3732,17 +4056,39 @@ async fn analysis_explain(app: AppHandle, id: String, model: String) -> Result<(
 /// 0 until the desktop service has said, then 1 for dark and 2 for light.
 static APP_THEME: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
-fn theme_script() -> Option<&'static str> {
-    match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
-        1 => Some("document.documentElement.dataset.theme = 'dark'"),
-        2 => Some("document.documentElement.dataset.theme = 'light'"),
-        _ => None,
-    }
+/// The accent colour's name, once the desktop service has said (`blue` until then).
+static APP_ACCENT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+fn theme_script() -> Option<String> {
+    let dark = match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => true,
+        2 => false,
+        _ => return None,
+    };
+    let accent = APP_ACCENT.lock().map(|a| a.clone()).unwrap_or_default();
+    let look = helix_desktop_api::theme_script(&helix_desktop_api::Look { dark, accent });
+    // How round things are and how clear the glass is (Settings → Appearance): numbers from the file Settings writes.
+    Some(format!(
+        "{look}; {}",
+        helix_config::shape_prefs::read().script("app")
+    ))
 }
 
 /// Applies the person's interface scale and light or dark theme (Settings) to this application's windows now and whenever they change.
 /// A page that loads later gets the theme from `on_page_load`.
 fn follow_appearance(app: tauri::AppHandle) {
+    // The corners and the glass follow the person's choices as they change.
+    let shape_app = app.clone();
+    helix_config::shape_prefs::watch(move |_| {
+        if let Some(script) = theme_script() {
+            let target = shape_app.clone();
+            let _ = shape_app.run_on_main_thread(move || {
+                for window in target.webview_windows().values() {
+                    let _ = window.eval(&script);
+                }
+            });
+        }
+    });
     let scale_app = app.clone();
     tauri::async_runtime::spawn(async move {
         let Ok(desktop) = helix_desktop_api::Desktop::session().await else {
@@ -3773,15 +4119,22 @@ fn follow_appearance(app: tauri::AppHandle) {
             return;
         };
         let _ = desktop
-            .watch_theme_dark(move |dark| {
-                eprintln!("UI theme {}", if dark { "dark" } else { "light" });
+            .watch_theme(move |look| {
+                eprintln!(
+                    "UI theme {} accent {}",
+                    if look.dark { "dark" } else { "light" },
+                    look.accent
+                );
                 APP_THEME.store(
-                    if dark { 1 } else { 2 },
+                    if look.dark { 1 } else { 2 },
                     std::sync::atomic::Ordering::Relaxed,
                 );
+                if let Ok(mut accent) = APP_ACCENT.lock() {
+                    *accent = look.accent.clone();
+                }
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
-                        let _ = window.eval(script);
+                        let _ = window.eval(&script);
                     }
                 }
             })
@@ -3832,6 +4185,9 @@ fn main() {
             analysis_cancel,
             analysis_explain,
             chat_list,
+            mobius_notify,
+            summon_context,
+            summon_selection,
             chat_status,
             chat_send,
             chat_pick_attachments,
@@ -3854,6 +4210,24 @@ fn main() {
             inline::stage_transform,
             inline::code_transform,
             inline::code_apply,
+            inline::code_save,
+            agent::agent_tasks,
+            agent::agent_task_delete,
+            agent::background::agent_task_start,
+            agent::background::agent_task_stop,
+            agent::background::agent_task_diff,
+            agent::background::agent_task_apply,
+            agent::background::agent_task_discard,
+            agent::background::agent_task_review,
+            agent::background::agent_task_plan,
+            agent::background::agent_skill_draft,
+            mcp::mcp_servers,
+            mcp::mcp_server_save,
+            mcp::mcp_server_delete,
+            mcp::mcp_server_test,
+            skills::agent_skills,
+            skills::agent_skill_save,
+            skills::agent_skill_delete,
             scheduled::scheduled_list,
             scheduled::scheduled_save,
             scheduled::scheduled_set_enabled,
@@ -3877,10 +4251,15 @@ fn main() {
             project_set_folder,
             code_tree,
             code_read,
+            code_search,
             memory_list,
             memory_add,
             memory_remove,
+            reply_prefs,
+            reply_prefs_set,
             tools_revert_change,
+            tools_revert_hunk,
+            tools_accept_hunk,
             web_lookup,
             web_cancel,
             web_open_source,
@@ -3928,6 +4307,7 @@ fn main() {
             knowledge_cancel,
             knowledge_set_use,
             knowledge_search,
+            knowledge_peek,
             hub_repo,
             hub_download,
             library_reveal,
@@ -3985,7 +4365,7 @@ fn main() {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 if let Some(script) = theme_script() {
-                    let _ = webview.eval(script);
+                    let _ = webview.eval(&script);
                 }
             }
         })
@@ -3994,6 +4374,8 @@ fn main() {
             app.manage(web::Research::default());
             act::watch(app.handle().clone());
             app.manage(agent::Runtime::default());
+            app.manage(agent::Background::default());
+            agent::settle_tasks_after_start();
             app.manage(acp::Runtime::default());
             let mut fresh = Conversation::new(&new_id(), now()).expect("a fresh id is valid");
             if let Some(turns) = take_bar_handoff() {
@@ -4024,6 +4406,7 @@ fn main() {
                 once_route: None,
                 chat: Chat::new(fresh),
                 last_backend: "On this computer".into(),
+                inference_context_tokens: 0,
             })));
             if seeded {
                 let shared = shared(app.handle());
@@ -4102,7 +4485,7 @@ mod picture_wire_tests {
             ("user", "what is this?".to_string()),
         ];
         let pictures = vec![(1usize, vec![vec![1u8, 2, 3], vec![4u8, 5]])];
-        let args = chat_args(&messages, &pictures, "vision", "").unwrap();
+        let args = chat_args(&messages, &pictures, "vision", "", None).unwrap();
         let images = args.get("images").expect("images are sent");
         assert_eq!(images.value_signature().to_string(), "aay");
         // The whole argument map still encodes as a{sv}, the shape the service reads.
@@ -4114,7 +4497,7 @@ mod picture_wire_tests {
             "a{sv}"
         );
         // Without pictures nothing changes: no images, string content.
-        let plain = chat_args(&messages, &[], "chat", "").unwrap();
+        let plain = chat_args(&messages, &[], "chat", "", None).unwrap();
         assert!(!plain.contains_key("images"));
     }
 }

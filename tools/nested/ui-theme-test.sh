@@ -34,7 +34,7 @@ print(round(sum(px) / len(px)))
 PY
 }
 sleep 1
-grep -q '^UI theme dark$' "$LOG" && echo "ok: the app read dark at startup" || fail "no startup theme: $(grep 'UI theme' "$LOG")"
+grep -q '^UI theme dark accent ' "$LOG" && echo "ok: the app read dark at startup" || fail "no startup theme: $(grep 'UI theme' "$LOG")"
 # The window is repainted a moment after the change, so look a few times.
 until_bright() { # "lt|gt" limit
   local v
@@ -48,8 +48,8 @@ until_bright() { # "lt|gt" limit
 }
 D=$(until_bright lt 90) && echo "ok: drawn dark ($D)" || fail "dark theme is bright: $D"
 set_mode light
-grep -q '^UI theme light$' "$LOG" || sleep 2
-grep -q '^UI theme light$' "$LOG" && echo "ok: the app was told light" || fail "not told: $(grep 'UI theme' "$LOG")"
+grep -q '^UI theme light accent ' "$LOG" || sleep 2
+grep -q '^UI theme light accent ' "$LOG" && echo "ok: the app was told light" || fail "not told: $(grep 'UI theme' "$LOG")"
 L=$(until_bright gt 150) && echo "ok: drawn light ($L)" || fail "light theme is dark: $L"
 set_mode dark
 D2=$(until_bright lt 90) && echo "ok: back to dark ($D2)" || fail "did not go back to dark: $D2"

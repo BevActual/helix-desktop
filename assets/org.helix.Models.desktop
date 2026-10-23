@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=Helix Models
+Comment=Manage the models and where Helix runs them
+Exec=helix-models
+Icon=org.helix.Models
+Terminal=false
+Categories=System;Settings;
+StartupNotify=true
+Actions=Backends;Routing;
+
+[Desktop Action Backends]
+Name=Backends
+Exec=helix-models --page backends
+
+[Desktop Action Routing]
+Name=Routing
+Exec=helix-models --page routing

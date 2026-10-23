@@ -164,6 +164,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Config::load_default()
     });
     let config_includes = config_load_result.includes;
+    niri::helix::input::apply_saved(&mut config.input);
+    niri::helix::look::apply_saved(&mut config);
+    niri::helix::binds::apply_saved(&mut config);
 
     let spawn_at_startup = mem::take(&mut config.spawn_at_startup);
     let spawn_sh_at_startup = mem::take(&mut config.spawn_sh_at_startup);
@@ -183,8 +186,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Increase the buffer size so that it's harder to crash a frozen client with a 1000 Hz mouse.
     set_default_max_buffer_size(&display, 1024 * 1024);
 
-    let headless = env::var_os("HELIX_NESTED_HEADLESS")
-        .is_some_and(|v| v != "0" && !v.is_empty());
+    let headless = env::var_os("HELIX_NESTED_HEADLESS").is_some_and(|v| v != "0" && !v.is_empty());
     if headless {
         for var in ["WAYLAND_DISPLAY", "WAYLAND_SOCKET", "DISPLAY"] {
             env::remove_var(var);

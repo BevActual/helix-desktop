@@ -4,7 +4,7 @@ export interface AboutView {
   version: string;
   service: string;
   agent_access: string;
-  settings: number;
+  system: [string, string][];
   network: boolean;
   bluetooth: boolean;
 }

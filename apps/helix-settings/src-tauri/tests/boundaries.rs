@@ -28,10 +28,16 @@ fn settings_holds_the_manager_role_only() {
         "org.helix.Inference",
         "WEBKIT_DISABLE",
         "innerHTML",
-        "eval(",
     ] {
         assert!(!sources.contains(forbidden), "{forbidden}");
     }
+    // The page never evaluates strings. (The Rust side runs one fixed theme script in each window with the webview's own `eval`; that is not this.)
+    let page = [
+        include_str!("../../dist/settings.js"),
+        include_str!("../../dist/index.html"),
+    ]
+    .join("\n");
+    assert!(!page.contains("eval("), "the page must not eval");
     assert!(sources.contains(".manager()"));
     assert!(sources.contains("textContent"));
 }

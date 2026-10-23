@@ -434,6 +434,10 @@ pub struct Niri {
 
     /// Helix: toplevel opens that should land on the agent desk without stealing focus.
     pub helix_place_on_agent_desk: u32,
+    /// The set of displays whose remembered setup was last applied (or saved), so it is applied once per change of set.
+    pub helix_profile_key: Option<Vec<String>>,
+    /// What had the keyboard when `helix-summon` was pressed, and when.
+    pub helix_summon: Option<(Instant, niri_ipc::HelixSummonContext)>,
     pub ipc_outputs_changed: bool,
 
     pub satellite: Option<Satellite>,
@@ -1579,6 +1583,10 @@ impl State {
         };
 
         self.niri.config_error_notification.hide();
+        // What the person set in Settings stays over a freshly loaded file.
+        crate::helix::input::apply_saved(&mut config.input);
+        crate::helix::look::apply_saved(&mut config);
+        crate::helix::binds::apply_saved(&mut config);
 
         // Find & orphan removed named workspaces.
         let mut removed_workspaces: Vec<String> = vec![];
@@ -1717,7 +1725,8 @@ impl State {
         if config.debug.liquid_glass_shader.is_some()
             || old_config.debug.liquid_glass_shader.is_some()
         {
-            let src = shaders::read_liquid_glass_shader(config.debug.liquid_glass_shader.as_deref());
+            let src =
+                shaders::read_liquid_glass_shader(config.debug.liquid_glass_shader.as_deref());
             self.backend.with_primary_renderer(|renderer| {
                 shaders::set_custom_glass_program(renderer, src.as_deref());
             });
@@ -2114,6 +2123,8 @@ impl State {
 
         let new_config = self.backend.ipc_outputs().lock().unwrap().clone();
         self.niri.output_management_state.notify_changes(new_config);
+
+        self.helix_displays_changed();
     }
 
     pub fn open_screenshot_ui(&mut self, show_pointer: bool, path: Option<String>) {
@@ -2525,9 +2536,12 @@ impl Niri {
         let xdg_foreign_state = XdgForeignState::new::<State>(&display_handle);
 
         let is_tty = matches!(backend, Backend::Tty(_));
+        // The nested test compositor has no gamma hardware. With HELIX_NESTED_GAMMA set it offers a pretend 256-entry table and logs what a client
+        // sets (`HELIX gamma …`), so a colour client such as night light can be tested end to end without a screen.
+        let virtual_gamma = !is_tty && crate::utils::helix_nested_gamma();
         let gamma_control_manager_state =
             GammaControlManagerState::new::<State, _>(&display_handle, move |client| {
-                is_tty && !client.get_data::<ClientState>().unwrap().restricted
+                (is_tty || virtual_gamma) && !client.get_data::<ClientState>().unwrap().restricted
             });
         let activation_state = XdgActivationState::new::<State>(&display_handle);
         event_loop
@@ -2808,6 +2822,8 @@ impl Niri {
 
             ipc_server,
             helix_place_on_agent_desk: 0,
+            helix_profile_key: None,
+            helix_summon: None,
             ipc_outputs_changed: false,
 
             satellite: None,
@@ -3191,7 +3207,12 @@ impl Niri {
 
             // The frame the compositor draws around a trusted surface: THICKNESS logical pixels along each edge.
             const THICKNESS: f64 = 4.;
-            let rim_color = self.config.borrow().trusted_surface.rim_color.to_array_unpremul();
+            let rim_color = self
+                .config
+                .borrow()
+                .trusted_surface
+                .rim_color
+                .to_array_unpremul();
             let (w, h) = (output_size.w, output_size.h);
             for (buffer, size) in state.trusted_rim.iter_mut().zip([
                 (w, THICKNESS),
@@ -3501,7 +3522,9 @@ impl Niri {
         let Some(client) = layer.wl_surface().client() else {
             return false;
         };
-        let Some(credentials) = crate::utils::get_credentials_for_client(&self.display_handle, &client) else {
+        let Some(credentials) =
+            crate::utils::get_credentials_for_client(&self.display_handle, &client)
+        else {
             return false;
         };
         let Ok(exe) = std::fs::read_link(format!("/proc/{}/exe", credentials.pid)) else {
@@ -3533,7 +3556,9 @@ impl Niri {
 
     /// Whether any output shows a trusted surface now.
     pub fn trusted_surface_open(&self) -> bool {
-        self.layout.outputs().any(|output| self.trusted_layer_on(output).is_some())
+        self.layout
+            .outputs()
+            .any(|output| self.trusted_layer_on(output).is_some())
     }
 
     /// Input that did not come from a device must not reach a trusted surface unless the config allows it.
@@ -6562,11 +6587,7 @@ impl Niri {
         let pixels = copy.to_vec();
 
         let path = path_override
-            .or_else(|| {
-                make_screenshot_path(&self.config.borrow())
-                    .ok()
-                    .flatten()
-            })
+            .or_else(|| make_screenshot_path(&self.config.borrow()).ok().flatten())
             .unwrap_or_else(|| {
                 let mut path = env::temp_dir();
                 path.push("screenshot.png");

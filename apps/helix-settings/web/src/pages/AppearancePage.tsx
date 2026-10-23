@@ -1,8 +1,52 @@
-import { useState } from "react";
-import { invoke, type RowView } from "@helix/ui";
+import { useEffect, useState } from "react";
+import { invoke, RowGroups, type Change, type RowView } from "@helix/ui";
 import { RowsPage, type PageHandle, type PageSpec } from "./RowsPage";
 
-/** Appearance rows, plus the action that copies the current theme onto the login screen. */
+const ACCENTS: [string, string][] = [["blue", "Blue"], ["purple", "Purple"], ["pink", "Pink"], ["red", "Red"], ["orange", "Orange"], ["yellow", "Yellow"], ["green", "Green"], ["graphite", "Graphite"]];
+
+/** The accent colour: a row of swatches. The choice is the desktop service's `theme.accent`, which every Helix application follows. */
+function AccentRow({ report }: { report: (text: string) => void }) {
+  const [current, setCurrent] = useState("blue");
+  useEffect(() => { invoke<string>("accent_get").then(setCurrent, () => undefined); }, []);
+  const pick = (name: string) => {
+    const before = current;
+    setCurrent(name);
+    invoke("accent_set", { name }).catch((error) => { setCurrent(before); report(`accent: ${String(error)}`); });
+  };
+  return (
+    <>
+      <h4>Accent colour</h4>
+      <div className="rows-card">
+        <div className="setting-row stacked">
+          <div className="setting-text">
+            <div className="setting-title">Accent</div>
+            <div className="setting-about">The colour of buttons, switches and selections in Helix applications.</div>
+          </div>
+          <div className="accent-swatches" role="radiogroup" aria-label="Accent colour">
+            {ACCENTS.map(([name, label]) => (
+              <button key={name} type="button" role="radio" aria-checked={current === name} aria-label={label} title={label} className="accent-swatch" data-accent={name} data-test={`accent-${name}`} onClick={() => pick(name)} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Animations, gaps and cursor size, which the Helix compositor holds. Nothing is drawn on another compositor. */
+function LookRows({ report }: { report: (text: string) => void }) {
+  const [rows, setRows] = useState<RowView[]>([]);
+  useEffect(() => { invoke<RowView[]>("look_rows").then(setRows, () => undefined); }, []);
+  if (rows.length === 0) return null;
+  const change = (id: string, next: Change) => {
+    invoke<RowView[]>("look_change", { id, change: next }).then(setRows, (error) => report(`${id}: ${String(error)}`));
+  };
+  return (
+    <RowGroups rows={rows} onChange={change} />
+  );
+}
+
+/** Appearance rows, the accent colour, and the action that copies the current theme onto the login screen. */
 export function AppearancePage({
   spec,
   register,
@@ -39,7 +83,9 @@ export function AppearancePage({
   return (
     <>
       <RowsPage spec={spec} initialRows={initialRows} register={register} onRows={onRows} report={report} />
-      <div className="setting-about">
+      <AccentRow report={report} />
+      <LookRows report={report} />
+      <div className="setting-about" style={{ marginTop: 18 }}>
         <button className="primary" type="button" data-test="greeter-sync" disabled={busy} onClick={sync}>
           Sync login screen
         </button>

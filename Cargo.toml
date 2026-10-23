@@ -9,10 +9,12 @@ members = [
     "core/helix-config",
     "core/helix-config-export",
     "core/helix-models",
+    "core/helix-task",
     "core/helix-monitor-model",
     "core/helix-shell-model",
     "core/helix-software-model",
     "core/helix-wallpaper-model",
+    "core/helix-nightlight-model",
     "core/helix-desktop-api",
     "core/helix-acp",
     "core/helix-embed",
@@ -20,9 +22,14 @@ members = [
     "core/helix-theme",
     "services/helix-wallpaper",
     "services/helix-idle",
+    "services/helix-identify",
+    "services/helix-lock",
+    "services/helix-agent-input",
+    "services/helix-nightlight",
     "services/helix-desktop",
     "services/helix-assistant",
     "services/helix-inference",
+    "services/helix-agents",
     "services/helix-image",
     "services/helix-system-upgrade",
     "shell/helix-shell-tauri/src-tauri",
@@ -32,6 +39,7 @@ members = [
     "apps/helix-mobius/src-tauri", # Mobius hub
     "apps/helix-software/src-tauri",
     "apps/helix-system-monitor/src-tauri",
+    "apps/helix-models/src-tauri",
     "dev/helix-attacker",
     # The compositor (niri fork). niri-visual-tests needs GTK 4 and libadwaita; build recipes exclude it.
     "compositor",
@@ -60,6 +68,7 @@ helix-chat = { path = "core/helix-chat" }
 helix-compositor = { path = "core/helix-compositor" }
 helix-config = { path = "core/helix-config" }
 helix-config-export = { path = "core/helix-config-export" }
+helix-task = { path = "core/helix-task" }
 helix-models = { path = "core/helix-models" }
 helix-monitor-model = { path = "core/helix-monitor-model" }
 helix-shell-model = { path = "core/helix-shell-model" }
@@ -70,6 +79,7 @@ helix-knowledge = { path = "core/helix-knowledge" }
 helix-theme = { path = "core/helix-theme" }
 helix-wallpaper = { path = "services/helix-wallpaper" }
 helix-wallpaper-model = { path = "core/helix-wallpaper-model" }
+helix-nightlight-model = { path = "core/helix-nightlight-model" }
 
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"

@@ -102,6 +102,36 @@ fn dark_for(
     }
 }
 
+/// How Helix applications look: light or dark, and the accent colour (a name from `helix_config::settings::ACCENTS`; the stylesheet turns it into colours).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Look {
+    pub dark: bool,
+    pub accent: String,
+}
+
+/// The script that puts a look on a page: `data-theme` and `data-accent` on the root element. The accent is checked here, so nothing but a plain
+/// name is ever put in a script.
+pub fn theme_script(look: &Look) -> String {
+    let accent: String = look
+        .accent
+        .chars()
+        .filter(|c| c.is_ascii_lowercase())
+        .take(16)
+        .collect();
+    format!(
+        "document.documentElement.dataset.theme = '{}'; document.documentElement.dataset.accent = '{}'",
+        if look.dark { "dark" } else { "light" },
+        if accent.is_empty() { "blue" } else { &accent },
+    )
+}
+
+fn accent_of(entries: &[OwnedValue]) -> String {
+    entry_of(entries, "theme.accent")
+        .and_then(|dict| dict_string(&dict, "value"))
+        .filter(|name| name.chars().all(|c| c.is_ascii_lowercase()) && !name.is_empty())
+        .unwrap_or_else(|| "blue".into())
+}
+
 /// Whether applications should draw dark now, from a GetSettings catalog (`theme.mode` and the `location.*` rows).
 pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTime) -> bool {
     let mode = entry_of(entries, "theme.mode").and_then(|dict| dict_string(&dict, "value"));
@@ -129,11 +159,8 @@ pub fn theme_is_dark(entries: &[OwnedValue], now: helix_theme::schedule::LocalTi
     )
 }
 
-/// The same answer from the settings list as JSON (what [`Desktop::settings`] returns).
-pub fn theme_is_dark_json(
-    settings: &serde_json::Value,
-    now: helix_theme::schedule::LocalTime,
-) -> bool {
+/// Where the person is, from the settings list as JSON (what [`Desktop::settings`] returns): the `location.*` rows.
+pub fn location_from_json(settings: &serde_json::Value) -> helix_theme::schedule::LocationConfig {
     let entry = |id: &str| {
         settings
             .as_array()
@@ -144,25 +171,38 @@ pub fn theme_is_dark_json(
             })
             .and_then(|e| e.get("value"))
     };
-    dark_for(
-        entry("theme.mode").and_then(|v| v.as_str()),
-        || helix_theme::schedule::LocationConfig {
-            custom_schedule: entry("location.custom_schedule")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false),
-            sunset: entry("location.sunset")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            sunrise: entry("location.sunrise")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            latitude: entry("location.latitude").and_then(|v| v.as_f64()),
-            longitude: entry("location.longitude").and_then(|v| v.as_f64()),
-        },
-        now,
-    )
+    helix_theme::schedule::LocationConfig {
+        custom_schedule: entry("location.custom_schedule")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        sunset: entry("location.sunset")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        sunrise: entry("location.sunrise")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        latitude: entry("location.latitude").and_then(|v| v.as_f64()),
+        longitude: entry("location.longitude").and_then(|v| v.as_f64()),
+    }
+}
+
+/// The same answer from the settings list as JSON (what [`Desktop::settings`] returns).
+pub fn theme_is_dark_json(
+    settings: &serde_json::Value,
+    now: helix_theme::schedule::LocalTime,
+) -> bool {
+    let mode = settings
+        .as_array()
+        .and_then(|entries| {
+            entries
+                .iter()
+                .find(|e| e.get("id").and_then(|v| v.as_str()) == Some("theme.mode"))
+        })
+        .and_then(|e| e.get("value"))
+        .and_then(|v| v.as_str());
+    dark_for(mode, || location_from_json(settings), now)
 }
 
 pub fn sound_volume_label(volume: Option<f64>) -> String {
@@ -389,10 +429,28 @@ impl Desktop {
         proxy.call("StopInputMeter", &()).await
     }
 
-    /// `Audio1.StartInputMeter` with sink id (returns error for unknown sinks).
-    pub async fn audio_start_input_meter(&self, sink_id: u32) -> zbus::Result<()> {
+    /// `Audio1.StartInputMeter` with the microphone's id (returns an error for an unknown one).
+    /// Renews that caller's eight-second lease. Level samples are not part of the audio snapshot.
+    pub async fn audio_start_input_meter(&self, source: u32) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Audio).await?;
-        proxy.call("StartInputMeter", &(sink_id,)).await
+        proxy.call("StartInputMeter", &(source,)).await
+    }
+
+    /// Calls `on_level` for every `InputLevel` sent to this connection: source id, peak (0..=1 as the
+    /// service sent it), and whether a sample was available.
+    pub async fn watch_input_level<F>(&self, mut on_level: F) -> zbus::Result<()>
+    where
+        F: FnMut(u32, f64, bool) + Send,
+    {
+        let proxy = self.domain_proxy(Domain::Audio).await?;
+        let mut levels = proxy.receive_signal("InputLevel").await?;
+        while let Some(message) = levels.next().await {
+            if let Ok((source, peak, available)) = message.body().deserialize::<(u32, f64, bool)>()
+            {
+                on_level(source, peak, available);
+            }
+        }
+        Ok(())
     }
 
     /// Calls `on_prompt` with every `Prompt` signal the service sends this client for a pairing (kind, device, passkey, pin, entered).
@@ -578,6 +636,44 @@ impl Desktop {
             }
         }
         Ok(())
+    }
+
+    /// Calls `on_look` with how applications should look now (dark or light, and the accent colour), then again whenever either changes: after a
+    /// settings change, and once a minute so an automatic theme turns at sunset and sunrise.
+    pub async fn watch_theme<F>(&self, mut on_look: F) -> zbus::Result<()>
+    where
+        F: FnMut(Look) + Send,
+    {
+        let proxy = ConfigurationProxy::new(&self.connection).await?;
+        let mut entries = proxy.get_settings().await?;
+        let now = || helix_theme::schedule::LocalTime::now();
+        let mut last = Look {
+            dark: theme_is_dark(&entries, now()),
+            accent: accent_of(&entries),
+        };
+        on_look(last.clone());
+        let mut changes = proxy.receive_changed().await?;
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+        tick.tick().await;
+        loop {
+            tokio::select! {
+                changed = changes.next() => {
+                    if changed.is_none() {
+                        return Ok(());
+                    }
+                    entries = proxy.get_settings().await?;
+                }
+                _ = tick.tick() => {}
+            }
+            let look = Look {
+                dark: theme_is_dark(&entries, now()),
+                accent: accent_of(&entries),
+            };
+            if look != last {
+                last = look.clone();
+                on_look(look);
+            }
+        }
     }
 
     /// Calls `on_dark` with whether applications should draw dark now, then again whenever that changes: after a settings change, and

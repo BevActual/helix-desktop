@@ -23,7 +23,8 @@ while True:
 print(data.decode().strip())
 PY
 }
-expect_reply() { local got; got=$(send "$1" "${3:-5}"); [ "$got" = "$2" ] && echo "ok: '$1' -> $2" || fail "'$1' gave '$got', wanted '$2'"; }
+# A command that worked answers with a sentence about what changed ("Theme dark to light."); "ok" as the wanted reply means "worked": anything that is not an error.
+expect_reply() { local got; got=$(send "$1" "${3:-5}"); if [ "$2" = ok ]; then case "$got" in ""|error:*) fail "'$1' gave '$got', wanted it to work";; *) echo "ok: '$1' -> $got";; esac; else [ "$got" = "$2" ] && echo "ok: '$1' -> $2" || fail "'$1' gave '$got', wanted '$2'"; fi; }
 expect_error() { local got; got=$(send "$1"); case "$got" in error:*) echo "ok: '$1' refused ($got)";; *) fail "'$1' was not refused: '$got'";; esac; }
 echo "--- 1. the socket and the tool list are private and say what is supported"
 [ "$(stat -c %a "$SOCK")" = 600 ] && echo "ok: the socket is owner only" || fail "socket mode $(stat -c %a "$SOCK")"
@@ -35,7 +36,7 @@ grep -q 'UPDATE theme.mode "light"' "$SETTINGS" && echo "ok: the desktop was tol
 expect_reply "theme-mode-set auto" "ok"; sleep 0.5
 grep -q 'UPDATE theme.mode "auto"' "$SETTINGS" && echo "ok: automatic theme" || fail "no auto update"
 expect_reply "nightlight-enable" "ok"; sleep 0.5
-grep -q 'UPDATE nightlight.enabled true' "$SETTINGS" && echo "ok: night light on" || fail "no night light update"
+python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["enabled"] is True else 1)' "$SCRATCH/config/helix/nightlight.json" && echo "ok: night light on (the helix-nightlight file)" || fail "night light not switched on in nightlight.json"
 expect_reply "notification-dnd-set on" "ok"; sleep 0.5
 expect_reply "notification-dnd-status" "on"
 expect_reply "notification-dnd-toggle" "ok"; sleep 0.5

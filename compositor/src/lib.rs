@@ -10,8 +10,8 @@ pub mod cursor;
 #[cfg(feature = "dbus")]
 pub mod dbus;
 pub mod frame_clock;
-pub mod helix;
 pub mod handlers;
+pub mod helix;
 pub mod input;
 pub mod ipc;
 pub mod layer;

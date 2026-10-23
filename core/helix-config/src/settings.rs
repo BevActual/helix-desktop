@@ -416,6 +416,11 @@ fn bootstrap_defs() -> impl Iterator<Item = &'static SettingDef> {
         .chain(settings_bootstrap_extra::BOOTSTRAP_EXTRA.iter())
 }
 
+/// The accent colours Helix offers, by name. The stylesheet (`core/shared-ui/style.css`, `:root[data-accent=…]`) turns a name into colours.
+pub const ACCENTS: [&str; 8] = [
+    "blue", "purple", "pink", "red", "orange", "yellow", "green", "graphite",
+];
+
 /// Subset needed for shell volume + Settings appearance/accessibility pages.
 pub const BOOTSTRAP: &[SettingDef] = &[
     SettingDef {
@@ -428,6 +433,17 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Str("dark"),
+    },
+    SettingDef {
+        id: "theme.accent",
+        page: "appearance",
+        title: "Accent colour",
+        group: "Colors",
+        kind: SettingKind::String,
+        desktop: false,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("blue"),
     },
     SettingDef {
         id: "theme.pure_black_dark",
@@ -3776,6 +3792,10 @@ fn validate(def: &SettingDef, id: &str, value: Value) -> Result<Value, String> {
                 validate_hook_command(text)?;
             } else if id == "location.sunrise" || id == "location.sunset" {
                 validate_hh_mm(text)?;
+            } else if id == "theme.accent" {
+                if !ACCENTS.contains(&text) {
+                    return Err("Choose one of the accent colours".into());
+                }
             } else if id == "shell.launcher.provider_prefix" {
                 if text.len() > 16 {
                     return Err("Provider prefixes must be at most 16 characters".into());

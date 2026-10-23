@@ -55,15 +55,43 @@ fn spawn(argv: &[String]) {
     }
 }
 
-/// Runs a command and waits for it, for the moment before sleep when the lock has to be in place first.
-fn run_and_wait(argv: &[String]) {
-    if let Some((program, args)) = argv.split_first() {
-        let _ = Command::new(program)
-            .args(args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+/// Locks the session: the configured locker, or (for the default only) the system's own when the Helix one is missing or cannot start. A locker
+/// that answers "no" because the session is already locked (exit 1) is not a reason to start another.
+fn lock(config: &Config, wait: bool) {
+    let config = config.clone();
+    let work = move || {
+        let status = run_status(&config.lock_command);
+        let failed_to_start = !matches!(status, Some(code) if code != 2 && code != 127);
+        if failed_to_start {
+            if let Some(fallback) = config.lock_fallback() {
+                eprintln!("IDLE helix-lock could not start; using {}", fallback[0]);
+                run_status(&fallback);
+            }
+        }
+    };
+    if wait {
+        work();
+    } else {
+        // `helix-lock --daemonize` returns when the lock is in place, so even this is a short wait, but never one that can hold up the idle loop.
+        std::thread::spawn(work);
+    }
+}
+
+/// Runs a command to its end and gives its exit code (`None` when it could not be started).
+fn run_status(argv: &[String]) -> Option<i32> {
+    let (program, args) = argv.split_first()?;
+    match Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+    {
+        Ok(status) => Some(status.code().unwrap_or(-1)),
+        Err(error) => {
+            eprintln!("IDLE could not run {program}: {error}");
+            None
+        }
     }
 }
 
@@ -79,7 +107,7 @@ impl Dispatch<ExtIdleNotificationV1, Kind> for App {
         match (event, kind) {
             (ext_idle_notification_v1::Event::Idled, Kind::Lock) => {
                 eprintln!("IDLE lock");
-                spawn(&app.config.lock_command);
+                lock(&app.config, false);
             }
             (ext_idle_notification_v1::Event::Idled, Kind::ScreenOff) => {
                 eprintln!("IDLE screen off");
@@ -135,7 +163,7 @@ fn watch_logind(config: Config) {
                 if let Ok(signals) = session.receive_signal("Lock") {
                     for _ in signals {
                         eprintln!("IDLE lock requested");
-                        spawn(&lock_config.lock_command);
+                        lock(&lock_config, false);
                     }
                 }
             });
@@ -166,7 +194,7 @@ fn watch_logind(config: Config) {
             };
             if going_to_sleep {
                 eprintln!("IDLE lock before sleep");
-                run_and_wait(&config.lock_command);
+                lock(&config, true);
                 inhibitor = None; // lets the sleep go ahead
             } else if inhibitor.is_none() {
                 inhibitor = take(&manager);

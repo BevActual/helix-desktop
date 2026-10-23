@@ -29,7 +29,7 @@ assert body["models"] == ["acme/primary", "acme/backup"], body
 assert "model" not in body, body
 assert body["provider"] == {"data_collection": "deny", "sort": "price"}, body["provider"]
 assert body["usage"] == {"include": True}, body
-assert body["stream"] is False
+assert body["stream"] is True  # the gateway streams; a server that ignores it is still understood
 PY
 for _ in $(seq 1 40); do has_id stats-1 && break; sleep 0.5; done
 has_id stats-1 && echo "ok: the reply has its details line" || fail "no details line"

@@ -17,6 +17,7 @@ helix-compositor = { workspace = true }
 helix-config = { workspace = true }
 helix-models = { workspace = true }
 helix-wallpaper-model = { workspace = true }
+helix-nightlight-model = { workspace = true }
 image = { workspace = true, features = ["jpeg", "png", "webp"] }
 base64 = { workspace = true }
 gtk = { workspace = true }
@@ -24,6 +25,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tauri = { workspace = true }
 zbus = { workspace = true, features = ["tokio"] }
+libc = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync"] }
 ureq = { workspace = true }
 

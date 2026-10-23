@@ -3,14 +3,24 @@
 //! tiers and the audit, change tiers and revoke, but it is not an agent, cannot approve anything, and never talks to the model. What a
 //! change may be is decided by the pure models in the core crates; the page only sends names those models listed.
 
+mod about;
+mod datetime;
+mod defaults;
+mod input;
+mod look;
+mod powerprofile;
+mod startup;
+mod topbar;
+mod users;
 mod wallhaven;
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use helix_agent::grants::{Grants, GrantsView, Request, RequestError};
 use helix_compositor::shortcuts::{self, ShortcutGroup};
-use helix_config::catalog::{Catalog, Change, RowView};
+use helix_config::catalog::{Catalog, Change, Choice, Control, RowView};
 use helix_config::keybinds::{self, KeybindRow};
 use helix_desktop_api::{Desktop, Domain};
 use helix_models::audio::{Audio, AudioView, Request as AudioRequest, RequestError as AudioError};
@@ -22,7 +32,7 @@ use helix_models::network::{
 };
 use helix_models::pairing::{Pairing, PairingView};
 use helix_wallpaper_model::picker::{Picker, PickerView};
-use helix_wallpaper_model::{choice_path, choice_to_toml, load_config, Source};
+use helix_wallpaper_model::{assign_monitor, choice_path, choice_to_toml, load_config, Source};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -65,6 +75,11 @@ type Shared = Arc<Mutex<State>>;
 
 /// The connection that registered as manager: the service knows the manager by this connection, so every change goes through it.
 static DESKTOP: Mutex<Option<Arc<Desktop>>> = Mutex::new(None);
+
+/// Bumped on every microphone-test start or stop, so a renew from an older test cannot reopen the mic.
+static METER_GEN: AtomicU64 = AtomicU64::new(0);
+/// Start, stop and renew take this in turn, so one cannot close a microphone another just opened.
+static METER_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn current() -> Option<Arc<Desktop>> {
     DESKTOP.lock().expect("desktop").clone()
@@ -475,6 +490,63 @@ async fn audio_set_default_input(app: AppHandle, id: u32) -> Result<(), String> 
     send_audio(audio_with(&app, |a| a.set_default_input(id))).await
 }
 
+#[derive(Clone, Serialize)]
+struct InputLevel {
+    source: u32,
+    percent: u8,
+    available: bool,
+}
+
+/// Opens the microphone in use and keeps its eight-second test lease alive, or closes it.
+/// The lease is renewed only while this test is the latest one. Leaving the Sound page turns it off.
+#[tauri::command]
+async fn audio_test_microphone(app: AppHandle, on: bool) -> Result<(), String> {
+    let generation = METER_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let _guard = METER_LOCK.lock().await;
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    if !on {
+        desktop
+            .audio_stop_input_meter()
+            .await
+            .map_err(|error| error.to_string())?;
+        eprintln!("SETTINGS audio meter stop");
+        return Ok(());
+    }
+    let id =
+        audio_with(&app, |audio| audio.input().map(|device| device.id)).ok_or("No microphone")?;
+    desktop
+        .audio_start_input_meter(id)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS audio meter start {id}");
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(4));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            let _guard = METER_LOCK.lock().await;
+            if METER_GEN.load(Ordering::Relaxed) != generation {
+                return;
+            }
+            let Some(id) = audio_with(&app, |audio| audio.input().map(|device| device.id)) else {
+                if let Some(desktop) = current() {
+                    let _ = desktop.audio_stop_input_meter().await;
+                }
+                return;
+            };
+            let Some(desktop) = current() else { return };
+            if desktop.audio_start_input_meter(id).await.is_err() {
+                return;
+            }
+            if METER_GEN.load(Ordering::Relaxed) != generation {
+                let _ = desktop.audio_stop_input_meter().await;
+            }
+        }
+    });
+    Ok(())
+}
+
 #[tauri::command]
 fn bluetooth_view(app: AppHandle) -> BluetoothView {
     bluetooth_with(&app, Bluetooth::view)
@@ -545,6 +617,28 @@ fn connect(app: AppHandle) {
                             })
                             .await;
                     });
+                    let level_app = app.clone();
+                    let level_desktop = desktop.clone();
+                    let levels = tauri::async_runtime::spawn(async move {
+                        let watcher = level_app.clone();
+                        let _ = level_desktop
+                            .watch_input_level(move |source, peak, available| {
+                                let percent = if peak.is_finite() {
+                                    (peak.clamp(0.0, 1.0) * 100.0).round() as u8
+                                } else {
+                                    0
+                                };
+                                let _ = watcher.emit(
+                                    "audio-level",
+                                    InputLevel {
+                                        source,
+                                        percent,
+                                        available,
+                                    },
+                                );
+                            })
+                            .await;
+                    });
                     let done_app = app.clone();
                     let done_desktop = desktop.clone();
                     let completed = tauri::async_runtime::spawn(async move {
@@ -575,6 +669,7 @@ fn connect(app: AppHandle) {
                                 .await;
                             prompts.abort();
                             completed.abort();
+                            levels.abort();
                         }
                         Err(error) => {
                             set_status(
@@ -591,10 +686,14 @@ fn connect(app: AppHandle) {
                             }
                             prompts.abort();
                             completed.abort();
+                            levels.abort();
                         }
                     }
                 }
                 Err(_) => set_status(&app, "unavailable"),
+            }
+            if let Some(desktop) = current() {
+                let _ = desktop.audio_stop_input_meter().await;
             }
             *DESKTOP.lock().expect("desktop") = None;
             tokio::time::sleep(Duration::from_secs(3)).await;
@@ -824,7 +923,8 @@ struct AboutView {
     version: &'static str,
     service: &'static str,
     agent_access: &'static str,
-    settings: usize,
+    /// What the computer is: name, operating system, kernel, processor, memory, compositor.
+    system: Vec<(String, String)>,
     network: bool,
     bluetooth: bool,
 }
@@ -845,10 +945,7 @@ fn about(app: AppHandle) -> AboutView {
             "denied" => "Not permitted: this is not the installed Settings",
             _ => "Unavailable",
         },
-        settings: ROW_PAGES
-            .iter()
-            .map(|(_, ids)| state.catalog.rows(ids).len())
-            .sum(),
+        system: about::system_lines(),
         network: state.network.view().available,
         bluetooth: state.bluetooth.view().available,
     }
@@ -857,6 +954,11 @@ fn about(app: AppHandle) -> AboutView {
 /// The key binds in the compositor's config files (read only: Settings never writes them).
 #[tauri::command]
 fn shortcuts_view() -> Vec<ShortcutGroup> {
+    // The Helix compositor says what is bound, from every file and from Settings, so nothing has to be read out of the config. Another
+    // compositor gets the read-only list read from its files.
+    if let Some(live) = helix_compositor::compositor_ipc::binds() {
+        return shortcuts::view(&shortcuts::from_compositor(&live));
+    }
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
         .or_else(|| {
@@ -887,6 +989,70 @@ fn shortcuts_view() -> Vec<ShortcutGroup> {
         }
     }
     shortcuts::view(&binds)
+}
+
+/// The shortcut Settings would change: the bind on `chord`, as the compositor reports it now.
+fn live_bind(chord: &str) -> Result<helix_compositor::compositor_ipc::CompositorBind, String> {
+    helix_compositor::compositor_ipc::binds()
+        .ok_or("This compositor cannot change shortcuts.".to_string())?
+        .into_iter()
+        .find(|b| b.chord == chord)
+        .ok_or_else(|| "That shortcut is not there any more.".to_string())
+}
+
+/// Moves a shortcut to other keys. If the keys are already used the answer is `taken: <what uses them>` and nothing changes, until the same request
+/// is made again with `replace` (the other shortcut is then turned off).
+#[tauri::command]
+fn shortcut_move(chord: String, to: String, replace: bool) -> Result<(), String> {
+    use helix_compositor::compositor_ipc::{binds, set_binds};
+    let from = live_bind(&chord)?;
+    let action = from
+        .action_kdl
+        .clone()
+        .ok_or("This shortcut cannot be moved from here.".to_string())?;
+    let all = binds().ok_or("This compositor cannot change shortcuts.")?;
+    let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+    if let Some(taken) = all
+        .iter()
+        .find(|b| same(&b.chord, &to) && b.action != "none" && !same(&b.chord, &chord))
+    {
+        if !replace {
+            let what = shortcuts::view(&shortcuts::from_compositor(std::slice::from_ref(taken)))
+                .into_iter()
+                .flat_map(|g| g.rows)
+                .next()
+                .map(|r| r.title)
+                .unwrap_or_default();
+            return Err(format!("taken: {what}"));
+        }
+    }
+    // The keys it leaves: an override is forgotten (what the config had there comes back); a bind from the config is turned off.
+    let (unbind, reset) = if from.source == "helix" {
+        (vec![], vec![chord])
+    } else {
+        (vec![chord], vec![])
+    };
+    set_binds(&[(to, action)], &unbind, &reset)?;
+    eprintln!("SETTINGS shortcut moved");
+    Ok(())
+}
+
+/// Turns a shortcut off.
+#[tauri::command]
+fn shortcut_off(chord: String) -> Result<(), String> {
+    live_bind(&chord)?;
+    helix_compositor::compositor_ipc::set_binds(&[], &[chord], &[])?;
+    eprintln!("SETTINGS shortcut off");
+    Ok(())
+}
+
+/// Gives a shortcut back to what the config says.
+#[tauri::command]
+fn shortcut_reset(chord: String) -> Result<(), String> {
+    live_bind(&chord)?;
+    helix_compositor::compositor_ipc::set_binds(&[], &[], &[chord])?;
+    eprintln!("SETTINGS shortcut reset");
+    Ok(())
 }
 
 /// Helix Shell Navigation keybinds from the service catalog (editable via UpdateOrderedList).
@@ -942,7 +1108,7 @@ pub(crate) fn wallpaper_folder(app: &AppHandle) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from(home()).join("Pictures/Wallpapers"))
 }
 
-fn scan_wallpapers(app: &AppHandle) -> PickerView {
+fn scan_wallpapers(app: &AppHandle, output: Option<&str>) -> PickerView {
     let folder = wallpaper_folder(app);
     let files: Vec<std::path::PathBuf> = std::fs::read_dir(&folder)
         .into_iter()
@@ -952,7 +1118,11 @@ fn scan_wallpapers(app: &AppHandle) -> PickerView {
         .map(|entry| entry.path())
         .filter(|path| path.is_file())
         .collect();
-    let current = load_config(&home()).default;
+    let config = load_config(&home());
+    let current = match output {
+        Some(name) => config.monitors.get(name).cloned().or(config.default),
+        None => config.default,
+    };
     let shared = shared(app);
     let mut state = shared.lock().expect("state");
     state.picker.set_folder(&folder, files);
@@ -961,8 +1131,19 @@ fn scan_wallpapers(app: &AppHandle) -> PickerView {
 }
 
 #[tauri::command]
-fn wallpaper_view(app: AppHandle) -> PickerView {
-    scan_wallpapers(&app)
+fn wallpaper_view(app: AppHandle, output: Option<String>) -> PickerView {
+    let output = output.filter(|name| !name.is_empty());
+    scan_wallpapers(&app, output.as_deref())
+}
+
+/// Connectors the Wallpaper page can give their own picture. Empty when the compositor is not there.
+#[tauri::command]
+fn wallpaper_outputs() -> Vec<String> {
+    use helix_compositor::compositor_ipc::connected_outputs;
+    connected_outputs()
+        .into_iter()
+        .map(|output| output.name)
+        .collect()
 }
 
 /// A small picture of listed image number `index`, as a data URL. Only listed images can be asked for.
@@ -992,7 +1173,8 @@ async fn wallpaper_thumb(app: AppHandle, index: usize) -> Option<String> {
 }
 
 /// Writes the choice where the wallpaper process looks (atomically, owner only) and tells the page. The process reloads by itself.
-pub(crate) fn write_choice(app: &AppHandle, source: Source) -> Result<(), String> {
+/// `shown` is the connector whose picture the page should highlight; none means the picture for every display.
+fn write_choice_file(app: &AppHandle, text: &str, shown: Option<&str>) -> Result<(), String> {
     let path = choice_path(&home());
     let parent = path.parent().ok_or("no folder for the choice")?;
     std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -1007,37 +1189,69 @@ pub(crate) fn write_choice(app: &AppHandle, source: Source) -> Result<(), String
             .mode(0o600)
             .open(&temporary)
             .map_err(|error| error.to_string())?;
-        file.write_all(choice_to_toml(&source).as_bytes())
+        file.write_all(text.as_bytes())
             .map_err(|error| error.to_string())?;
     }
     std::fs::rename(&temporary, &path).map_err(|error| error.to_string())?;
-    eprintln!("SETTINGS wallpaper chosen");
-    let view = scan_wallpapers(app);
+    match shown {
+        Some(name) => eprintln!("SETTINGS wallpaper monitor {name}"),
+        None => eprintln!("SETTINGS wallpaper chosen"),
+    }
+    let view = scan_wallpapers(app, shown);
     let _ = app.emit("wallpaper-view", view);
     greeter_auto_sync(app, "wallpaper");
     Ok(())
 }
 
+/// All displays, or one connected display. A name the compositor did not report is refused before the file changes.
+pub(crate) fn apply_wallpaper(
+    app: &AppHandle,
+    source: Source,
+    output: Option<String>,
+) -> Result<(), String> {
+    match output.filter(|name| !name.is_empty()) {
+        Some(name) => {
+            use helix_compositor::compositor_ipc::connected_outputs;
+            if !connected_outputs().iter().any(|output| output.name == name) {
+                return Err("unknown display".into());
+            }
+            let path = choice_path(&home());
+            let existing = std::fs::read_to_string(&path).unwrap_or_default();
+            let text = assign_monitor(&existing, &name, &source).map_err(str::to_string)?;
+            write_choice_file(app, &text, Some(&name))
+        }
+        None => write_choice_file(app, &choice_to_toml(&source), None),
+    }
+}
+
 #[tauri::command]
-fn wallpaper_choose_image(app: AppHandle, index: usize) -> Result<(), String> {
+fn wallpaper_choose_image(
+    app: AppHandle,
+    index: usize,
+    output: Option<String>,
+) -> Result<(), String> {
     let source = shared(&app)
         .lock()
         .expect("state")
         .picker
         .choose_image(index)
         .map_err(|error| format!("{error:?}"))?;
-    write_choice(&app, source)
+    apply_wallpaper(&app, source, output)
 }
 
 #[tauri::command]
-fn wallpaper_choose_swatch(app: AppHandle, index: usize) -> Result<(), String> {
+fn wallpaper_choose_swatch(
+    app: AppHandle,
+    index: usize,
+    output: Option<String>,
+) -> Result<(), String> {
     let source = shared(&app)
         .lock()
         .expect("state")
         .picker
         .choose_swatch(index)
         .map_err(|error| format!("{error:?}"))?;
-    write_choice(&app, source)
+    apply_wallpaper(&app, source, output)
 }
 
 /// Whether approvals are allowed on a desktop that cannot protect the dialog (off unless chosen). Stored where the shell reads it.
@@ -1160,10 +1374,19 @@ fn read_notification_prefs() -> helix_config::notification_prefs::NotificationPr
         .unwrap_or_default()
 }
 
-/// The Notifications page: banner time and count, kept in a file the shell watches.
+/// The Notifications page: do not disturb, quiet hours, banner time and count, kept in a file the shell watches.
 #[tauri::command]
 fn notifications_rows() -> Vec<RowView> {
-    read_notification_prefs().rows()
+    read_notification_prefs().rows_with_apps(&read_seen_notification_apps())
+}
+
+/// The applications that have sent a notification (written by the shell), so each can be given a rule.
+fn read_seen_notification_apps() -> Vec<String> {
+    notification_prefs_file()
+        .map(|p| p.with_file_name("notification-apps.json"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1175,6 +1398,8 @@ fn notifications_change(id: String, change: serde_json::Value) -> Result<Vec<Row
         change.get("value"),
     ) {
         (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
+        (Some("switch"), Some(v)) => Change::Switch(v.as_bool().ok_or("not a boolean")?),
+        (Some("choice"), Some(v)) => Change::Choice(v.as_str().ok_or("not text")?.to_string()),
         _ => return Err("unknown change".into()),
     };
     let next = read_notification_prefs()
@@ -1196,7 +1421,7 @@ fn notifications_change(id: String, change: serde_json::Value) -> Result<Vec<Row
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     eprintln!("SETTINGS notifications {id} changed");
-    Ok(next.rows())
+    Ok(next.rows_with_apps(&read_seen_notification_apps()))
 }
 
 fn idle_prefs_file() -> Option<std::path::PathBuf> {
@@ -1212,13 +1437,27 @@ fn read_idle_prefs() -> (helix_config::idle_prefs::IdlePrefs, String) {
 
 /// The Power & lock page: when the session locks and the screen goes off (`idle.toml`, read by helix-idle).
 #[tauri::command]
-fn power_rows() -> Vec<RowView> {
-    read_idle_prefs().0.rows()
+async fn power_rows() -> Vec<RowView> {
+    let mut rows = match powerprofile::read().await {
+        Some(profiles) => powerprofile::rows(&profiles),
+        None => Vec::new(),
+    };
+    rows.extend(read_idle_prefs().0.rows());
+    rows
 }
 
 #[tauri::command]
-fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+async fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     use std::io::Write;
+    if id == "profile:mode" {
+        let mode = change
+            .get("value")
+            .and_then(|v| v.as_str())
+            .ok_or("not text")?;
+        powerprofile::set(mode).await?;
+        eprintln!("SETTINGS power mode {mode}");
+        return Ok(power_rows().await);
+    }
     use std::os::unix::fs::OpenOptionsExt;
     let change = match (
         change.get("kind").and_then(|k| k.as_str()),
@@ -1257,72 +1496,1085 @@ fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, S
             .status();
     }
     eprintln!("SETTINGS power {id} changed");
-    Ok(next.rows())
+    let mut rows = match powerprofile::read().await {
+        Some(profiles) => powerprofile::rows(&profiles),
+        None => Vec::new(),
+    };
+    rows.extend(next.rows());
+    Ok(rows)
 }
 
-/// The Displays page: what is connected, as the compositor reports it (read only).
+/// The Displays page: each connected output, with scale and orientation the compositor applies for this session.
+fn clock_file() -> Option<std::path::PathBuf> {
+    dock_prefs_file().map(|p| p.with_file_name("clock-settings.json"))
+}
+
+fn read_clock() -> helix_config::clock_prefs::ClockFormat {
+    clock_file()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| helix_config::clock_prefs::ClockFormat::parse(&text))
+        .unwrap_or_default()
+}
+
+fn write_clock(format: helix_config::clock_prefs::ClockFormat) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let path = clock_file().ok_or("no folder for the settings")?;
+    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        file.write_all(format.to_json().as_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+    eprintln!("SETTINGS clock {}", format.name());
+    Ok(())
+}
+
+/// Default applications: web, mail, files, text, pictures, PDFs, video and music, read from and written to `~/.config/mimeapps.list`.
+#[tauri::command]
+fn defaults_rows() -> Vec<RowView> {
+    defaults::rows(&defaults::Apps::read())
+}
+
+#[tauri::command]
+fn defaults_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let (kind, desktop) = defaults::parse_change(&id, &change)?;
+    defaults::choose(&kind, &desktop)?;
+    eprintln!("SETTINGS default {kind} {desktop}");
+    Ok(defaults_rows())
+}
+
+/// The accent colour's name, from the desktop service (`blue` when it has none).
+#[tauri::command]
+async fn accent_get() -> String {
+    let Some(desktop) = current() else {
+        return "blue".into();
+    };
+    desktop
+        .settings()
+        .await
+        .ok()
+        .and_then(|settings| {
+            settings
+                .as_array()?
+                .iter()
+                .find(|e| e.get("id").and_then(|v| v.as_str()) == Some("theme.accent"))?
+                .get("value")?
+                .as_str()
+                .map(str::to_string)
+        })
+        .filter(|name| helix_config::settings::ACCENTS.contains(&name.as_str()))
+        .unwrap_or_else(|| "blue".into())
+}
+
+#[tauri::command]
+async fn accent_set(name: String) -> Result<(), String> {
+    if !helix_config::settings::ACCENTS.contains(&name.as_str()) {
+        return Err("that is not one of the accent colours".into());
+    }
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    desktop
+        .update_setting("theme.accent", &serde_json::json!(name))
+        .await
+        .map_err(|error| error.to_string())?;
+    // The ring around the focused window follows the accent (nothing happens on another compositor).
+    if let Some(ring) = look::accent_ring(&name) {
+        if helix_compositor::compositor_ipc::look_settings().is_some() {
+            let _ = helix_compositor::compositor_ipc::set_look_settings(&ring);
+        }
+    }
+    eprintln!("SETTINGS accent {name}");
+    Ok(())
+}
+
+/// Touchpad and mouse. Empty when the compositor cannot change them (it is not the Helix one).
+#[tauri::command]
+fn pointer_rows() -> Vec<RowView> {
+    helix_compositor::compositor_ipc::input_settings()
+        .map(|input| input::pointer_rows(&input))
+        .unwrap_or_default()
+}
+
+/// The layout and the key repeat.
+#[tauri::command]
+fn typing_rows() -> Vec<RowView> {
+    helix_compositor::compositor_ipc::input_settings()
+        .map(|input| input::typing_rows(&input, &input::read_layouts()))
+        .unwrap_or_default()
+}
+
+fn send_input(id: &str, change: &serde_json::Value) -> Result<(), String> {
+    let request = input::parse_change(id, change)?;
+    helix_compositor::compositor_ipc::set_input_settings(&request)?;
+    eprintln!("SETTINGS input {id}");
+    Ok(())
+}
+
+#[tauri::command]
+fn pointer_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    send_input(&id, &change)?;
+    Ok(pointer_rows())
+}
+
+#[tauri::command]
+fn typing_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    send_input(&id, &change)?;
+    Ok(typing_rows())
+}
+
+/// Startup apps: what starts at login, from the autostart folders.
+#[tauri::command]
+fn startup_rows() -> Vec<RowView> {
+    let Some(user) = startup::user_dir() else {
+        return Vec::new();
+    };
+    let entries = startup::read(&user, &startup::system_folders());
+    let addable = startup::installed(&startup::app_folders());
+    startup::rows(&entries, &addable)
+}
+
+#[tauri::command]
+fn startup_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let user = startup::user_dir().ok_or("no folder for the settings")?;
+    match startup::parse_change(&id, &change)? {
+        startup::Edit::Enable(entry, on) => {
+            startup::set_enabled(&user, &startup::system_folders(), &entry, on)?;
+            eprintln!("SETTINGS startup {entry} {}", if on { "on" } else { "off" });
+        }
+        startup::Edit::Add(app) => {
+            startup::add(&user, &startup::app_folders(), &app)?;
+            eprintln!("SETTINGS startup added {app}");
+        }
+    }
+    Ok(startup_rows())
+}
+
+/// The Top bar page: which parts of the bar are shown, kept in a file the shell watches.
+#[tauri::command]
+fn topbar_rows() -> Vec<RowView> {
+    topbar::rows(&topbar::read())
+}
+
+#[tauri::command]
+fn topbar_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let next = topbar::change(&topbar::read(), &id, &change)?;
+    topbar::write(&next)?;
+    eprintln!("SETTINGS top bar {id}");
+    Ok(topbar::rows(&next))
+}
+
+/// How things look: animations, gaps, cursor size. Empty when the compositor cannot change them (it is not the Helix one).
+#[tauri::command]
+fn look_rows() -> Vec<RowView> {
+    let mut rows = helix_compositor::compositor_ipc::look_settings()
+        .map(|look| look::look_rows(&look))
+        .unwrap_or_default();
+    // The shell's own corners and the glass are drawn by the shell, so their sliders are there whatever the compositor is.
+    let shape = helix_config::shape_prefs::read();
+    rows.extend(look::shape_rows(&shape));
+    rows.push(look::glass_row(shape.glass));
+    rows
+}
+
+/// Multitasking: focus, centring, the hot corner. Empty when the compositor cannot change them.
+#[tauri::command]
+fn multitask_rows() -> Vec<RowView> {
+    helix_compositor::compositor_ipc::look_settings()
+        .map(|look| {
+            let mut rows = look::multitask_rows(&look);
+            rows.extend(look::app_rows(&look, &running_app_ids()));
+            rows
+        })
+        .unwrap_or_default()
+}
+
+/// The applications that have a window open now.
+fn running_app_ids() -> Vec<String> {
+    let Some(ok) = helix_compositor::compositor_ipc::request_json("\"Windows\"") else {
+        return Vec::new();
+    };
+    ok.get("Windows")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|w| w.get("app_id").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect()
+}
+
+#[tauri::command]
+fn multitask_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    let current = helix_compositor::compositor_ipc::look_settings()
+        .and_then(|look| look.app_rules)
+        .unwrap_or_default();
+    let request = match look::parse_app_change(&id, &change, &current) {
+        Some(request) => request?,
+        None => look::parse_multitask_change(&id, &change)?,
+    };
+    helix_compositor::compositor_ipc::set_look_settings(&request)?;
+    eprintln!("SETTINGS multitasking {id}");
+    Ok(multitask_rows())
+}
+
+/// A change to the shape file (`~/.config/helix/shape-settings.json`): a corner or the glass. Returns whether `id` was one of those.
+fn shape_change(id: &str, change: &serde_json::Value) -> Result<bool, String> {
+    let mut shape = helix_config::shape_prefs::read();
+    let number = || {
+        change
+            .get("value")
+            .and_then(serde_json::Value::as_f64)
+            .filter(|v| v.is_finite())
+            .ok_or("not a number".to_string())
+    };
+    let scale = || number().map(|p| (p / 100.0).clamp(0.0, helix_config::shape_prefs::SCALE_MAX));
+    match id {
+        "shape:bar" => shape.bar = scale()?,
+        "shape:dock" => shape.dock = scale()?,
+        "shape:panels" => shape.panels = scale()?,
+        "shape:toasts" => shape.toasts = scale()?,
+        "shape:apps" => shape.apps = scale()?,
+        "look:glass" => shape.glass = (number()? / 100.0).clamp(0.0, 1.0),
+        _ => return Ok(false),
+    }
+    helix_config::shape_prefs::write(&shape)?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn look_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    // The shell's own corners and the glass are the shell's, not the compositor's.
+    if shape_change(&id, &change)? {
+        eprintln!("SETTINGS look {id}");
+        return Ok(look_rows());
+    }
+    let request = look::parse_change(&id, &change)?;
+    // The windows' corners are the compositor's; they are also written down with the rest so everything agrees (and Helix applications can follow).
+    if request.window_corner_radius.is_some() {
+        let mut shape = helix_config::shape_prefs::read();
+        look::merge_window_corners(&mut shape, &request);
+        helix_config::shape_prefs::write(&shape)?;
+    }
+    helix_compositor::compositor_ipc::set_look_settings(&request)?;
+    eprintln!("SETTINGS look {id}");
+    Ok(look_rows())
+}
+
+/// What the desktop service last said about finding the place by itself (it writes this next to the other state files).
+fn location_status_file() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_STATE_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/state"))
+        })?;
+    Some(base.join("helix/location-status.json"))
+}
+
+/// The Date & time page: the time zone and automatic time from timedated, the clock format the shell watches, and where the person is.
+#[tauri::command]
+async fn datetime_rows() -> Vec<RowView> {
+    let place = match current() {
+        Some(desktop) => desktop
+            .settings()
+            .await
+            .map(|settings| datetime::Place::from_settings(&settings))
+            .unwrap_or_default(),
+        None => datetime::Place::default(),
+    };
+    let timedate = datetime::read_timedate().await;
+    let clock = read_clock();
+    let locate = location_status_file()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| datetime::LocateStatus::parse(&text))
+        .unwrap_or_default();
+    datetime::rows(
+        timedate.as_ref(),
+        clock,
+        &place,
+        &locate,
+        &datetime::now_text(clock),
+    )
+}
+
+#[tauri::command]
+async fn datetime_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    use datetime::Edit;
+    let service = |setting: &'static str, value: serde_json::Value| async move {
+        let desktop = current().ok_or("not connected to the desktop service")?;
+        desktop
+            .update_setting(setting, &value)
+            .await
+            .map_err(|error| error.to_string())?;
+        eprintln!("SETTINGS set {setting} {value}");
+        Ok::<(), String>(())
+    };
+    match datetime::parse_edit(&id, &change)? {
+        Edit::Timezone(zone) => {
+            let known = datetime::read_timedate()
+                .await
+                .is_some_and(|td| td.zones.contains(&zone));
+            if !known {
+                return Err("that is not a time zone this computer knows".into());
+            }
+            datetime::set_timezone(&zone).await?;
+            eprintln!("SETTINGS timezone {zone}");
+        }
+        Edit::Ntp(on) => {
+            datetime::set_ntp(on).await?;
+            eprintln!("SETTINGS ntp {on}");
+        }
+        Edit::Clock(format) => write_clock(format)?,
+        Edit::Latitude(n) => service("location.latitude", serde_json::json!(n)).await?,
+        Edit::Longitude(n) => service("location.longitude", serde_json::json!(n)).await?,
+        Edit::Auto(on) => service("location.auto_locate", serde_json::json!(on)).await?,
+        Edit::Custom(on) => service("location.custom_schedule", serde_json::json!(on)).await?,
+        Edit::Sunrise(t) => service("location.sunrise", serde_json::json!(t)).await?,
+        Edit::Sunset(t) => service("location.sunset", serde_json::json!(t)).await?,
+    }
+    Ok(datetime_rows().await)
+}
+
 #[tauri::command]
 fn displays_rows() -> Vec<RowView> {
-    use std::io::{BufRead, BufReader, Write};
-    use std::os::unix::net::UnixStream;
-    let Some(path) = std::env::var_os("NIRI_SOCKET") else {
-        return Vec::new();
+    display_rows()
+}
+
+fn read_night() -> helix_nightlight_model::NightLight {
+    helix_nightlight_model::load()
+}
+
+/// Night light, at the top of the Displays page: the `helix-nightlight` service reads the file these rows write.
+fn night_rows(night: &helix_nightlight_model::NightLight) -> Vec<RowView> {
+    use helix_nightlight_model::{WARMTH_MAX, WARMTH_MIN};
+    let row = |id: &str, title: &str, description: &str, control: Control| RowView {
+        id: format!("night:{id}"),
+        title: title.into(),
+        group: "Night light".into(),
+        description: description.into(),
+        overridden: false,
+        control,
     };
-    let Ok(mut stream) = UnixStream::connect(path) else {
-        return Vec::new();
-    };
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
-    if stream.write_all(b"\"Outputs\"\n").is_err() {
-        return Vec::new();
+    let mut rows = vec![
+        row(
+            "enabled",
+            "Night light",
+            "Warms the screen to be easier on the eyes. Colours return to normal when it is off.",
+            Control::Switch { on: night.enabled },
+        ),
+        row(
+            "warmth",
+            "Warmth",
+            "The colour temperature in kelvin. Lower is warmer.",
+            Control::Slider {
+                min: WARMTH_MIN as f64,
+                max: WARMTH_MAX as f64,
+                integer: true,
+                value: night.warmth as f64,
+            },
+        ),
+        row(
+            "scheduled",
+            "On a schedule",
+            "Warm only between the hours below, warming up and cooling down over half an hour. Off keeps the screen warm all the time.",
+            Control::Switch { on: night.scheduled },
+        ),
+    ];
+    if night.scheduled {
+        rows.push(row(
+            "sun",
+            "Follow sunset and sunrise",
+            "Uses where you are, set in Date & time. Off uses the hours below.",
+            Control::Switch { on: night.sun },
+        ));
     }
-    let mut line = String::new();
-    if BufReader::new(stream).read_line(&mut line).is_err() {
-        return Vec::new();
-    }
-    let Ok(reply) = serde_json::from_str::<serde_json::Value>(&line) else {
-        return Vec::new();
-    };
-    let Some(outputs) = reply.pointer("/Ok/Outputs").and_then(|o| o.as_object()) else {
-        return Vec::new();
-    };
-    let mut rows: Vec<RowView> = outputs
-        .iter()
-        .map(|(name, output)| {
-            let text = |key: &str| output.get(key).and_then(|v| v.as_str()).unwrap_or("");
-            let make = format!("{} {}", text("make"), text("model"))
-                .trim()
-                .to_string();
-            let mode = output
-                .get("current_mode")
-                .and_then(|i| i.as_u64())
-                .and_then(|i| output.pointer(&format!("/modes/{i}")))
-                .map(|m| {
-                    let w = m.get("width").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let h = m.get("height").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let hz =
-                        m.get("refresh_rate").and_then(|v| v.as_u64()).unwrap_or(0) as f64 / 1000.0;
-                    format!("{w} × {h} at {hz:.0} Hz")
-                })
-                .unwrap_or_default();
-            let scale = output
-                .pointer("/logical/scale")
-                .and_then(|v| v.as_f64())
-                .map(|s| format!(", scale {s}"))
-                .unwrap_or_default();
-            RowView {
-                id: name.chars().take(40).collect(),
-                title: helix_base::display::sanitize_for_display(name, 40),
-                group: "Connected".into(),
-                description: helix_base::display::sanitize_for_display(&make, 80),
-                overridden: false,
-                control: helix_config::catalog::Control::Text {
-                    value: helix_base::display::sanitize_for_display(&format!("{mode}{scale}"), 80),
+    if night.scheduled && !night.sun {
+        for (id, title, value) in [
+            ("start", "From (hour)", night.start),
+            ("end", "Until (hour)", night.end),
+        ] {
+            rows.push(row(
+                id,
+                title,
+                "On the 24-hour clock.",
+                Control::Slider {
+                    min: 0.0,
+                    max: 23.0,
+                    integer: true,
+                    value: value as f64,
                 },
+            ));
+        }
+    }
+    rows
+}
+
+fn night_change(name: &str, change: &serde_json::Value) -> Result<(), String> {
+    let value = change.get("value").ok_or("unknown change")?;
+    let next = read_night()
+        .set(name, value)
+        .map_err(|error| format!("{error:?}"))?;
+    helix_nightlight_model::save(&next)?;
+    eprintln!("SETTINGS night light {name} changed");
+    Ok(())
+}
+
+#[tauri::command]
+fn displays_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    use helix_compositor::compositor_ipc::{
+        apply_output, connected_outputs, mode_from_token, output_request, scale_from_token,
+        turn_wire, OutputAdjust,
+    };
+    let (kind, name) = id.split_once(':').ok_or("unknown display")?;
+    if kind == "night" {
+        night_change(name, &change)?;
+        return Ok(displays_rows());
+    }
+    let outputs = connected_outputs();
+    let output = outputs
+        .iter()
+        .find(|output| output.name == name)
+        .ok_or("unknown display")?;
+    let adjust = match change.get("kind").and_then(|kind| kind.as_str()) {
+        Some("choice") => {
+            let value = change
+                .get("value")
+                .and_then(|value| value.as_str())
+                .ok_or("not text")?;
+            match kind {
+                "scale" => {
+                    if scale_choices(output.scale).1 == value {
+                        return Ok(display_rows());
+                    }
+                    OutputAdjust::Scale(scale_from_token(value).ok_or("pick a scale")?)
+                }
+                "turn" => {
+                    if turn_choices(output.transform.as_deref()).1 == value {
+                        return Ok(display_rows());
+                    }
+                    OutputAdjust::Turn(turn_wire(value).ok_or("pick an orientation")?)
+                }
+                "mode" => {
+                    if mode_choices(output).1 == value {
+                        return Ok(display_rows());
+                    }
+                    let (width, height, refresh) =
+                        mode_from_token(value).ok_or("pick a resolution")?;
+                    if !output.modes.iter().any(|mode| {
+                        mode.width == width as u32
+                            && mode.height == height as u32
+                            && mode.refresh_millihertz == refresh
+                    }) {
+                        return Err("pick a resolution".into());
+                    }
+                    OutputAdjust::Mode {
+                        width,
+                        height,
+                        refresh_hz: refresh as f64 / 1000.0,
+                    }
+                }
+                "place" => {
+                    if place_choices(output, &outputs).1 == value {
+                        return Ok(display_rows());
+                    }
+                    place_adjust(value, output, &outputs)?
+                }
+                _ => return Err("unknown display".into()),
+            }
+        }
+        Some("switch") => {
+            let on = change
+                .get("value")
+                .and_then(|value| value.as_bool())
+                .ok_or("not a boolean")?;
+            match kind {
+                "vrr" => {
+                    if !output.vrr_supported {
+                        return Err("this display has no variable refresh".into());
+                    }
+                    if output.vrr_enabled == on {
+                        return Ok(display_rows());
+                    }
+                    OutputAdjust::Vrr(on)
+                }
+                "power" => {
+                    if output.scale.is_some() == on {
+                        return Ok(display_rows());
+                    }
+                    if !on && outputs.iter().filter(|other| other.scale.is_some()).count() < 2 {
+                        return Err("keep at least one display on".into());
+                    }
+                    OutputAdjust::Power(on)
+                }
+                _ => return Err("unknown display".into()),
+            }
+        }
+        _ => return Err("unknown change".into()),
+    };
+    let line = output_request(name, adjust).map_err(str::to_string)?;
+    apply_output(&line)?;
+    wait_until_applied(name, &adjust);
+    persist_display(name, &adjust)?;
+    eprintln!("SETTINGS display {line}");
+    Ok(display_rows())
+}
+
+/// The displays in use, for the arrangement picture: where each sits on the desktop and how large it is, in logical pixels.
+#[tauri::command]
+fn display_layout() -> Vec<serde_json::Value> {
+    use helix_compositor::compositor_ipc::{connected_outputs, output_name_ok};
+    connected_outputs()
+        .iter()
+        .filter(|output| output_name_ok(&output.name) && output.scale.is_some())
+        .filter_map(|output| {
+            Some(serde_json::json!({
+                "name": output.name,
+                "label": display_heading(output),
+                "x": output.x?,
+                "y": output.y?,
+                "w": output.logical_width?,
+                "h": output.logical_height?,
+            }))
+        })
+        .collect()
+}
+
+/// Flashes each display's number on that display for a few seconds (`helix-identify`), the same numbers the arrangement picture shows.
+#[tauri::command]
+fn display_identify() -> Result<(), String> {
+    let layout = display_layout();
+    if layout.len() < 2 {
+        return Err("There is only one display.".into());
+    }
+    let names: Vec<String> = layout
+        .iter()
+        .enumerate()
+        .filter_map(|(index, screen)| Some(format!("{}={}", screen["name"].as_str()?, index + 1)))
+        .collect();
+    // The helper next to this program (a build tree or an install), else the one on the path.
+    let program = std::env::var_os("HELIX_IDENTIFY_BIN")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .map(|exe| exe.with_file_name("helix-identify"))
+                .filter(|p| p.exists())
+        })
+        .unwrap_or_else(|| "helix-identify".into());
+    std::process::Command::new(program)
+        .args(["--seconds", "4"])
+        .args(&names)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|_| "helix-identify is not installed.".to_string())?;
+    eprintln!("SETTINGS identify {}", names.join(" "));
+    Ok(())
+}
+
+/// Moves one display to where it was dropped, snapped against a neighbour so the desktop stays in one piece.
+#[tauri::command]
+fn display_move(name: String, x: i32, y: i32) -> Result<Vec<serde_json::Value>, String> {
+    use helix_compositor::compositor_ipc::{
+        apply_output, connected_outputs, output_request, snap_position, OutputAdjust,
+    };
+    let outputs = connected_outputs();
+    let output = outputs
+        .iter()
+        .find(|output| output.name == name && output.scale.is_some())
+        .ok_or("that display is not in use")?;
+    let size = output
+        .logical_width
+        .zip(output.logical_height)
+        .ok_or("that display is not in use")?;
+    let others: Vec<(i32, i32, u32, u32)> = outputs
+        .iter()
+        .filter(|other| other.name != name && other.scale.is_some())
+        .filter_map(|other| {
+            Some((
+                other.x?,
+                other.y?,
+                other.logical_width?,
+                other.logical_height?,
+            ))
+        })
+        .collect();
+    let at =
+        snap_position((x, y), size, &others).ok_or("there is no other display to sit beside")?;
+    if output.x != Some(at.0) || output.y != Some(at.1) {
+        // A display with no position of its own is placed by the compositor after the others, so it would jump when this one moves: give every
+        // other display the place it has now first.
+        for other in outputs
+            .iter()
+            .filter(|other| other.name != name && other.scale.is_some())
+        {
+            if let Some(here) = other.x.zip(other.y) {
+                let keep = OutputAdjust::Position(Some(here));
+                apply_output(&output_request(&other.name, keep).map_err(str::to_string)?)?;
+                wait_until_applied(&other.name, &keep);
+                persist_display(&other.name, &keep)?;
+            }
+        }
+        let adjust = OutputAdjust::Position(Some(at));
+        apply_output(&output_request(&name, adjust).map_err(str::to_string)?)?;
+        wait_until_applied(&name, &adjust);
+        persist_display(&name, &adjust)?;
+        eprintln!("SETTINGS display {name} moved to {} {}", at.0, at.1);
+    }
+    Ok(display_layout())
+}
+
+fn place_adjust(
+    value: &str,
+    output: &helix_compositor::compositor_ipc::OutputSnapshot,
+    outputs: &[helix_compositor::compositor_ipc::OutputSnapshot],
+) -> Result<helix_compositor::compositor_ipc::OutputAdjust, String> {
+    use helix_compositor::compositor_ipc::{place_beside, OutputAdjust, Side};
+    if value == "auto" {
+        return Ok(OutputAdjust::Position(None));
+    }
+    let (side, other_name) = value.split_once(':').ok_or("pick an arrangement")?;
+    let side = match side {
+        "right" => Side::Right,
+        "left" => Side::Left,
+        "above" => Side::Above,
+        "below" => Side::Below,
+        _ => return Err("pick an arrangement".into()),
+    };
+    let other = outputs
+        .iter()
+        .find(|other| other.name == other_name && other.scale.is_some())
+        .ok_or("that display is not connected")?;
+    if other.name == output.name {
+        return Err("pick an arrangement".into());
+    }
+    let this_size = output
+        .logical_width
+        .zip(output.logical_height)
+        .ok_or("that display is not in use")?;
+    let other_box = other
+        .x
+        .zip(other.y)
+        .zip(other.logical_width.zip(other.logical_height))
+        .map(|((x, y), (width, height))| (x, y, width, height))
+        .ok_or("that display is not in use")?;
+    Ok(OutputAdjust::Position(Some(place_beside(
+        side, other_box, this_size,
+    ))))
+}
+
+fn wait_until_applied(name: &str, adjust: &helix_compositor::compositor_ipc::OutputAdjust) {
+    use helix_compositor::compositor_ipc::{connected_outputs, scale_token, OutputAdjust};
+    for _ in 0..25 {
+        let matched = connected_outputs().into_iter().any(|output| {
+            output.name == name
+                && match adjust {
+                    OutputAdjust::Scale(scale) => output
+                        .scale
+                        .is_some_and(|current| scale_token(current) == scale_token(*scale)),
+                    OutputAdjust::Turn(turn) => output.transform.as_deref() == Some(*turn),
+                    OutputAdjust::Mode {
+                        width,
+                        height,
+                        refresh_hz,
+                    } => {
+                        output.width == Some(*width as u32)
+                            && output.height == Some(*height as u32)
+                            && output.refresh_millihertz.is_some_and(|refresh| {
+                                (refresh as f64 - refresh_hz * 1000.0).abs() < 2.0
+                            })
+                    }
+                    OutputAdjust::Position(Some((x, y))) => {
+                        output.x == Some(*x) && output.y == Some(*y)
+                    }
+                    OutputAdjust::Position(None) => true,
+                    OutputAdjust::Vrr(on) => output.vrr_enabled == *on,
+                    OutputAdjust::Power(on) => output.scale.is_some() == *on,
+                }
+        });
+        if matched {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(40));
+    }
+}
+
+/// Records the one display that was changed in `helix-setup.kdl` and leaves the others as they were. A resolution or position is written only when
+/// it was the thing changed or the file already had one, so choosing a scale does not pin the placement a display was given automatically.
+fn persist_display(
+    name: &str,
+    adjust: &helix_compositor::compositor_ipc::OutputAdjust,
+) -> Result<(), String> {
+    use helix_compositor::compositor_config::{save_display, saved_output_has, DisplaySetup};
+    // The Helix compositor remembers the whole setup itself, per set of connected displays, and applies it again when that set returns; the file
+    // below is only for a compositor that cannot.
+    if helix_compositor::compositor_ipc::helix_capabilities().display_profiles {
+        return helix_compositor::compositor_ipc::save_display_profile();
+    }
+    use helix_compositor::compositor_ipc::{
+        connected_outputs, kdl_transform, scale_token, OutputAdjust,
+    };
+    let outputs = connected_outputs();
+    let output = outputs
+        .iter()
+        .find(|output| output.name == name)
+        .ok_or("the compositor did not report the display")?;
+    // Saved by the monitor's identity when it has one, so its settings follow it to another port.
+    let saved_as = output.config_name(&outputs);
+    let names = [saved_as.as_str(), output.name.as_str()];
+    let position = match adjust {
+        OutputAdjust::Position(None) => None,
+        OutputAdjust::Position(Some(_)) => output.x.zip(output.y),
+        _ if saved_output_has(&names, "position") => output.x.zip(output.y),
+        _ => None,
+    };
+    let mode = match adjust {
+        OutputAdjust::Mode { .. } => true,
+        _ => saved_output_has(&names, "mode"),
+    }
+    .then(|| {
+        output
+            .width
+            .zip(output.height)
+            .zip(output.refresh_millihertz)
+            .map(|((width, height), refresh)| {
+                format!("{width}x{height}@{:.3}", refresh as f64 / 1000.0)
+            })
+    })
+    .flatten();
+    let replaces = [output.name.as_str()];
+    save_display(
+        &DisplaySetup {
+            name: saved_as.clone(),
+            off: output.scale.is_none(),
+            scale: output.scale.and_then(|scale| {
+                scale_token(scale)
+                    .and_then(|token| token.parse().ok())
+                    .or(Some(scale))
+            }),
+            transform: output
+                .transform
+                .as_deref()
+                .and_then(kdl_transform)
+                .map(str::to_string),
+            mode,
+            position,
+            vrr: output.vrr_enabled,
+        },
+        &replaces,
+    )
+}
+
+fn display_rows() -> Vec<RowView> {
+    use helix_compositor::compositor_ipc::{connected_outputs, output_name_ok};
+    let outputs = connected_outputs();
+    let mut rows = Vec::new();
+    for output in &outputs {
+        if !output_name_ok(&output.name) {
+            continue;
+        }
+        let group = display_heading(output);
+        let mapped = output.scale.is_some();
+        let others_on = outputs.iter().filter(|other| other.scale.is_some()).count();
+        if !mapped {
+            if outputs.len() > 1 {
+                rows.push(power_row(&output.name, &group, false));
+            } else {
+                rows.push(text_row(
+                    &format!("picture:{}", output.name),
+                    "Picture",
+                    &group,
+                    "Not in use",
+                    "Off",
+                ));
+            }
+            continue;
+        }
+        let several = others_on > 1;
+        let (options, current) = mode_choices(output);
+        if !options.is_empty() {
+            rows.push(RowView {
+                id: format!("mode:{}", output.name),
+                title: "Resolution".into(),
+                group: group.clone(),
+                description: if several {
+                    String::new()
+                } else {
+                    format!("At {}, {}", output.x.unwrap_or(0), output.y.unwrap_or(0))
+                },
+                overridden: false,
+                control: Control::Choice { options, current },
+            });
+        }
+        let (options, current) = scale_choices(output.scale);
+        rows.push(RowView {
+            id: format!("scale:{}", output.name),
+            title: "Scale".into(),
+            group: group.clone(),
+            description: String::new(),
+            overridden: false,
+            control: Control::Choice { options, current },
+        });
+        let (options, current) = turn_choices(output.transform.as_deref());
+        rows.push(RowView {
+            id: format!("turn:{}", output.name),
+            title: "Orientation".into(),
+            group: group.clone(),
+            description: "Counter-clockwise.".into(),
+            overridden: false,
+            control: Control::Choice { options, current },
+        });
+        if several {
+            let (options, current) = place_choices(output, &outputs);
+            rows.push(RowView {
+                id: format!("place:{}", output.name),
+                title: "Arrangement".into(),
+                group: group.clone(),
+                description: format!("At {}, {}", output.x.unwrap_or(0), output.y.unwrap_or(0)),
+                overridden: false,
+                control: Control::Choice { options, current },
+            });
+        }
+        if output.vrr_supported {
+            rows.push(RowView {
+                id: format!("vrr:{}", output.name),
+                title: "Variable refresh".into(),
+                group: group.clone(),
+                description: String::new(),
+                overridden: false,
+                control: Control::Switch {
+                    on: output.vrr_enabled,
+                },
+            });
+        }
+        if others_on > 1 {
+            rows.push(power_row(&output.name, &group, true));
+        }
+    }
+    if let Some(saved) = helix_compositor::compositor_ipc::display_profile_saved() {
+        rows.push(text_row(
+            "profile:status",
+            "Remembered layout",
+            "Layout",
+            "The compositor saves how your displays are set up, for exactly this set of displays, and applies it again when they are connected.",
+            if saved { "Saved" } else { "Not yet: change a display to save it" },
+        ));
+    }
+    rows.extend(night_rows(&read_night()));
+    rows
+}
+
+fn text_row(id: &str, title: &str, group: &str, description: &str, value: &str) -> RowView {
+    RowView {
+        id: id.into(),
+        title: title.into(),
+        group: group.into(),
+        description: description.into(),
+        overridden: false,
+        control: Control::Text {
+            value: value.into(),
+        },
+    }
+}
+
+fn power_row(name: &str, group: &str, on: bool) -> RowView {
+    RowView {
+        id: format!("power:{name}"),
+        title: "On".into(),
+        group: group.into(),
+        description: "Another display stays on.".into(),
+        overridden: false,
+        control: Control::Switch { on },
+    }
+}
+
+fn display_heading(output: &helix_compositor::compositor_ipc::OutputSnapshot) -> String {
+    let label = [output.make.as_str(), output.model.as_str()]
+        .into_iter()
+        .filter(|text| !text.is_empty() && !text.eq_ignore_ascii_case("unknown"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let heading = if label.is_empty() {
+        output.name.clone()
+    } else {
+        format!("{label} ({})", output.name)
+    };
+    helix_base::display::sanitize_for_display(&heading, 80)
+}
+
+fn mode_choices(
+    output: &helix_compositor::compositor_ipc::OutputSnapshot,
+) -> (Vec<Choice>, String) {
+    use helix_compositor::compositor_ipc::mode_token;
+    let mut options: Vec<Choice> = output
+        .modes
+        .iter()
+        .map(|mode| {
+            let hz = mode.refresh_millihertz as f64 / 1000.0;
+            let rate = if (hz - hz.round()).abs() < 0.05 {
+                format!("{:.0}", hz.round())
+            } else {
+                format!("{hz:.3}")
+            };
+            let mut label = format!("{} × {} at {rate} Hz", mode.width, mode.height);
+            if mode.preferred && output.modes.len() > 1 {
+                label.push_str(" preferred");
+            }
+            Choice {
+                value: mode_token(mode.width, mode.height, mode.refresh_millihertz),
+                label,
             }
         })
         .collect();
-    rows.sort_by(|a, b| a.id.cmp(&b.id));
-    rows
+    let current = output
+        .width
+        .zip(output.height)
+        .zip(output.refresh_millihertz)
+        .map(|((width, height), refresh)| mode_token(width, height, refresh))
+        .unwrap_or_default();
+    if !current.is_empty() && !options.iter().any(|option| option.value == current) {
+        options.push(Choice {
+            value: current.clone(),
+            label: current.clone(),
+        });
+    }
+    (options, current)
+}
+
+fn place_choices(
+    output: &helix_compositor::compositor_ipc::OutputSnapshot,
+    outputs: &[helix_compositor::compositor_ipc::OutputSnapshot],
+) -> (Vec<Choice>, String) {
+    use helix_compositor::compositor_ipc::{place_beside, Side};
+    let mut options = vec![Choice {
+        value: "auto".into(),
+        label: "Automatic".into(),
+    }];
+    let mut matched = None;
+    let Some(this_size) = output.logical_width.zip(output.logical_height) else {
+        return (options, "auto".into());
+    };
+    for other in outputs {
+        if other.name == output.name || other.scale.is_none() {
+            continue;
+        }
+        let Some(other_box) = other
+            .x
+            .zip(other.y)
+            .zip(other.logical_width.zip(other.logical_height))
+        else {
+            continue;
+        };
+        let ((x, y), (width, height)) = other_box;
+        let other_box = (x, y, width, height);
+        let label_name = helix_base::display::sanitize_for_display(&other.name, 24);
+        for (side, word) in [
+            (Side::Right, "Right of"),
+            (Side::Left, "Left of"),
+            (Side::Below, "Below"),
+            (Side::Above, "Above"),
+        ] {
+            let (px, py) = place_beside(side, other_box, this_size);
+            let token = format!(
+                "{}:{}",
+                match side {
+                    Side::Right => "right",
+                    Side::Left => "left",
+                    Side::Below => "below",
+                    Side::Above => "above",
+                },
+                other.name
+            );
+            if output.x == Some(px) && output.y == Some(py) && matched.is_none() {
+                matched = Some(token.clone());
+            }
+            options.push(Choice {
+                value: token,
+                label: format!("{word} {label_name}"),
+            });
+        }
+    }
+    (options, matched.unwrap_or_else(|| "auto".into()))
+}
+
+fn scale_choices(current: Option<f64>) -> (Vec<Choice>, String) {
+    use helix_compositor::compositor_ipc::{scale_token, OUTPUT_SCALES};
+    let mut options: Vec<Choice> = OUTPUT_SCALES
+        .iter()
+        .map(|scale| Choice {
+            value: scale_token(*scale).unwrap_or("1").to_string(),
+            label: format!("{}%", (*scale * 100.0).round() as u32),
+        })
+        .collect();
+    let selected = current.and_then(scale_token).unwrap_or("").to_string();
+    if selected.is_empty() {
+        let Some(scale) = current else {
+            return (options, "1".into());
+        };
+        let token = format!("{scale:.2}");
+        let token = token
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string();
+        options.push(Choice {
+            value: token.clone(),
+            label: format!("{}%", (scale * 100.0).round() as u32),
+        });
+        return (options, token);
+    }
+    (options, selected)
+}
+
+fn turn_choices(current: Option<&str>) -> (Vec<Choice>, String) {
+    let mut options = vec![
+        Choice {
+            value: "normal".into(),
+            label: "Landscape".into(),
+        },
+        Choice {
+            value: "90".into(),
+            label: "90°".into(),
+        },
+        Choice {
+            value: "180".into(),
+            label: "180°".into(),
+        },
+        Choice {
+            value: "270".into(),
+            label: "270°".into(),
+        },
+    ];
+    let selected = current
+        .and_then(transform_token)
+        .unwrap_or("normal")
+        .to_string();
+    if !options.iter().any(|option| option.value == selected) {
+        options.push(Choice {
+            value: selected.clone(),
+            label: helix_base::display::sanitize_for_display(current.unwrap_or("Flipped"), 24),
+        });
+    }
+    (options, selected)
+}
+
+fn transform_token(transform: &str) -> Option<&str> {
+    match transform {
+        "Normal" => Some("normal"),
+        "90" | "180" | "270" => Some(transform),
+        "Flipped" => Some("flipped"),
+        "Flipped90" => Some("flipped-90"),
+        "Flipped180" => Some("flipped-180"),
+        "Flipped270" => Some("flipped-270"),
+        _ => None,
+    }
 }
 
 fn catalog_bool(state: &State, id: &str) -> bool {
@@ -1617,17 +2869,39 @@ fn startup_page() -> Option<String> {
 /// 0 until the desktop service has said, then 1 for dark and 2 for light.
 static APP_THEME: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
-fn theme_script() -> Option<&'static str> {
-    match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
-        1 => Some("document.documentElement.dataset.theme = 'dark'"),
-        2 => Some("document.documentElement.dataset.theme = 'light'"),
-        _ => None,
-    }
+/// The accent colour's name, once the desktop service has said (`blue` until then).
+static APP_ACCENT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+fn theme_script() -> Option<String> {
+    let dark = match APP_THEME.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => true,
+        2 => false,
+        _ => return None,
+    };
+    let accent = APP_ACCENT.lock().map(|a| a.clone()).unwrap_or_default();
+    let look = helix_desktop_api::theme_script(&helix_desktop_api::Look { dark, accent });
+    // How round things are and how clear the glass is (Settings → Appearance): numbers from the file Settings writes.
+    Some(format!(
+        "{look}; {}",
+        helix_config::shape_prefs::read().script("app")
+    ))
 }
 
 /// Applies the person's interface scale and light or dark theme (Settings) to this application's windows now and whenever they change.
 /// A page that loads later gets the theme from `on_page_load`.
 fn follow_appearance(app: tauri::AppHandle) {
+    // The corners and the glass follow the person's choices as they change.
+    let shape_app = app.clone();
+    helix_config::shape_prefs::watch(move |_| {
+        if let Some(script) = theme_script() {
+            let target = shape_app.clone();
+            let _ = shape_app.run_on_main_thread(move || {
+                for window in target.webview_windows().values() {
+                    let _ = window.eval(&script);
+                }
+            });
+        }
+    });
     let scale_app = app.clone();
     tauri::async_runtime::spawn(async move {
         let Ok(desktop) = helix_desktop_api::Desktop::session().await else {
@@ -1658,15 +2932,22 @@ fn follow_appearance(app: tauri::AppHandle) {
             return;
         };
         let _ = desktop
-            .watch_theme_dark(move |dark| {
-                eprintln!("UI theme {}", if dark { "dark" } else { "light" });
+            .watch_theme(move |look| {
+                eprintln!(
+                    "UI theme {} accent {}",
+                    if look.dark { "dark" } else { "light" },
+                    look.accent
+                );
                 APP_THEME.store(
-                    if dark { 1 } else { 2 },
+                    if look.dark { 1 } else { 2 },
                     std::sync::atomic::Ordering::Relaxed,
                 );
+                if let Ok(mut accent) = APP_ACCENT.lock() {
+                    *accent = look.accent.clone();
+                }
                 if let Some(script) = theme_script() {
                     for window in app.webview_windows().values() {
-                        let _ = window.eval(script);
+                        let _ = window.eval(&script);
                     }
                 }
             })
@@ -1702,6 +2983,7 @@ fn main() {
             approvals_view,
             approvals_set,
             wallpaper_view,
+            wallpaper_outputs,
             wallpaper_thumb,
             wallpaper_choose_image,
             wallpaper_choose_swatch,
@@ -1711,11 +2993,40 @@ fn main() {
             power_rows,
             power_change,
             displays_rows,
+            display_layout,
+            display_move,
+            users::users_view,
+            users::users_set_name,
+            users::users_choose_picture,
+            users::users_clear_picture,
+            display_identify,
+            displays_change,
+            datetime_rows,
+            accent_get,
+            accent_set,
+            defaults_rows,
+            defaults_change,
+            pointer_rows,
+            look_rows,
+            topbar_rows,
+            startup_rows,
+            startup_change,
+            topbar_change,
+            look_change,
+            multitask_rows,
+            multitask_change,
+            pointer_change,
+            typing_rows,
+            typing_change,
+            datetime_change,
             dock_change,
             wallhaven::wallhaven_search,
             wallhaven::wallhaven_thumb,
             wallhaven::wallhaven_use,
             shortcuts_view,
+            shortcut_move,
+            shortcut_off,
+            shortcut_reset,
             keybinds_view,
             keybinds_set,
             about,
@@ -1735,6 +3046,7 @@ fn main() {
             audio_set_input_volume,
             audio_set_input_muted,
             audio_set_default_input,
+            audio_test_microphone,
             bluetooth_view,
             bluetooth_set_power,
             bluetooth_scan,
@@ -1754,7 +3066,7 @@ fn main() {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 if let Some(script) = theme_script() {
-                    let _ = webview.eval(script);
+                    let _ = webview.eval(&script);
                 }
             }
         })

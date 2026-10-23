@@ -76,6 +76,12 @@ pub fn outcome_json(outcome: &Outcome) -> Json {
         "completion_tokens": outcome.completion_tokens,
         "language": outcome.language,
     });
+    if !outcome.model.is_empty() {
+        result["model"] = json!(outcome.model);
+    }
+    if let Some(cost) = outcome.cost_micro {
+        result["cost_micro"] = json!(cost);
+    }
     if !outcome.image_png.is_empty() {
         result["image"] = json!({
             "png": outcome.image_png,
@@ -139,13 +145,33 @@ fn to_variant(value: &Json) -> Option<OwnedValue> {
     OwnedValue::try_from(wrapped).ok()
 }
 
+/// Whether the computer is saving power (the firmware's platform profile, else the power daemon's).
+fn power_saver_active() -> bool {
+    if let Ok(text) = std::fs::read_to_string("/sys/firmware/acpi/platform_profile") {
+        let profile = text.trim();
+        if profile == "low-power" || profile == "cool" {
+            return true;
+        }
+    }
+    if let Ok(output) = std::process::Command::new("powerprofilesctl")
+        .arg("get")
+        .output()
+    {
+        return String::from_utf8_lossy(&output.stdout).trim() == "power-saver";
+    }
+    false
+}
+
 fn parse_chat(
     args: &Map<String, Json>,
     client: &str,
     routing: &RoutingTable,
     images: Vec<ImageInput>,
 ) -> Result<ChatRequest, InferenceError> {
-    const KNOWN: [&str; 7] = [
+    const KNOWN: [&str; 10] = [
+        "backend",
+        "route",
+        "remote_timeout",
         "messages",
         "model",
         "schema",
@@ -216,14 +242,59 @@ fn parse_chat(
         request.model = text.to_string();
     }
     // Local model slots: when the client omits model, use the profile from inference-routing.toml.
-    if request.model.is_empty() {
-        if !routing.is_local(&task) {
+    // A caller may name the backend itself (Mobius does, for a persona's own model): it must be one the person configured, and never for Act.
+    let explicit = match args.get("backend") {
+        None => None,
+        Some(value) => {
+            let Some(id) = value.as_str() else {
+                return Err(invalid("backend must be a string"));
+            };
+            (!id.is_empty() && id != "local").then(|| id.to_string())
+        }
+    };
+    if let Some(id) = &explicit {
+        if task == "act" {
+            return Err(invalid("the act task only runs on a local model"));
+        }
+        let backend = routing
+            .backend(id)
+            .ok_or_else(|| invalid(format!("no such backend: {id}")))?;
+        if backend.kind != "openai" {
             return Err(invalid(format!(
-                "task \"{task}\" is routed to a non-local backend; the sandboxed engine only runs local GGUF \
-                 (use Mobius for LAN/cloud talk)"
+                "backend {} is of a kind this service does not speak",
+                backend.id
             )));
         }
-        request.model = routing.route(&task).model;
+        request.backend = backend.id.clone();
+        if request.model.is_empty() {
+            request.model = "default".into();
+        }
+    }
+    if explicit.is_none() && request.model.is_empty() {
+        let route = routing.route(&task);
+        if routing.is_local(&task) {
+            request.model = route.model;
+        } else {
+            // The person routed this slot to another machine or a hosted service: that is the explicit choice. The Act slot is the exception: only a
+            // model on this computer may emit tools for the desktop.
+            if task == "act" {
+                return Err(invalid("the act task only runs on a local model"));
+            }
+            let Some(backend) = routing.backend(&route.backend) else {
+                return Err(invalid(format!(
+                    "task \"{task}\" is routed to a backend that is not configured: {}",
+                    route.backend
+                )));
+            };
+            if backend.kind != "openai" {
+                return Err(invalid(format!(
+                    "backend {} is of a kind this service does not speak",
+                    backend.id
+                )));
+            }
+            request.backend = backend.id.clone();
+            request.model = route.model;
+        }
     }
     if let Some(value) = args.get("schema") {
         let Some(text) = value.as_str() else {
@@ -233,7 +304,7 @@ fn parse_chat(
         if task != "act" {
             return Err(invalid("schema is only allowed for task \"act\""));
         }
-        if !routing.is_local(&task) {
+        if !request.backend.is_empty() {
             return Err(invalid("schema requires a local act backend"));
         }
         request.json_schema = text.to_string();
@@ -257,6 +328,67 @@ fn parse_chat(
         };
         request.temperature = number;
     }
+    if !request.backend.is_empty() {
+        // Off the computer: the person can keep that from happening while the battery is being saved.
+        if !routing.allow_remote_on_battery_saver && power_saver_active() {
+            return Err(invalid(
+                "Battery saver is on, so models on other computers and services are not used. Allow them in Settings, or use a model on this computer.",
+            ));
+        }
+        if let Some(value) = args.get("remote_timeout") {
+            let Some(seconds) = value.as_u64().or_else(|| value.as_f64().map(|f| f as u64)) else {
+                return Err(invalid("remote_timeout must be a number of seconds"));
+            };
+            request.timeout_secs = seconds.clamp(15, 600);
+        }
+        if let Some(value) = args.get("route") {
+            let Some(map) = value.as_object() else {
+                return Err(invalid("route must be a dictionary"));
+            };
+            let mut route = RemoteRoute::default();
+            for (key, v) in map {
+                match key.as_str() {
+                    "fallbacks" => {
+                        let list = v
+                            .as_array()
+                            .ok_or_else(|| invalid("fallbacks is a list of model ids"))?;
+                        if list.len() > 8 {
+                            return Err(invalid("at most 8 fallback models"));
+                        }
+                        for item in list {
+                            let id = item
+                                .as_str()
+                                .ok_or_else(|| invalid("fallbacks is a list of model ids"))?;
+                            if id.is_empty() || id.len() > 128 {
+                                return Err(invalid("a fallback model id is 1 to 128 characters"));
+                            }
+                            route.fallbacks.push(id.to_string());
+                        }
+                    }
+                    "prefer" => {
+                        let word = v
+                            .as_str()
+                            .ok_or_else(|| invalid("prefer is price or speed"))?;
+                        if !["", "price", "speed"].contains(&word) {
+                            return Err(invalid("prefer is price or speed"));
+                        }
+                        route.prefer = word.to_string();
+                    }
+                    "private_only" => {
+                        route.private_only = v
+                            .as_bool()
+                            .ok_or_else(|| invalid("private_only is true or false"))?
+                    }
+                    other => return Err(invalid(format!("unknown route option: {other}"))),
+                }
+            }
+            request.route = Some(route);
+        }
+    } else if args.contains_key("route") || args.contains_key("remote_timeout") {
+        return Err(invalid(
+            "route and remote_timeout are for models on other computers",
+        ));
+    }
     if let Some(value) = args.get("priority") {
         match value.as_str() {
             Some("background") => request.priority = Priority::Background,
@@ -268,6 +400,10 @@ fn parse_chat(
 }
 
 impl Inner {
+    pub fn set_remote(&self, remote: Arc<dyn RemoteChat>) {
+        self.queue.set_remote(remote);
+    }
+
     pub fn new(
         connection: Connection,
         config: Config,
@@ -504,6 +640,22 @@ impl Service {
             .unwrap_or_default()
     }
 
+    /// Asks a configured backend which models it offers, for the management app; the key stays here. JSON: `{ok, models, trust, error}`.
+    async fn probe(&self, backend: String) -> Result<String, InferenceError> {
+        if backend.is_empty() || backend.len() > 64 {
+            return Err(invalid("backend is a short id"));
+        }
+        let result = tokio::task::spawn_blocking(move || crate::remote::probe(&backend))
+            .await
+            .map_err(|e| InferenceError::Failed(e.to_string()))?;
+        Ok(result.to_string())
+    }
+
+    /// Frees the model now if nothing is running or waiting. True when it did.
+    async fn unload(&self) -> bool {
+        self.0.queue.unload_if_idle(Duration::ZERO)
+    }
+
     async fn list_models(&self) -> Vec<OwnedValue> {
         self.0
             .queue
@@ -718,4 +870,117 @@ impl Service {
 
     #[zbus(signal)]
     async fn changed(emitter: &zbus::object_server::SignalEmitter<'_>) -> zbus::Result<()>;
+}
+
+#[cfg(test)]
+mod routing_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn table() -> RoutingTable {
+        RoutingTable::parse(
+            "allow_remote_on_battery_saver = true\n[[backends]]\nid = \"lan\"\nkind = \"openai\"\nbase_url = \"http://studio:8080/v1\"\n\
+             [[backends]]\nid = \"odd\"\nkind = \"carrier-pigeon\"\n\
+             [profiles.chat]\nbackend = \"lan\"\nmodel = \"big\"\n\
+             [profiles.code]\nbackend = \"odd\"\nmodel = \"x\"\n\
+             [profiles.summarize]\nbackend = \"missing\"\n\
+             [profiles.act]\nbackend = \"lan\"\nmodel = \"big\"\n\
+             [profiles.vision]\nbackend = \"local\"\nmodel = \"small.gguf\"\n",
+        )
+    }
+
+    fn args(task: &str) -> Map<String, Json> {
+        let v = json!({"messages": [{"role": "user", "content": "hi"}], "task": task});
+        v.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn a_slot_the_person_routed_elsewhere_goes_there_and_nothing_else_does() {
+        let routing = table();
+        let request = parse_chat(&args("chat"), "c", &routing, vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("lan", "big")
+        );
+        // A local slot stays on the engine.
+        let request = parse_chat(&args("vision"), "c", &routing, vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("", "small.gguf")
+        );
+        // Only a model on this computer may act for the desktop, wherever the slot is routed.
+        assert!(parse_chat(&args("act"), "c", &routing, vec![]).is_err());
+        // A backend that is missing or of an unknown kind is an error, never a fall back to local.
+        assert!(parse_chat(&args("summarize"), "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&args("code"), "c", &routing, vec![]).is_err());
+        // An output grammar never goes to another machine.
+        let mut with_schema = args("chat");
+        with_schema.insert("schema".into(), json!("{}"));
+        assert!(parse_chat(&with_schema, "c", &routing, vec![]).is_err());
+    }
+
+    #[test]
+    fn a_caller_may_name_a_configured_backend_and_how_it_should_choose() {
+        let routing = table();
+        let mut named = args("chat");
+        named.insert("backend".into(), json!("lan"));
+        named.insert("model".into(), json!("mine"));
+        named.insert("remote_timeout".into(), json!(9999));
+        named.insert(
+            "route".into(),
+            json!({"fallbacks": ["x/y"], "prefer": "price", "private_only": true}),
+        );
+        let request = parse_chat(&named, "c", &routing, vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("lan", "mine")
+        );
+        assert_eq!(request.timeout_secs, 600, "clamped");
+        assert_eq!(request.route.unwrap().fallbacks, ["x/y"]);
+        // Not a backend the person configured, not for Act, nothing odd in the options.
+        let with = |key: &str, value: Json| {
+            let mut a = args("chat");
+            a.insert("backend".into(), json!("lan"));
+            a.insert(key.into(), value);
+            a
+        };
+        let mut unknown = args("chat");
+        unknown.insert("backend".into(), json!("nowhere"));
+        assert!(parse_chat(&unknown, "c", &routing, vec![]).is_err());
+        let mut act = args("act");
+        act.insert("backend".into(), json!("lan"));
+        assert!(parse_chat(&act, "c", &routing, vec![]).is_err());
+        assert!(parse_chat(
+            &with("route", json!({"prefer": "vibes"})),
+            "c",
+            &routing,
+            vec![]
+        )
+        .is_err());
+        assert!(parse_chat(
+            &with("route", json!({"colour": "red"})),
+            "c",
+            &routing,
+            vec![]
+        )
+        .is_err());
+        assert!(parse_chat(
+            &with("route", json!({"fallbacks": vec!["a"; 9]})),
+            "c",
+            &routing,
+            vec![]
+        )
+        .is_err());
+        // Options for another machine are an error on a local request.
+        let mut local = args("vision");
+        local.insert("route".into(), json!({}));
+        assert!(parse_chat(&local, "c", &routing, vec![]).is_err());
+        // With battery saver on and not allowed, other machines are not used.
+        let strict = RoutingTable::parse("[[backends]]\nid = \"lan\"\nkind = \"openai\"\nbase_url = \"http://studio/v1\"\n[profiles.chat]\nbackend = \"lan\"\n");
+        let saving = std::fs::read_to_string("/sys/firmware/acpi/platform_profile")
+            .is_ok_and(|p| matches!(p.trim(), "low-power" | "cool"));
+        if saving {
+            assert!(parse_chat(&args("chat"), "c", &strict, vec![]).is_err());
+        }
+    }
 }

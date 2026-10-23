@@ -47,7 +47,7 @@ export function KnowledgePanel({ report, onGetModel }: { report: (error: unknown
   return (
     <>
       <h3 className="models-h3">Your folders</h3>
-      <p className="models-lead">Choose folders and Mobius reads their text files into a search index on this computer, so you can find things by what they mean as well as by the words in them. Nothing leaves this computer: the index is one file in your data folder, and removing a folder removes everything read from it.</p>
+      <p className="models-lead">Folders the agent can search while you work, by the words in a file and by what a passage means. The index stays on this computer. Removing a folder forgets what was read from it and does not touch the files.</p>
       {status && !status.meaning ? (
         <div className="set-offer" data-test="kn-nomeaning">
           <div className="set-offer-text"><div><strong>Search by meaning needs a small model</strong></div><span>Until it is installed, files can only be found by their words.</span></div>

@@ -4,6 +4,7 @@
 #   (wallhaven-test.sh needs the internet and is run by hand.)
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+SUITE_FAILED=0
 # Whichever shell build was made last (fast or release), unless HELIX_SHELL_BIN says otherwise.
 export HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$(ls -t "$ROOT/target/fast/helix-shell-tauri" "$ROOT/target/release/helix-shell-tauri" 2>/dev/null | head -1)}"
 # A shell started from a launched program must not decide the tests' roles for them.
@@ -14,7 +15,13 @@ run() {  # name script program [env...]
   # Tests count the actions a run sent, so each starts from an empty scratch directory (this exact path, made by this script).
   rm -rf "/tmp/helix-nested/suite-$name"
   HELIX_NESTED_SCRIPT="$ROOT/tools/nested/$script" timeout 420 "$ROOT/tools/nested/run.sh" "suite-$name" "$ROOT/tools/nested/$program" "$@" >"$out" 2>&1
-  if grep -qE 'FAIL|TIMEOUT|NOT FOUND|FAILED' "$out"; then echo "FAIL  $name   ($out)"; grep -E 'FAIL|TIMEOUT|NOT FOUND' "$out" | head -3; else echo "ok    $name"; fi
+  if grep -qE '^(FAIL:|NOT FOUND:|PASS:.*FAIL)|FAIL  |TIMEOUT|NOT FOUND:|FAILED$' "$out"; then
+    echo "FAIL  $name   ($out)"
+    grep -E '^(FAIL:|NOT FOUND:)|FAIL  |TIMEOUT|NOT FOUND:|FAILED$' "$out" | head -3
+    SUITE_FAILED=1
+  else
+    echo "ok    $name"
+  fi
 }
 # A window wide enough to show Mobius's chat list (below 720 px it is behind a button). One line of KDL cannot hold the nested block, so it has newlines.
 WIDE=$'HELIX_NESTED_KDL=layout {\n gaps 0\n default-column-width { fixed 1100; }\n}'
@@ -26,6 +33,14 @@ pick shell-auto-theme && run shell-auto-theme shell-auto-theme-test.sh tauri-fak
 pick net            && run net network-test.sh tauri-fake-desktop.sh
 pick bt             && run bt bluetooth-test.sh tauri-fake-desktop.sh
 pick ctl            && run ctl shell-control-test.sh tauri-shell.sh
+pick bar-prefs       && run bar-prefs shell-bar-prefs-test.sh tauri-shell.sh
+pick shell-ui-scale && run shell-ui-scale shell-ui-scale-test.sh tauri-fake-desktop.sh HELIX_FAKE_UI_SCALE=1.5
+pick privacy       && run privacy shell-privacy-test.sh tauri-shell.sh HELIX_PW_DUMP=tools/nested/fake-pw-dump.sh HELIX_PRIVACY_DEV=/nonexistent
+pick agent-display && run agent-display agent-display-test.sh tauri-shell.sh "HELIX_AGENT_DISPLAY_NIRI=$ROOT/target/fast/niri" "HELIX_AGENT_INPUT=$ROOT/target/fast/helix-agent-input"
+pick shell-launcher-output && run shell-launcher-output shell-launcher-output-test.sh tauri-shell.sh HELIX_SHELL_ROLE=panels HELIX_NESTED_EXTRA_OUTPUTS=1024x768 "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick agent-computer-use && run agent-computer-use agent-computer-use-test.sh tauri-shell.sh "HELIX_AGENT_DISPLAY_NIRI=$ROOT/target/fast/niri" "HELIX_AGENT_INPUT=$ROOT/target/fast/helix-agent-input"
+pick settings-topbar && run settings-topbar settings-topbar-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-startup && run settings-startup settings-startup-test.sh settings-startup-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick cc             && run cc control-center-test.sh tauri-shell.sh HELIX_NESTED_PRIVATE_AUDIO=1
 pick notifications  && run notifications notifications-test.sh tauri-shell.sh
 pick trusted-attack && run trusted-attack trusted-attack-test.sh tauri-shell.sh
@@ -39,8 +54,11 @@ pick dock           && run dock dock-test.sh dock-nested.sh
 pick ws             && run ws workspaces-test.sh tauri-fake-desktop.sh
 pick tray           && run tray tray-test.sh tauri-fake-desktop.sh
 pick idle           && run idle idle-test.sh idle-nested.sh
+pick helix-lock    && run helix-lock helix-lock-test.sh idle-program.sh
+pick nightlight    && run nightlight nightlight-test.sh nightlight-nested.sh HELIX_NESTED_GAMMA=1
+pick nightlight-sun && run nightlight-sun nightlight-sun-test.sh nightlight-sun-nested.sh HELIX_NESTED_GAMMA=1
 pick island         && run island island-test.sh tauri-shell.sh
-pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }; include \"$ROOT/tools/nested/fixtures/niri-binds.kdl\""
 pick settings-net   && run settings-net settings-net-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-sound && run settings-sound settings-sound-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-title   && run mobius-title mobius-title-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_AUTO_TITLE=1 "HELIX_FAKE_REPLY=Cron versus systemd timers"
@@ -57,6 +75,7 @@ pick mobius-composer && run mobius-composer mobius-composer-test.sh mobius-neste
 pick mobius-regen && run mobius-regen mobius-regen-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=2
 pick mobius-stage   && run mobius-stage mobius-stage-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n'
 pick mobius-panes  && run mobius-panes mobius-panes-test.sh mobius-nested.sh "$WIDE" "HELIX_FAKE_REPLY=Hi."
+pick mobius-summon && run mobius-summon mobius-summon-test.sh mobius-nested.sh "$WIDE"
 pick mobius-docops  && run mobius-docops mobius-docops-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n\nStep two: write it up.\n```\n\n```docops\n[{"op":"replace","find":"gather the facts","with":"collect the evidence"},{"op":"append","text":"Step three: review."}]\n```\n'
 pick mobius-code   && run mobius-code mobius-code-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-side    && run mobius-side mobius-side-test.sh mobius-nested.sh "$WIDE" $'HELIX_FAKE_REPLY=Here is a draft.\n\n```artifact:Plan\nStep one: gather the facts.\n```\n'
@@ -70,12 +89,26 @@ pick mobius-hint    && run mobius-hint mobius-hint-test.sh mobius-nested.sh "$WI
 pick mobius-act     && run mobius-act mobius-act-test.sh mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-notifications && run settings-notifications settings-notifications-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-displays && run settings-displays settings-displays-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-arrange && run settings-arrange settings-arrange-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_EXTRA_OUTPUTS=1024x768
+pick identify && run identify identify-test.sh identify-nested.sh HELIX_NESTED_EXTRA_OUTPUTS=1024x768 "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-datetime && run settings-datetime settings-datetime-test.sh settings-datetime-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-pointer && run settings-pointer settings-pointer-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-defaults && run settings-defaults settings-defaults-test.sh settings-defaults-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-accent && run settings-accent settings-accent-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-look && run settings-look settings-look-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-multitask && run settings-multitask settings-multitask-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-shortcuts && run settings-shortcuts settings-shortcuts-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=binds { Mod+F7 { focus-column-left; }; }"
+pick helix-models && run helix-models helix-models-test.sh models-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick helix-shell-action && run helix-shell-action helix-shell-action-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-wallpaper && run settings-wallpaper settings-wallpaper-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh tauri-shell.sh
 pick ui-scale          && run ui-scale ui-scale-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick ui-theme          && run ui-theme ui-theme-test.sh system-monitor-scale-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
-pick mobius         && run mobius mobius-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=25
+pick mobius         && run mobius mobius-test.sh mobius-nested.sh "$WIDE" HELIX_FAKE_DELAY_MS=800
 pick greeter        && run greeter greeter-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick greeter-power  && run greeter-power greeter-power-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick greeter-session && run greeter-session greeter-session-test.sh greeter-session-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software       && run software software-test.sh software-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software-real && run software-real software-real-test.sh software-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
@@ -130,4 +163,6 @@ pick mobius-welcome && run mobius-welcome mobius-welcome-test.sh mobius-welcome-
 pick mobius-web && run mobius-web mobius-web-test.sh mobius-web-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
 pick mobius-edit  && run mobius-edit mobius-edit-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-tools && run mobius-tools mobius-tools-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
+pick mobius-agent-tasks && run mobius-agent-tasks mobius-agent-tasks-test.sh mobius-tools-nested.sh "$WIDE" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=Done."
 pick mobius-reply-save && run mobius-reply-save mobius-reply-save-test.sh mobius-reply-save-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10
+exit "$SUITE_FAILED"

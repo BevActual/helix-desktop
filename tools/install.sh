@@ -50,9 +50,9 @@ OUT=${CARGO_TARGET_DIR:-$ROOT/target}/$PROFILE
 D=$DESTDIR
 
 # The session half: binaries (package -> binary), and the systemd user units made from tools/systemd/*.in.
-SESSION_PKGS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-greeter helix-settings helix-mobius helix-software helix-system-monitor"
-SESSION_BINS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-greeter helix-settings helix-mobius helix-software helix-system-monitor"
-SESSION_UNITS="helix-shell-strut helix-shell-bar helix-shell-panels helix-idle helix-wallpaper"
+SESSION_PKGS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-lock helix-identify helix-agent-input helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor helix-models-app"
+SESSION_BINS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-lock helix-identify helix-agent-input helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor helix-models"
+SESSION_UNITS="helix-shell-strut helix-shell-bar helix-shell-panels helix-idle helix-nightlight helix-wallpaper"
 
 if [ "$UNINSTALL" = 1 ]; then
   rm -f "$D$BINDIR"/helix-desktop "$D$BINDIR"/helix-assistant "$D$BINDIR"/helix-inference \
@@ -63,7 +63,7 @@ if [ "$UNINSTALL" = 1 ]; then
         "$D$DATADIR"/helix/msg-risk.toml "$D$DATADIR"/helix/tool-hints.toml "$D$DATADIR"/helix/helix-wallpaper.png
   for bin in $SESSION_BINS helix-greeter-apply-appearance helix-panel helix-askpass helix-greeter-session; do rm -f "$D$BINDIR/$bin"; done
   for unit in $SESSION_UNITS; do rm -f "$D$UNITDIR/$unit.service"; done
-  for app in Shell Settings Software SystemMonitor Mobius; do rm -f "$D$DATADIR/applications/org.helix.$app.desktop"; done
+  for app in Shell Settings Software SystemMonitor Mobius Models; do rm -f "$D$DATADIR/applications/org.helix.$app.desktop"; done
   rm -f "$D$DATADIR/icons/hicolor/scalable/apps/org.helix.Shell.svg" "$D$DATADIR/icons/hicolor/scalable/apps/org.helix.SystemMonitor.svg"
   rm -rf "$D$PREFIX/lib64/helix" "$D$DATADIR/helix/templates" "$D$DATADIR/helix-greeter"
   rmdir "$D$DATADIR/helix" 2>/dev/null || true
@@ -150,17 +150,20 @@ if [ "$SESSION" = 1 ]; then
   install_entry helix-software org.helix.Software.desktop
   install_entry helix-system-monitor org.helix.SystemMonitor.desktop
   install_entry helix-mobius org.helix.Mobius.desktop
+  install_entry helix-models org.helix.Models.desktop
   [ -x "$D$BINDIR/helix-shell-tauri" ] && install -Dm644 "$ROOT/assets/org.helix.Shell.svg" "$D$DATADIR/icons/hicolor/scalable/apps/org.helix.Shell.svg"
   [ -x "$D$BINDIR/helix-system-monitor" ] && install -Dm644 "$ROOT/assets/org.helix.SystemMonitor.svg" "$D$DATADIR/icons/hicolor/scalable/apps/org.helix.SystemMonitor.svg"
+  [ -x "$D$BINDIR/helix-models" ] && install -Dm644 "$ROOT/assets/org.helix.Models.svg" "$D$DATADIR/icons/hicolor/scalable/apps/org.helix.Models.svg"
 
   # systemd user units. Enabling is per user (`systemctl --user enable --now helix-shell-strut helix-shell-bar ...`).
-  unit_args=("SHELL_BIN=$BINDIR/helix-shell-tauri" "STRUT_BIN=$BINDIR/helix-shell-strut" "IDLE_BIN=$BINDIR/helix-idle"
+  unit_args=("SHELL_BIN=$BINDIR/helix-shell-tauri" "STRUT_BIN=$BINDIR/helix-shell-strut" "IDLE_BIN=$BINDIR/helix-idle" "NIGHTLIGHT_BIN=$BINDIR/helix-nightlight"
              "WALLPAPER_BIN=$BINDIR/helix-wallpaper" "ASKPASS=$BINDIR/helix-askpass")
   for unit in $SESSION_UNITS; do
     case $unit in
       helix-shell-strut) have_bin=helix-shell-strut ;;
       helix-shell-bar|helix-shell-panels) have_bin=helix-shell-tauri ;;
       helix-idle) have_bin=helix-idle ;;
+      helix-nightlight) have_bin=helix-nightlight ;;
       helix-wallpaper) have_bin=helix-wallpaper ;;
     esac
     [ -x "$D$BINDIR/$have_bin" ] && subst "$ROOT/tools/systemd/$unit.service.in" "$D$UNITDIR/$unit.service" "${unit_args[@]}"

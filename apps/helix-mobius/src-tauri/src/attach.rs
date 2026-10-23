@@ -382,6 +382,45 @@ mod tests {
     }
 
     #[test]
+    fn search_stays_inside_text_files_and_caps_hits() {
+        let dir = std::env::temp_dir().join(format!("helix-search-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src")).unwrap();
+        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        std::fs::write(
+            dir.join("notes.txt"),
+            "alpha\nThe Helix phrase is here\nalpha again\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("src/main.rs"),
+            "fn main() {\n    // helix phrase\n}\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join(".git/config"), "helix phrase in a hidden folder\n").unwrap();
+        std::fs::write(dir.join("secrets.json"), "{\"token\":\"helix phrase\"}\n").unwrap();
+        let (hits, truncated) = search_text(&dir, "helix phrase");
+        assert!(!truncated);
+        assert_eq!(
+            hits,
+            vec![
+                SearchHit {
+                    path: "notes.txt".into(),
+                    line: 2,
+                    text: "The Helix phrase is here".into()
+                },
+                SearchHit {
+                    path: "src/main.rs".into(),
+                    line: 2,
+                    text: "// helix phrase".into()
+                },
+            ]
+        );
+        assert!(search_text(&dir, "h").0.is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn binary_and_text_are_told_apart() {
         assert!(!is_probably_text(Path::new("a.bin"), &[0, 1, 2]));
         assert!(is_probably_text(Path::new("a.txt"), b"hello"));
@@ -455,6 +494,71 @@ pub fn find_files(root: &Path, query: &str, limit: usize) -> Vec<(String, PathBu
     });
     hits.truncate(limit);
     hits
+}
+
+/// One line that contains a search phrase, inside a project text file the Code stage may show.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SearchHit {
+    pub path: String,
+    pub line: u32,
+    pub text: String,
+}
+
+/// Files `search_text` looks through at most; past this it says the search was cut short.
+const SEARCH_FILES: usize = 600;
+
+/// Case-insensitive line search over the same files `find_files` would list: no hidden or build folders, text extensions only, and each file
+/// still has to pass the edit tool's path check (inside the folder, not a link, not credentials). At most three lines per file and forty in all.
+pub fn search_text(root: &Path, query: &str) -> (Vec<SearchHit>, bool) {
+    let query = query.trim().to_lowercase();
+    if query.chars().count() < 2 || query.chars().count() > 200 {
+        return (Vec::new(), false);
+    }
+    let mut hits = Vec::new();
+    let mut truncated = false;
+    let files = find_files(root, "", SEARCH_FILES + 1);
+    if files.len() > SEARCH_FILES {
+        truncated = true;
+    }
+    for (rel, _) in files.into_iter().take(SEARCH_FILES) {
+        if hits.len() >= 40 {
+            truncated = true;
+            break;
+        }
+        let Ok(file) = crate::edits::resolve(root, &rel) else {
+            continue;
+        };
+        let Ok(meta) = std::fs::metadata(&file) else {
+            continue;
+        };
+        if !meta.is_file() || meta.len() == 0 || meta.len() > crate::edits::MAX_FILE_BYTES {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        let mut in_file = 0u32;
+        for (index, line) in text.lines().enumerate() {
+            if hits.len() >= 40 {
+                truncated = true;
+                break;
+            }
+            if in_file >= 3 {
+                break;
+            }
+            if !line.to_lowercase().contains(&query) {
+                continue;
+            }
+            let shown: String = line.trim().chars().take(160).collect();
+            hits.push(SearchHit {
+                path: rel.clone(),
+                line: (index + 1) as u32,
+                text: shown,
+            });
+            in_file += 1;
+        }
+    }
+    (hits, truncated)
 }
 
 fn rel_display(root: &Path, path: &Path) -> String {

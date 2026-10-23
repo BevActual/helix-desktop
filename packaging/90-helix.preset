@@ -4,3 +4,4 @@ enable helix-shell-strut.service
 enable helix-shell-bar.service
 enable helix-wallpaper.service
 enable helix-idle.service
+enable helix-nightlight.service

@@ -469,14 +469,134 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                 .collect(),
             trusted_surfaces: true,
             agent_desk: true,
+            display_profiles: true,
+            summon: true,
+            input_settings: true,
+            look_settings: true,
+            shell_action: true,
+            bind_settings: true,
         }),
+        Request::HelixSaveDisplayProfile
+        | Request::HelixApplyDisplayProfile
+        | Request::HelixForgetDisplayProfile
+        | Request::HelixDisplayProfile => {
+            let (tx, rx) = async_channel::bounded(1);
+            let request = request.clone();
+            ctx.event_loop.insert_idle(move |state| {
+                let reply = match request {
+                    Request::HelixSaveDisplayProfile => state
+                        .helix_save_display_profile()
+                        .map(|()| Response::Handled),
+                    Request::HelixApplyDisplayProfile => state
+                        .helix_apply_display_profile()
+                        .map(|_| Response::Handled),
+                    Request::HelixForgetDisplayProfile => state
+                        .helix_forget_display_profile()
+                        .map(|()| Response::Handled),
+                    _ => Ok(Response::HelixDisplayProfile(
+                        state.helix_display_profile_info(),
+                    )),
+                };
+                let _ = tx.send_blocking(reply);
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("display profile request failed"))??
+        }
+        Request::HelixInput => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_input());
+            });
+            let input = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("input settings query failed"))?;
+            Response::HelixInput(input)
+        }
+        Request::HelixMoveLayerToFocusedOutput { namespace } => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_move_layer_to_focused_output(&namespace));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("moving the layer surface failed"))?;
+            Response::Handled
+        }
+        Request::HelixLook => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_look());
+            });
+            let look = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("look settings query failed"))?;
+            Response::HelixLook(look)
+        }
+        Request::HelixSetLook(change) => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_set_look(change));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("look settings change failed"))??;
+            Response::Handled
+        }
+        Request::HelixBinds => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_binds());
+            });
+            let binds = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("key bind query failed"))?;
+            Response::HelixBinds(binds)
+        }
+        Request::HelixSetBinds(change) => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_set_binds(change));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("key bind change failed"))??;
+            Response::Handled
+        }
+        Request::HelixSetInput(change) => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_set_input(change));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("input settings change failed"))??;
+            Response::Handled
+        }
+        Request::HelixSummonContext => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_take_summon_context());
+            });
+            let context = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("summon context query failed"))?;
+            Response::HelixSummonContext(context)
+        }
         Request::HelixAgentDesk => {
             let (tx, rx) = async_channel::bounded(1);
             ctx.event_loop.insert_idle(move |state| {
                 let info = state.helix_agent_desk_info();
                 let _ = tx.send_blocking(info);
             });
-            let info = rx.recv().await.map_err(|_| String::from("agent desk query failed"))?;
+            let info = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("agent desk query failed"))?;
             Response::HelixAgentDesk(info)
         }
     };

@@ -102,14 +102,12 @@ impl Shaders {
             })
             .ok();
 
-        let postprocess_and_clip = compile_postprocess_and_clip(
-            renderer,
-            include_str!("clipped_surface.frag"),
-        )
-            .map_err(|err| {
-                warn!("error compiling postprocess_and_clip shader: {err:?}");
-            })
-            .ok();
+        let postprocess_and_clip =
+            compile_postprocess_and_clip(renderer, include_str!("clipped_surface.frag"))
+                .map_err(|err| {
+                    warn!("error compiling postprocess_and_clip shader: {err:?}");
+                })
+                .ok();
 
         let resize = compile_resize_program(renderer, include_str!("resize.frag"))
             .map_err(|err| {

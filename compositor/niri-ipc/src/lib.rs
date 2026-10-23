@@ -126,6 +126,36 @@ pub enum Request {
     HelixCapabilities,
     /// Helix: agent desk workspace state (name, id, window count, focus).
     HelixAgentDesk,
+    /// Helix: remember how the connected displays are set up (scale, orientation, resolution, position, on or off) for exactly this set of
+    /// displays. When the same set is connected again, the compositor applies it by itself.
+    HelixSaveDisplayProfile,
+    /// Helix: apply the remembered setup for the displays connected now, if there is one.
+    HelixApplyDisplayProfile,
+    /// Helix: forget the remembered setup for the displays connected now.
+    HelixForgetDisplayProfile,
+    /// Helix: whether a setup is remembered for the displays connected now.
+    HelixDisplayProfile,
+    /// Helix: the pointer and keyboard settings in effect now (the overrides Settings made, over `config.kdl`).
+    HelixInput,
+    /// Helix: change pointer and keyboard settings. Only the fields that are `Some` change; they take effect at once, are remembered, and are applied
+    /// again whenever the configuration is loaded.
+    HelixSetInput(HelixInput),
+    /// Helix: move the layer surfaces with this namespace to the output that has the focus (a panel opens on the screen the person is working on).
+    /// Nothing moves if one has the keyboard grabbed (an open panel) or is already there.
+    HelixMoveLayerToFocusedOutput { namespace: String },
+    /// Helix: how things look in effect now (the overrides Settings made, over `config.kdl`).
+    HelixLook,
+    /// Helix: change how things look: animations, the gap between windows, the cursor size and the colour of the focus ring. Only the `Some` fields change; they
+    /// take effect at once, are remembered, and are applied again whenever the configuration is loaded.
+    HelixSetLook(HelixLook),
+    /// Helix: the window that had the keyboard when `helix-summon` was last used, once. Empty when it was never used, was a minute ago or
+    /// more, or was already taken.
+    HelixSummonContext,
+    /// Helix: every key bind in effect now, with where it came from.
+    HelixBinds,
+    /// Helix: change key binds: set some (replacing what is on the same chord), unbind some, and give some back to what `config.kdl` says. Remembered,
+    /// applied again whenever the configuration is loaded, and in effect at once.
+    HelixSetBinds(HelixBindsChange),
 }
 
 /// Reply from niri to client.
@@ -176,6 +206,211 @@ pub enum Response {
     HelixCapabilities(HelixCapabilities),
     /// Helix agent desk state.
     HelixAgentDesk(HelixAgentDesk),
+    /// Helix display profile state.
+    HelixDisplayProfile(HelixDisplayProfile),
+    /// Helix summon context.
+    HelixSummonContext(Option<HelixSummonContext>),
+    /// Helix pointer and keyboard settings.
+    HelixInput(HelixInput),
+    /// Helix look settings.
+    HelixLook(HelixLook),
+    /// Helix key binds.
+    HelixBinds(Vec<HelixBind>),
+}
+
+/// One key bind in effect.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixBind {
+    /// The chord as it is written in a config: `Mod+Shift+E`, `XF86AudioMute`, `Mod+WheelScrollDown`.
+    pub chord: String,
+    /// What it does, by name: `focus-column-left`, `spawn`, `helix-shell`; `none` when Settings unbound it.
+    pub action: String,
+    /// The action's arguments, for reading: `helix-panel launcher`.
+    pub detail: String,
+    /// The title the hotkey overlay shows for it, if the config gave one.
+    pub title: Option<String>,
+    /// `config` (the person's files and niri's defaults) or `helix` (an override made in Settings).
+    pub source: String,
+    /// The action as a config writes it, when that can be worked out exactly (so it can be put on another chord): always for an override.
+    pub action_kdl: Option<String>,
+}
+
+/// What `HelixSetBinds` changes.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixBindsChange {
+    /// Binds to set: the chord and the action as a config writes it (`focus-column-left`, `helix-shell "launcher"`, `spawn "foot"`).
+    #[serde(default)]
+    pub set: Vec<HelixBindSet>,
+    /// Chords to leave unbound.
+    #[serde(default)]
+    pub unbind: Vec<String>,
+    /// Chords to give back to what the config says (the override is forgotten).
+    #[serde(default)]
+    pub reset: Vec<String>,
+}
+
+/// A bind to set.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixBindSet {
+    /// The chord.
+    pub chord: String,
+    /// The action as a config writes it.
+    pub action: String,
+}
+
+/// The look settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixLook {
+    /// Whether windows and workspaces animate.
+    #[serde(default)]
+    pub animations: Option<bool>,
+    /// Logical pixels between windows and the screen's edge, 0 to 64.
+    #[serde(default)]
+    pub window_gaps: Option<u16>,
+    /// The cursor's size in pixels, 16 to 64.
+    #[serde(default)]
+    pub cursor_size: Option<u8>,
+    /// The colour of the ring around the focused window, `#rrggbb`.
+    #[serde(default)]
+    pub focus_color: Option<String>,
+    /// Whether the window under the pointer takes the keyboard focus.
+    #[serde(default)]
+    pub focus_follows_mouse: Option<bool>,
+    /// Whether moving the pointer into the top-left corner opens the overview.
+    #[serde(default)]
+    pub hot_corner: Option<bool>,
+    /// When the focused column is centred: `never`, `always` or `on-overflow`.
+    #[serde(default)]
+    pub center_focused: Option<String>,
+    /// One rule per application, replacing the whole list (an empty list clears it); at most 64.
+    #[serde(default)]
+    pub app_rules: Option<Vec<HelixAppRule>>,
+    /// Whether the pointer jumps to a window when the keyboard focuses it.
+    #[serde(default)]
+    pub warp_mouse_to_focus: Option<bool>,
+    /// The key the shortcuts called Mod use: `super`, `alt` or `ctrl`.
+    #[serde(default)]
+    pub mod_key: Option<String>,
+    /// Whether switching to the workspace you are on goes back to the one before.
+    #[serde(default)]
+    pub workspace_back_and_forth: Option<bool>,
+    /// The corner radius of every window in logical pixels, 0 to 32 (0 is square).
+    #[serde(default)]
+    pub window_corner_radius: Option<u16>,
+    /// How fast animations run, in percent: 100 is as designed, 200 twice as fast, 25 four times slower (25 to 400).
+    #[serde(default)]
+    pub animation_speed: Option<u16>,
+    /// How strong the blur behind glass is, 0 (light) to 100 (heavy).
+    #[serde(default)]
+    pub blur_strength: Option<u8>,
+    /// How much the shell's glass bends what is behind its edges, in percent (0 to 200; 100 is the physical value).
+    #[serde(default)]
+    pub refraction: Option<u16>,
+    /// Whether windows cast a shadow.
+    #[serde(default)]
+    pub window_shadows: Option<bool>,
+    /// The width of the ring around the focused window in pixels, 0 (none) to 8.
+    #[serde(default)]
+    pub focus_ring_width: Option<u8>,
+}
+
+/// What the person wants done with one application's windows.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixAppRule {
+    /// The application, as the window reports it (`org.gnome.Nautilus`): letters, digits, dots, dashes and underscores.
+    pub app_id: String,
+    /// How its windows open: `floating`, `maximized` or `fullscreen`; none means the way the layout opens them.
+    #[serde(default)]
+    pub open: Option<String>,
+    /// Kept out of screen sharing and screenshots.
+    #[serde(default)]
+    pub private: bool,
+    /// How solid its windows are, 20 to 100 percent; none means fully.
+    #[serde(default)]
+    pub opacity: Option<u8>,
+}
+
+/// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixInput {
+    /// Touchpad: tap to click.
+    #[serde(default)]
+    pub touchpad_tap: Option<bool>,
+    /// Touchpad: content follows the fingers.
+    #[serde(default)]
+    pub touchpad_natural_scroll: Option<bool>,
+    /// Touchpad: pointer speed, -1 to 1.
+    #[serde(default)]
+    pub touchpad_speed: Option<f64>,
+    /// Touchpad: ignore it while typing.
+    #[serde(default)]
+    pub touchpad_disable_while_typing: Option<bool>,
+    /// Touchpad: `clickfinger` (the number of fingers decides the button) or `button-areas`.
+    #[serde(default)]
+    pub touchpad_click_method: Option<String>,
+    /// Touchpad: tap, then drag with the same finger.
+    #[serde(default)]
+    pub touchpad_tap_and_drag: Option<bool>,
+    /// Touchpad: a drag carries on after the finger lifts, until another tap.
+    #[serde(default)]
+    pub touchpad_drag_lock: Option<bool>,
+    /// Touchpad: `two-finger` or `edge`.
+    #[serde(default)]
+    pub touchpad_scroll_method: Option<String>,
+    /// Touchpad: switched off while an external mouse is plugged in.
+    #[serde(default)]
+    pub touchpad_off_with_mouse: Option<bool>,
+    /// Mouse: content follows the wheel the other way.
+    #[serde(default)]
+    pub mouse_natural_scroll: Option<bool>,
+    /// Mouse: pointer speed, -1 to 1.
+    #[serde(default)]
+    pub mouse_speed: Option<f64>,
+    /// Mouse: `adaptive` (faster when moved faster) or `flat`.
+    #[serde(default)]
+    pub mouse_accel_profile: Option<String>,
+    /// Mouse: primary button on the right.
+    #[serde(default)]
+    pub mouse_left_handed: Option<bool>,
+    /// Keyboard: milliseconds a key is held before it repeats.
+    #[serde(default)]
+    pub keyboard_repeat_delay: Option<u16>,
+    /// Keyboard: repeats a second.
+    #[serde(default)]
+    pub keyboard_repeat_rate: Option<u8>,
+    /// Keyboard: the layouts, as xkb names separated by commas (`us` or `us,de`).
+    #[serde(default)]
+    pub keyboard_layout: Option<String>,
+}
+
+/// What had the keyboard when the person summoned Mobius. Only what the compositor already tells every client about windows.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixSummonContext {
+    /// The window's title, if it set one.
+    pub title: Option<String>,
+    /// The window's application id, if it set one.
+    pub app_id: Option<String>,
+    /// The process that owns the window's connection, if known.
+    pub pid: Option<i32>,
+    /// Milliseconds since the summon.
+    pub age_ms: u64,
+}
+
+/// Whether a display setup is remembered for the set of displays connected now.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixDisplayProfile {
+    /// The displays connected now, by "make model serial" (or connector when a display reports no identity), sorted.
+    pub displays: Vec<String>,
+    /// Whether a setup is remembered for exactly this set.
+    pub saved: bool,
 }
 
 /// Capabilities reported by helix-niri. Stock niri never sends this response.
@@ -197,6 +432,24 @@ pub struct HelixCapabilities {
     /// Whether agent-desk IPC and window placement are available.
     #[serde(default)]
     pub agent_desk: bool,
+    /// Whether the compositor remembers display setups per set of connected displays and applies them itself.
+    #[serde(default)]
+    pub display_profiles: bool,
+    /// Whether `helix-summon` and `HelixSummonContext` are available.
+    #[serde(default)]
+    pub summon: bool,
+    /// Whether `HelixInput` and `HelixSetInput` are available.
+    #[serde(default)]
+    pub input_settings: bool,
+    /// Whether `HelixLook` and `HelixSetLook` are available.
+    #[serde(default)]
+    pub look_settings: bool,
+    /// Whether `HelixBinds` and `HelixSetBinds` are available.
+    #[serde(default)]
+    pub bind_settings: bool,
+    /// Whether the `helix-shell "<command>"` bind action is available.
+    #[serde(default)]
+    pub shell_action: bool,
 }
 
 /// State of the Helix agent desk workspace.
@@ -1025,6 +1278,14 @@ pub enum Action {
     },
     /// Helix: focus the agent desk workspace.
     HelixFocusAgentDesk {},
+    /// Helix: remember which window has the keyboard, then raise Mobius (or start it).
+    HelixSummon {},
+    /// Helix: ask the shell to do something, by name (`launcher`, `lock`, `volume-up`).
+    HelixShell {
+        /// What to ask for.
+        #[cfg_attr(feature = "clap", arg())]
+        command: String,
+    },
 }
 
 fn helix_default_place_count() -> u8 {

@@ -8,13 +8,18 @@ use serde_json::Value;
 
 /// `"Layers"` or any other bare request name; the reply's payload, or `None` when niri is not there or says no.
 pub fn request(name: &str) -> Option<Value> {
+    request_line(&format!("\"{name}\""))
+}
+
+/// Like [`request`], with the whole request as one line of JSON (for requests that carry fields).
+pub fn request_line(request: &str) -> Option<Value> {
     let path = std::env::var_os("NIRI_SOCKET")?;
     let mut stream = UnixStream::connect(path).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(1))).ok()?;
     stream
         .set_write_timeout(Some(Duration::from_secs(1)))
         .ok()?;
-    stream.write_all(format!("\"{name}\"\n").as_bytes()).ok()?;
+    stream.write_all(format!("{request}\n").as_bytes()).ok()?;
     let mut line = String::new();
     BufReader::new(stream).read_line(&mut line).ok()?;
     let reply: Value = serde_json::from_str(&line).ok()?;

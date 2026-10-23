@@ -1,5 +1,5 @@
 #!/bin/bash
-# Settings > Notifications: the page shows the two settings the shell honours; a typed value is written to the file the shell watches, and an out-of-range one is not kept.
+# Settings > Notifications: the page shows the settings the shell honours; a typed value is written to the file the shell watches, and an out-of-range one is not kept.
 #   HELIX_NESTED_SCRIPT=tools/nested/settings-notifications-test.sh tools/nested/run.sh settings-notifications tools/nested/settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log; FAILED=0
 source "$ROOT/tools/nested/ui-lib.sh"
@@ -16,8 +16,9 @@ print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
+mkdir -p "$(dirname "$FILE")"; echo '["Chat","Mail"]' > "$(dirname "$FILE")/notification-apps.json"
 click_id page-notifications; sleep 1.5; shot settings-notifications
-for id in toast_seconds max_toasts; do has_id "set-$id" && echo "ok: $id is on the page" || fail "no row for $id"; done
+for id in dnd quiet quiet_start quiet_end toast_seconds max_toasts; do has_id "set-$id" && echo "ok: $id is on the page" || fail "no row for $id"; done
 has_id set-notification.position && fail "a setting the shell ignores is still listed" || echo "ok: nothing the shell ignores"
 click_id set-toast_seconds-number; wtype "10"; wtype -k Return; sleep 1
 grep -q '"toast_seconds":10' "$FILE" && echo "ok: a typed time written" || fail "time not written: $(cat "$FILE" 2>&1)"
@@ -25,6 +26,28 @@ click_id set-max_toasts-number; wtype "2"; wtype -k Return; sleep 1
 grep -q '"max_toasts":2' "$FILE" && grep -q '"toast_seconds":10' "$FILE" && echo "ok: a second change keeps the first" || fail "second change lost the first: $(cat "$FILE")"
 click_id set-toast_seconds-number; wtype "500"; wtype -k Return; sleep 1
 grep -q '"toast_seconds":10' "$FILE" && echo "ok: an out-of-range time is not kept" || fail "out of range accepted: $(cat "$FILE")"
+echo "--- do not disturb is written to the same file"
+click_id set-dnd; sleep 1
+grep -q '"dnd":true' "$FILE" && grep -q '"toast_seconds":10' "$FILE" && echo "ok: do not disturb is kept with the banner settings" || fail "dnd not written: $(cat "$FILE" 2>&1)"
+click_id set-dnd; sleep 1
+grep -q '"dnd":false' "$FILE" && echo "ok: do not disturb turns off" || fail "dnd stayed on: $(cat "$FILE")"
+echo "--- quiet hours are written beside the other settings"
+click_id set-quiet; sleep 0.4
+click_id set-quiet_start-number; wtype "9"; wtype -k Return; sleep 0.6
+click_id set-quiet_end-number; wtype "17"; wtype -k Return; sleep 0.6
+grep -q '"quiet":true' "$FILE" && grep -q '"quiet_start":9' "$FILE" && grep -q '"quiet_end":17' "$FILE" \
+  && grep -q '"toast_seconds":10' "$FILE" && grep -q '"dnd":false' "$FILE" \
+  && echo "ok: quiet hours kept with the other settings" || fail "quiet hours: $(cat "$FILE" 2>&1)"
+click_id set-quiet_start-number; wtype "24"; wtype -k Return; sleep 0.6
+grep -q '"quiet_start":9' "$FILE" && echo "ok: an hour past 23 is not kept" || fail "hour 24 accepted: $(cat "$FILE")"
 [ "$(stat -c %a "$FILE")" = 600 ] && echo "ok: file is private" || fail "file mode"
+echo "--- per-application rules, for the applications that have sent a notification"
+has_id "set-app:chat-quiet" && has_id "set-app:mail-off" && echo "ok: each application seen has a rule row" || fail "no application rows"
+click_id "set-app:chat-quiet"; sleep 1
+grep -q '"app_rules":{"chat":"quiet"}' "$FILE" && grep -q '"toast_seconds":10' "$FILE" && echo "ok: a Quiet rule is written with the other settings" || fail "rule not written: $(cat "$FILE")"
+click_id "set-app:mail-off"; sleep 1
+grep -q '"mail":"off"' "$FILE" && grep -q '"chat":"quiet"' "$FILE" && echo "ok: a second rule keeps the first" || fail "second rule: $(cat "$FILE")"
+click_id "set-app:chat-banners"; sleep 1
+grep -q '"chat"' "$FILE" && fail "Banners left an entry: $(cat "$FILE")" || echo "ok: Banners is the default and is not written"
 shot settings-notifications-after
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

@@ -33,16 +33,18 @@ Nix, Guix and AUR packaging that built the deleted C++ binary, and a Rust layeri
 
 ## 2. Settings (missing pages and ghost settings)
 
-Settings has pages for Appearance, Accessibility, Displays, Network, Bluetooth, Keyboard, Wallpaper, Dock,
-Notifications, Power & lock, Privacy & agents and About. The gaps below come from `settings-audit.md` and `settings-tauri.md`.
+Settings has pages for Appearance (accent colour, animations, gaps, cursor size), Wallpaper, Accessibility, Displays (with a draggable
+arrangement and night light), Network, Bluetooth, Sound, Keyboard (typing and shortcuts), Multitasking, Mouse & touchpad, Startup apps, Default
+apps, Date & time (with automatic location), Top bar, Dock, Notifications, Power & lock (with a power mode), Privacy & agents and About. What
+each one does, and what it does not, is in `settings-audit.md`; that file is the source, this table is only the open work.
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
-| Sound page: live input level meter | S | A `watch_input_level` call in `helix-desktop-api` for the `InputLevel` signal; `Audio1.StartInputMeter` is already there | The page ships without the meter (device choice, volume and mute are done) |
-| **Notifications page, next**: do-not-disturb schedule and per-app rules (banner time and count are done) | M | A consumer in `helix_shell_model::notifications` for each | `settings-audit.md` |
-| **Night light**: temperature and schedule | L | A gamma-control client (`wlr-gamma-control` is in `protocols/`); the service only guards the setting today | `settings-audit.md`; `configuration.rs` has guards, no gamma client |
-| **Interface scale in the shell's own chrome** (bar, dock, panels follow the scale) | M | The bar and dock set layer-surface sizes and exclusive zones, so they need to follow the scale rather than be zoomed | Applications follow `accessibility.ui_scale` already; the shell does not |
-| Candidates, not yet confirmed as needed: date/time and region, default applications, pointer and touchpad | M each | Product decision | Common desktop expectations; no doc asks for them yet |
+| **Notifications page, next**: per-app rules (the on/off switch, banner time and count, quiet hours are done) | M | A consumer in `helix_shell_model::notifications` | `settings-audit.md` |
+| **Privacy page**: location (on/off is in Date & time), and which programs may use the camera and microphone. The "in use" indicator in the bar is done (`tauri-rust-shell.md`) | M | Portal permission store (PipeWire alone does not hold permissions) | Common desktop expectation |
+| **Users**: name, picture, password | M | A polkit-guarded helper; never handle the password in the page | Common desktop expectation |
+| Top bar: height and position, auto-hide, order of items | M | The bar sets a strut, so a change has to move the exclusive zone | `settings-audit.md` "Top bar" |
+| Printers, removable media, online accounts, Qt and GTK 3 following the accent | M each | Product decision | Not asked for yet |
 
 Rule for any new row (from `settings-audit.md`): nothing ships in Settings unless something running in the session
 acts on it, and a nested test asserts the exact requests sent.
@@ -55,8 +57,6 @@ acts on it, and a nested test asserts the exact requests sent.
 | Software: add and remove sources | M | Confirmation and auth for system remotes | `software-tauri.md` |
 | System Monitor: kill and renice, behind a confirmation | M | Own-process-only rule, confirm dialog | `system-monitor-tauri.md` "v1 omissions" |
 | System Monitor: cut the bar and Control Center `sysmon` widgets over | M | Monitor model shared with the shell | `system-monitor-tauri.md` |
-| Greeter: power actions (restart, shut down) | M | logind call from the greeter user, polkit | `greeter-tauri.md` "Not yet" |
-| Greeter: remember last account and session | S | State file in `/var/lib/helix-greeter` | `greeter-tauri.md` |
 | Greeter: packaging for the apply helper and a polkit rule scoped to the installed path | M | Install layout | `greeter-tauri.md`; the helper is safe to expose only at a fixed, root-owned path |
 
 ## 4. Shell
@@ -64,7 +64,6 @@ acts on it, and a nested test asserts the exact requests sent.
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
 | Finish the React slices and delete the hand-written fallbacks | M–L | None | `frontend-stack.md`: `shell.js` still owns mode, regions and glass |
-| Mic and camera in use indicator | M | Service exposes capture streams | `tauri-rust-shell.md` "Not yet" |
 | Today panel with calendar behind the date, and timers | M | A calendar source | `tauri-rust-shell.md` |
 | Extension story to replace the removed Luau plugins | L | Design doc first (sandboxed, out-of-process over D-Bus fits the contracts) | README "Scope" |
 
@@ -82,8 +81,7 @@ acts on it, and a nested test asserts the exact requests sent.
 ## Suggested order
 
 1. Foundations, all of section 1 (a few days, unlocks everything).
-2. Sound page: biggest visible hole, no dependencies, and it exercises the page pattern the others reuse.
-3. Act loop end to end: the product bet, and it decides what the agent-facing UI work looks like.
-4. Software: a real install tested on a throwaway machine, then adding and removing sources.
-5. Notifications page together with its consumer, then night light, then UI scale.
-6. Greeter power actions and packaging, then shell slices and the extension design.
+2. Act loop end to end: the product bet, and it decides what the agent-facing UI work looks like.
+3. Software: a real install tested on a throwaway machine, then adding and removing sources.
+4. Notifications page together with its consumer, then night light, then UI scale. The Sound page, including the microphone test, is done. Quiet hours hide ordinary banners between two hours and are checked when the hour changes (`notifications-prefs-test.sh`). Displays sets resolution, scale, orientation, arrangement, variable refresh, and power, and keeps them in `helix-setup.kdl` (`settings-displays-test.sh`). Night light still needs a gamma client before it can be a row. Per-app notification rules are still open.
+5. Greeter power actions and packaging, then shell slices and the extension design.

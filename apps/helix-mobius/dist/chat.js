@@ -15,8 +15,10 @@ $("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
 let reporting = false;
 let reportTimer = null;
 let composerAct = false;
+let composerPlan = false;
 let modeChat = "";
 let view = { id: "", title: "New chat", messages: [], streaming: false, error: "", temporary: false, pinned: false, project: "" };
+let lastWaitNotice = "";
 let status = { inference: "ready", backend: "On this computer", left_device: false };
 let personas = { active: "helix", personas: [] };
 let lab = null; // the experiments and this chat's style, from the React dialogs
@@ -81,7 +83,7 @@ const SLASH_COMMANDS = [
   { cmd: "/web", desc: "Pick online sources yourself", run: (text) => { openWeb(text.replace(/^\/web\s*/i, "")); return Promise.resolve(); } },
   { cmd: "/remember", desc: "Remember something in every chat (local models only)", run: (typed) => {
     const fact = (typed || "").replace(/^\/remember\b/i, "").trim();
-    if (!fact) { reactMemory?.open(); return Promise.resolve(); }
+    if (!fact) { openMemory(); return Promise.resolve(); }
     return invoke("memory_add", { text: fact }).then(() => {
       const banner = $("banner");
       banner.textContent = "Remembered. /memory shows everything Mobius remembers.";
@@ -89,9 +91,9 @@ const SLASH_COMMANDS = [
       setTimeout(() => { if (banner.textContent.startsWith("Remembered")) banner.hidden = true; }, 4000);
     });
   } },
-  { cmd: "/memory", desc: "See and edit what Mobius remembers", run: () => { reactMemory?.open(); return Promise.resolve(); } },
+  { cmd: "/memory", desc: "See and edit what Mobius remembers", run: () => { openMemory(); return Promise.resolve(); } },
   { cmd: "/side", desc: "A side chat: ask something that reads this chat without adding to it", run: () => startSideChat().catch(report) },
-  { cmd: "/tools", desc: "Configure Tools mode (research + project commands)", run: () => { reactTools?.open(view); return Promise.resolve(); } },
+  { cmd: "/tools", desc: "Configure Tools mode (research + project commands)", run: () => { openTools(); return Promise.resolve(); } },
   { cmd: "/desk", desc: "Show the Helix agent desk workspace", run: () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report) },
   { cmd: "/context", desc: "Review recent history and chat brief", run: () => { openChatContext(); return Promise.resolve(); } },
   { cmd: "/find", desc: "Find in this chat", run: () => { openFindBar(); return Promise.resolve(); } },
@@ -141,6 +143,45 @@ let slashShown = [];
 const reactSlash = window.HelixMobiusReact
   ? window.HelixMobiusReact.slash($("slash-menu"), (index) => { if (mentionRows.length) pickMention(mentionRows[index]); else if (slashShown[index]) runSlash(slashShown[index]); })
   : null;
+
+let knowledgePeek = [];
+let knowledgePeekTimer;
+let knowledgeInChat = true;
+invoke("knowledge_status").then((s) => { if (s) knowledgeInChat = !!s.use_in_chat; }).catch(() => {});
+listen("knowledge-changed", (event) => { knowledgeInChat = !!event.payload?.use_in_chat; knowledgePeek = []; drawKnowledgeChips(); });
+function drawKnowledgeChips() {
+  const host = $("knowledge-chips");
+  if (!knowledgePeek.length || composerMode() !== "ask" || view.tools_enabled || view.analysis_job || !view.id) {
+    host.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  host.hidden = false;
+  host.replaceChildren();
+  const lead = el("span", "knowledge-lead", "From your files");
+  lead.dataset.test = "knowledge-lead";
+  host.append(lead);
+  knowledgePeek.forEach((hit, i) => {
+    const chip = el("span", "knowledge-chip");
+    chip.dataset.test = `knowledge-chip-${i}`;
+    chip.title = hit.excerpt || "";
+    chip.textContent = hit.heading ? `${hit.title} › ${hit.heading}` : hit.title;
+    host.append(chip);
+  });
+}
+function scheduleKnowledgePeek() {
+  clearTimeout(knowledgePeekTimer);
+  const query = input.value.trim();
+  const localBackend = !status.backend || status.backend === "On this computer" || String(status.backend).toLowerCase().startsWith("local");
+  if (query.length < 8 || composerMode() !== "ask" || view.tools_enabled || view.analysis_job || !view.id || !localBackend || !knowledgeInChat) {
+    knowledgePeek = [];
+    drawKnowledgeChips();
+    return;
+  }
+  knowledgePeekTimer = setTimeout(() => {
+    invoke("knowledge_peek", { query }).then((hits) => { knowledgePeek = Array.isArray(hits) ? hits : []; drawKnowledgeChips(); }).catch(() => { knowledgePeek = []; drawKnowledgeChips(); });
+  }, 450);
+}
 
 function drawAttachChips() {
   const host = $("attach-chips");
@@ -373,8 +414,50 @@ function clearAttachments() {
   drawAttachChips();
 }
 
+// The window the person was using when they summoned Mobius (the compositor notes it at the key press). A chip they can remove; sent with the
+// next message as a small note, and then forgotten.
+let summonNote = null;
+function drawSummonChip() {
+  const chip = $("summon-chip");
+  chip.hidden = !summonNote;
+  if (!summonNote) return;
+  const what = summonNote.title || summonNote.app_id || "a window";
+  chip.textContent = `About: ${what.length > 48 ? what.slice(0, 47) + "…" : what} · sent with your message ×`;
+}
+// The text they had selected there, read once when they summon (never otherwise): a second chip, removable, sent only if left.
+let summonSelection = "";
+function drawSelectionChip() {
+  const chip = $("summon-selection-chip");
+  chip.hidden = !summonSelection;
+  if (!summonSelection) return;
+  const first = summonSelection.split("\n")[0];
+  chip.textContent = `Selected: “${first.length > 40 ? first.slice(0, 39) + "…" : first}” · ${summonSelection.length} characters · sent with your message ×`;
+}
+$("summon-selection-chip").onclick = () => { summonSelection = ""; drawSelectionChip(); };
+async function checkSummon() {
+  try {
+    const note = await invoke("summon_context");
+    if (note && (note.title || note.app_id)) {
+      summonNote = note; drawSummonChip(); input.focus();
+      invoke("summon_selection").then((text) => { summonSelection = text || ""; drawSelectionChip(); }, () => undefined);
+    }
+  } catch { /* no compositor to ask */ }
+}
+$("summon-chip").onclick = () => { summonNote = null; drawSummonChip(); };
+window.addEventListener("focus", () => { checkSummon(); });
+setTimeout(checkSummon, 600);
+
 function attachmentPayload() {
   const files = pendingAttachments.map((a) => ({ name: a.name, content: a.content, original_chars: a.original_chars }));
+  if (summonNote) {
+    const lines = [`The person summoned you from another window. Title: ${summonNote.title || "(none)"}`, `Application: ${summonNote.app_id || "(unknown)"}`];
+    files.unshift({ name: "the window they were using", content: lines.join("\n"), original_chars: lines.join("\n").length });
+    summonNote = null; drawSummonChip();
+  }
+  if (summonSelection) {
+    files.unshift({ name: "the text they had selected", content: summonSelection, original_chars: summonSelection.length });
+    summonSelection = ""; drawSelectionChip();
+  }
   if (stageOpen && stageAttach && stageOpen.text.trim()) {
     const text = stageOpen.text;
     const how = "\n\n[To change this document, reply with a ```docops block holding a JSON list (at most 10) of edits, each one of: {\"op\":\"replace\",\"find\":\"exact old text\",\"with\":\"new text\"}, {\"op\":\"delete\",\"find\":\"...\"}, {\"op\":\"insert_after\",\"anchor\":\"exact text on a line\",\"text\":\"...\"}, {\"op\":\"replace_section\",\"heading\":\"Heading text\",\"text\":\"...\"}, {\"op\":\"append\",\"text\":\"...\"}. Use this for small changes; for a full rewrite use an artifact block.]";
@@ -729,11 +812,17 @@ function drawBlocks(host, blocks) {
 }
 
 function typingDots() {
-  const dots = el("span", "typing-dots");
-  dots.dataset.test = "typing";
-  dots.setAttribute("aria-label", "Thinking");
-  for (let i = 0; i < 3; i++) dots.append(el("span", "dot"));
-  return dots;
+  const mark = el("span", "typing-dots");
+  mark.dataset.test = "typing";
+  mark.setAttribute("aria-label", "Writing");
+  mark.append(el("span", "dot"), document.createTextNode("Writing"));
+  return mark;
+}
+function writingCaret() {
+  const caret = el("span", "writing-caret");
+  caret.dataset.test = "writing-caret";
+  caret.setAttribute("aria-hidden", "true");
+  return caret;
 }
 
 function messageNode(message, index, last) {
@@ -784,6 +873,7 @@ function messageNode(message, index, last) {
   }
   drawBlocks(body, message.blocks);
   if (!message.blocks.length) body.append(typingDots());
+  else if (last && view.streaming) body.append(writingCaret());
   const actions = el("div", "msg-actions");
   const copy = el("button", "mini", "Copy");
   copy.dataset.test = "copy-" + index;
@@ -934,11 +1024,10 @@ function drawLabChips() {
 }
 
 function toolsChipLabel() {
-  if (!view.tools_enabled) return "Tools · off";
-  if (!view.workspace) return "Tools · on";
+  if (!view.workspace) return "Folder";
   const parts = view.workspace.split("/").filter(Boolean);
   const name = parts.length ? parts[parts.length - 1] : view.workspace;
-  return `Tools · ${name}`;
+  return name;
 }
 
 // What each workspace asks of the chat (docs/design/mobius-workspaces.md, "The chat shapes itself to the mode"): the composer's wording and the
@@ -986,16 +1075,39 @@ function drawModeStarters() {
   $("empty").hidden = !empty || !!ui;
   host.hidden = !(empty && ui);
   host.replaceChildren();
+  drawDockActions();
   if (host.hidden) return;
   host.append(el("h3", "", ui.title), el("p", "", ui.note));
   const row = el("div", "mode-starter-row");
   for (const [label, prompt] of ui.starters) {
     const b = el("button", "mode-starter", label);
-    b.type = "button"; b.dataset.test = "starter-" + label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-$/, "");
+    b.type = "button"; b.dataset.test = "starter-" + starterId(label);
     b.onclick = () => sendPlain(prompt);
     row.append(b);
   }
   host.append(row);
+}
+
+function starterId(label) {
+  return label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-$/, "");
+}
+
+// Once a work mode has a conversation, the same actions stay above the composer. The empty screen keeps the larger starters.
+function drawDockActions() {
+  const host = $("dock-actions");
+  if (!host) return;
+  const ui = WORKSPACE_UI[workspace];
+  const empty = !view || (view.messages.length === 0 && (view.tasks || []).length === 0);
+  host.hidden = !ui || empty || !!view.analysis_job;
+  host.replaceChildren();
+  if (host.hidden) return;
+  for (const [label, prompt] of ui.starters) {
+    const button = el("button", "dock-action", label);
+    button.type = "button";
+    button.dataset.test = "dock-" + starterId(label);
+    button.onclick = () => sendPlain(prompt);
+    host.append(button);
+  }
 }
 
 function composerPlaceholder() {
@@ -1006,10 +1118,12 @@ function composerPlaceholder() {
   }
   input.placeholder = composerAct
     ? "Say what to do on the desktop"
+    : composerPlan
+    ? "Describe the task — Mobius will write a plan, and nothing runs yet"
     : WORKSPACE_UI[workspace] && !view.tools_enabled
     ? WORKSPACE_UI[workspace].placeholder
     : view.tools_enabled
-    ? "Ask a task — each step is shown for your approval"
+    ? "Give Agent a task — each step is shown, then it continues"
     : "Message Mobius — / for commands";
 }
 
@@ -1064,11 +1178,13 @@ function drawComposerMeta() {
   $("pin-chat").classList.toggle("active", !!view.pinned);
   $("pin-chat").title = view.pinned ? "Unpin chat" : "Pin chat";
   $("project-chat").title = view.project ? ("Project: " + view.project) : "Move to project";
-  if (modeChat !== view.id) { if (modeChat) composerAct = false; modeChat = view.id; }
+  if (modeChat !== view.id) { if (modeChat) { composerAct = false; composerPlan = false; } modeChat = view.id; }
   const mode = composerMode();
-  $("mode").textContent = mode === "act" ? "Act" : mode === "tools" ? "Tools" : "Ask";
-  $("mode").className = "mode-chip" + (mode === "ask" ? "" : " mode-" + mode);
-  $("mode").title = mode === "act" ? "Act: the next message goes to the desktop assistant (Shift+Tab to change)" : "Mode: " + $("mode").textContent + " (Shift+Tab to change)";
+  $("mode").textContent = mode === "act" ? "Desktop" : mode === "agent" ? "Agent" : mode === "plan" ? "Plan" : "Ask";
+  $("mode").className = "mode-chip" + (mode === "ask" ? "" : " mode-" + (mode === "agent" ? "tools" : mode));
+  $("mode").title = "Mode: " + $("mode").textContent + " (Shift+Tab to change)";
+  const build = $("plan-build");
+  if (build) build.hidden = mode !== "plan" || !!view.streaming || !(view.messages || []).some((m) => m.role === "assistant");
   $("meta-tools").hidden = !view.tools_enabled;
   $("meta-tools").textContent = toolsChipLabel();
   $("meta-tools").classList.toggle("tools-on", !!view.tools_enabled);
@@ -1079,13 +1195,29 @@ function drawComposerMeta() {
       ? "Tools mode is on for this chat — click to change folder or turn off"
       : "Turn on Tools mode for in-chat research and reviewed project commands";
   const context = view.context;
-  $("meta-context").textContent = context?.omitted_messages ? "Context · recent only" : (view.brief ? "Context · brief" : "Context");
-  $("meta-context").classList.toggle("context-limited", !!context?.omitted_messages);
-  $("meta-context").disabled = !view.id;
+  const ctxBtn = $("meta-context");
+  const ctxLabel = ctxBtn.querySelector(".context-label");
+  const ring = ctxBtn.querySelector(".context-ring");
+  const ctxText = context?.omitted_messages ? "Recent only" : (view.brief ? "Brief set" : "Context");
+  if (ctxLabel) ctxLabel.textContent = ctxText;
+  else ctxBtn.textContent = ctxText;
+  ctxBtn.classList.toggle("context-limited", !!context?.omitted_messages);
+  ctxBtn.disabled = !view.id;
+  if (ring && context?.budget_chars) {
+    const modelChars = context.model_context_tokens ? context.model_context_tokens * 4 : 0;
+    const fill = modelChars
+      ? Math.min(1, context.used_chars / modelChars)
+      : Math.min(1, context.used_chars / context.budget_chars);
+    ring.style.setProperty("--context-fill", String(fill));
+    ctxBtn.title = modelChars
+      ? `Chat context: about ${context.used_chars.toLocaleString()} characters of a ${context.model_context_tokens.toLocaleString()}-token model window (recent-history budget ${context.budget_chars.toLocaleString()} chars). Click for the brief.`
+      : `Chat context: ${context.used_chars.toLocaleString()} of ${context.budget_chars.toLocaleString()} characters of recent history. Click for the brief.`;
+  } else if (ring) ring.style.removeProperty("--context-fill");
   drawQueue();
   drawProjectFilter();
   updateJumpLatest();
   composerPlaceholder();
+  drawKnowledgeChips();
 }
 
 function syncSendEnabled() {
@@ -1124,11 +1256,86 @@ function setHome(on) {
   glide.finished.then(() => queueReport(), () => undefined);
 }
 
+function waitingStep() {
+  for (let i = view.messages.length - 1; i >= 0; i--) {
+    if (view.messages[i].role !== "assistant") continue;
+    return (view.messages[i].activities || []).find((a) => a.state === "waiting") || null;
+  }
+  return null;
+}
+function listLive() {
+  const wait = waitingStep();
+  return { streaming: !!view.streaming && !wait, waiting: !!wait };
+}
+function chatSurfaceVisible() {
+  return workspace === "chat" && !view.analysis_job && !document.hidden && document.hasFocus();
+}
+function drawApprovalHint() {
+  const wait = waitingStep();
+  const needs = $("needs-you");
+  if (wait && !chatSurfaceVisible()) {
+    needs.hidden = false;
+    const note = waitingNotice(wait);
+    needs.textContent = `${note.title} — show the chat`;
+    needs.onclick = () => { setWorkspace("chat"); closeSideDrawer(); scrollDown(); document.querySelector(".tool-activity.waiting [data-test=tool-approve]")?.focus(); };
+  } else needs.hidden = true;
+  if (wait && wait.id !== lastWaitNotice && !chatSurfaceVisible()) {
+    const note = waitingNotice(wait);
+    invoke("mobius_notify", { summary: note.title, body: note.body }).catch(() => {});
+    lastWaitNotice = wait.id;
+  }
+  if (!wait) lastWaitNotice = "";
+}
+function waitingNotice(step) {
+  const line = (step.input || "").split("\n")[0].trim();
+  if (step.tool === "terminal") return { title: "Approve a command", body: line || "A terminal command is waiting." };
+  if (step.tool === "edit_file") return { title: "Review a file edit", body: line || "A file edit is waiting." };
+  if (step.tool === "agent_permission") return { title: "Allow the agent", body: line || "The agent is waiting for permission." };
+  return { title: "Mobius needs you", body: line || "A tool step is waiting for your review." };
+}
+function agentStatusLabel() {
+  const wait = waitingStep();
+  if (wait) {
+    if (wait.tool === "terminal") return "Approve command";
+    if (wait.tool === "edit_file") return "Review edit";
+    if (wait.tool === "web_read") return "Approve page";
+    return "Needs you";
+  }
+  let running = null;
+  for (let i = view.messages.length - 1; i >= 0; i--) {
+    if (view.messages[i].role !== "assistant") continue;
+    const acts = view.messages[i].activities || [];
+    running = acts.findLast ? acts.findLast((a) => a.state === "running") : [...acts].reverse().find((a) => a.state === "running");
+    break;
+  }
+  if (!running) return view.tools_enabled ? "Agent working" : "Writing";
+  if (running.tool === "web_search") return "Searching";
+  if (running.tool === "web_read") return "Reading a page";
+  if (running.tool === "terminal") return "Running a command";
+  if (running.tool === "edit_file") return "Editing a file";
+  if (running.tool === "answer") return "Writing";
+  return view.tools_enabled ? "Agent working" : "Writing";
+}
+function drawAgentStatus() {
+  const chip = $("agent-status");
+  if (!chip) return;
+  const wait = waitingStep();
+  if (!view.streaming && !wait) { chip.hidden = true; chip.onclick = null; return; }
+  chip.hidden = false;
+  chip.textContent = agentStatusLabel();
+  chip.classList.toggle("waiting", !!wait);
+  chip.title = wait ? "Show the step that needs you" : "What Mobius is doing";
+  chip.onclick = wait
+    ? () => document.querySelector(".tool-activity.waiting [data-test=tool-approve]")?.focus()
+    : null;
+}
 function drawChat() {
   $("analysis-evidence").hidden = !view.analysis_job;
   if (!view.streaming) $("loading-chip").hidden = true;
+  drawAgentStatus();
   $("chat-title").textContent = view.temporary ? "Temporary chat" : (view.title || "New chat");
   drawComposerMeta();
+  drawKnowledgeChips();
   if (reactThread) {
     reactThread.set(view.messages, view.streaming, view.context, view.tasks || []);
   } else {
@@ -1156,6 +1363,8 @@ function drawChat() {
   banner.onclick = status.inference !== "ready" && !view.error
     ? () => invoke("chat_status").then((s) => { status = s; drawChat(); }).catch(report)
     : null;
+  drawApprovalHint();
+  drawList();
   if (stickToBottom) scrollDown();
   if (!$("find-bar").hidden && $("find-input").value.trim()) runFind();
   queueReport();
@@ -1195,7 +1404,9 @@ listen("chat-stream", (event) => {
   }
   const last = $("messages").lastElementChild;
   if (!last || !last.classList.contains("assistant")) return;
-  drawBlocks(last.querySelector(".msg-body"), event.payload.blocks);
+  const body = last.querySelector(".msg-body");
+  drawBlocks(body, event.payload.blocks);
+  body.append(event.payload.blocks?.length ? writingCaret() : typingDots());
   if (stickToBottom) scrollDown();
 });
 
@@ -1285,6 +1496,7 @@ const reactThread = window.HelixMobiusReact
         if (reactThread) reactThread.undo(id, false);
         report(error);
       }),
+    openProjectFile: (path) => openProjectFile(path),
   })
   : null;
 if (reactAct && reactThread) {
@@ -1320,7 +1532,7 @@ function drawProjectFilter() {
 function drawList(items) {
   if (items) chatItems = items;
   reactWelcome?.recents(chatItems.filter((c) => !c.temporary).slice(0, 3).map((c) => ({ id: c.id, title: c.title, project: c.project })));
-  if (reactChats) { reactChats.set(chatItems, view.id); return; }
+  if (reactChats) { reactChats.set(chatItems, view.id, listLive()); return; }
   const host = $("chats");
   host.replaceChildren();
   const needle = chatFilter.trim().toLowerCase();
@@ -1358,8 +1570,21 @@ function drawList(items) {
     const row = el("div", "chat-row" + (item.id === view.id ? " current" : "") + (item.pinned ? " pinned" : ""));
     row.dataset.test = "chat-" + index;
     const open = el("button", "chat-open");
-    const title = el("span", "chat-open-title", item.title);
-    open.append(title);
+    const line = el("span", "chat-open-line");
+    const live = item.id === view.id ? listLive() : null;
+    if (live?.waiting) {
+      const mark = el("span", "chat-waiting");
+      mark.dataset.test = "chat-waiting";
+      mark.title = "Needs your review";
+      line.append(mark);
+    } else if (live?.streaming) {
+      const working = el("span", "chat-working");
+      working.dataset.test = "chat-working";
+      working.title = "Writing";
+      line.append(working);
+    }
+    line.append(el("span", "chat-open-title", item.title));
+    open.append(line);
     if (item.project) open.append(el("span", "chat-open-project", item.project));
     const snippet = snippetById[item.id] || (needle && item.preview) || "";
     if (snippet && needle) open.append(el("span", "chat-open-snippet", snippet));
@@ -1635,6 +1860,7 @@ input.addEventListener("input", () => {
   grow();
   if (!maybeSlashFromInput()) maybeMentionFromInput();
   scheduleActHint();
+  scheduleKnowledgePeek();
   if (promptHistoryIndex >= 0 && input.value !== promptHistory[promptHistoryIndex]) {
     promptHistoryIndex = -1;
     promptDraft = "";
@@ -1643,7 +1869,7 @@ input.addEventListener("input", () => {
 input.addEventListener("keydown", (event) => {
   if (event.key === "Tab" && event.shiftKey && !event.isComposing) {
     event.preventDefault();
-    const order = ["ask", "tools", "act"];
+    const order = ["agent", "ask", "plan", "act"];
     setComposerMode(order[(order.indexOf(composerMode()) + 1) % order.length]);
     return;
   }
@@ -1730,7 +1956,7 @@ $("composer").addEventListener("submit", (event) => {
   input.value = "";
   grow();
   stickToBottom = true;
-  invoke("chat_send", { text, attachments: attachments.length ? attachments : null, pictures: pictures.length ? pictures : null })
+  invoke("chat_send", { text, attachments: attachments.length ? attachments : null, pictures: pictures.length ? pictures : null, plan: composerMode() === "plan" })
     .then(() => {
       clearAttachments();
       clearPictures();
@@ -1745,20 +1971,29 @@ input.addEventListener("paste", (event) => {
   const files = event.clipboardData && event.clipboardData.files;
   if (files && files.length && addPictureFiles(files)) event.preventDefault();
 });
-// The composer's mode: Ask (chat only), Tools (the chat's Tools mode) or Act (the next message goes to the desktop assistant).
-function composerMode() { return composerAct ? "act" : view.tools_enabled ? "tools" : "ask"; }
+// Harness modes, as in other agents: Agent does the work, Ask only answers, Plan writes a plan, Desktop is one desktop message.
+function composerMode() { return composerAct ? "act" : composerPlan ? "plan" : view.tools_enabled ? "agent" : "ask"; }
 function setComposerMode(next) {
   hideActHint();
-  if (next === "folder") { reactTools?.open(view); return; }
-  if (next === "act") { composerAct = true; drawComposerMeta(); input.focus(); return; }
+  if (next === "tools") next = "agent";
+  if (next === "desktop") next = "act";
+  if (next === "folder") { openTools(); return; }
+  if (next === "act") { composerAct = true; composerPlan = false; drawComposerMeta(); input.focus(); return Promise.resolve(); }
   composerAct = false;
+  composerPlan = next === "plan";
   drawComposerMeta();
-  const enabled = next === "tools";
-  if (enabled !== !!view.tools_enabled) {
-    invoke("tools_configure", { chatId: view.id, enabled, workspace: view.workspace || "" }).catch(report);
-  }
+  const enabled = next === "agent";
+  const pending = enabled !== !!view.tools_enabled
+    ? invoke("tools_configure", { chatId: view.id, enabled, workspace: view.workspace || "", policy: view.tools_policy || "" }).catch(report)
+    : Promise.resolve();
   input.focus();
+  return pending;
 }
+$("plan-build").onclick = () => {
+  setComposerMode("agent").then(() => {
+    invoke("chat_send", { text: "Build the plan above.", attachments: null, pictures: null, plan: false }).catch(report);
+  });
+};
 window.addEventListener("mobius-set-mode", (event) => setComposerMode(event.detail));
 function modeState() {
   return { mode: composerMode(), folder: view.workspace || "", busy: !view.id || view.streaming || !!view.analysis_job };
@@ -1800,7 +2035,7 @@ $("find-prev").onclick = () => focusFindMatch(findIndex - 1);
 $("find-next").onclick = () => focusFindMatch(findIndex + 1);
 $("find-close").onclick = () => { closeFindBar(); input.focus(); };
 
-// The chips beside the composer are quiet: the model, Tools when on, and a "⋯" that opens the rest (persona, style, where it runs, context).
+// The composer's footer holds the model, Tools when on, and a "⋯" that opens the rest (persona, style, where it runs, context).
 function openMoreMenu() {
   document.querySelectorAll(".more-menu").forEach((m) => m.remove());
   const box = $("meta-more").getBoundingClientRect();
@@ -2086,25 +2321,46 @@ $("open-assistant").onclick = () => { closeHubMenu(); invoke("chat_open_shell_pa
 $("open-agents").onclick = () => { closeHubMenu(); invoke("chat_open_shell_panel", { id: "agents" }).catch(report); };
 $("open-settings-agents").onclick = () => { closeHubMenu(); invoke("open_settings_agents").catch(report); };
 
-// Narrow sidebar drawer -------------------------------------------------------------------------------------------------------------
+// Sidebar: a drawer on a narrow window, and a rail you can fold on a wide one (remembered).
+let sideCollapsed = false;
+try { sideCollapsed = localStorage.getItem("mobius-side") === "collapsed"; } catch { /* not remembered */ }
 function closeSideDrawer() {
   document.body.classList.remove("side-open");
-  $("side-toggle").setAttribute("aria-expanded", "false");
   $("side-scrim").hidden = true;
+  drawSideCollapsed();
 }
 function openSideDrawer() {
   document.body.classList.add("side-open");
-  $("side-toggle").setAttribute("aria-expanded", "true");
   $("side-scrim").hidden = false;
+  $("side-toggle").setAttribute("aria-expanded", "true");
+  $("side-toggle").title = "Conversations";
+  $("side-toggle").setAttribute("aria-label", "Conversations");
+}
+function drawSideCollapsed() {
+  const wide = window.matchMedia("(min-width: 720px)").matches;
+  document.body.classList.toggle("side-collapsed", sideCollapsed && wide);
+  if (!wide) return;
+  const open = !sideCollapsed;
+  $("side-toggle").setAttribute("aria-expanded", String(open));
+  $("side-toggle").title = open ? "Hide the sidebar" : "Show the sidebar";
+  $("side-toggle").setAttribute("aria-label", $("side-toggle").title);
+}
+function toggleSideCollapsed() {
+  sideCollapsed = !sideCollapsed;
+  try { localStorage.setItem("mobius-side", sideCollapsed ? "collapsed" : "open"); } catch { /* not remembered */ }
+  drawSideCollapsed();
 }
 $("side-toggle").onclick = () => {
-  if (document.body.classList.contains("side-open")) closeSideDrawer();
+  if (window.matchMedia("(min-width: 720px)").matches) toggleSideCollapsed();
+  else if (document.body.classList.contains("side-open")) closeSideDrawer();
   else openSideDrawer();
 };
 $("side-scrim").onclick = () => closeSideDrawer();
 window.matchMedia("(min-width: 720px)").addEventListener("change", (event) => {
   if (event.matches) closeSideDrawer();
+  else drawSideCollapsed();
 });
+drawSideCollapsed();
 
 // Models page -----------------------------------------------------------------------------------------------------------------------
 const ROUTE_SOURCES = [
@@ -2373,8 +2629,8 @@ async function refreshCloudKeyStatus() {
   const has = !!(keyStatus && keyStatus.has_key);
   if (routeDraft) routeDraft.hasCloudKey = has;
   $("route-cloud-key-status").textContent = has
-    ? "API key is saved securely."
-    : "No API key saved yet.";
+    ? "Secret saved"
+    : "No key saved yet.";
 }
 
 async function loadRouteModels(source) {
@@ -2450,14 +2706,22 @@ window.addEventListener("mobius-image-prompt", (event) => {
   input.value = "/image " + event.detail;
   grow(); syncSendEnabled(); maybeSlashFromInput(); input.focus();
 });
-$("open-analysis").onclick = () => {
+function openAnalysis() {
   closeHubMenu();
   closeSideDrawer();
+  $("mode-analyze").classList.add("active");
   if (reactAnalysis) reactAnalysis.open();
   else report("Build the Mobius frontend to use software analysis.");
-};
+}
+$("open-analysis").onclick = () => openAnalysis();
+$("mode-analyze").onclick = () => openAnalysis();
+window.addEventListener("mobius-analysis-closed", () => $("mode-analyze").classList.remove("active"));
 $("analysis-evidence").onclick = () => reactAnalysis?.open(view.analysis_job);
 
+function openMemory() {
+  if (reactModels) openRouting("memory");
+  else reactMemory?.open();
+}
 async function openRouting(section) {
   closeHubMenu();
   closeSideDrawer();
@@ -2700,7 +2964,7 @@ $("route-probe-cloud").onclick = () => {
         else if (action === "write") setWorkspace("write");
         else if (action === "code") setWorkspace("code");
         else if (action === "tools") {
-          reactTools?.open(view);
+          openTools();
           useStarter("Research this with public sources. Cite pages in the answer.");
         }
         else if (action === "models") $("open-models").click();
@@ -2765,8 +3029,10 @@ function pollBarHandoff() {
     invoke("chat_list").then(drawList);
   }).catch(() => {});
 }
-window.addEventListener("focus", pollBarHandoff);
+window.addEventListener("focus", () => { pollBarHandoff(); drawApprovalHint(); drawList(); });
 document.addEventListener("visibilitychange", () => {
+  drawApprovalHint();
+  drawList();
   if (document.visibilityState === "visible") pollBarHandoff();
 });
 setInterval(pollBarHandoff, 2500);
@@ -2778,6 +3044,22 @@ const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
 const reactMemory = window.HelixMobiusReact?.memory($("memory-host"));
 const reactScheduled = window.HelixMobiusReact?.scheduled($("scheduled-host"), (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
 $("mode-scheduled").onclick = () => reactScheduled?.open();
+const reactAgentTasks = window.HelixMobiusReact?.agentTasks($("agent-tasks-host"), (shown) => { document.body.classList.toggle("agents-open", shown); $("mode-tasks").classList.toggle("active", shown); $("mode-chat").classList.toggle("active", !shown); }, (id) => invoke("chat_open", { id }).then(() => { clearAttachments(); input.focus(); }).catch(report));
+$("mode-tasks").onclick = () => reactAgentTasks?.open();
+// "Run as task" on a message hands it to the Agents page, with this chat's project folder.
+window.addEventListener("mobius-run-as-task", (event) => reactAgentTasks?.open({ goal: event.detail.goal, folder: view.workspace || "", policy: view.tools_policy || "" }));
+// What is waiting for the person shows as a count on the sidebar row, whatever page is open.
+async function drawAgentsBadge() {
+  const tasks = await invoke("agent_tasks").catch(() => []);
+  const waiting = tasks.filter((t) => t.state && t.state.state === "waiting").length;
+  const badge = $("agents-badge");
+  badge.hidden = waiting === 0;
+  badge.textContent = String(waiting);
+}
+drawAgentsBadge();
+setInterval(drawAgentsBadge, 4000);
+// Opening a chat from the list leaves the Agents page.
+document.addEventListener("click", (event) => { if (event.target instanceof Element && event.target.closest("#chat-list-host, #new-chat, #mode-chat")) reactAgentTasks?.close(); }, true);
 // A chat begun from the Projects page joins its project once it has its first message (an empty chat is not kept, so it cannot be moved yet).
 let pendingProject = "";
 const reactProjects = window.HelixMobiusReact?.projects($("projects-host"), {
@@ -2801,20 +3083,23 @@ function paletteItems(query) {
   const act = (id, title, sub, hint, run) => { if (match(title + " " + sub)) rows.push({ id, section: "Do", title, sub, hint, run }); };
   act("new", "New chat", "", "Ctrl+N", () => $("new-chat").click());
   act("temp", "Temporary chat", "Not saved", "Ctrl+Shift+N", () => $("temp-chat").click());
-  act("mode-ask", "Mode: Ask", "Chat only", "", () => setComposerMode("ask"));
-  act("mode-tools", "Mode: Tools", "Research and project commands, each step reviewed", "", () => setComposerMode("tools"));
-  act("mode-act", "Mode: Act", "Do the next message on the desktop", "", () => setComposerMode("act"));
+  act("mode-agent", "Mode: Agent", "Do the work in the project, each step reviewed", "", () => setComposerMode("agent"));
+  act("mode-ask", "Mode: Ask", "Answer only", "", () => setComposerMode("ask"));
+  act("mode-plan", "Mode: Plan", "Write a plan before anything runs", "", () => setComposerMode("plan"));
+  act("mode-act", "Mode: Desktop", "The next message goes to the desktop assistant", "", () => setComposerMode("act"));
   act("model", "Choose model", "This chat's model", "", () => $("meta-model").click());
   act("routing", "Settings", "Models, providers and how replies are written", "Ctrl+,", () => openRouting().catch(report));
   act("ws-chat", "Workspace: Chat", "Just the conversation", "", () => setWorkspace("chat"));
   act("ws-write", "Workspace: Write", "A document beside the chat", "", () => setWorkspace("write"));
   act("ws-image", "Workspace: Image", "Edit a picture beside the chat", "", () => setWorkspace("image"));
   act("ws-code", "Workspace: Code", "Project files and changes beside the chat", "", () => setWorkspace("code"));
+  act("analyze", "Analyze software", "Inspect a Linux binary with REA and Ghidra. It is not run.", "", () => openAnalysis());
   act("side", "Side chat", "Ask something that reads this chat without touching it", "/side", () => startSideChat().catch(report));
   act("artifacts", "Artifacts", "Every document your chats made", "", () => showArtifacts(true));
+  act("agent-tasks", "Agents", "Tasks that run on their own, and what they did", "", () => reactAgentTasks?.open());
   act("scheduled", "Scheduled prompts", "Run a prompt by itself at a time", "", () => reactScheduled?.open());
   act("projects", "Projects", "Instructions, folder, chats and documents together", "", () => reactProjects?.open());
-  act("memory", "Memory", "What Mobius remembers", "", () => reactMemory?.open());
+  act("memory", "Memory", "What Mobius remembers", "", () => openMemory());
   act("find", "Find in this chat", "", "Ctrl+F", () => openFindBar());
   act("export", "Export this chat", "Markdown", "Ctrl+Shift+C", () => $("export-chat").click());
   act("fork", "Fork this chat", "Continue from here in a new chat", "Ctrl+Shift+F", () => forkChat());
@@ -2828,6 +3113,48 @@ let stageOpen = null;      // { title, text } while a document is open
 let stageAttach = true;    // whether it is sent with the next message
 let workspace = "chat";    // chat | write | code: how the window is laid out (docs/design/mobius-workspaces.md)
 let workspaceChat = "";
+// Open views are tabs, the way an editor keeps Browser and Files beside the agent. Chat stays; the others appear when opened and can be closed.
+const VIEW_LABELS = { chat: "Chat", write: "Write", image: "Image", code: "Code" };
+let openViews = ["chat"];
+try {
+  const saved = JSON.parse(sessionStorage.getItem("mobius-views") || "[]");
+  if (Array.isArray(saved)) openViews = ["chat", ...saved.filter((id) => VIEW_LABELS[id] && id !== "chat")];
+} catch { /* not remembered */ }
+function rememberViews() {
+  try { sessionStorage.setItem("mobius-views", JSON.stringify(openViews.filter((id) => id !== "chat"))); } catch { /* not remembered */ }
+}
+function drawViewTabs() {
+  const host = $("view-tabs");
+  host.replaceChildren();
+  host.hidden = openViews.length < 2;
+  for (const id of openViews) {
+    const tab = el("div", "view-tab" + (workspace === id ? " active" : ""));
+    tab.dataset.test = "view-tab-" + id;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", workspace === id ? "true" : "false");
+    const label = el("button", "view-tab-label", VIEW_LABELS[id]);
+    label.type = "button";
+    label.onclick = () => setWorkspace(id);
+    tab.append(label);
+    if (id !== "chat") {
+      const close = el("button", "view-tab-x", "×");
+      close.type = "button";
+      close.dataset.test = "view-tab-close-" + id;
+      close.title = "Close " + VIEW_LABELS[id];
+      close.setAttribute("aria-label", close.title);
+      close.onclick = (event) => { event.stopPropagation(); closeView(id); };
+      tab.append(close);
+    }
+    host.append(tab);
+  }
+}
+function closeView(id) {
+  openViews = openViews.filter((viewId) => viewId !== id);
+  rememberViews();
+  if (workspace === id) setWorkspace("chat");
+  else drawViewTabs();
+}
+drawViewTabs();
 function drawStageChip() {
   const chip = $("stage-chip");
   chip.hidden = !stageOpen;
@@ -2837,6 +3164,7 @@ function drawStageChip() {
   document.body.classList.toggle("stage-open", !!stageOpen || workspace === "code" || workspace === "image");
   drawLayout();
   if (typeof view !== "undefined" && view && view.messages) { drawModeStarters(); composerPlaceholder(); }
+  drawViewTabs();
   if (stageReady) { if (stageWidthFor !== workspace) { stageWidthFor = workspace; loadStageWidth(); } drawStageSide(); }
   if (!stageOpen) return;
   chip.textContent = stageAttach ? `${stageOpen.title} · sent with your message ×` : `${stageOpen.title} · not sent (click to send)`;
@@ -2989,7 +3317,7 @@ const reactStage = window.HelixMobiusReact?.stage($("stage-doc"), {
 const reactCode = window.HelixMobiusReact?.codeStage($("stage-code"), {
   report: (error) => report(error),
   folder: () => view.workspace || "",
-  chooseFolder: () => reactTools?.open(view),
+  chooseFolder: () => openTools(),
   changes: () => {
     for (let i = view.messages.length - 1; i >= 0; i--) {
       const a = (view.messages[i].activities || []).find((x) => x.tool === "changes");
@@ -3001,7 +3329,23 @@ const reactCode = window.HelixMobiusReact?.codeStage($("stage-code"), {
   shown: (open) => { stageOpen = open; stageAttach = true; drawStageChip(); },
   tasks: () => codeTasks(),
   reveal: (index) => document.querySelector(`[data-test="msg-${index}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" }),
+  terminal: () => codeTerminal(),
 });
+function codeTerminal() {
+  for (let i = view.messages.length - 1; i >= 0; i--) {
+    const acts = view.messages[i].activities || [];
+    for (let j = acts.length - 1; j >= 0; j--) {
+      if (acts[j].tool === "terminal") return { command: acts[j].input || "", state: acts[j].state || "", output: acts[j].output || "" };
+    }
+  }
+  return null;
+}
+function openProjectFile(path) {
+  if (!path) return;
+  setWorkspace("code");
+  reactCode?.open();
+  setTimeout(() => reactCode?.show(path), 0);
+}
 // Each request in this chat as a task: its state and what the agent did for it (the Code stage's Tasks list, and what Follow watches).
 function codeTasks() {
   const out = [], m = view.messages;
@@ -3043,11 +3387,14 @@ function setWorkspace(next, doc) {
   if (workspace === "code") reactCode?.close();
   if (workspace === "image") reactImage?.close();
   workspace = next;
+  if (VIEW_LABELS[next] && !openViews.includes(next)) { openViews.push(next); rememberViews(); }
   stageOpen = null;
   if (next === "code") reactCode?.open();
   if (next === "image") reactImage?.open(doc, "Picture");
   if (next === "write") { if (doc) reactStage?.open(doc); else reactStage?.open("Untitled", ""); }
   drawStageChip();
+  drawApprovalHint();
+  drawList();
 }
 function openWorkspaceMenu() {
   document.querySelectorAll(".workspace-menu").forEach((m) => m.remove());
@@ -3081,7 +3428,7 @@ function openWorkspaceMenu() {
   setTimeout(() => window.addEventListener("mousedown", close, true), 0);
 }
 $("workspace-btn").onclick = () => openWorkspaceMenu();
-for (const id of ["chat", "write", "image", "code"]) $("mode-" + id).onclick = () => setWorkspace(id);
+for (const id of ["chat", "write", "image", "code"]) $("mode-" + id).onclick = () => { $("mode-analyze").classList.remove("active"); setWorkspace(id); };
 
 // Artifacts: every document the chats made, as a list in place of the chat list.
 let artifactsView = false;
@@ -3152,5 +3499,6 @@ const reactPalette = window.HelixMobiusReact?.palette($("palette-host"), {
   newChatWith: (text) => invoke("chat_new").then(() => { input.value = text; grow(); syncSendEnabled(); input.focus(); }).catch(report),
 });
 
-$("meta-tools").onclick = () => reactTools?.open(view);
+function openTools() { reactTools?.open({ ...view, craft: workspace }); }
+$("meta-tools").onclick = () => openTools();
 $("meta-agent-desk").onclick = () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report);

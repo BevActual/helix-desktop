@@ -70,7 +70,7 @@ pending operations, then reconnect the service mixer independently.
 test lease for the calling connection. `StopInputMeter()` stops that caller's capture.
 `InputLevel(u source,d peak,b available)` is sent only to that caller. Samples are
 reduced to a bounded peak and immediately returned to PipeWire; nothing is saved.
-Settings renews the lease only while its test is active and stops it on page exit.
+Settings renews the lease only while its Sound page test is on (`Test microphone`) and stops it on leaving that page.
 Disconnecting a client releases its stream. Level updates never enter snapshots.
 
 `Network1.GetDns()` reads the active connection profile. `SetDns(a{sv})` accepts
@@ -313,8 +313,9 @@ Search bodies, thumbnails and full images have separate size limits. Files are
 written through unique temporary files and renamed only on successful completion.
 The service applies the wallpaper only after the full image download succeeds.
 
-The wallpaper migration remains partial: per-display picking and favorites still need
-native destinations. Daily provider, video wallpaper, fill color, transitions and
+The wallpaper migration remains partial: favorites still need a native destination.
+Settings picks a picture for every display or for one connected display, and
+`helix-wallpaper` paints that choice. Daily provider, video wallpaper, fill color, transitions and
 automation scalars are available in Appearance. Legacy Settings editors have been
 retired; full desktop migration remains incomplete.
 
@@ -364,5 +365,7 @@ display inventory. Snapshots contain availability, capability IDs (`inventory`),
 output records with connector/name, enabled state, mode, logical size/position, scale, transform
 and VRR state. Device serial numbers are not exported. Querying requires a registered Helix
 desktop and compositor socket; it is asynchronous, bounded to two seconds, retries automatically
-and clears stale outputs when unavailable. No display mutations are exposed through this interface
-yet. The native Displays page opens existing shell editing controls while migration continues.
+and clears stale outputs when unavailable. No display mutations are exposed through this interface.
+Settings changes resolution, scale, orientation, arrangement, variable refresh, and power on the
+compositor socket (`Request::Output`) and records them in `helix-setup.kdl`. Night light stays off
+this page until a gamma client exists.

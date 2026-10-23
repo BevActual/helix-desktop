@@ -61,11 +61,20 @@ impl Server {
             timeout_ms: expire_timeout,
         };
         let state = shell_state(&self.app);
+        let mut new_apps: Option<Vec<String>> = None;
         let (id, events) = {
             let mut shell = state.lock().expect("shell state");
             let now = now_ms(shell.started);
-            shell.notifications.notify(incoming, now)
+            let before = shell.notifications.seen_apps().len();
+            let result = shell.notifications.notify(incoming, now);
+            if shell.notifications.seen_apps().len() != before {
+                new_apps = Some(shell.notifications.seen_apps().to_vec());
+            }
+            result
         };
+        if let Some(apps) = new_apps {
+            write_seen_apps(&apps);
+        }
         eprintln!(
             "NOTIFY stored id={id} replaces={replaces_id} app={:?}",
             app_label
@@ -205,6 +214,31 @@ fn prefs_path() -> Option<std::path::PathBuf> {
     Some(base.join("helix/notification-settings.json"))
 }
 
+/// The applications that have sent a notification, for Settings to offer a rule for each (`notification-apps.json` beside the settings).
+fn seen_apps_path() -> Option<std::path::PathBuf> {
+    prefs_path().map(|p| p.with_file_name("notification-apps.json"))
+}
+
+fn read_seen_apps() -> Vec<String> {
+    seen_apps_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
+        .unwrap_or_default()
+}
+
+fn write_seen_apps(apps: &[String]) {
+    let Some(path) = seen_apps_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let temporary = path.with_extension("tmp");
+    if std::fs::write(&temporary, serde_json::to_vec(apps).unwrap_or_default()).is_ok() {
+        let _ = std::fs::rename(&temporary, &path);
+    }
+}
+
 fn read_prefs() -> helix_config::notification_prefs::NotificationPrefs {
     prefs_path()
         .and_then(|path| std::fs::read_to_string(path).ok())
@@ -212,24 +246,87 @@ fn read_prefs() -> helix_config::notification_prefs::NotificationPrefs {
         .unwrap_or_default()
 }
 
-/// Applies the banner time and count from Settings now and whenever the file changes (a stat once a second, nothing more).
-fn watch_prefs(app: AppHandle) {
-    let apply = |app: &AppHandle| {
-        let prefs = read_prefs();
-        shell_state(app)
-            .lock()
-            .expect("shell state")
-            .notifications
-            .set_toast_prefs(
-                u64::from(prefs.toast_seconds) * 1000,
-                prefs.max_toasts as usize,
-            );
-        eprintln!(
-            "NOTIFICATIONS settings seconds={} toasts={}",
-            prefs.toast_seconds, prefs.max_toasts
+/// Writes Do not disturb into the settings file, keeping the banner time and count already there. A failure is logged, not hidden.
+fn persist_dnd(on: bool) {
+    if let Err(error) = write_dnd(on) {
+        eprintln!("NOTIFICATIONS could not save do-not-disturb: {error}");
+    }
+}
+
+fn write_dnd(on: bool) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let current = read_prefs();
+    if current.dnd == on {
+        return Ok(());
+    }
+    let next = current
+        .set("dnd", &serde_json::json!(on))
+        .map_err(|error| format!("{error:?}"))?;
+    let path = prefs_path().ok_or("no settings folder")?;
+    let parent = path.parent().ok_or("no settings folder")?;
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    // Settings writes this file too: a name of our own keeps the two from sharing one half-written temporary file.
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)
+        .map_err(|e| e.to_string())?;
+    file.write_all(next.to_json().as_bytes())
+        .map_err(|e| e.to_string())?;
+    drop(file);
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())
+}
+
+/// The current local hour, 0–23. Quiet hours are checked against this, not against the file's clock.
+fn local_hour() -> u32 {
+    // SAFETY: `localtime_r` is called with a valid time and a zeroed `tm`.
+    unsafe {
+        let now = libc::time(std::ptr::null_mut());
+        let mut tm: libc::tm = std::mem::zeroed();
+        if libc::localtime_r(&now, &mut tm).is_null() {
+            return 0;
+        }
+        tm.tm_hour.clamp(0, 23) as u32
+    }
+}
+
+/// Applies banner time, banner count, Do not disturb and quiet hours from Settings. Returns whether quiet hours are in effect.
+fn apply_prefs(app: &AppHandle) -> bool {
+    let prefs = read_prefs();
+    let quiet = prefs.quiet_at(local_hour());
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        shell.notifications.set_toast_prefs(
+            u64::from(prefs.toast_seconds) * 1000,
+            prefs.max_toasts as usize,
         );
-    };
-    apply(&app);
+        shell.notifications.set_dnd(prefs.dnd);
+        shell.notifications.set_quiet(quiet);
+        shell.notifications.remember_apps(read_seen_apps());
+        shell
+            .notifications
+            .set_app_rules(prefs.app_rules.iter().map(|(name, rule)| {
+                (
+                    name.clone(),
+                    *rule == helix_config::notification_prefs::AppRule::Off,
+                )
+            }));
+    }
+    eprintln!(
+        "NOTIFICATIONS settings seconds={} toasts={} dnd={} quiet={}",
+        prefs.toast_seconds, prefs.max_toasts, prefs.dnd, quiet
+    );
+    quiet
+}
+
+/// Applies the settings now, whenever the file changes, and when the hour crosses into or out of quiet hours (a stat once a second).
+fn watch_prefs(app: AppHandle) {
+    let mut quiet = apply_prefs(&app);
     tauri::async_runtime::spawn(async move {
         let stamp = || {
             prefs_path()
@@ -237,14 +334,21 @@ fn watch_prefs(app: AppHandle) {
                 .and_then(|m| m.modified().ok())
         };
         let mut seen = stamp();
+        let mut hour = local_hour();
         loop {
             tokio::time::sleep(Duration::from_secs(1)).await;
             let now = stamp();
-            if now == seen {
+            let now_hour = local_hour();
+            if now == seen && now_hour == hour {
                 continue;
             }
+            let file_changed = now != seen;
             seen = now;
-            apply(&app);
+            hour = now_hour;
+            if !file_changed && read_prefs().quiet_at(now_hour) == quiet {
+                continue;
+            }
+            quiet = apply_prefs(&app);
             changed(&app, Vec::new()).await;
         }
     });
@@ -306,6 +410,7 @@ pub async fn notification_set_dnd(app: AppHandle, on: bool) {
         .expect("shell state")
         .notifications
         .set_dnd(on);
+    persist_dnd(on);
     changed(&app, Vec::new()).await;
 }
 
@@ -327,6 +432,8 @@ pub async fn toggle_dnd(app: &AppHandle) {
         let now = now_ms(shell.started);
         let on = shell.notifications.view(now).dnd;
         shell.notifications.set_dnd(!on);
+        drop(shell);
+        persist_dnd(!on);
     }
     changed(app, Vec::new()).await;
 }

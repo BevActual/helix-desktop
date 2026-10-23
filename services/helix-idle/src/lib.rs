@@ -21,13 +21,23 @@ fn words(list: &[&str]) -> Vec<String> {
     list.iter().map(|w| (*w).to_string()).collect()
 }
 
+/// The Helix lock screen. It returns once the session is locked, which is what "lock before sleep" waits for.
+pub fn default_lock_command() -> Vec<String> {
+    words(&["helix-lock", "--daemonize"])
+}
+
+/// What locks the session when `helix-lock` is not installed or cannot start: the system's own locker, on a plain colour.
+pub fn fallback_lock_command() -> Vec<String> {
+    words(&["swaylock", "--daemonize", "--color", "0e1028"])
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             enabled: true,
             lock_after: Duration::from_secs(300),
             screen_off_after: Some(Duration::from_secs(420)),
-            lock_command: words(&["swaylock", "--daemonize", "--color", "0e1028"]),
+            lock_command: default_lock_command(),
             screen_off_command: words(&["niri", "msg", "action", "power-off-monitors"]),
             screen_on_command: words(&["niri", "msg", "action", "power-on-monitors"]),
         }
@@ -51,6 +61,11 @@ fn command(table: &toml::Table, key: &str, fallback: Vec<String>) -> Vec<String>
 }
 
 impl Config {
+    /// The locker to use when the one configured cannot start. Only the default has one: a person who named their own locker gets exactly that.
+    pub fn lock_fallback(&self) -> Option<Vec<String>> {
+        (self.lock_command == default_lock_command()).then(fallback_lock_command)
+    }
+
     /// Reads `idle.toml`. A missing, unreadable or odd file means the defaults; nothing in it can make the machine lock *less* than the
     /// minimum, and a screen-off can never come before the lock.
     pub fn parse(text: &str) -> Self {
@@ -100,7 +115,8 @@ mod tests {
         assert!(c.enabled);
         assert_eq!(c.lock_after, Duration::from_secs(300));
         assert_eq!(c.screen_off_after, Some(Duration::from_secs(420)));
-        assert_eq!(c.lock_command[0], "swaylock");
+        assert_eq!(c.lock_command[0], "helix-lock");
+        assert_eq!(c.lock_fallback().unwrap()[0], "swaylock");
     }
 
     #[test]

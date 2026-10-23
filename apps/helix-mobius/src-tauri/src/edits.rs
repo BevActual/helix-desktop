@@ -216,6 +216,114 @@ pub fn snapshot(root: &Path) -> std::collections::BTreeMap<String, String> {
     out
 }
 
+/// The change groups of a before/after pair, as line ranges in each text (two lines of context apiece, the way the Changes card shows them). The
+/// ranges are exact, so a group is replaced where it is and never searched for.
+struct Groups {
+    old: Vec<String>,
+    new: Vec<String>,
+    groups: Vec<(std::ops::Range<usize>, std::ops::Range<usize>)>,
+}
+
+fn change_groups(before: &str, after: &str) -> Groups {
+    let diff = similar::TextDiff::from_lines(before, after);
+    let groups = diff
+        .grouped_ops(2)
+        .iter()
+        .filter_map(|ops| {
+            let (first, last) = (ops.first()?, ops.last()?);
+            Some((
+                first.old_range().start..last.old_range().end,
+                first.new_range().start..last.new_range().end,
+            ))
+        })
+        .collect();
+    Groups {
+        old: diff.old_slices().iter().map(|s| s.to_string()).collect(),
+        new: diff.new_slices().iter().map(|s| s.to_string()).collect(),
+        groups,
+    }
+}
+
+/// How many change groups there are (for per-hunk revert in the Changes card).
+#[cfg(test)]
+fn hunk_count(before: &str, after: &str) -> usize {
+    change_groups(before, after).groups.len()
+}
+
+/// The file text when only one change group from the turn is kept; the rest are dropped.
+pub fn after_accepting_only_hunk(before: &str, after: &str, hunk: usize) -> Result<String, String> {
+    let g = change_groups(before, after);
+    let (old, new) = g
+        .groups
+        .get(hunk)
+        .ok_or_else(|| "That hunk is not in this change.".to_string())?;
+    Ok([
+        g.old[..old.start].concat(),
+        g.new[new.clone()].concat(),
+        g.old[old.end..].concat(),
+    ]
+    .concat())
+}
+
+/// The file text after undoing one change group, leaving the rest of the turn's edits in place.
+pub fn after_reverting_hunk(before: &str, after: &str, hunk: usize) -> Result<String, String> {
+    let g = change_groups(before, after);
+    let (old, new) = g
+        .groups
+        .get(hunk)
+        .ok_or_else(|| "That hunk is not in this change.".to_string())?;
+    Ok([
+        g.new[..new.start].concat(),
+        g.old[old.clone()].concat(),
+        g.new[new.end..].concat(),
+    ]
+    .concat())
+}
+
+/// Refreshes the Changes card row after a partial or full revert from a checkpoint.
+pub fn refresh_change(change: &mut FileChange, checkpoint: &Checkpoint) {
+    let old = checkpoint.before.as_deref().unwrap_or("");
+    let new = if checkpoint.after_present {
+        checkpoint.after.as_str()
+    } else {
+        ""
+    };
+    if old == new {
+        change.reverted = true;
+        change.added = 0;
+        change.removed = 0;
+        change.diff.clear();
+        return;
+    }
+    change.reverted = false;
+    let (kind, old_text, new_text) = if old.is_empty() {
+        ("added", "", new)
+    } else if !checkpoint.after_present {
+        ("deleted", old, "")
+    } else {
+        ("modified", old, new)
+    };
+    change.kind = kind.into();
+    let diff = similar::TextDiff::from_lines(old_text, new_text);
+    let (mut added, mut removed) = (0, 0);
+    for item in diff.iter_all_changes() {
+        match item.tag() {
+            similar::ChangeTag::Insert => added += 1,
+            similar::ChangeTag::Delete => removed += 1,
+            similar::ChangeTag::Equal => {}
+        }
+    }
+    change.added = added;
+    change.removed = removed;
+    change.diff = diff
+        .unified_diff()
+        .context_radius(2)
+        .to_string()
+        .chars()
+        .take(8000)
+        .collect();
+}
+
 /// What changed in `root` since `before` was taken: one entry per file, with a unified diff (cut at 8,000 characters) and the checkpoint that
 /// reverts it.
 pub fn changes_since(
@@ -347,6 +455,47 @@ mod tests {
     fn the_diff_marks_each_line() {
         assert_eq!(diff_text("a.rs", "x\ny", "z"), "a.rs\n- x\n- y\n+ z\n");
         assert!(diff_text("n.rs", "", "z").starts_with("new file n.rs"));
+    }
+
+    #[test]
+    fn reverting_the_only_hunk_restores_the_file() {
+        let old = "a\nb\nc\n";
+        let new = "a\nB\nc\n";
+        assert_eq!(hunk_count(old, new), 1);
+        assert_eq!(after_reverting_hunk(old, new, 0).unwrap(), old);
+    }
+
+    #[test]
+    fn dashes_and_repeated_blocks_do_not_confuse_a_hunk() {
+        // a removed `---` line, and two identical blocks where only the second changed
+        let old = "title\n---\nbody\n";
+        let new = "title\nbody\n";
+        assert_eq!(after_reverting_hunk(old, new, 0).unwrap(), old);
+        let block = "{\n  a;\n}\n";
+        let old = format!("{block}{}{block}", "x\n".repeat(20));
+        let new = format!("{block}{}{}", "x\n".repeat(20), block.replace("a;", "b;"));
+        assert_eq!(after_reverting_hunk(&old, &new, 0).unwrap(), old);
+        assert_eq!(after_accepting_only_hunk(&old, &new, 0).unwrap(), new);
+    }
+
+    #[test]
+    fn one_hunk_can_be_reverted_while_another_stays() {
+        let old = "top\nalpha\nmiddle\n".to_string()
+            + &(0..30)
+                .map(|i| format!("filler {i}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+            + "\nomega\nbottom\n";
+        let new = old.replace("alpha", "ALPHA").replace("omega", "OMEGA");
+        assert!(hunk_count(&old, &new) >= 2);
+        let mid = after_reverting_hunk(&old, &new, 0).unwrap();
+        assert!(mid.contains("alpha") && !mid.contains("ALPHA"));
+        assert!(mid.contains("OMEGA"));
+        let back = after_reverting_hunk(&old, &new, 1).unwrap();
+        assert!(back.contains("omega") && !back.contains("OMEGA"));
+        assert!(back.contains("ALPHA"));
+        let only0 = after_accepting_only_hunk(&old, &new, 0).unwrap();
+        assert!(only0.contains("ALPHA") && !only0.contains("OMEGA"));
     }
 
     #[test]

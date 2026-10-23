@@ -13,10 +13,12 @@ pub mod launcher;
 pub mod notifications;
 pub mod panel_surface;
 pub mod panels_ipc;
+pub mod privacy;
 pub mod quick_insert;
 pub mod shell_surface;
 pub mod surfaces;
 pub mod tray;
+pub mod ui_scale;
 
 // Modules that live in other crates but are named `crate::<module>` throughout this crate.
 pub use helix_base::display;

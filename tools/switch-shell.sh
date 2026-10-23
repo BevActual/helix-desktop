@@ -110,6 +110,11 @@ write_units_and_links() {
   link_app helix-software org.helix.Software.desktop
   link_app helix-system-monitor org.helix.SystemMonitor.desktop
   link_app helix-mobius org.helix.Mobius.desktop || true
+  link_app helix-models org.helix.Models.desktop || true
+  # The lock screen and the agent display's input helper are looked up by name on PATH.
+  link_app helix-lock "" || true
+  link_app helix-agent-input "" || true
+  link_app helix-identify "" || true
   # The old name is gone; drop a link left by an earlier install.
   rm -f "$HOME/.local/bin/helix-chat"
   escaped=$(printf '%s' "$BIN" | sed 's/ /\\\\x20/g')
@@ -154,6 +159,10 @@ PY
     idle_escaped=$(printf '%s' "$IDLE" | sed 's/ /\\\\x20/g')
     sed "s|@IDLE_BIN@|$idle_escaped|" "$ROOT/tools/systemd/helix-idle.service.in" > "$UNITS/helix-idle.service"
   fi
+  if NIGHT=$(pick_bin helix-nightlight); then
+    night_escaped=$(printf '%s' "$NIGHT" | sed 's/ /\\\\x20/g')
+    sed "s|@NIGHTLIGHT_BIN@|$night_escaped|" "$ROOT/tools/systemd/helix-nightlight.service.in" > "$UNITS/helix-nightlight.service"
+  fi
   systemctl --user daemon-reload
   systemctl --user stop helix-shell-tauri-trial.service 2>/dev/null || true
   systemctl --user disable helix-shell-tauri-trial.service 2>/dev/null || true
@@ -169,6 +178,9 @@ PY
   systemctl --user disable helix-shell-tauri.service 2>/dev/null || true
   if [ -f "$UNITS/helix-idle.service" ]; then
     systemctl --user enable helix-idle.service
+  fi
+  if [ -f "$UNITS/helix-nightlight.service" ]; then
+    systemctl --user enable helix-nightlight.service
   fi
   if [ -f "$UNITS/helix-wallpaper.service" ]; then
     systemctl --user enable helix-wallpaper.service
@@ -205,6 +217,9 @@ case "${1:-install}" in
       systemctl --user start helix-shell-strut.service helix-shell-bar.service helix-shell-panels.service
       if [ -f "$UNITS/helix-idle.service" ]; then
         systemctl --user start helix-idle.service 2>/dev/null || true
+      fi
+      if [ -f "$UNITS/helix-nightlight.service" ]; then
+        systemctl --user start helix-nightlight.service 2>/dev/null || true
       fi
       if [ -f "$UNITS/helix-wallpaper.service" ]; then
         systemctl --user start helix-wallpaper.service 2>/dev/null || true
@@ -249,6 +264,9 @@ case "${1:-install}" in
     if [ -f "$UNITS/helix-idle.service" ]; then
       systemctl --user restart helix-idle.service
     fi
+    if [ -f "$UNITS/helix-nightlight.service" ]; then
+      systemctl --user restart helix-nightlight.service
+    fi
     if [ -f "$UNITS/helix-wallpaper.service" ]; then
       systemctl --user restart helix-wallpaper.service
     fi
@@ -259,7 +277,7 @@ case "${1:-install}" in
     exit 2
     ;;
   status)
-    for unit in helix-shell-strut helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-service; do
+    for unit in helix-shell-strut helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-nightlight helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service 2>/dev/null || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
     if systemctl --user is-active --quiet helix-shell-bar.service 2>/dev/null \

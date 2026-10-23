@@ -1,0 +1,21 @@
+[package]
+name = "helix-lock"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "The Helix lock screen: an ext-session-lock client that matches the login screen. A separate small process, so a crash leaves the session locked, never open."
+
+[dependencies]
+smithay-client-toolkit = "0.21"
+wayland-client = { workspace = true }
+cairo-rs = { version = "0.21", features = ["png"] }
+pango = { version = "0.21", features = ["v1_44"] }
+pangocairo = "0.21"
+image = { workspace = true, features = ["jpeg", "png", "webp"] }
+libc = { workspace = true }
+toml = { workspace = true }
+helix-wallpaper-model = { workspace = true }
+
+[lints]
+workspace = true

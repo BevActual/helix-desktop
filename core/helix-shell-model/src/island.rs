@@ -40,6 +40,10 @@ pub enum Kind {
     Assistant,
     /// Agent desk has windows while the person is on another workspace.
     AgentDesk,
+    /// The agent display (an agent's own screen) is running with programs on it: the person can watch it.
+    AgentDisplay,
+    /// An agent working on its display has asked the person for help and is waiting.
+    AgentHelp,
     Media,
 }
 
@@ -125,9 +129,117 @@ pub fn choose(
     IslandView::none()
 }
 
+/// Puts the agent display over what is playing or sitting on the agent desk: something an agent is doing on its own screen is more worth a glance
+/// than music. What waits on the person, and the assistant at work, still come first.
+pub fn with_agent_display(view: IslandView, windows: Option<usize>) -> IslandView {
+    let Some(count) = windows.filter(|c| *c > 0) else {
+        return view;
+    };
+    if matches!(view.kind, Kind::Approval | Kind::Assistant) {
+        return view;
+    }
+    IslandView {
+        kind: Kind::AgentDisplay,
+        text: "Agent display".into(),
+        detail: if count == 1 {
+            "1 window".into()
+        } else {
+            format!("{count} windows")
+        },
+    }
+}
+
+/// The agent asked for help: that outranks everything except something waiting for approval, because the agent is stopped until the person acts.
+pub fn with_agent_help(view: IslandView, reason: Option<&str>) -> IslandView {
+    let Some(reason) = reason.filter(|r| !r.is_empty()) else {
+        return view;
+    };
+    if view.kind == Kind::Approval {
+        return view;
+    }
+    IslandView {
+        kind: Kind::AgentHelp,
+        text: "Agent needs your help".into(),
+        detail: sanitize_for_display(reason, 60),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_help_request_outranks_all_but_an_approval() {
+        let music = IslandView {
+            kind: Kind::Media,
+            text: "Song".into(),
+            detail: "Artist".into(),
+        };
+        let shown = with_agent_help(music, Some("sign in to the portal"));
+        assert_eq!(
+            (shown.kind, shown.text.as_str(), shown.detail.as_str()),
+            (
+                Kind::AgentHelp,
+                "Agent needs your help",
+                "sign in to the portal"
+            )
+        );
+        let thinking = IslandView {
+            kind: Kind::Assistant,
+            text: "Thinking…".into(),
+            detail: String::new(),
+        };
+        assert_eq!(with_agent_help(thinking, Some("x")).kind, Kind::AgentHelp);
+        let waiting = IslandView {
+            kind: Kind::Approval,
+            text: "Waiting for you".into(),
+            detail: String::new(),
+        };
+        assert_eq!(with_agent_help(waiting.clone(), Some("x")), waiting);
+        assert_eq!(with_agent_help(IslandView::none(), None).kind, Kind::None);
+        assert_eq!(
+            with_agent_help(IslandView::none(), Some("")).kind,
+            Kind::None
+        );
+        let hostile = with_agent_help(IslandView::none(), Some("pay\u{202e}pal now"));
+        assert!(!hostile.detail.contains('\u{202e}'));
+    }
+
+    #[test]
+    fn the_agent_display_beats_music_and_the_desk_but_not_what_needs_the_person() {
+        let music = IslandView {
+            kind: Kind::Media,
+            text: "Song".into(),
+            detail: "Artist".into(),
+        };
+        let shown = with_agent_display(music.clone(), Some(2));
+        assert_eq!(
+            (shown.kind, shown.text.as_str(), shown.detail.as_str()),
+            (Kind::AgentDisplay, "Agent display", "2 windows")
+        );
+        assert_eq!(
+            with_agent_display(IslandView::none(), Some(1)).detail,
+            "1 window"
+        );
+        assert_eq!(
+            with_agent_display(music.clone(), Some(0)),
+            music,
+            "nothing on it: nothing said"
+        );
+        assert_eq!(with_agent_display(music.clone(), None), music);
+        let waiting = IslandView {
+            kind: Kind::Approval,
+            text: "Waiting for you".into(),
+            detail: String::new(),
+        };
+        assert_eq!(with_agent_display(waiting.clone(), Some(3)), waiting);
+        let thinking = IslandView {
+            kind: Kind::Assistant,
+            text: "Thinking…".into(),
+            detail: String::new(),
+        };
+        assert_eq!(with_agent_display(thinking.clone(), Some(3)), thinking);
+    }
 
     fn playing(title: &str) -> Media {
         Media {

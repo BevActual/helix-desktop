@@ -104,6 +104,7 @@ pub fn open_on_agent_desk(folder: &Path) -> Result<(), String> {
 
 pub async fn run(
     folder: &Path,
+    policy: &helix_task::Policy,
     script: &str,
     mut cancel: watch::Receiver<bool>,
     progress: impl Fn(String),
@@ -118,54 +119,14 @@ pub async fn run(
         return Err("The project folder changed. Select it again.".into());
     }
     let mut command = tokio::process::Command::new("bwrap");
-    command.args([
-        "--die-with-parent",
-        "--new-session",
-        "--unshare-all",
-        "--cap-drop",
-        "ALL",
-    ]);
-    for path in ["/usr", "/bin", "/lib", "/lib64"] {
-        if Path::new(path).exists() {
-            command.args(["--ro-bind", path, path]);
-        }
-    }
     command
-        .args([
-            "--proc",
-            "/proc",
-            "--dev",
-            "/dev",
-            "--tmpfs",
-            "/tmp",
-            "--dir",
-            "/tmp/home",
-            "--bind",
-        ])
-        .arg(folder)
-        .arg("/workspace")
-        .args([
-            "--chdir",
-            "/workspace",
-            "--clearenv",
-            "--setenv",
-            "PATH",
-            "/usr/local/bin:/usr/bin:/bin",
-            "--setenv",
-            "HOME",
-            "/tmp/home",
-            "--setenv",
-            "LANG",
-            "C.UTF-8",
-            "--setenv",
-            "TERM",
-            "dumb",
-            "--",
-            "/bin/bash",
-            "--noprofile",
-            "--norc",
-            "-c",
-        ])
+        .args(helix_task::bwrap_args(
+            policy,
+            folder,
+            &|p| p.exists(),
+            &|p| p.is_dir(),
+        ))
+        .args(["--", "/bin/bash", "--noprofile", "--norc", "-c"])
         .arg(script)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -239,6 +200,37 @@ mod tests {
         assert!(workspace("/etc").is_err());
     }
     #[tokio::test]
+    async fn the_policy_decides_what_a_command_can_see_and_change() {
+        let path = std::env::temp_dir().join(format!("mobius-policy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(path.join(".git")).unwrap();
+        std::fs::write(path.join(".env"), "SECRET=1").unwrap();
+        std::fs::write(path.join(".git/HEAD"), "ref\n").unwrap();
+        let folder = path.canonicalize().unwrap();
+        let (_signal, cancel) = watch::channel(false);
+        let policy = helix_task::Policy::balanced(folder.to_str().unwrap());
+        let output = run(
+            &folder,
+            &policy,
+            "cat .env 2>/dev/null | wc -c; cat .git/HEAD; touch .git/new 2>/dev/null && echo wrote || echo blocked; touch ok.txt && echo fine",
+            cancel,
+            |_| {},
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            output.text.split_whitespace().collect::<Vec<_>>(),
+            ["0", "ref", "blocked", "fine"],
+            "{}",
+            output.text
+        );
+        assert!(!folder.join(".git/new").exists());
+        assert_eq!(
+            std::fs::read_to_string(folder.join(".env")).unwrap(),
+            "SECRET=1"
+        );
+    }
+    #[tokio::test]
     async fn project_command_is_isolated_and_cancellable() {
         let path = std::env::temp_dir().join(format!("mobius-terminal-{}", std::process::id()));
         std::fs::create_dir_all(&path).unwrap();
@@ -246,6 +238,7 @@ mod tests {
         let (signal, cancel) = watch::channel(false);
         let output = run(
             &folder,
+            &helix_task::Policy::careful(),
             "printf 'hello'; printf 'saved' > proof.txt; test ! -e /home",
             cancel.clone(),
             |_| {},
@@ -258,10 +251,12 @@ mod tests {
             std::fs::read_to_string(folder.join("proof.txt")).unwrap(),
             "saved"
         );
-        let (stopped, _) = tokio::join!(run(&folder, "sleep 20", cancel, |_| {}), async {
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            signal.send(true).unwrap();
-        });
+        let careful = helix_task::Policy::careful();
+        let (stopped, _) =
+            tokio::join!(run(&folder, &careful, "sleep 20", cancel, |_| {}), async {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                signal.send(true).unwrap();
+            });
         assert!(stopped.unwrap().stopped);
         std::fs::remove_dir_all(folder).unwrap();
     }

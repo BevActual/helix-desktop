@@ -61,7 +61,7 @@ export function Analysis({ register, report }: { register: (handle: AnalysisHand
   };
   const inventory = job?.records.find((record) => record.tool === "list_procedures")?.evidence.normalized_result;
   const functions = Array.isArray(inventory) ? inventory as { value: string; address: string }[] : [];
-  return <dialog ref={dialog} className="sheet analysis-sheet" data-test="analysis-panel" onClose={() => setOpen(false)}>
+  return <dialog ref={dialog} className="sheet analysis-sheet" data-test="analysis-panel" onClose={() => { setOpen(false); window.dispatchEvent(new CustomEvent("mobius-analysis-closed")); }}>
     <div className="sheet-body">
       <header className="sheet-head"><h3>Analyze software</h3><p className="sheet-note">Inspect a Linux binary locally with REA and Ghidra. The selected program is never run.</p></header>
       <div className="sheet-scroll">
@@ -73,6 +73,10 @@ export function Analysis({ register, report }: { register: (handle: AnalysisHand
         </section>
         {job?.id && <section className="sheet-section" aria-live="polite"><strong data-test="analysis-status">{job.stage}{busy ? ` · ${elapsed}s` : ""}</strong>{busy && <progress aria-label="Analysis running" />}{job.sha256 && <p className="analysis-digest">SHA-256: {job.sha256}</p>}<p className="sheet-note">Job {job.id} · {job.records.length} evidence records · decompiled code is pseudocode</p></section>}
         {(error || job?.error) && <pre className="analysis-error" role="alert" data-test="analysis-error">{error || job?.error}</pre>}
+        {functions.length > 0 && <section className="sheet-section" data-test="analysis-functions">
+          <p className="sheet-note">Functions Ghidra found. Choose one, then Analyze again to decompile it. The result is pseudocode.</p>
+          <ul className="analysis-fns">{functions.slice(0, 40).map((fn) => <li key={fn.address || fn.value}><button type="button" disabled={busy} onClick={() => setProcedure(fn.value || fn.address)}>{fn.value || fn.address}</button></li>)}</ul>
+        </section>}
         {job?.records.map((record) => <Evidence key={record.reference} record={record} />)}
         {job?.state === "ready" && <section className="sheet-section"><label className="sheet-field">Explain with a model on this computer<select data-test="analysis-model" value={model} onChange={(e) => setModel(e.target.value)} disabled={busy}>{!models.length && <option value="">Install a local text model in Models &amp; routing</option>}{models.map((id) => <option key={id} value={id}>{id}</option>)}</select></label><p className="sheet-note">Starts a conversation with evidence references. This conversation and its follow-up questions stay local.</p></section>}
       </div>

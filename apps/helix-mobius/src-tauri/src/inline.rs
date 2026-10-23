@@ -80,7 +80,8 @@ async fn ask_model(
     if !is_local {
         return Err("Editing a selection uses the model on this computer. Set the chat route to a local model.".into());
     }
-    let mut args = crate::chat_args(&messages, &[], &task, &model).map_err(|e| e.to_string())?;
+    let mut args =
+        crate::chat_args(&messages, &[], &task, &model, None).map_err(|e| e.to_string())?;
     args.insert("max_tokens", Value::U32(max_tokens));
     args.insert("temperature", Value::F64(0.3));
     let connection = crate::connection().await.map_err(|e| e.to_string())?;
@@ -250,6 +251,48 @@ pub fn code_apply(
     Ok(id)
 }
 
+/// The whole-file replacement a person typed in the viewer, or why it must not be written. `before` is the file as they opened it.
+pub fn save_plan(current: &str, before: &str, after: &str) -> Result<(), String> {
+    if after.len() > crate::edits::MAX_FILE_BYTES as usize {
+        return Err("That is too long to save.".into());
+    }
+    if current != before {
+        return Err("The file changed since you started editing, so it was not saved.".into());
+    }
+    if after == before {
+        return Err("Nothing changed.".into());
+    }
+    Ok(())
+}
+
+/// Writes a file the person edited in the viewer, after they reviewed the diff. Same restore point as `edit_file` (`tools_undo_edit`).
+#[tauri::command]
+pub fn code_save(
+    app: AppHandle,
+    path: String,
+    before: String,
+    after: String,
+) -> Result<String, String> {
+    let (file, content) = project_file(&app, &path)?;
+    save_plan(&content, &before, &after)?;
+    let checkpoint = crate::edits::Checkpoint {
+        path: file,
+        before: Some(content),
+        after,
+        after_present: true,
+    };
+    let chat_id = crate::shared(&app)
+        .lock()
+        .expect("state")
+        .chat
+        .conversation
+        .id
+        .clone();
+    let id = format!("codeedit-{}", crate::new_id());
+    crate::edits::apply(&checkpoint, &crate::edit_store(&chat_id, &id))?;
+    Ok(id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,5 +338,22 @@ mod tests {
             "She said \"hi\" and left."
         );
         assert_eq!(clean("\"A\" and \"B\""), "\"A\" and \"B\"");
+    }
+
+    #[test]
+    fn a_viewer_edit_is_refused_when_the_file_moved_or_nothing_changed() {
+        assert!(save_plan("a\n", "a\n", "b\n").is_ok());
+        assert!(save_plan("a\n", "a\n", "a\n")
+            .unwrap_err()
+            .contains("Nothing changed"));
+        assert!(save_plan("changed\n", "a\n", "b\n")
+            .unwrap_err()
+            .contains("changed since"));
+        assert!(save_plan(
+            "a",
+            "a",
+            &"x".repeat(crate::edits::MAX_FILE_BYTES as usize + 1)
+        )
+        .is_err());
     }
 }

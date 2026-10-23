@@ -11,13 +11,16 @@
 
 mod act_feed;
 mod admin_auth;
+mod agent_display;
 mod agent_ipc;
 mod apps;
 mod backlight;
 mod bar;
+mod bar_prefs;
 mod battery;
 mod blur;
 mod capture;
+mod clock;
 mod confirmer;
 mod control;
 mod desktop_action;
@@ -31,9 +34,12 @@ mod notify;
 mod panels_bridge;
 mod polkit_agent;
 mod polkit_helper;
+mod privacy;
 mod role;
+mod shape;
 mod strut;
 mod tray;
+mod ui_scale;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -347,11 +353,14 @@ fn apply_panel_plan(app: &AppHandle, plan: helix_shell_model::shell_surface::Pla
     match ShellRole::from_env() {
         ShellRole::Bar => layer::apply(app, BAR_PLAN),
         ShellRole::Panels => {
-            let plan = if plan.input == helix_shell_model::shell_surface::InputRegion::Whole {
-                plan
-            } else {
-                PANEL_CLOSED
-            };
+            let opening = plan.input == helix_shell_model::shell_surface::InputRegion::Whole;
+            let plan = if opening { plan } else { PANEL_CLOSED };
+            if opening {
+                // A panel opens on the screen that has the focus: the compositor moves the surface there (a no-op where it already is).
+                let _ = niri_query::request_line(
+                    r#"{"HelixMoveLayerToFocusedOutput":{"namespace":"helix-panels"}}"#,
+                );
+            }
             layer::apply(app, plan);
         }
         ShellRole::Monolith => layer::apply(app, plan),
@@ -547,6 +556,50 @@ fn control(app: &AppHandle, command: &str) {
         "control-center" => open_panel(app, "control-center"),
         "agents" => open_panel(app, "agents"),
         "notifications" => open_panel(app, "notifications"),
+        "today" => open_panel(app, "today"),
+        // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): drive the agent display without the viewer.
+        "agent-display" => open_panel(app, "agent-display"),
+        "agent-display-start" => {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                if let Err(error) = agent_display::start(&app) {
+                    eprintln!("AGENT-DISPLAY start failed: {error}");
+                }
+            });
+        }
+        "agent-display-stop" => agent_display::stop(),
+        other if other.starts_with("agent-display-agent-input ") => {
+            let line = other["agent-display-agent-input ".len()..].to_string();
+            std::thread::spawn(move || match agent_display::agent_input(&line) {
+                Ok(()) => eprintln!("AGENT-DISPLAY agent input ok"),
+                Err(error) => eprintln!("AGENT-DISPLAY agent input failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-input ") => {
+            let line = other["agent-display-input ".len()..].to_string();
+            std::thread::spawn(move || match agent_display::input(&line) {
+                Ok(()) => eprintln!("AGENT-DISPLAY input ok"),
+                Err(error) => eprintln!("AGENT-DISPLAY input failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-frame ") => {
+            let path = other["agent-display-frame ".len()..].trim().to_string();
+            std::thread::spawn(move || match agent_display::frame() {
+                Ok(bytes) => {
+                    let _ = std::fs::write(&path, bytes);
+                    eprintln!("AGENT-DISPLAY frame written");
+                }
+                Err(error) => eprintln!("AGENT-DISPLAY frame failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-launch ") => {
+            let id = other["agent-display-launch ".len()..].trim().to_string();
+            std::thread::spawn(move || {
+                if let Err(error) = agent_display::launch(&id) {
+                    eprintln!("AGENT-DISPLAY launch failed: {error}");
+                }
+            });
+        }
         "quick-insert" => open_panel(app, "quick-insert"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
@@ -1103,6 +1156,8 @@ async fn refresh_quick(app: &AppHandle) {
         None => serde_json::Value::Null,
     };
     let mut quick = Quick::from_settings(&settings);
+    // Night light is the `helix-nightlight` service's own file, not a setting of the desktop service.
+    quick.use_night_light(Some(helix_nightlight_model::load().enabled));
     quick.set_resolved_dark(helix_desktop_api::theme_is_dark_json(
         &settings,
         helix_desktop_api::LocalTime::now(),
@@ -1215,12 +1270,10 @@ async fn quick_set_dark(app: AppHandle, on: bool) -> Result<(), String> {
 
 #[tauri::command]
 async fn quick_set_night_light(app: AppHandle, on: bool) -> Result<(), String> {
-    let update = shell_state(&app)
-        .lock()
-        .expect("shell state")
-        .quick
-        .set_night_light(on);
-    send_setting(update).await
+    helix_nightlight_model::set_enabled(on)?;
+    eprintln!("QUICK night light {}", if on { "on" } else { "off" });
+    refresh_quick(&app).await;
+    Ok(())
 }
 
 /// What the on-screen indicator shows after a key press or a slider: one value, drawn for a moment.
@@ -1350,15 +1403,10 @@ async fn brightness_set(app: AppHandle, percent: f64) -> Result<(), String> {
         .map(|_| ())
 }
 
-/// Flips the Night Light setting from its current state (what a key binding wants).
+/// Flips Night Light from its current state (what a key binding wants).
 pub(crate) async fn toggle_night_light(app: &AppHandle) {
-    let update = {
-        let state = shell_state(app);
-        let shell = state.lock().expect("shell state");
-        let on = shell.quick.view().night_light.unwrap_or(false);
-        shell.quick.set_night_light(!on)
-    };
-    let _ = send_setting(update).await;
+    let on = helix_nightlight_model::load().enabled;
+    let _ = quick_set_night_light(app.clone(), !on).await;
 }
 
 pub(crate) async fn toggle_dark_theme(app: &AppHandle) {
@@ -2061,7 +2109,22 @@ fn main() {
             report_interactive,
             dock::dock_view,
             dock::dock_prefs,
+            clock::clock_format,
+            bar_prefs::bar_prefs,
+            shape::shape_vars,
+            ui_scale::ui_scale,
+            privacy::privacy_view,
+            agent_display::agent_display_status,
+            agent_display::agent_display_start,
+            agent_display::agent_display_stop,
+            agent_display::agent_display_launch,
+            agent_display::agent_display_input,
+            agent_display::agent_display_control,
+            agent_display::agent_display_help_done,
+            agent_display::agent_display_help,
+            agent_display::agent_display_frame,
             dock::workspaces_view,
+            dock::active_window_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
             dock::dock_activate,
@@ -2220,6 +2283,12 @@ fn main() {
                         })
                 });
             }
+            // Every surface that draws a time (the bar, the control center) hears about the clock choice.
+            clock::start(handle.clone());
+            bar_prefs::start(handle.clone());
+            shape::start(handle.clone());
+            ui_scale::start(handle.clone());
+            privacy::start(handle.clone());
             if role.is_bar_side() {
                 notify::serve(handle.clone());
                 tray::serve(handle.clone());

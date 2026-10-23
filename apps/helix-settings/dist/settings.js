@@ -27,9 +27,16 @@ const PAGES = [
   { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
   { name: "sound", title: "Sound", icon: "volume", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
+  { name: "multitask", title: "Multitasking", icon: "grid", rows: false },
+  { name: "pointer", title: "Mouse & touchpad", icon: "mouse", rows: false },
+  { name: "startup", title: "Startup apps", icon: "play", rows: false },
+  { name: "defaults", title: "Default apps", icon: "folder", rows: false },
+  { name: "datetime", title: "Date & time", icon: "clock", rows: false },
+  { name: "topbar", title: "Top bar", icon: "sidebar", rows: false },
   { name: "dock", title: "Dock", icon: "grid", rows: false },
   { name: "notifications", title: "Notifications", icon: "bell", rows: false },
   { name: "power", title: "Power & lock", icon: "lock", rows: false },
+  { name: "users", title: "Users", icon: "user", rows: false },
   { name: "agents", title: "Privacy & agents", icon: "shield", rows: false },
   { name: "about", title: "About", icon: "sparkle", rows: false },
 ];
@@ -46,7 +53,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "notifications" || page.name === "power" || page.name === "displays") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "topbar" || page.name === "multitask" || page.name === "startup" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime" || page.name === "users" || page.name === "pointer" || page.name === "defaults") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -106,11 +113,22 @@ function showPage(name) {
   } else {
     if (name === "about") drawAbout();
     if (name === "keyboard") drawKeyboard();
-    if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
+    if (name === "wallpaper") {
+      invoke("wallpaper_outputs").then((names) => {
+        wallpaperOutputs = names || [];
+        return invoke("wallpaper_view", { output: wallpaperOutput() });
+      }).then(drawWallpaper);
+    }
     if (name === "dock") invoke("dock_rows").then(drawDock);
+    if (name === "topbar") invoke("topbar_rows").then(drawTopbar);
+    if (name === "multitask") invoke("multitask_rows").then(drawMultitask);
+    if (name === "startup") invoke("startup_rows").then(drawStartup);
     if (name === "notifications") invoke("notifications_rows").then(drawNotifications);
     if (name === "power") invoke("power_rows").then(drawPower);
     if (name === "displays") invoke("displays_rows").then(drawDisplays);
+    if (name === "datetime") invoke("datetime_rows").then(drawDatetime);
+    if (name === "pointer") invoke("pointer_rows").then(drawPointer);
+    if (name === "defaults") invoke("defaults_rows").then(drawDefaults);
   }
   queueReport();
 }
@@ -123,24 +141,48 @@ async function drawAbout() {
   const info = await invoke("about");
   const host = $("about-host");
   host.replaceChildren();
-  const card = el("div", "rows-card");
-  [["Helix Settings", info.version], ["Desktop service", info.service], ["Agent access", info.agent_access],
-   ["Settings on these pages", String(info.settings)], ["Wi-Fi", info.network ? "Available" : "Not available"], ["Bluetooth", info.bluetooth ? "Available" : "Not available"]]
-    .forEach(([name, value]) => {
+  const card = (rows) => {
+    const box = el("div", "rows-card");
+    rows.forEach(([name, value]) => {
       const line = el("div", "setting-row");
-      line.append(el("div", "setting-title", name), el("div", "slider-value", value));
-      card.append(line);
+      const text = el("div", "slider-value", value);
+      text.dataset.test = "about-" + name;
+      line.append(el("div", "setting-title", name), text);
+      box.append(line);
     });
-  host.append(card);
+    return box;
+  };
+  if (info.system.length) host.append(el("h4", "", "This computer"), card(info.system));
+  host.append(el("h4", "", "Helix"), card([["Helix Settings", info.version], ["Desktop service", info.service], ["Agent access", info.agent_access],
+    ["Wi-Fi", info.network ? "Available" : "Not available"], ["Bluetooth", info.bluetooth ? "Available" : "Not available"]]));
   queueReport();
 }
 
 // Wallpaper: a grid of the pictures in the folder; choosing one writes the choice and the wallpaper process reloads by itself ---------
 let thumbObserver = null;
+let wallpaperTarget = "all";
+let wallpaperOutputs = [];
+function wallpaperOutput() { return wallpaperTarget === "all" ? null : wallpaperTarget; }
 function drawWallpaper(view) {
   if (reactPages.wallpaper) return;   // the React page listens for this event itself
   const host = $("wallpaper-host");
   host.replaceChildren();
+  host.append(el("h4", "", "Show on"));
+  const segments = el("div", "segments");
+  segments.dataset.test = "wp-targets";
+  const addTarget = (value, label) => {
+    const button = el("button", "segment" + (wallpaperTarget === value ? " current" : ""), label);
+    button.type = "button";
+    button.dataset.test = "wp-target-" + value;
+    button.onclick = () => {
+      wallpaperTarget = value;
+      invoke("wallpaper_view", { output: wallpaperOutput() }).then(drawWallpaper);
+    };
+    segments.append(button);
+  };
+  addTarget("all", "All displays");
+  wallpaperOutputs.forEach((name) => addTarget(name, name));
+  host.append(segments, el("div", "setting-about note", "All displays sets every screen. A named display keeps its own picture."));
   host.append(el("h4", "", "Colours"));
   const swatches = el("div", "swatches");
   view.swatches.forEach((swatch) => {
@@ -148,7 +190,7 @@ function drawWallpaper(view) {
     button.style.background = swatch.hex;
     button.title = swatch.hex;
     button.dataset.test = "wp-swatch-" + swatch.index;
-    button.onclick = () => invoke("wallpaper_choose_swatch", { index: swatch.index });
+    button.onclick = () => invoke("wallpaper_choose_swatch", { index: swatch.index, output: wallpaperOutput() });
     swatches.append(button);
   });
   host.append(swatches);
@@ -172,7 +214,7 @@ function drawWallpaper(view) {
     tile.dataset.test = "wp-image-" + image.index;
     tile.title = image.name;
     tile.append(el("span", "wp-name", image.name));
-    tile.onclick = () => invoke("wallpaper_choose_image", { index: image.index });
+    tile.onclick = () => invoke("wallpaper_choose_image", { index: image.index, output: wallpaperOutput() });
     grid.append(tile);
     thumbObserver.observe(tile);
   });
@@ -244,7 +286,7 @@ function wallhavenBlock() {
         tile.onclick = () => {
           if (wallhaven.using) return;
           wallhaven.using = hit.id; tile.classList.add("busy"); message.textContent = "";
-          invoke("wallhaven_use", { id: hit.id }).catch((error) => { message.textContent = String(error); })
+          invoke("wallhaven_use", { id: hit.id, output: wallpaperOutput() }).catch((error) => { message.textContent = String(error); })
             .then(() => { if (!tile.querySelector(".wp-saved")) tile.append(el("span", "wp-saved", "Saved")); })
             .finally(() => { wallhaven.using = null; tile.classList.remove("busy"); });
         };
@@ -350,7 +392,7 @@ function rowLine(page, row) {
   if (row.description) text.append(el("div", "setting-about", row.description));
   line.append(text);
   const control = row.control;
-  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "topbar" ? invoke("topbar_change", { id: row.id, change }).then(drawTopbar) : page === "multitask" ? invoke("multitask_change", { id: row.id, change }).then(drawMultitask) : page === "startup" ? invoke("startup_change", { id: row.id, change }).then(drawStartup) : page === "notifications" ? invoke("notifications_change", { id: row.id, change }).then(drawNotifications) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : page === "displays" ? invoke("displays_change", { id: row.id, change }).then(drawDisplays) : page === "datetime" ? invoke("datetime_change", { id: row.id, change }).then(drawDatetime) : page === "pointer" ? invoke("pointer_change", { id: row.id, change }).then(drawPointer) : page === "defaults" ? invoke("defaults_change", { id: row.id, change }).then(drawDefaults) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -400,6 +442,17 @@ function rowLine(page, row) {
     line.append(wrap);
   } else if (control.kind === "text") {
     line.append(el("div", "setting-value", control.value));
+  } else if (control.kind === "choice" && control.options.length > 6) {
+    const select = el("select", "choice-select");
+    select.dataset.test = "set-" + row.id;
+    control.options.forEach((option) => {
+      const item = el("option", "", option.label);
+      item.value = option.value;
+      item.selected = option.value === control.current;
+      select.append(item);
+    });
+    select.addEventListener("change", () => send({ kind: "choice", value: select.value }));
+    line.append(select);
   } else if (control.kind === "choice") {
     const segments = el("div", "segments");
     control.options.forEach((option) => {
@@ -455,11 +508,76 @@ function drawPower(rows) {
   queueReport();
 }
 function drawDisplays(rows) {
+  if (reactPages.displays) { reactPages.displays.setRows(rows); return; }
+  pageRows.displays = rows;
   const host = $("displays-host");
   host.replaceChildren();
   drawGroups(host, "displays", rows);
   if (!rows.length) host.append(el("div", "empty", "No displays reported."));
-  host.append(el("div", "setting-about note", "Resolution, scale and arrangement are set in the compositor's configuration."));
+  host.append(el("div", "setting-about note", "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup."));
+  if (searching()) drawSearch();
+  queueReport();
+}
+function drawDefaults(rows) {
+  if (reactPages.defaults) { reactPages.defaults.setRows(rows); return; }
+  pageRows.defaults = rows;
+  const host = $("defaults-host");
+  host.replaceChildren();
+  drawGroups(host, "defaults", rows);
+  if (!rows.length) host.append(el("div", "empty", "No applications were found for these kinds of file."));
+  host.append(el("div", "setting-about note", "Kept in ~/.config/mimeapps.list, where every program looks."));
+  if (searching()) drawSearch();
+  queueReport();
+}
+function drawStartup(rows) {
+  if (reactPages.startup) { reactPages.startup.setRows(rows); return; }
+  pageRows.startup = rows;
+  const host = $("startup-host");
+  host.replaceChildren();
+  drawGroups(host, "startup", rows);
+  if (!rows.length) host.append(el("div", "empty", "Nothing starts when you log in."));
+  host.append(el("div", "setting-about note", "These start the next time you log in. Turning one off keeps it on the list, and a program from the system is never changed."));
+  if (searching()) drawSearch();
+  queueReport();
+}
+function drawMultitask(rows) {
+  if (reactPages.multitask) { reactPages.multitask.setRows(rows); return; }
+  pageRows.multitask = rows;
+  const host = $("multitask-host");
+  host.replaceChildren();
+  drawGroups(host, "multitask", rows);
+  if (!rows.length) host.append(el("div", "empty", "Multitasking settings need the Helix compositor."));
+  if (searching()) drawSearch();
+  queueReport();
+}
+function drawTopbar(rows) {
+  if (reactPages.topbar) { reactPages.topbar.setRows(rows); return; }
+  pageRows.topbar = rows;
+  const host = $("topbar-host");
+  host.replaceChildren();
+  drawGroups(host, "topbar", rows);
+  host.append(el("div", "setting-about note", "The control center and notification buttons always stay, so the bar can never lock you out of them."));
+  if (searching()) drawSearch();
+  queueReport();
+}
+function drawPointer(rows) {
+  if (reactPages.pointer) { reactPages.pointer.setRows(rows); return; }
+  pageRows.pointer = rows;
+  const host = $("pointer-host");
+  host.replaceChildren();
+  drawGroups(host, "pointer", rows);
+  if (!rows.length) host.append(el("div", "empty", "Mouse and touchpad settings need the Helix compositor."));
+  if (searching()) drawSearch();
+  queueReport();
+}
+function drawDatetime(rows) {
+  if (reactPages.datetime) { reactPages.datetime.setRows(rows); return; }
+  pageRows.datetime = rows;
+  const host = $("datetime-host");
+  host.replaceChildren();
+  drawGroups(host, "datetime", rows);
+  host.append(el("div", "setting-about note", "The time zone and automatic time are the system's, so changing them asks for your password. Location is only used here, to work out sunrise and sunset."));
+  if (searching()) drawSearch();
   queueReport();
 }
 function drawRows(view) {
@@ -477,8 +595,15 @@ function drawRows(view) {
   queueReport();
 }
 invoke("dock_rows").then((rows) => { pageRows.dock = rows; });
+invoke("topbar_rows").then((rows) => { pageRows.topbar = rows; });
+invoke("multitask_rows").then((rows) => { pageRows.multitask = rows; });
+invoke("startup_rows").then((rows) => { pageRows.startup = rows; });
 invoke("notifications_rows").then((rows) => { pageRows.notifications = rows; });
 invoke("power_rows").then((rows) => { pageRows.power = rows; });
+invoke("displays_rows").then((rows) => { pageRows.displays = rows; });
+invoke("datetime_rows").then((rows) => { pageRows.datetime = rows; });
+invoke("pointer_rows").then((rows) => { pageRows.pointer = rows; });
+invoke("defaults_rows").then((rows) => { pageRows.defaults = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Search: matching rows from every page, under the page they belong to ------------------------------------------------------------

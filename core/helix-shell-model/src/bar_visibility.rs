@@ -12,14 +12,14 @@ const FILE: &str = "helix-top-strut.json";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopStrutState {
-    /// `BAR_HEIGHT` when the bar should reserve space, `0` when hidden.
+    /// `BAR_HEIGHT` at the interface scale when the bar should reserve space, `0` when hidden.
     pub exclusive_zone: i32,
 }
 
 impl TopStrutState {
     pub fn visible() -> Self {
         Self {
-            exclusive_zone: BAR_HEIGHT,
+            exclusive_zone: crate::ui_scale::scaled(BAR_HEIGHT, crate::ui_scale::read()),
         }
     }
 

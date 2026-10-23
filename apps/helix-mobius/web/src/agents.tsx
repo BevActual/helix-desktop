@@ -56,7 +56,7 @@ export function AgentsPanel({ report }: { report: (error: unknown) => void }) {
   return (
     <>
       <h3 className="models-h3">Coding agents</h3>
-      <p className="models-lead">Mobius can let another coding agent work in a project, through the Agent Client Protocol. The agent keeps its own sign-in, which Mobius never reads. Every file the agent wants to write is shown to you as a change to apply or skip (with Undo), and every command it wants to run is shown and run in the project sandbox only when you say.</p>
+      <p className="models-lead">In Code, Mobius can hand the project to another coding agent. That agent keeps its own sign-in, which Mobius never reads. Every file it wants to write is a change you apply or skip, and every command waits until you say so, then runs in the project sandbox.</p>
       <div className="set-offer" data-test="agents-warning">
         <div className="set-offer-text"><div><strong>An agent is a program running as you</strong></div><span>Mobius controls what the agent asks Mobius for, but cannot stop an agent that acts on its own. Turn on only agents you trust.</span></div>
       </div>

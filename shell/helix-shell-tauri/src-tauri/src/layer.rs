@@ -36,7 +36,7 @@ fn set_input_region(window: &gtk::ApplicationWindow, region: InputRegion, width:
                 0,
                 0,
                 width.max(1),
-                BAR_HEIGHT,
+                crate::ui_scale::scaled(BAR_HEIGHT),
             ));
             for (x, y, w, h) in EXTRA.lock().expect("extra input").iter() {
                 let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(*x, *y, *w, *h));
@@ -82,7 +82,7 @@ fn make_transparent_top(window: &gtk::Window) {
 /// shell surface is ignored and windows would slide under the bar. This is a second, empty, transparent surface (a plain GTK window,
 /// no web view, so no extra web process) anchored to the top and sides whose only job is to reserve the bar's strip.
 pub fn reserve_bar_space() {
-    set_top_reserve_zone(BAR_HEIGHT);
+    set_top_reserve_zone(crate::ui_scale::scaled(BAR_HEIGHT));
 }
 
 /// In-process top strut when `helix-shell-strut` is not running. `zone` is `BAR_HEIGHT` or `0`.
@@ -249,6 +249,23 @@ pub fn apply(app: &AppHandle, plan: Plan) {
     set_input_region(
         &gtk_window,
         plan.input,
+        gtk_window.allocated_width(),
+        gtk_window.allocated_height(),
+    );
+}
+
+/// Re-applies the pointer region (the bar's strip changed size with the interface scale). Must run on the main thread.
+pub fn refresh_input(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(WINDOW) else {
+        return;
+    };
+    let Ok(gtk_window) = window.gtk_window() else {
+        return;
+    };
+    let region = *INPUT.lock().expect("input region");
+    set_input_region(
+        &gtk_window,
+        region,
         gtk_window.allocated_width(),
         gtk_window.allocated_height(),
     );
