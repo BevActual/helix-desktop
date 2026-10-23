@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use niri_config::appearance::Color;
 use niri_config::appearance::CornerRadius;
 use niri_config::appearance::{BackgroundEffectRule, LiquidGlassPart};
-use niri_config::input::FocusFollowsMouse;
+use niri_config::input::{FocusFollowsMouse, ModKey, WarpMouseToFocus};
 use niri_config::layer_rule::{LayerRule, Match as LayerMatch};
 use niri_config::layout::CenterFocusedColumn;
 use niri_config::utils::RegexEq;
@@ -63,6 +63,11 @@ pub fn validate(look: &HelixLook) -> Result<(), String> {
     if let Some(color) = &look.focus_color {
         if parse_hex(color).is_none() {
             return Err("a colour is #rrggbb".into());
+        }
+    }
+    if let Some(key) = &look.mod_key {
+        if mod_of(key).is_none() {
+            return Err("the Mod key is super, alt or ctrl".into());
         }
     }
     if let Some(mode) = &look.center_focused {
@@ -126,6 +131,12 @@ fn merge(base: &mut HelixLook, change: &HelixLook) {
     }
     if change.hot_corner.is_some() {
         base.hot_corner = change.hot_corner;
+    }
+    if change.warp_mouse_to_focus.is_some() {
+        base.warp_mouse_to_focus = change.warp_mouse_to_focus;
+    }
+    if change.mod_key.is_some() {
+        base.mod_key = change.mod_key.clone();
     }
     if change.center_focused.is_some() {
         base.center_focused = change.center_focused.clone();
@@ -192,6 +203,15 @@ fn radius_of(config: &Config) -> Option<u16> {
 const GLASS_NAMESPACE: &str = "^helix-panels?$";
 
 /// The blur passes and offset for a strength: light is one pass and a small offset, heavy is five passes and a wide one.
+fn mod_of(name: &str) -> Option<ModKey> {
+    match name {
+        "super" => Some(ModKey::Super),
+        "alt" => Some(ModKey::Alt),
+        "ctrl" => Some(ModKey::Ctrl),
+        _ => None,
+    }
+}
+
 fn blur_for(strength: u8) -> (u8, f64) {
     let t = f64::from(strength.min(100)) / 100.0;
     (1 + (t * 4.0).round() as u8, 1.5 + t * 4.5)
@@ -227,6 +247,12 @@ pub fn overlay(config: &mut Config, look: &HelixLook) {
         config.input.focus_follows_mouse = on.then_some(FocusFollowsMouse {
             max_scroll_amount: None,
         });
+    }
+    if let Some(on) = look.warp_mouse_to_focus {
+        config.input.warp_mouse_to_focus = on.then_some(WarpMouseToFocus { mode: None });
+    }
+    if let Some(key) = look.mod_key.as_deref().and_then(mod_of) {
+        config.input.mod_key = Some(key);
     }
     if let Some(on) = look.hot_corner {
         config.gestures.hot_corners.off = !on;
@@ -292,6 +318,15 @@ pub fn effective(config: &Config) -> HelixLook {
         )),
         focus_follows_mouse: Some(config.input.focus_follows_mouse.is_some()),
         hot_corner: Some(!config.gestures.hot_corners.off),
+        warp_mouse_to_focus: Some(config.input.warp_mouse_to_focus.is_some()),
+        mod_key: Some(
+            match config.input.mod_key {
+                Some(ModKey::Alt) => "alt",
+                Some(ModKey::Ctrl) => "ctrl",
+                _ => "super",
+            }
+            .to_string(),
+        ),
         center_focused: Some(center_name(config.layout.center_focused_column).to_string()),
         workspace_back_and_forth: Some(config.input.workspace_auto_back_and_forth),
         window_corner_radius: Some(radius_of(config).unwrap_or(0)),
@@ -542,6 +577,28 @@ mod tests {
             },
         );
         assert_eq!(effective(&own).refraction, None, "not ours to change");
+    }
+
+    #[test]
+    fn the_mod_key_and_pointer_warp_are_set_and_read_back() {
+        let mut config = Config::default();
+        assert_eq!(effective(&config).mod_key.as_deref(), Some("super"));
+        assert_eq!(effective(&config).warp_mouse_to_focus, Some(false));
+        overlay(
+            &mut config,
+            &HelixLook {
+                mod_key: Some("alt".into()),
+                warp_mouse_to_focus: Some(true),
+                ..HelixLook::default()
+            },
+        );
+        assert_eq!(effective(&config).mod_key.as_deref(), Some("alt"));
+        assert_eq!(effective(&config).warp_mouse_to_focus, Some(true));
+        assert!(validate(&HelixLook {
+            mod_key: Some("hyper".into()),
+            ..HelixLook::default()
+        })
+        .is_err());
     }
 
     #[test]

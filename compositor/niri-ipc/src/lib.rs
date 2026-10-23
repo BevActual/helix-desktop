@@ -236,6 +236,12 @@ pub struct HelixLook {
     /// When the focused column is centred: `never`, `always` or `on-overflow`.
     #[serde(default)]
     pub center_focused: Option<String>,
+    /// Whether the pointer jumps to a window when the keyboard focuses it.
+    #[serde(default)]
+    pub warp_mouse_to_focus: Option<bool>,
+    /// The key the shortcuts called Mod use: `super`, `alt` or `ctrl`.
+    #[serde(default)]
+    pub mod_key: Option<String>,
     /// Whether switching to the workspace you are on goes back to the one before.
     #[serde(default)]
     pub workspace_back_and_forth: Option<bool>,

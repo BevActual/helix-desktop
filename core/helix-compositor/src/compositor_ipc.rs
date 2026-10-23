@@ -53,6 +53,9 @@ pub struct LookSettings {
     /// `never`, `always` or `on-overflow`.
     pub center_focused: Option<String>,
     pub workspace_back_and_forth: Option<bool>,
+    pub warp_mouse_to_focus: Option<bool>,
+    /// `super`, `alt` or `ctrl`.
+    pub mod_key: Option<String>,
     /// Every window's corner radius in pixels, 0 to 32.
     pub window_corner_radius: Option<u16>,
     pub animation_speed: Option<u16>,

@@ -204,6 +204,26 @@ pub fn multitask_rows(look: &LookSettings) -> Vec<RowView> {
             },
         ),
         row(
+            "mt:warp",
+            "Pointer follows the keyboard focus",
+            "Windows",
+            "When a shortcut moves focus to another window, the pointer jumps onto it.",
+            on(look.warp_mouse_to_focus, false),
+        ),
+        row(
+            "mt:mod",
+            "Shortcut key",
+            "Windows",
+            "The key the window shortcuts are built on. Super is the default; Alt or Ctrl suit keyboards without one but can clash with apps.",
+            Control::Choice {
+                options: [("super", "Super"), ("alt", "Alt"), ("ctrl", "Ctrl")]
+                    .iter()
+                    .map(|(value, label)| Choice { value: (*value).into(), label: (*label).into() })
+                    .collect(),
+                current: look.mod_key.clone().unwrap_or_else(|| "super".into()),
+            },
+        ),
+        row(
             "mt:corner",
             "Hot corner",
             "Workspaces",
@@ -231,6 +251,14 @@ pub fn parse_multitask_change(id: &str, change: &Value) -> Result<LookSettings, 
     let mut out = LookSettings::default();
     match (id, kind) {
         ("mt:focus", Some("switch")) => out.focus_follows_mouse = Some(switch()?),
+        ("mt:warp", Some("switch")) => out.warp_mouse_to_focus = Some(switch()?),
+        ("mt:mod", Some("choice")) => {
+            let key = value.and_then(Value::as_str).ok_or("not text")?;
+            if !matches!(key, "super" | "alt" | "ctrl") {
+                return Err("pick a key".into());
+            }
+            out.mod_key = Some(key.to_string());
+        }
         ("mt:corner", Some("switch")) => out.hot_corner = Some(switch()?),
         ("mt:back", Some("switch")) => out.workspace_back_and_forth = Some(switch()?),
         ("mt:center", Some("choice")) => {
