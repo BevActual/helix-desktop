@@ -2177,6 +2177,7 @@ button.view-tab-x:hover { background: var(--fill-3, var(--fill-1)); color: var(-
 .arrangement-name { font-size: 10px; opacity: .85; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* What the top bar shows (Settings, Top bar): the shell puts bar-hide-<item> on the root element. */
+#bar-window { margin-left: 8px; max-width: min(34vw, 420px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: var(--label-2); line-height: 26px; } #bar-window strong { color: var(--label); font-weight: 600; } #bar-window[hidden] { display: none; }
 html.bar-hide-apps #apps, html.bar-hide-mobius #ask, html.bar-hide-workspaces #workspaces { display: none; }
 html.bar-hide-date #clock .day { display: none; }
 html.bar-hide-wifi #status [data-slot="wifi"], html.bar-hide-bluetooth #status [data-slot="bt"], html.bar-hide-volume #status [data-slot="vol"], html.bar-hide-battery #batt { display: none !important; }

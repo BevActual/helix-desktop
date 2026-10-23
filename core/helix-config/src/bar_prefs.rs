@@ -36,6 +36,13 @@ pub const ITEMS: &[BarItem] = &[
         default: true,
     },
     BarItem {
+        key: "window",
+        title: "Active window",
+        about: "The name of the window you are working in, beside the workspaces.",
+        group: "Left",
+        default: false,
+    },
+    BarItem {
         key: "date",
         title: "Date beside the time",
         about: "The day and date before the time.",

@@ -57,6 +57,8 @@ function applyBarPrefs(raw) {
   let prefs = {};
   try { prefs = JSON.parse(raw); } catch (error) { prefs = {}; }
   for (const [key, on] of Object.entries(prefs)) document.documentElement.classList.toggle("bar-hide-" + key, !on);
+  showActiveWindow = prefs.window === true;
+  drawActiveWindow();
   clockSeconds = prefs.seconds === true;
   clearInterval(secondsTimer);
   if (clockSeconds) secondsTimer = setInterval(tickClock, 1000);
@@ -1298,6 +1300,25 @@ function drawWorkspaces(strip) {
   queueGlass();
 }
 listen("workspaces-view", (event) => drawWorkspaces(event.payload));
+
+// The active window's name, when the bar is set to show it (Settings → Top bar → Active window). Drawn as text, never markup.
+let activeWindow = { app: "", title: "" };
+let showActiveWindow = false;
+function drawActiveWindow() {
+  const host = $("bar-window");
+  const { app, title } = activeWindow;
+  host.hidden = !showActiveWindow || !(app || title);
+  if (host.hidden) { queueReport(); return; }
+  host.replaceChildren();
+  const strong = document.createElement("strong");
+  strong.textContent = app || title;
+  host.append(strong);
+  if (app && title && title.toLowerCase() !== app.toLowerCase()) host.append(document.createTextNode(" — " + title));
+  host.title = [app, title].filter(Boolean).join(" — ");
+  queueReport();
+}
+listen("active-window", (event) => { activeWindow = event.payload; drawActiveWindow(); });
+invoke("active_window_view").then((view) => { activeWindow = view; drawActiveWindow(); }, () => undefined);
 invoke("workspaces_view").then(drawWorkspaces);
 
 

@@ -33,4 +33,17 @@ echo '{"version":1,"show":{"seconds":true}}' > "$FILE"
 sleep 2
 shown apps && echo "ok: choosing again brings back what was hidden before" || fail "apps not back"
 shot bar-seconds
+# The active window: off by default; on, the bar names the window that has the focus.
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+python3 "$ROOT/tools/nested/probe_window.py" >/dev/null 2>&1 &
+PROBE=$!
+sleep 3
+shown bar-window && fail "the active window showed although it is off by default" || echo "ok: the active window is off by default"
+echo '{"version":1,"show":{"window":true}}' > "$FILE"
+wait_state bar-window yes && echo "ok: with it on, the bar names the focused window" || fail "bar-window not shown"
+grep -q 'ACTIVE-WINDOW .*title="probe"' "$LOG" && echo "ok: the shell saw the window's title" || fail "no active window: $(grep ACTIVE-WINDOW "$LOG" | tail -2)"
+sleep 2; shot bar-window
+kill $PROBE 2>/dev/null
+for _ in $(seq 1 20); do grep ACTIVE-WINDOW "$LOG" | tail -1 | grep -q 'title=""' && break; sleep 0.25; done
+grep ACTIVE-WINDOW "$LOG" | tail -1 | grep -q 'title=""' && echo "ok: nothing focused, nothing named" || fail "stale name: $(grep ACTIVE-WINDOW "$LOG" | tail -1)"
 [ "$FAILED" = 0 ] && echo "PASS: bar prefs" || exit 1

@@ -2122,6 +2122,7 @@ fn main() {
             agent_display::agent_display_help,
             agent_display::agent_display_frame,
             dock::workspaces_view,
+            dock::active_window_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
             dock::dock_activate,
