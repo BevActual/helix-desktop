@@ -3061,6 +3061,7 @@ dependencies = [
  "libc",
  "serde_json",
  "tokio",
+ "ureq",
  "zbus",
 ]
 
@@ -3132,6 +3133,21 @@ dependencies = [
  "serde",
  "serde_json",
  "ts-rs",
+]
+
+[[package]]
+name = "helix-models-app"
+version = "0.1.0"
+dependencies = [
+ "gtk",
+ "helix-config",
+ "helix-desktop-api",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tokio",
+ "zbus",
 ]
 
 [[package]]

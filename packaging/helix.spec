@@ -228,6 +228,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-mobius
 %{_bindir}/helix-software
 %{_bindir}/helix-system-monitor
+%{_bindir}/helix-models
 %{_bindir}/helix-greeter-apply-appearance
 %{_libexecdir}/helix-system-upgrade
 %{_userunitdir}/helix-service.service
@@ -248,6 +249,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_datadir}/icons/hicolor/scalable/apps/helix.svg
 %{_datadir}/icons/hicolor/scalable/apps/org.helix.Shell.svg
 %{_datadir}/icons/hicolor/scalable/apps/org.helix.SystemMonitor.svg
+%{_datadir}/icons/hicolor/scalable/apps/org.helix.Models.svg
 %dir %{_datadir}/helix
 %{_datadir}/helix/msg-risk.toml
 %{_datadir}/helix/tool-hints.toml

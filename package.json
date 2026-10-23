@@ -10,7 +10,8 @@
     "greeter/helix-greeter-tauri/web",
     "apps/helix-software/web",
     "apps/helix-system-monitor/web",
-    "apps/helix-mobius/web"
+    "apps/helix-mobius/web",
+    "apps/helix-models/web"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

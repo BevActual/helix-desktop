@@ -157,6 +157,96 @@ export function Segmented<T extends string>({ value, options, onChange, test }: 
   );
 }
 
+/**
+ * A pop-up button, as on macOS: the current choice with a chevron, and a menu of the others that opens beneath it. Arrow keys move, Enter chooses,
+ * Escape and a click elsewhere close it. One choice is marked with a tick. An option can be disabled (greyed, with a reason as its title).
+ */
+export function Popup<T extends string>({ value, options, onChange, test, label, placeholder }: {
+  value: T;
+  options: { id: T; label: string; disabled?: boolean; title?: string }[];
+  onChange: (id: T) => void;
+  test?: string;
+  label: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const host = useRef<HTMLDivElement>(null);
+  const current = options.find((option) => option.id === value);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: MouseEvent) => {
+      if (!host.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", outside, true);
+    return () => window.removeEventListener("mousedown", outside, true);
+  }, [open]);
+  const choose = (option: { id: T; disabled?: boolean }) => {
+    if (option.disabled) return;
+    setOpen(false);
+    if (option.id !== value) onChange(option.id);
+  };
+  const move = (by: number) => {
+    const count = options.length;
+    for (let step = 1; step <= count; step++) {
+      const next = (active + by * step + count * step) % count;
+      if (!options[next].disabled) {
+        setActive(next);
+        return;
+      }
+    }
+  };
+  return (
+    <div className="hx-popup" ref={host}>
+      <button
+        type="button"
+        className="hx-popup-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        data-test={test}
+        onClick={() => { setActive(Math.max(0, options.findIndex((option) => option.id === value))); setOpen(!open); }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (!open) { setActive(Math.max(0, options.findIndex((option) => option.id === value))); setOpen(true); } else move(event.key === "ArrowDown" ? 1 : -1);
+          } else if (event.key === "Enter" && open) {
+            event.preventDefault();
+            choose(options[active]);
+          } else if (event.key === "Escape" && open) {
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}
+      >
+        <span className="hx-popup-value">{current ? current.label : placeholder ?? "Choose"}</span>
+        <Icon name="chevron-down" />
+      </button>
+      {open ? (
+        <div className="hx-menu" role="menu" aria-label={label}>
+          {options.map((option, index) => (
+            <button
+              type="button"
+              key={option.id}
+              role="menuitemradio"
+              aria-checked={option.id === value}
+              disabled={option.disabled}
+              title={option.title}
+              className={`hx-menu-item${index === active ? " active" : ""}`}
+              data-test={test ? `${test}-${option.id}` : undefined}
+              onMouseEnter={() => setActive(index)}
+              onClick={() => choose(option)}
+            >
+              <span className="hx-menu-tick">{option.id === value ? "✓" : ""}</span>
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Switch({ checked, onChange, label, test }: { checked: boolean; onChange: (next: boolean) => void; label: string; test?: string }) {
   return <button className="hx-switch" role="switch" aria-checked={checked} aria-label={label} data-test={test} onClick={() => onChange(!checked)} />;
 }
@@ -213,17 +303,20 @@ export function Meter({ percent, live, label }: { percent: number; live?: boolea
 /** A modal sheet that drops from the titlebar, or a centred alert. Escape cancels; Enter does not confirm (the primary must be clicked). */
 export function Sheet({ title, children, actions, alert, onCancel, test }: { title: string; children?: ReactNode; actions: ReactNode; alert?: boolean; onCancel: () => void; test?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  // The latest onCancel, without re-running the effect: focusing the sheet again on every render would take the keyboard from a field being typed in.
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
   useEffect(() => {
     ref.current?.focus();
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onCancel();
+        cancel.current();
       }
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [onCancel]);
+  }, []);
   return (
     <div className="hx-scrim" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
       <div ref={ref} tabIndex={-1} role={alert ? "alertdialog" : "dialog"} aria-label={title} className={`hx-sheet${alert ? " hx-alert" : ""}`} data-test={test}>

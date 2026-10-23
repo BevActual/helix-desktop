@@ -99,6 +99,7 @@ pick settings-accent && run settings-accent settings-accent-test.sh settings-fak
 pick settings-look && run settings-look settings-look-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-multitask && run settings-multitask settings-multitask-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-shortcuts && run settings-shortcuts settings-shortcuts-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=binds { Mod+F7 { focus-column-left; }; }"
+pick helix-models && run helix-models helix-models-test.sh models-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick helix-shell-action && run helix-shell-action helix-shell-action-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-wallpaper && run settings-wallpaper settings-wallpaper-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh tauri-shell.sh

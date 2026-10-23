@@ -1,0 +1,27 @@
+[package]
+name = "helix-models-app"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Helix Models: the app for the model gateway (org.helix.Inference): backends, installed models, and which backend answers each slot."
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+helix-config = { workspace = true }
+helix-desktop-api = { workspace = true }
+gtk = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true }
+tokio = { workspace = true, features = ["time", "sync", "macros", "rt-multi-thread"] }
+zbus = { workspace = true, features = ["tokio"] }
+
+[[bin]]
+name = "helix-models"
+path = "src/main.rs"
+
+[lints]
+workspace = true

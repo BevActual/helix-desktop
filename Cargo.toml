@@ -38,6 +38,7 @@ members = [
     "apps/helix-mobius/src-tauri", # Mobius hub
     "apps/helix-software/src-tauri",
     "apps/helix-system-monitor/src-tauri",
+    "apps/helix-models/src-tauri",
     "dev/helix-attacker",
     # The compositor (niri fork). niri-visual-tests needs GTK 4 and libadwaita; build recipes exclude it.
     "compositor",

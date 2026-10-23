@@ -2315,3 +2315,18 @@ body.chat .agents-plan-done { margin: 6px 0 12px; font-size: 13px; } body.chat .
 .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .user-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .user-actions { display: flex; gap: 8px; margin-top: 6px; }
+
+/* Pop-up button and its menu (kit.tsx Popup): the current choice with a chevron; the menu opens beneath it. */
+.hx-popup { position: relative; display: inline-block; }
+.hx-popup-button { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 3px 8px 3px 12px; border: 0; border-radius: 8px; background: var(--fill-1); color: var(--label); font: inherit; cursor: default; box-shadow: inset 0 0 0 .5px var(--hairline); }
+.hx-popup-button:hover { background: color-mix(in srgb, var(--fill-1) 60%, var(--label) 8%); }
+.hx-popup-button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.hx-popup-button[aria-expanded="true"] { background: var(--accent); color: #fff; }
+.hx-popup-button svg { width: 12px; height: 12px; opacity: .7; }
+.hx-popup-value { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-menu { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; min-width: 100%; max-height: 280px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--glass-solid, var(--bg)); box-shadow: var(--shadow-small), inset 0 0 0 .5px var(--hairline); animation: hx-menu-in 120ms var(--ease, ease-out) both; }
+.hx-menu-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 12px 5px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--label); font: inherit; text-align: left; white-space: nowrap; cursor: default; }
+.hx-menu-item.active:not(:disabled) { background: var(--accent); color: #fff; }
+.hx-menu-item:disabled { color: var(--label-2); opacity: .55; }
+.hx-menu-tick { width: 14px; text-align: center; font-size: 12px; }
+@keyframes hx-menu-in { from { opacity: 0; transform: translateY(-3px) scale(.98); } to { opacity: 1; transform: none; } }
