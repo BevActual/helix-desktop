@@ -1605,9 +1605,12 @@ fn topbar_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, 
 /// How things look: animations, gaps, cursor size. Empty when the compositor cannot change them (it is not the Helix one).
 #[tauri::command]
 fn look_rows() -> Vec<RowView> {
-    helix_compositor::compositor_ipc::look_settings()
+    let mut rows = helix_compositor::compositor_ipc::look_settings()
         .map(|look| look::look_rows(&look))
-        .unwrap_or_default()
+        .unwrap_or_default();
+    // The glass is drawn by the shell, so its slider is there whatever the compositor is.
+    rows.insert(0, look::glass_row(read_shape().1));
+    rows
 }
 
 /// Multitasking: focus, centring, the hot corner. Empty when the compositor cannot change them.
@@ -1626,8 +1629,23 @@ fn multitask_change(id: String, change: serde_json::Value) -> Result<Vec<RowView
     Ok(multitask_rows())
 }
 
-/// Writes the corner step where the shell reads it (`~/.config/helix/shape-settings.json`, private to the person).
-fn write_shape(step: &helix_config::shape_prefs::Step) -> Result<(), String> {
+fn shape_file() -> Option<std::path::PathBuf> {
+    dock_prefs_file().map(|p| p.with_file_name("shape-settings.json"))
+}
+
+/// The corner step and glass level the person chose (the defaults when there is no file).
+fn read_shape() -> (&'static helix_config::shape_prefs::Step, f64) {
+    let text = shape_file()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .unwrap_or_default();
+    (
+        helix_config::shape_prefs::parse_step(&text),
+        helix_config::shape_prefs::parse_glass(&text),
+    )
+}
+
+/// Writes the corner step and glass level where the shell reads them (`~/.config/helix/shape-settings.json`, private to the person).
+fn write_shape(step: &helix_config::shape_prefs::Step, glass: f64) -> Result<(), String> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
     let path = dock_prefs_file()
@@ -1643,7 +1661,7 @@ fn write_shape(step: &helix_config::shape_prefs::Step) -> Result<(), String> {
             .mode(0o600)
             .open(&temporary)
             .map_err(|e| e.to_string())?;
-        file.write_all(helix_config::shape_prefs::to_json(step).as_bytes())
+        file.write_all(helix_config::shape_prefs::to_json_with(step, glass).as_bytes())
             .map_err(|e| e.to_string())?;
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())
@@ -1651,11 +1669,22 @@ fn write_shape(step: &helix_config::shape_prefs::Step) -> Result<(), String> {
 
 #[tauri::command]
 fn look_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    // The glass slider is the shell's own, not the compositor's.
+    if id == "look:glass" {
+        let percent = change
+            .get("value")
+            .and_then(serde_json::Value::as_f64)
+            .filter(|v| v.is_finite())
+            .ok_or("not a number")?;
+        write_shape(read_shape().0, (percent / 100.0).clamp(0.0, 1.0))?;
+        eprintln!("SETTINGS look {id}");
+        return Ok(look_rows());
+    }
     let request = look::parse_change(&id, &change)?;
     helix_compositor::compositor_ipc::set_look_settings(&request)?;
     // The shell's own corners follow the same step (a file it watches).
     if let Some(radius) = request.window_corner_radius {
-        write_shape(helix_config::shape_prefs::nearest(radius))?;
+        write_shape(helix_config::shape_prefs::nearest(radius), read_shape().1)?;
     }
     eprintln!("SETTINGS look {id}");
     Ok(look_rows())

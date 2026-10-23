@@ -16,15 +16,23 @@ fn path() -> Option<std::path::PathBuf> {
     Some(base.join("helix/shape-settings.json"))
 }
 
-fn read() -> f64 {
-    path()
+fn read() -> (f64, f64) {
+    let text = path()
         .and_then(|p| std::fs::read_to_string(p).ok())
-        .map_or(1.0, |text| helix_config::shape_prefs::parse_scale(&text))
+        .unwrap_or_default();
+    (
+        if text.is_empty() {
+            1.0
+        } else {
+            helix_config::shape_prefs::parse_scale(&text)
+        },
+        helix_config::shape_prefs::parse_glass(&text),
+    )
 }
 
-/// The scale, 0 (square) to 2; 1 is the default look.
+/// The corner scale (0 square to 2, 1 as designed) and the glass level (0 clear to 1 tinted).
 #[tauri::command]
-pub fn shape_scale() -> f64 {
+pub fn shape_scale() -> (f64, f64) {
     read()
 }
 
@@ -43,9 +51,9 @@ pub fn start(app: AppHandle) {
                 continue;
             }
             seen = now;
-            let scale = read();
-            eprintln!("SHAPE scale={scale}");
-            let _ = app.emit("shape-scale", scale);
+            let (scale, glass) = read();
+            eprintln!("SHAPE scale={scale} glass={glass}");
+            let _ = app.emit("shape-scale", (scale, glass));
         }
     });
 }

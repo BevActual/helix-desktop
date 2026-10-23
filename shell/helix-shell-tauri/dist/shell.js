@@ -1490,9 +1490,12 @@ invoke("bar_prefs").then(applyBarPrefs, () => undefined);
 listen("bar-prefs", (event) => applyBarPrefs(event.payload));
 
 // How round the shell's own corners are (Settings → Appearance → Corner roundness): a scale the bar, dock, panels and toasts multiply their radii by.
-function applyShape(scale) {
+function applyShape(pair) {
+  const [scale, glass] = Array.isArray(pair) ? pair : [1, 0.6];
   const value = Number.isFinite(scale) ? Math.min(2, Math.max(0, scale)) : 1;
+  const tint = Number.isFinite(glass) ? Math.min(1, Math.max(0, glass)) : 0.6;
   document.documentElement.style.setProperty("--shape", String(value));
+  document.documentElement.style.setProperty("--glass-t", String(tint));
   queueGlass();
   queueReport();
 }

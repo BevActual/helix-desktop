@@ -51,10 +51,10 @@ SHAPE=$SCRATCH/config/helix/shape-settings.json
 echo '{"version":1,"step":"square","scale":0}' > "$SHAPE"
 for _ in $(seq 1 20); do grep -q 'SHAPE scale=0' "$LOG" && break; sleep 0.25; done
 grep -q 'SHAPE scale=0' "$LOG" && echo "ok: the shell took the corner scale" || fail "no shape log: $(grep SHAPE "$LOG" | tail -2)"
-echo '{"version":1,"step":"round","scale":1.6}' > "$SHAPE"
-for _ in $(seq 1 20); do grep -q 'SHAPE scale=1.6' "$LOG" && break; sleep 0.25; done
-grep -q 'SHAPE scale=1.6' "$LOG" && echo "ok: and a rounder one" || fail "no second shape log"
+echo '{"version":1,"step":"round","scale":1.6,"glass":0.1}' > "$SHAPE"
+for _ in $(seq 1 20); do grep -q 'SHAPE scale=1.6 glass=0.1' "$LOG" && break; sleep 0.25; done
+grep -q 'SHAPE scale=1.6 glass=0.1' "$LOG" && echo "ok: and a rounder one, with clearer glass" || fail "no second shape log"
 echo 'nonsense' > "$SHAPE"
-for _ in $(seq 1 20); do grep -q 'SHAPE scale=1$' "$LOG" && break; sleep 0.25; done
-grep -q 'SHAPE scale=1$' "$LOG" && echo "ok: a damaged file means the default look" || fail "damaged shape file: $(grep SHAPE "$LOG" | tail -1)"
+for _ in $(seq 1 20); do grep -q 'SHAPE scale=1 glass=0.6$' "$LOG" && break; sleep 0.25; done
+grep -q 'SHAPE scale=1 glass=0.6$' "$LOG" && echo "ok: a damaged file means the default look" || fail "damaged shape file: $(grep SHAPE "$LOG" | tail -1)"
 [ "$FAILED" = 0 ] && echo "PASS: bar prefs" || exit 1

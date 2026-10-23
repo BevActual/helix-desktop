@@ -39,6 +39,18 @@ fn row(id: &str, title: &str, description: &str, control: Control) -> RowView {
     }
 }
 
+/// Clear to Tinted, like iOS: how see-through the bar, dock and panels are. A percent, 0 (clear) to 100 (tinted).
+pub fn glass_row(glass: f64) -> RowView {
+    RowView {
+        id: "look:glass".into(),
+        title: "Glass".into(),
+        group: "Windows and cursor".into(),
+        description: "Clear shows more of what is behind the bar, dock and panels. Tinted is more opaque and easier to read.".into(),
+        overridden: false,
+        control: Control::Slider { min: 0.0, max: 100.0, integer: true, value: (glass * 100.0).round() },
+    }
+}
+
 pub fn look_rows(look: &LookSettings) -> Vec<RowView> {
     let slider = |min: f64, max: f64, value: f64| Control::Slider {
         min,
