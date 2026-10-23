@@ -93,6 +93,9 @@ excellent at the first two *without any setup or approval*, and trustworthy at t
 
 ### What not to do
 
+> Stance update (2026-10-23): the owner is AI-forward and wants to test the boundaries; see `ai-forward-platform.md`. The list below is the *default for
+> ordinary users*; each item becomes a configurable setting with rollback and audit (Lab, graduated autonomy), not a prohibition on the platform.
+
 * No always-on capture of the screen, keystrokes or microphone. No data leaves the machine without a visible, revocable choice.
 * No AI that is on by default where a person did not ask for it; every feature has a switch; nothing is pre-loaded to watch.
 * No wall of approval prompts, and no "YOLO mode" as the answer to approval fatigue: reduce the prompts by raising the floor (sandbox, review on copy),
