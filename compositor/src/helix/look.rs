@@ -70,6 +70,21 @@ pub fn validate(look: &HelixLook) -> Result<(), String> {
             return Err("centring is never, always or on-overflow".into());
         }
     }
+    if look
+        .animation_speed
+        .is_some_and(|s| !(25..=400).contains(&s))
+    {
+        return Err("animation speed is 25 to 400 percent".into());
+    }
+    if look.blur_strength.is_some_and(|s| s > 100) {
+        return Err("blur strength is 0 to 100".into());
+    }
+    if look.refraction.is_some_and(|r| r > 200) {
+        return Err("refraction is 0 to 200 percent".into());
+    }
+    if look.focus_ring_width.is_some_and(|w| w > 8) {
+        return Err("the focus ring is 0 to 8 pixels".into());
+    }
     if look.window_corner_radius.is_some_and(|r| r > 32) {
         return Err("window corners are 0 to 32 pixels".into());
     }
@@ -121,6 +136,21 @@ fn merge(base: &mut HelixLook, change: &HelixLook) {
     if change.window_corner_radius.is_some() {
         base.window_corner_radius = change.window_corner_radius;
     }
+    if change.animation_speed.is_some() {
+        base.animation_speed = change.animation_speed;
+    }
+    if change.blur_strength.is_some() {
+        base.blur_strength = change.blur_strength;
+    }
+    if change.refraction.is_some() {
+        base.refraction = change.refraction;
+    }
+    if change.window_shadows.is_some() {
+        base.window_shadows = change.window_shadows;
+    }
+    if change.focus_ring_width.is_some() {
+        base.focus_ring_width = change.focus_ring_width;
+    }
 }
 
 /// A rule for every window that sets only the corner radius (and clips the window to it), which is what the override is. Later rules win, so it is
@@ -159,6 +189,29 @@ fn radius_of(config: &Config) -> Option<u16> {
         .map(|r| r.top_left.round().clamp(0.0, 32.0) as u16)
 }
 
+const GLASS_NAMESPACE: &str = "^helix-panels?$";
+
+/// The blur passes and offset for a strength: light is one pass and a small offset, heavy is five passes and a wide one.
+fn blur_for(strength: u8) -> (u8, f64) {
+    let t = f64::from(strength.min(100)) / 100.0;
+    (1 + (t * 4.0).round() as u8, 1.5 + t * 4.5)
+}
+
+fn strength_of(passes: u8) -> u8 {
+    ((f64::from(passes.clamp(1, 5)) - 1.0) / 4.0 * 100.0).round() as u8
+}
+
+/// The shell's own glass rule, if it is there (see [`ensure_glass_rule`]).
+fn glass_rule(config: &mut Config) -> Option<&mut LayerRule> {
+    config.layer_rules.iter_mut().find(|rule| {
+        rule.matches.len() == 1
+            && rule.matches[0]
+                .namespace
+                .as_ref()
+                .is_some_and(|ns| ns.0.as_str() == GLASS_NAMESPACE)
+    })
+}
+
 /// Puts the overrides over a configuration.
 pub fn overlay(config: &mut Config, look: &HelixLook) {
     if let Some(on) = look.animations {
@@ -183,6 +236,32 @@ pub fn overlay(config: &mut Config, look: &HelixLook) {
     }
     if let Some(on) = look.workspace_back_and_forth {
         config.input.workspace_auto_back_and_forth = on;
+    }
+    if let Some(speed) = look.animation_speed {
+        config.animations.slowdown = 100.0 / f64::from(speed.clamp(25, 400));
+    }
+    if let Some(strength) = look.blur_strength {
+        let (passes, offset) = blur_for(strength);
+        config.blur.passes = passes;
+        config.blur.offset = offset;
+    }
+    if let Some(percent) = look.refraction {
+        if let Some(rule) = glass_rule(config) {
+            let part = rule
+                .background_effect
+                .liquid_glass
+                .get_or_insert_with(LiquidGlassPart::default);
+            part.refraction_strength = Some(niri_config::utils::FloatOrInt(
+                f64::from(percent.min(200)) / 100.0,
+            ));
+        }
+    }
+    if let Some(on) = look.window_shadows {
+        config.layout.shadow.on = on;
+    }
+    if let Some(width) = look.focus_ring_width {
+        config.layout.focus_ring.off = width == 0;
+        config.layout.focus_ring.width = f64::from(width.min(8));
     }
     if let Some(radius) = look.window_corner_radius {
         config.window_rules.retain(|rule| !is_corner_rule(rule));
@@ -216,6 +295,34 @@ pub fn effective(config: &Config) -> HelixLook {
         center_focused: Some(center_name(config.layout.center_focused_column).to_string()),
         workspace_back_and_forth: Some(config.input.workspace_auto_back_and_forth),
         window_corner_radius: Some(radius_of(config).unwrap_or(0)),
+        animation_speed: Some(
+            (100.0 / config.animations.slowdown.max(0.001))
+                .round()
+                .clamp(25.0, 400.0) as u16,
+        ),
+        blur_strength: Some(strength_of(config.blur.passes)),
+        refraction: config
+            .layer_rules
+            .iter()
+            .find(|rule| {
+                rule.matches.len() == 1
+                    && rule.matches[0]
+                        .namespace
+                        .as_ref()
+                        .is_some_and(|ns| ns.0.as_str() == GLASS_NAMESPACE)
+            })
+            .and_then(|rule| rule.background_effect.liquid_glass)
+            .map(|lg| {
+                (lg.refraction_strength.map_or(0.35, |v| v.0) * 100.0)
+                    .round()
+                    .clamp(0.0, 200.0) as u16
+            }),
+        window_shadows: Some(config.layout.shadow.on),
+        focus_ring_width: Some(if config.layout.focus_ring.off {
+            0
+        } else {
+            config.layout.focus_ring.width.round().clamp(0.0, 8.0) as u8
+        }),
     }
 }
 
@@ -234,7 +341,7 @@ pub fn ensure_glass_rule(config: &mut Config) {
     if covered {
         return;
     }
-    let Ok(namespace) = "^helix-panels?$".parse::<RegexEq>() else {
+    let Ok(namespace) = GLASS_NAMESPACE.parse::<RegexEq>() else {
         return;
     };
     config.layer_rules.insert(
@@ -288,6 +395,13 @@ impl State {
             )
         };
         self.niri.clock.set_complete_instantly(off);
+        if change.animation_speed.is_some() {
+            let slowdown = self.niri.config.borrow().animations.slowdown;
+            self.niri.clock.set_rate(1.0 / slowdown.max(0.001));
+        }
+        if change.refraction.is_some() {
+            self.niri.recompute_layer_rules();
+        }
         if change.cursor_size.is_some() {
             self.niri.cursor_manager.reload(&theme, size);
             self.niri.cursor_texture_cache.clear();
@@ -352,6 +466,115 @@ mod tests {
         let count = own.layer_rules.len();
         ensure_glass_rule(&mut own);
         assert_eq!(own.layer_rules.len(), count);
+    }
+
+    #[test]
+    fn effects_are_set_and_read_back_in_the_units_the_page_uses() {
+        let mut config = Config::default();
+        ensure_glass_rule(&mut config);
+        overlay(
+            &mut config,
+            &HelixLook {
+                animation_speed: Some(200),
+                blur_strength: Some(100),
+                refraction: Some(150),
+                window_shadows: Some(true),
+                focus_ring_width: Some(0),
+                ..HelixLook::default()
+            },
+        );
+        let seen = effective(&config);
+        assert_eq!(seen.animation_speed, Some(200));
+        assert_eq!(
+            config.animations.slowdown, 0.5,
+            "twice as fast is half the slowdown"
+        );
+        assert_eq!((seen.blur_strength, config.blur.passes), (Some(100), 5));
+        assert_eq!(seen.refraction, Some(150));
+        assert_eq!(seen.window_shadows, Some(true));
+        assert_eq!(seen.focus_ring_width, Some(0));
+        assert!(config.layout.focus_ring.off);
+        overlay(
+            &mut config,
+            &HelixLook {
+                focus_ring_width: Some(3),
+                blur_strength: Some(0),
+                animation_speed: Some(25),
+                ..HelixLook::default()
+            },
+        );
+        let seen = effective(&config);
+        assert_eq!(
+            (
+                seen.focus_ring_width,
+                seen.blur_strength,
+                seen.animation_speed
+            ),
+            (Some(3), Some(0), Some(25))
+        );
+        assert!(!config.layout.focus_ring.off && config.layout.focus_ring.width == 3.0);
+        assert_eq!(config.animations.slowdown, 4.0);
+        // Blur gets heavier with the strength, never lighter.
+        let mut last = (0u8, 0.0f64);
+        for strength in (0..=100).step_by(10) {
+            let (passes, offset) = blur_for(strength);
+            assert!(passes >= last.0 && offset >= last.1, "{strength}");
+            last = (passes, offset);
+        }
+    }
+
+    #[test]
+    fn refraction_is_not_reported_when_the_person_has_their_own_glass_rule() {
+        let mut own = Config::default();
+        own.layer_rules.push(LayerRule {
+            matches: vec![LayerMatch {
+                namespace: Some("helix-panel".parse::<RegexEq>().unwrap()),
+                ..LayerMatch::default()
+            }],
+            ..LayerRule::default()
+        });
+        ensure_glass_rule(&mut own);
+        overlay(
+            &mut own,
+            &HelixLook {
+                refraction: Some(120),
+                ..HelixLook::default()
+            },
+        );
+        assert_eq!(effective(&own).refraction, None, "not ours to change");
+    }
+
+    #[test]
+    fn impossible_effects_are_refused() {
+        let bad = |look: HelixLook| validate(&look).is_err();
+        assert!(bad(HelixLook {
+            animation_speed: Some(10),
+            ..HelixLook::default()
+        }));
+        assert!(bad(HelixLook {
+            animation_speed: Some(401),
+            ..HelixLook::default()
+        }));
+        assert!(bad(HelixLook {
+            blur_strength: Some(101),
+            ..HelixLook::default()
+        }));
+        assert!(bad(HelixLook {
+            refraction: Some(201),
+            ..HelixLook::default()
+        }));
+        assert!(bad(HelixLook {
+            focus_ring_width: Some(9),
+            ..HelixLook::default()
+        }));
+        assert!(validate(&HelixLook {
+            animation_speed: Some(25),
+            blur_strength: Some(100),
+            refraction: Some(200),
+            focus_ring_width: Some(8),
+            ..HelixLook::default()
+        })
+        .is_ok());
     }
 
     #[test]

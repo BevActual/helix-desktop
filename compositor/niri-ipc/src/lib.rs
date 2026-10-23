@@ -242,6 +242,21 @@ pub struct HelixLook {
     /// The corner radius of every window in logical pixels, 0 to 32 (0 is square).
     #[serde(default)]
     pub window_corner_radius: Option<u16>,
+    /// How fast animations run, in percent: 100 is as designed, 200 twice as fast, 25 four times slower (25 to 400).
+    #[serde(default)]
+    pub animation_speed: Option<u16>,
+    /// How strong the blur behind glass is, 0 (light) to 100 (heavy).
+    #[serde(default)]
+    pub blur_strength: Option<u8>,
+    /// How much the shell's glass bends what is behind its edges, in percent (0 to 200; 100 is the physical value).
+    #[serde(default)]
+    pub refraction: Option<u16>,
+    /// Whether windows cast a shadow.
+    #[serde(default)]
+    pub window_shadows: Option<bool>,
+    /// The width of the ring around the focused window in pixels, 0 (none) to 8.
+    #[serde(default)]
+    pub focus_ring_width: Option<u8>,
 }
 
 /// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.

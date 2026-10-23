@@ -7,15 +7,15 @@ source "$ROOT/tools/nested/ui-lib.sh"
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 shot() { niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/$1.png"; }
 wait_id() { for _ in $(seq 1 ${2:-40}); do has_id "$1" && return 0; sleep 0.25; done; return 1; }
-loc=$(python3 - <<'PY'
+origin() { local loc; loc=$(python3 - <<'PY'
 import json, subprocess
 w = next(x for x in json.loads(subprocess.check_output(["niri","msg","--json","windows"])) if "settings" in (x["app_id"] or "").lower())
 o = next(iter(json.loads(subprocess.check_output(["niri","msg","--json","outputs"])).values()))["logical"]
 l = w["layout"]; t = l.get("tile_pos_in_workspace_view") or [0,0]; f = l.get("window_offset_in_tile") or [0,0]
 print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
-)
-export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
+); export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}; }
+origin
 ipc() { python3 - "$1" <<'PY'
 import json, os, socket, sys
 s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(sys.argv[1].encode() + b"\n"); s.settimeout(5)
@@ -52,6 +52,8 @@ wait_id set-look:glass-number 20 && echo "ok: the Glass slider is on Appearance"
 click_id set-look:glass-number; wtype "25"; wtype -k Return; sleep 1
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["glass"]==0.25 else 1)' "$SHAPE" && echo "ok: 25 is written as a quarter of the way to tinted" || fail "glass file: $(cat "$SHAPE" 2>&1)"
 echo "--- corners: each kind of thing has its own slider"
+# niri does not report this window's place (0 0); it sits 12 px in from the corner, which is where the page's own 0 0 is drawn.
+export UI_ORIGIN="12 12"
 SHAPE=$SCRATCH/config/helix/shape-settings.json
 for id in look:corner-windows shape:bar shape:dock shape:panels shape:toasts shape:apps; do wait_id "set-$id-number" 20 && echo "ok: a slider for $id" || fail "no row $id"; done
 has_id set-look:corner-helix-number && fail "a separate Helix windows slider is still there" || echo "ok: one Windows slider covers every window, Helix apps included"
@@ -60,11 +62,11 @@ has_id set-look:corner-helix-number && fail "a separate Helix windows slider is 
 r=$(ipc '{"HelixSetLook":{"window_corner_radius":20}}'); [ "$r" = '"Handled"' ] && [ "$(field window_corner_radius)" = "20" ] && echo "ok: the compositor holds one radius for every window" || fail "compositor: $(ipc '"HelixLook"')"
 ipc '{"HelixSetLook":{"window_corner_radius":8}}' >/dev/null; sleep 0.5
 [ "$(field window_corner_radius)" = "8" ] && echo "ok: and changes it" || fail "after windows: $(ipc '"HelixLook"')"
-click_id set-shape:bar-number; wtype "0"; wtype -k Return; sleep 1
-click_id set-shape:dock-number; wtype "150"; wtype -k Return; sleep 1
-click_id set-shape:panels-number; wtype "50"; wtype -k Return; sleep 1
-click_id set-shape:toasts-number; wtype "200"; wtype -k Return; sleep 1
 click_id set-shape:apps-number; wtype "25"; wtype -k Return; sleep 1
+click_id set-shape:toasts-number; wtype "200"; wtype -k Return; sleep 1
+click_id set-shape:panels-number; wtype "50"; wtype -k Return; sleep 1
+click_id set-shape:dock-number; wtype "150"; wtype -k Return; sleep 1
+click_id set-shape:bar-number; wtype "0"; wtype -k Return; sleep 1
 python3 - "$SHAPE" <<'PY' && echo "ok: every part has its own number, and the glass is kept" || fail "shape file: $(cat "$SHAPE")"
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -78,6 +80,16 @@ s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(
 PY
 sleep 2
 [ "$(field window_corner_radius)" = "8" ] && echo "ok: the windows' corners survive a reload" || fail "lost on reload: $(ipc '"HelixLook"')"
+echo "--- windows and effects: animation speed, blur, shadows, focus ring"
+r=$(ipc '{"HelixSetLook":{"animation_speed":200,"blur_strength":75,"window_shadows":true,"focus_ring_width":5}}'); [ "$r" = '"Handled"' ] && echo "ok: the compositor accepts the effects" || fail "effects: $r"
+[ "$(field animation_speed)" = "200" ] && [ "$(field blur_strength)" = "75" ] && [ "$(field window_shadows)" = "True" ] && [ "$(field focus_ring_width)" = "5" ] && echo "ok: and reports them in the units the page uses" || fail "read back: $(ipc '"HelixLook"')"
+r=$(ipc '{"HelixSetLook":{"animation_speed":1000}}'); echo "$r" | grep -qi "25 to 400" && echo "ok: an impossible speed is refused" || fail "no refusal: $r"
+python3 - <<'PY'
+import json, os, socket
+s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(b'{"Action":{"LoadConfigFile":{}}}\n'); s.settimeout(5); s.recv(4096)
+PY
+sleep 2
+[ "$(field animation_speed)" = "200" ] && [ "$(field focus_ring_width)" = "5" ] && echo "ok: the effects survive a reload" || fail "lost on reload: $(ipc '"HelixLook"')"
 # Inside Helix apps: with the apps' scale at 0 the page itself is drawn square (looked at in the picture).
 echo '{"version":2,"windows":8,"bar":1,"dock":1,"panels":1,"toasts":1,"apps":0,"glass":0.6}' > "$SHAPE"
 sleep 3; shot look-square

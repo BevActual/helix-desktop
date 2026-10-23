@@ -51,6 +51,11 @@ pub struct LookSettings {
     pub workspace_back_and_forth: Option<bool>,
     /// Every window's corner radius in pixels, 0 to 32.
     pub window_corner_radius: Option<u16>,
+    pub animation_speed: Option<u16>,
+    pub blur_strength: Option<u8>,
+    pub refraction: Option<u16>,
+    pub window_shadows: Option<bool>,
+    pub focus_ring_width: Option<u8>,
 }
 
 /// What had the keyboard when Mobius was summoned (`helix-summon`): only what the compositor lists about every window.

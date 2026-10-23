@@ -39,6 +39,17 @@ fn row(id: &str, title: &str, description: &str, control: Control) -> RowView {
     }
 }
 
+fn effect_row(id: &str, title: &str, description: &str, control: Control) -> RowView {
+    RowView {
+        id: id.into(),
+        title: title.into(),
+        group: "Effects".into(),
+        description: description.into(),
+        overridden: false,
+        control,
+    }
+}
+
 fn corner_row(id: &str, title: &str, description: &str, control: Control) -> RowView {
     RowView {
         id: id.into(),
@@ -120,7 +131,42 @@ pub fn look_rows(look: &LookSettings) -> Vec<RowView> {
             "In pixels. Applies as soon as you let go.",
             slider(16.0, 64.0, f64::from(look.cursor_size.unwrap_or(24))),
         ),
+        effect_row(
+            "look:anim-speed",
+            "Animation speed",
+            "How fast windows and workspaces move, in percent. 100 is as designed, 200 twice as fast, 50 half as fast.",
+            slider(25.0, 400.0, f64::from(look.animation_speed.unwrap_or(100))),
+        ),
+        effect_row(
+            "look:blur",
+            "Blur strength",
+            "How strongly the glass blurs what is behind it. Higher is softer and costs a little more power.",
+            slider(0.0, 100.0, f64::from(look.blur_strength.unwrap_or(50))),
+        ),
+        effect_row(
+            "look:shadows",
+            "Window shadows",
+            "A soft shadow under each window.",
+            Control::Switch { on: look.window_shadows.unwrap_or(false) },
+        ),
+        effect_row(
+            "look:ring",
+            "Focus ring width",
+            "The ring around the window you are working in, in pixels. 0 hides it.",
+            slider(0.0, 8.0, f64::from(look.focus_ring_width.unwrap_or(2))),
+        ),
     ]
+    // Refraction is only offered when the shell's glass rule is the compositor's own (a rule of the person's is theirs to edit).
+    .into_iter()
+    .chain(look.refraction.map(|percent| {
+        effect_row(
+            "look:refraction",
+            "Glass refraction",
+            "How much the bar, dock and panels bend what is behind their edges, in percent. 0 is flat glass.",
+            slider(0.0, 200.0, f64::from(percent)),
+        )
+    }))
+    .collect()
 }
 
 /// Multitasking: how windows and workspaces behave. The same compositor overrides as the look, on their own page.
@@ -219,6 +265,21 @@ pub fn parse_change(id: &str, change: &Value) -> Result<LookSettings, String> {
         ("look:cursor", Some("number")) => {
             out.cursor_size = Some(number()?.round().clamp(16.0, 64.0) as u8)
         }
+        ("look:anim-speed", Some("number")) => {
+            out.animation_speed = Some(number()?.round().clamp(25.0, 400.0) as u16)
+        }
+        ("look:blur", Some("number")) => {
+            out.blur_strength = Some(((number()? / 25.0).round() * 25.0).clamp(0.0, 100.0) as u8)
+        }
+        ("look:refraction", Some("number")) => {
+            out.refraction = Some(number()?.round().clamp(0.0, 200.0) as u16)
+        }
+        ("look:shadows", Some("switch")) => {
+            out.window_shadows = Some(value.and_then(Value::as_bool).ok_or("not a boolean")?)
+        }
+        ("look:ring", Some("number")) => {
+            out.focus_ring_width = Some(number()?.round().clamp(0.0, 8.0) as u8)
+        }
         ("look:corner-windows", Some("number")) => {
             out.window_corner_radius = Some(number()?.round().clamp(0.0, 32.0) as u16)
         }
@@ -286,6 +347,73 @@ mod tests {
             .all(|r| matches!(r.control, Control::Slider { value, .. } if value == 100.0)));
         assert!(set("look:gaps", "number", json!("x")).is_err());
         assert!(set("look:nope", "switch", json!(true)).is_err());
+    }
+
+    #[test]
+    fn effects_rows_and_changes() {
+        let rows = look_rows(&LookSettings {
+            animation_speed: Some(150),
+            blur_strength: Some(80),
+            refraction: Some(35),
+            window_shadows: Some(true),
+            focus_ring_width: Some(4),
+            ..LookSettings::default()
+        });
+        let effects: Vec<&RowView> = rows.iter().filter(|r| r.group == "Effects").collect();
+        assert_eq!(
+            effects.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+            [
+                "look:anim-speed",
+                "look:blur",
+                "look:shadows",
+                "look:ring",
+                "look:refraction"
+            ]
+        );
+        assert!(
+            matches!(effects[0].control, Control::Slider { value, min, max, .. } if value == 150.0 && min == 25.0 && max == 400.0)
+        );
+        assert!(matches!(effects[2].control, Control::Switch { on: true }));
+        // No refraction row when the compositor does not report one (the person has their own glass rule).
+        let none = look_rows(&LookSettings::default());
+        assert!(!none.iter().any(|r| r.id == "look:refraction"));
+        let set =
+            |id: &str, kind: &str, v: Value| parse_change(id, &json!({"kind": kind, "value": v}));
+        assert_eq!(
+            set("look:anim-speed", "number", json!(1000))
+                .unwrap()
+                .animation_speed,
+            Some(400)
+        );
+        assert_eq!(
+            set("look:anim-speed", "number", json!(1))
+                .unwrap()
+                .animation_speed,
+            Some(25)
+        );
+        assert_eq!(
+            set("look:blur", "number", json!(70)).unwrap().blur_strength,
+            Some(70)
+        );
+        assert_eq!(
+            set("look:refraction", "number", json!(250))
+                .unwrap()
+                .refraction,
+            Some(200)
+        );
+        assert_eq!(
+            set("look:shadows", "switch", json!(true))
+                .unwrap()
+                .window_shadows,
+            Some(true)
+        );
+        assert_eq!(
+            set("look:ring", "number", json!(20))
+                .unwrap()
+                .focus_ring_width,
+            Some(8)
+        );
+        assert!(set("look:ring", "switch", json!(true)).is_err());
     }
 
     #[test]
