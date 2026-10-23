@@ -81,6 +81,12 @@ PATH=$HOME/.local/cuda/bin:$PATH cmake -S third_party/llama.cpp-0.6.0 -B build \
   answers an OpenAI-compatible request.
 * To try first: one other machine running `llama-server`, added as a LAN backend, and a phone chat app pointed at the gateway.
 
+## Routing
+
+Which model answers a request, beyond choosing a backend per slot, is `model-routing.md` (research on Switchyard, RouteLLM, Arch-Router and
+the hybrid on-device/cloud literature, and the direction: a policy-first router with visible reasons and escalation, telemetry, agent-loop signals,
+then optional judges).
+
 ## Order of work
 
 1. Engine: Vulkan + CUDA `llama-server` build and a benchmark against the CPU-only engine (done: built from the vendored source).
