@@ -1662,11 +1662,11 @@ fn look_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, St
         eprintln!("SETTINGS look {id}");
         return Ok(look_rows());
     }
-    let mut request = look::parse_change(&id, &change)?;
+    let request = look::parse_change(&id, &change)?;
     // The windows' corners are the compositor's; they are also written down with the rest so everything agrees (and Helix applications can follow).
-    if request.window_corner_radius.is_some() || request.helix_window_corner_radius.is_some() {
+    if request.window_corner_radius.is_some() {
         let mut shape = helix_config::shape_prefs::read();
-        look::merge_window_corners(&mut shape, &mut request);
+        look::merge_window_corners(&mut shape, &request);
         helix_config::shape_prefs::write(&shape)?;
     }
     helix_compositor::compositor_ipc::set_look_settings(&request)?;

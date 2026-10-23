@@ -67,20 +67,11 @@ pub fn shape_rows(shape: &helix_config::shape_prefs::Shape) -> Vec<RowView> {
     ]
 }
 
-/// A change to a window's corners, merged with what is written down: Helix applications' windows follow the windows' radius until they were given one of their
-/// own; the request sent to the compositor always carries both, so the two rules never disagree with the file.
-pub fn merge_window_corners(
-    shape: &mut helix_config::shape_prefs::Shape,
-    request: &mut LookSettings,
-) {
+/// A change to every window's corners, written down with the rest so everything agrees.
+pub fn merge_window_corners(shape: &mut helix_config::shape_prefs::Shape, request: &LookSettings) {
     if let Some(radius) = request.window_corner_radius {
         shape.windows = radius;
     }
-    if let Some(radius) = request.helix_window_corner_radius {
-        shape.helix_windows = Some(radius);
-    }
-    request.window_corner_radius = Some(shape.windows);
-    request.helix_window_corner_radius = Some(shape.helix_windows_effective());
 }
 
 /// Clear to Tinted, like iOS: how see-through the bar, dock and panels are. A percent, 0 (clear) to 100 (tinted).
@@ -120,18 +111,8 @@ pub fn look_rows(look: &LookSettings) -> Vec<RowView> {
         corner_row(
             "look:corner-windows",
             "Windows",
-            "How round the corners of every window are, in pixels.",
+            "How round the corners of every window are, in pixels: Helix applications and all the others.",
             slider(0.0, 32.0, f64::from(look.window_corner_radius.unwrap_or(12))),
-        ),
-        corner_row(
-            "look:corner-helix",
-            "Helix app windows",
-            "Settings, Mobius and the other Helix applications. They follow Windows until you change this.",
-            slider(
-                0.0,
-                32.0,
-                f64::from(look.helix_window_corner_radius.or(look.window_corner_radius).unwrap_or(12)),
-            ),
         ),
         row(
             "look:cursor",
@@ -241,9 +222,6 @@ pub fn parse_change(id: &str, change: &Value) -> Result<LookSettings, String> {
         ("look:corner-windows", Some("number")) => {
             out.window_corner_radius = Some(number()?.round().clamp(0.0, 32.0) as u16)
         }
-        ("look:corner-helix", Some("number")) => {
-            out.helix_window_corner_radius = Some(number()?.round().clamp(0.0, 32.0) as u16)
-        }
         _ => return Err("unknown change".into()),
     }
     Ok(out)
@@ -271,11 +249,7 @@ mod tests {
             "windows"
         );
         assert!(
-            matches!(rows[3].control, Control::Slider { value, .. } if value == 18.0),
-            "Helix windows follow until told otherwise"
-        );
-        assert!(
-            matches!(rows[4].control, Control::Slider { value, .. } if value == 40.0),
+            matches!(rows[3].control, Control::Slider { value, .. } if value == 40.0),
             "cursor"
         );
     }
@@ -304,12 +278,6 @@ mod tests {
                 .window_corner_radius,
             Some(6)
         );
-        assert_eq!(
-            set("look:corner-helix", "number", json!(99))
-                .unwrap()
-                .helix_window_corner_radius,
-            Some(32)
-        );
         assert!(set("look:corner-windows", "number", json!("x")).is_err());
         let shape_rows = shape_rows(&helix_config::shape_prefs::Shape::default());
         assert_eq!(shape_rows.len(), 5);
@@ -321,45 +289,19 @@ mod tests {
     }
 
     #[test]
-    fn helix_windows_follow_the_windows_until_they_have_a_radius_of_their_own() {
+    fn the_windows_radius_is_written_down_with_the_rest() {
         use helix_config::shape_prefs::Shape;
-        let change = |all: Option<u16>, helix: Option<u16>| LookSettings {
-            window_corner_radius: all,
-            helix_window_corner_radius: helix,
-            ..LookSettings::default()
-        };
         let mut shape = Shape::default();
-        let mut request = change(Some(20), None);
-        merge_window_corners(&mut shape, &mut request);
-        assert_eq!(
-            (
-                request.window_corner_radius,
-                request.helix_window_corner_radius,
-                shape.helix_windows
-            ),
-            (Some(20), Some(20), None)
+        merge_window_corners(
+            &mut shape,
+            &LookSettings {
+                window_corner_radius: Some(20),
+                ..LookSettings::default()
+            },
         );
-        let mut request = change(None, Some(2));
-        merge_window_corners(&mut shape, &mut request);
-        assert_eq!(
-            (
-                request.window_corner_radius,
-                request.helix_window_corner_radius,
-                shape.helix_windows
-            ),
-            (Some(20), Some(2), Some(2))
-        );
-        let mut request = change(Some(8), None);
-        merge_window_corners(&mut shape, &mut request);
-        assert_eq!(
-            (
-                request.window_corner_radius,
-                request.helix_window_corner_radius,
-                shape.windows
-            ),
-            (Some(8), Some(2), 8),
-            "their own choice stays"
-        );
+        assert_eq!(shape.windows, 20);
+        merge_window_corners(&mut shape, &LookSettings::default());
+        assert_eq!(shape.windows, 20, "a change to something else leaves it");
     }
 
     #[test]

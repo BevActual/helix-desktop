@@ -242,9 +242,6 @@ pub struct HelixLook {
     /// The corner radius of every window in logical pixels, 0 to 32 (0 is square).
     #[serde(default)]
     pub window_corner_radius: Option<u16>,
-    /// The corner radius of Helix applications' windows (`org.helix.*`) when it is not the same as every other window's, 0 to 32.
-    #[serde(default)]
-    pub helix_window_corner_radius: Option<u16>,
 }
 
 /// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.

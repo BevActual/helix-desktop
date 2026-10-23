@@ -13,8 +13,6 @@ pub const GLASS_DEFAULT: f64 = 0.6;
 pub struct Shape {
     /// Every window's corner radius in pixels.
     pub windows: u16,
-    /// The corner radius of Helix applications' windows when it differs from every other window's (`None`: the same).
-    pub helix_windows: Option<u16>,
     /// The top bar and its buttons.
     pub bar: f64,
     /// The dock, its icons and its menu.
@@ -33,7 +31,6 @@ impl Default for Shape {
     fn default() -> Self {
         Self {
             windows: WINDOW_DEFAULT,
-            helix_windows: None,
             bar: 1.0,
             dock: 1.0,
             panels: 1.0,
@@ -76,9 +73,6 @@ impl Shape {
         if let Some(n) = value.get("windows").and_then(Value::as_u64) {
             shape.windows = n.min(u64::from(WINDOW_MAX)) as u16;
         }
-        if let Some(n) = value.get("helix_windows").and_then(Value::as_u64) {
-            shape.helix_windows = Some(n.min(u64::from(WINDOW_MAX)) as u16);
-        }
         for (key, slot) in [
             ("bar", &mut shape.bar),
             ("dock", &mut shape.dock),
@@ -104,16 +98,10 @@ impl Shape {
         json!({
             "version": 2,
             "windows": self.windows,
-            "helix_windows": self.helix_windows,
             "bar": self.bar, "dock": self.dock, "panels": self.panels, "toasts": self.toasts, "apps": self.apps,
             "glass": self.glass,
         })
         .to_string()
-    }
-
-    /// The radius Helix applications' windows get.
-    pub fn helix_windows_effective(&self) -> u16 {
-        self.helix_windows.unwrap_or(self.windows)
     }
 
     /// The CSS custom properties a page of the shell or of an application is given: `name: value` pairs for the root element.
@@ -222,7 +210,6 @@ mod tests {
     fn each_thing_has_its_own_setting_and_it_round_trips() {
         let shape = Shape {
             windows: 4,
-            helix_windows: Some(18),
             bar: 0.0,
             dock: 1.5,
             panels: 0.5,
@@ -231,8 +218,6 @@ mod tests {
             glass: 0.2,
         };
         assert_eq!(Shape::parse(&shape.to_json()), shape);
-        assert_eq!(Shape::default().helix_windows_effective(), WINDOW_DEFAULT);
-        assert_eq!(shape.helix_windows_effective(), 18);
     }
 
     #[test]
@@ -240,18 +225,10 @@ mod tests {
         for text in ["", "{", "[]", r#"{"bar":"x"}"#, r#"{"windows":-3}"#] {
             assert_eq!(Shape::parse(text), Shape::default(), "{text}");
         }
-        let wild = Shape::parse(
-            r#"{"windows": 900, "bar": 9, "dock": -1, "glass": 5, "helix_windows": 99}"#,
-        );
+        let wild = Shape::parse(r#"{"windows": 900, "bar": 9, "dock": -1, "glass": 5}"#);
         assert_eq!(
-            (
-                wild.windows,
-                wild.bar,
-                wild.dock,
-                wild.glass,
-                wild.helix_windows
-            ),
-            (32, 2.0, 0.0, 1.0, Some(32))
+            (wild.windows, wild.bar, wild.dock, wild.glass),
+            (32, 2.0, 0.0, 1.0)
         );
     }
 

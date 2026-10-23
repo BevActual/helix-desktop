@@ -53,12 +53,13 @@ click_id set-look:glass-number; wtype "25"; wtype -k Return; sleep 1
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["glass"]==0.25 else 1)' "$SHAPE" && echo "ok: 25 is written as a quarter of the way to tinted" || fail "glass file: $(cat "$SHAPE" 2>&1)"
 echo "--- corners: each kind of thing has its own slider"
 SHAPE=$SCRATCH/config/helix/shape-settings.json
-for id in look:corner-windows look:corner-helix shape:bar shape:dock shape:panels shape:toasts shape:apps; do wait_id "set-$id-number" 20 && echo "ok: a slider for $id" || fail "no row $id"; done
-[ "$(field window_corner_radius)" = "0" ] && [ "$(field helix_window_corner_radius)" = "0" ] && echo "ok: windows start square, as this configuration says" || fail "start: $(ipc '"HelixLook"')"
-# (the window rows sit above the fold of this small window, so their logic is tested in look.rs; here the compositor takes both)
-r=$(ipc '{"HelixSetLook":{"window_corner_radius":20,"helix_window_corner_radius":2}}'); [ "$r" = '"Handled"' ] && [ "$(field window_corner_radius)" = "20" ] && [ "$(field helix_window_corner_radius)" = "2" ] && echo "ok: the compositor holds one radius for windows and one for Helix apps" || fail "compositor: $(ipc '"HelixLook"')"
+for id in look:corner-windows shape:bar shape:dock shape:panels shape:toasts shape:apps; do wait_id "set-$id-number" 20 && echo "ok: a slider for $id" || fail "no row $id"; done
+has_id set-look:corner-helix-number && fail "a separate Helix windows slider is still there" || echo "ok: one Windows slider covers every window, Helix apps included"
+[ "$(field window_corner_radius)" = "0" ] && echo "ok: windows start square, as this configuration says" || fail "start: $(ipc '"HelixLook"')"
+# (the Windows row sits above the fold of this small window, so its merge logic is tested in look.rs; here the compositor takes the value)
+r=$(ipc '{"HelixSetLook":{"window_corner_radius":20}}'); [ "$r" = '"Handled"' ] && [ "$(field window_corner_radius)" = "20" ] && echo "ok: the compositor holds one radius for every window" || fail "compositor: $(ipc '"HelixLook"')"
 ipc '{"HelixSetLook":{"window_corner_radius":8}}' >/dev/null; sleep 0.5
-[ "$(field window_corner_radius)" = "8" ] && [ "$(field helix_window_corner_radius)" = "2" ] && echo "ok: changing the windows leaves the Helix apps' radius alone" || fail "after windows: $(ipc '"HelixLook"')"
+[ "$(field window_corner_radius)" = "8" ] && echo "ok: and changes it" || fail "after windows: $(ipc '"HelixLook"')"
 click_id set-shape:bar-number; wtype "0"; wtype -k Return; sleep 1
 click_id set-shape:dock-number; wtype "150"; wtype -k Return; sleep 1
 click_id set-shape:panels-number; wtype "50"; wtype -k Return; sleep 1
@@ -68,15 +69,15 @@ python3 - "$SHAPE" <<'PY' && echo "ok: every part has its own number, and the gl
 import json, sys
 d = json.load(open(sys.argv[1]))
 assert (d["bar"], d["dock"], d["panels"], d["toasts"], d["apps"]) == (0.0, 1.5, 0.5, 2.0, 0.25), d
-assert d["glass"] == 0.25 and d["windows"] == 12 and d["helix_windows"] is None, d
+assert d["glass"] == 0.25 and d["windows"] == 12, d
 PY
-r=$(ipc '{"HelixSetLook":{"helix_window_corner_radius":99}}'); echo "$r" | grep -qi "0 to 32" && echo "ok: an impossible corner is refused" || fail "no refusal: $r"
+r=$(ipc '{"HelixSetLook":{"window_corner_radius":99}}'); echo "$r" | grep -qi "0 to 32" && echo "ok: an impossible corner is refused" || fail "no refusal: $r"
 python3 - <<'PY'
 import json, os, socket
 s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(b'{"Action":{"LoadConfigFile":{}}}\n'); s.settimeout(5); s.recv(4096)
 PY
 sleep 2
-[ "$(field window_corner_radius)" = "8" ] && [ "$(field helix_window_corner_radius)" = "2" ] && echo "ok: both corners survive a reload" || fail "lost on reload: $(ipc '"HelixLook"')"
+[ "$(field window_corner_radius)" = "8" ] && echo "ok: the windows' corners survive a reload" || fail "lost on reload: $(ipc '"HelixLook"')"
 # Inside Helix apps: with the apps' scale at 0 the page itself is drawn square (looked at in the picture).
 echo '{"version":2,"windows":8,"bar":1,"dock":1,"panels":1,"toasts":1,"apps":0,"glass":0.6}' > "$SHAPE"
 sleep 3; shot look-square
