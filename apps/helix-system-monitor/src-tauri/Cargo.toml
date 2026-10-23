@@ -11,6 +11,7 @@ tauri-build = { workspace = true }
 
 [dependencies]
 helix-monitor-model = { workspace = true }
+helix-config = { workspace = true }
 helix-desktop-api = { workspace = true }
 gtk = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

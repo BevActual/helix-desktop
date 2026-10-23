@@ -3246,6 +3246,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "gtk",
+ "helix-config",
  "helix-desktop-api",
  "helix-software-model",
  "serde",
@@ -3269,6 +3270,7 @@ name = "helix-system-monitor"
 version = "0.1.0"
 dependencies = [
  "gtk",
+ "helix-config",
  "helix-desktop-api",
  "helix-monitor-model",
  "serde",

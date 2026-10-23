@@ -4047,15 +4047,29 @@ fn theme_script() -> Option<String> {
         _ => return None,
     };
     let accent = APP_ACCENT.lock().map(|a| a.clone()).unwrap_or_default();
-    Some(helix_desktop_api::theme_script(&helix_desktop_api::Look {
-        dark,
-        accent,
-    }))
+    let look = helix_desktop_api::theme_script(&helix_desktop_api::Look { dark, accent });
+    // How round things are and how clear the glass is (Settings → Appearance): numbers from the file Settings writes.
+    Some(format!(
+        "{look}; {}",
+        helix_config::shape_prefs::read().script("app")
+    ))
 }
 
 /// Applies the person's interface scale and light or dark theme (Settings) to this application's windows now and whenever they change.
 /// A page that loads later gets the theme from `on_page_load`.
 fn follow_appearance(app: tauri::AppHandle) {
+    // The corners and the glass follow the person's choices as they change.
+    let shape_app = app.clone();
+    helix_config::shape_prefs::watch(move |_| {
+        if let Some(script) = theme_script() {
+            let target = shape_app.clone();
+            let _ = shape_app.run_on_main_thread(move || {
+                for window in target.webview_windows().values() {
+                    let _ = window.eval(&script);
+                }
+            });
+        }
+    });
     let scale_app = app.clone();
     tauri::async_runtime::spawn(async move {
         let Ok(desktop) = helix_desktop_api::Desktop::session().await else {

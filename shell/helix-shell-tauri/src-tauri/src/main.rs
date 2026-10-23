@@ -2111,7 +2111,7 @@ fn main() {
             dock::dock_prefs,
             clock::clock_format,
             bar_prefs::bar_prefs,
-            shape::shape_scale,
+            shape::shape_vars,
             ui_scale::ui_scale,
             privacy::privacy_view,
             agent_display::agent_display_status,

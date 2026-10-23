@@ -1489,18 +1489,17 @@ listen("clock-format", (event) => { clockFormat = event.payload; tickClock(); wi
 invoke("bar_prefs").then(applyBarPrefs, () => undefined);
 listen("bar-prefs", (event) => applyBarPrefs(event.payload));
 
-// How round the shell's own corners are (Settings → Appearance → Corner roundness): a scale the bar, dock, panels and toasts multiply their radii by.
-function applyShape(pair) {
-  const [scale, glass] = Array.isArray(pair) ? pair : [1, 0.6];
-  const value = Number.isFinite(scale) ? Math.min(2, Math.max(0, scale)) : 1;
-  const tint = Number.isFinite(glass) ? Math.min(1, Math.max(0, glass)) : 0.6;
-  document.documentElement.style.setProperty("--shape", String(value));
-  document.documentElement.style.setProperty("--glass-t", String(tint));
+// How round each part of the shell is and how clear its glass is (Settings → Appearance): Rust sends a script that sets a few numbers on the root element.
+function applyShape(vars) {
+  for (const [name, value] of Array.isArray(vars) ? vars : []) {
+    // Only the shell's own shape properties, and only numbers.
+    if (/^--(shape-[a-z]+|glass-t)$/.test(name) && /^[0-9]+(\.[0-9]+)?$/.test(value)) document.documentElement.style.setProperty(name, value);
+  }
   queueGlass();
   queueReport();
 }
-listen("shape-scale", (event) => applyShape(event.payload));
-invoke("shape_scale").then(applyShape, () => undefined);
+listen("shape-vars", (event) => applyShape(event.payload));
+invoke("shape_vars").then(applyShape, () => undefined);
 invoke("clock_format").then((format) => { clockFormat = format; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
 listen("dock-prefs", (event) => applyDockPrefs(event.payload));
 invoke("dock_prefs").then(applyDockPrefs);

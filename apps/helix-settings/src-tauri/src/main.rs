@@ -1608,8 +1608,10 @@ fn look_rows() -> Vec<RowView> {
     let mut rows = helix_compositor::compositor_ipc::look_settings()
         .map(|look| look::look_rows(&look))
         .unwrap_or_default();
-    // The glass is drawn by the shell, so its slider is there whatever the compositor is.
-    rows.insert(0, look::glass_row(read_shape().1));
+    // The shell's own corners and the glass are drawn by the shell, so their sliders are there whatever the compositor is.
+    let shape = helix_config::shape_prefs::read();
+    rows.extend(look::shape_rows(&shape));
+    rows.push(look::glass_row(shape.glass));
     rows
 }
 
@@ -1629,63 +1631,45 @@ fn multitask_change(id: String, change: serde_json::Value) -> Result<Vec<RowView
     Ok(multitask_rows())
 }
 
-fn shape_file() -> Option<std::path::PathBuf> {
-    dock_prefs_file().map(|p| p.with_file_name("shape-settings.json"))
-}
-
-/// The corner step and glass level the person chose (the defaults when there is no file).
-fn read_shape() -> (&'static helix_config::shape_prefs::Step, f64) {
-    let text = shape_file()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .unwrap_or_default();
-    (
-        helix_config::shape_prefs::parse_step(&text),
-        helix_config::shape_prefs::parse_glass(&text),
-    )
-}
-
-/// Writes the corner step and glass level where the shell reads them (`~/.config/helix/shape-settings.json`, private to the person).
-fn write_shape(step: &helix_config::shape_prefs::Step, glass: f64) -> Result<(), String> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let path = dock_prefs_file()
-        .ok_or("no folder for the settings")?
-        .with_file_name("shape-settings.json");
-    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
-    let temporary = path.with_extension("tmp");
-    {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&temporary)
-            .map_err(|e| e.to_string())?;
-        file.write_all(helix_config::shape_prefs::to_json_with(step, glass).as_bytes())
-            .map_err(|e| e.to_string())?;
+/// A change to the shape file (`~/.config/helix/shape-settings.json`): a corner or the glass. Returns whether `id` was one of those.
+fn shape_change(id: &str, change: &serde_json::Value) -> Result<bool, String> {
+    let mut shape = helix_config::shape_prefs::read();
+    let number = || {
+        change
+            .get("value")
+            .and_then(serde_json::Value::as_f64)
+            .filter(|v| v.is_finite())
+            .ok_or("not a number".to_string())
+    };
+    let scale = || number().map(|p| (p / 100.0).clamp(0.0, helix_config::shape_prefs::SCALE_MAX));
+    match id {
+        "shape:bar" => shape.bar = scale()?,
+        "shape:dock" => shape.dock = scale()?,
+        "shape:panels" => shape.panels = scale()?,
+        "shape:toasts" => shape.toasts = scale()?,
+        "shape:apps" => shape.apps = scale()?,
+        "look:glass" => shape.glass = (number()? / 100.0).clamp(0.0, 1.0),
+        _ => return Ok(false),
     }
-    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())
+    helix_config::shape_prefs::write(&shape)?;
+    Ok(true)
 }
 
 #[tauri::command]
 fn look_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
-    // The glass slider is the shell's own, not the compositor's.
-    if id == "look:glass" {
-        let percent = change
-            .get("value")
-            .and_then(serde_json::Value::as_f64)
-            .filter(|v| v.is_finite())
-            .ok_or("not a number")?;
-        write_shape(read_shape().0, (percent / 100.0).clamp(0.0, 1.0))?;
+    // The shell's own corners and the glass are the shell's, not the compositor's.
+    if shape_change(&id, &change)? {
         eprintln!("SETTINGS look {id}");
         return Ok(look_rows());
     }
-    let request = look::parse_change(&id, &change)?;
-    helix_compositor::compositor_ipc::set_look_settings(&request)?;
-    // The shell's own corners follow the same step (a file it watches).
-    if let Some(radius) = request.window_corner_radius {
-        write_shape(helix_config::shape_prefs::nearest(radius), read_shape().1)?;
+    let mut request = look::parse_change(&id, &change)?;
+    // The windows' corners are the compositor's; they are also written down with the rest so everything agrees (and Helix applications can follow).
+    if request.window_corner_radius.is_some() || request.helix_window_corner_radius.is_some() {
+        let mut shape = helix_config::shape_prefs::read();
+        look::merge_window_corners(&mut shape, &mut request);
+        helix_config::shape_prefs::write(&shape)?;
     }
+    helix_compositor::compositor_ipc::set_look_settings(&request)?;
     eprintln!("SETTINGS look {id}");
     Ok(look_rows())
 }
@@ -2802,15 +2786,29 @@ fn theme_script() -> Option<String> {
         _ => return None,
     };
     let accent = APP_ACCENT.lock().map(|a| a.clone()).unwrap_or_default();
-    Some(helix_desktop_api::theme_script(&helix_desktop_api::Look {
-        dark,
-        accent,
-    }))
+    let look = helix_desktop_api::theme_script(&helix_desktop_api::Look { dark, accent });
+    // How round things are and how clear the glass is (Settings → Appearance): numbers from the file Settings writes.
+    Some(format!(
+        "{look}; {}",
+        helix_config::shape_prefs::read().script("app")
+    ))
 }
 
 /// Applies the person's interface scale and light or dark theme (Settings) to this application's windows now and whenever they change.
 /// A page that loads later gets the theme from `on_page_load`.
 fn follow_appearance(app: tauri::AppHandle) {
+    // The corners and the glass follow the person's choices as they change.
+    let shape_app = app.clone();
+    helix_config::shape_prefs::watch(move |_| {
+        if let Some(script) = theme_script() {
+            let target = shape_app.clone();
+            let _ = shape_app.run_on_main_thread(move || {
+                for window in target.webview_windows().values() {
+                    let _ = window.eval(&script);
+                }
+            });
+        }
+    });
     let scale_app = app.clone();
     tauri::async_runtime::spawn(async move {
         let Ok(desktop) = helix_desktop_api::Desktop::session().await else {

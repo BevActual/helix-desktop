@@ -70,7 +70,9 @@ pub fn validate(look: &HelixLook) -> Result<(), String> {
             return Err("centring is never, always or on-overflow".into());
         }
     }
-    if look.window_corner_radius.is_some_and(|r| r > 32) {
+    if look.window_corner_radius.is_some_and(|r| r > 32)
+        || look.helix_window_corner_radius.is_some_and(|r| r > 32)
+    {
         return Err("window corners are 0 to 32 pixels".into());
     }
     Ok(())
@@ -121,12 +123,26 @@ fn merge(base: &mut HelixLook, change: &HelixLook) {
     if change.window_corner_radius.is_some() {
         base.window_corner_radius = change.window_corner_radius;
     }
+    if change.helix_window_corner_radius.is_some() {
+        base.helix_window_corner_radius = change.helix_window_corner_radius;
+    }
 }
 
 /// A rule for every window that sets only the corner radius (and clips the window to it), which is what the override is. Later rules win, so it is
 /// put last; the one from an earlier overlay is taken out first so rules do not pile up.
-fn corner_rule(radius: u16) -> WindowRule {
+/// The windows of Helix applications (Settings, Mobius, Software, System Monitor, ...).
+const HELIX_APPS: &str = r"^org\.helix\.";
+
+fn corner_rule(radius: u16, helix_only: bool) -> WindowRule {
     WindowRule {
+        matches: if helix_only {
+            vec![niri_config::window_rule::Match {
+                app_id: HELIX_APPS.parse::<RegexEq>().ok(),
+                ..niri_config::window_rule::Match::default()
+            }]
+        } else {
+            Vec::new()
+        },
         geometry_corner_radius: Some(CornerRadius {
             top_left: f32::from(radius),
             top_right: f32::from(radius),
@@ -138,13 +154,38 @@ fn corner_rule(radius: u16) -> WindowRule {
     }
 }
 
-fn is_corner_rule(rule: &WindowRule) -> bool {
+/// A corner rule of ours: only the corner radius and the clip are set, and it matches every window (`helix_only` false) or only Helix applications' (true).
+fn is_corner_rule(rule: &WindowRule, helix_only: bool) -> bool {
     let mut bare = rule.clone();
     bare.geometry_corner_radius = None;
     bare.clip_to_geometry = None;
-    bare == WindowRule::default()
+    let matches_ok = if helix_only {
+        bare.matches.len() == 1
+            && bare.matches[0]
+                .app_id
+                .as_ref()
+                .is_some_and(|re| re.0.as_str() == HELIX_APPS)
+            && bare.matches[0].title.is_none()
+            && bare.matches[0].is_active.is_none()
+            && bare.matches[0].is_focused.is_none()
+    } else {
+        bare.matches.is_empty()
+    };
+    bare.matches.clear();
+    matches_ok
+        && bare == WindowRule::default()
         && rule.geometry_corner_radius.is_some()
         && rule.clip_to_geometry == Some(true)
+}
+
+fn radius_of(config: &Config, helix_only: bool) -> Option<u16> {
+    config
+        .window_rules
+        .iter()
+        .rev()
+        .find(|rule| is_corner_rule(rule, helix_only))
+        .and_then(|rule| rule.geometry_corner_radius)
+        .map(|r| r.top_left.round().clamp(0.0, 32.0) as u16)
 }
 
 /// Puts the overrides over a configuration.
@@ -173,8 +214,17 @@ pub fn overlay(config: &mut Config, look: &HelixLook) {
         config.input.workspace_auto_back_and_forth = on;
     }
     if let Some(radius) = look.window_corner_radius {
-        config.window_rules.retain(|rule| !is_corner_rule(rule));
-        config.window_rules.push(corner_rule(radius));
+        config
+            .window_rules
+            .retain(|rule| !is_corner_rule(rule, false));
+        config.window_rules.push(corner_rule(radius, false));
+    }
+    // After the rule for every window, so it wins for Helix applications.
+    if let Some(radius) = look.helix_window_corner_radius {
+        config
+            .window_rules
+            .retain(|rule| !is_corner_rule(rule, true));
+        config.window_rules.push(corner_rule(radius, true));
     }
     if let Some([r, g, b]) = look.focus_color.as_deref().and_then(parse_hex) {
         let color = Color::from_rgba8_unpremul(r, g, b, 255);
@@ -203,14 +253,9 @@ pub fn effective(config: &Config) -> HelixLook {
         hot_corner: Some(!config.gestures.hot_corners.off),
         center_focused: Some(center_name(config.layout.center_focused_column).to_string()),
         workspace_back_and_forth: Some(config.input.workspace_auto_back_and_forth),
-        window_corner_radius: Some(
-            config
-                .window_rules
-                .iter()
-                .rev()
-                .find(|rule| is_corner_rule(rule))
-                .and_then(|rule| rule.geometry_corner_radius)
-                .map_or(0, |r| r.top_left.round().clamp(0.0, 32.0) as u16),
+        window_corner_radius: Some(radius_of(config, false).unwrap_or(0)),
+        helix_window_corner_radius: Some(
+            radius_of(config, true).unwrap_or_else(|| radius_of(config, false).unwrap_or(0)),
         ),
     }
 }
@@ -348,6 +393,61 @@ mod tests {
         let count = own.layer_rules.len();
         ensure_glass_rule(&mut own);
         assert_eq!(own.layer_rules.len(), count);
+    }
+
+    #[test]
+    fn helix_application_windows_can_have_their_own_corners() {
+        let mut config = Config::default();
+        let before = config.window_rules.len();
+        let set = |config: &mut Config, all: Option<u16>, helix: Option<u16>| {
+            overlay(
+                config,
+                &HelixLook {
+                    window_corner_radius: all,
+                    helix_window_corner_radius: helix,
+                    ..HelixLook::default()
+                },
+            )
+        };
+        set(&mut config, Some(6), None);
+        let seen = effective(&config);
+        assert_eq!(
+            (seen.window_corner_radius, seen.helix_window_corner_radius),
+            (Some(6), Some(6)),
+            "they follow the windows until told otherwise"
+        );
+        set(&mut config, None, Some(20));
+        set(&mut config, None, Some(2));
+        assert_eq!(
+            config.window_rules.len(),
+            before + 2,
+            "one rule for every window, one for Helix applications"
+        );
+        let seen = effective(&config);
+        assert_eq!(
+            (seen.window_corner_radius, seen.helix_window_corner_radius),
+            (Some(6), Some(2))
+        );
+        let rule = config.window_rules.last().unwrap();
+        let app = rule.matches[0].app_id.as_ref().unwrap();
+        assert!(
+            app.0.is_match("org.helix.Settings")
+                && app.0.is_match("org.helix.Mobius")
+                && !app.0.is_match("firefox")
+                && !app.0.is_match("org.gnome.Helix")
+        );
+        // Changing the windows later leaves the Helix applications' own choice alone.
+        set(&mut config, Some(14), None);
+        let seen = effective(&config);
+        assert_eq!(
+            (seen.window_corner_radius, seen.helix_window_corner_radius),
+            (Some(14), Some(2))
+        );
+        assert!(validate(&HelixLook {
+            helix_window_corner_radius: Some(33),
+            ..HelixLook::default()
+        })
+        .is_err());
     }
 
     #[test]

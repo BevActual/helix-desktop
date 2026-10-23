@@ -51,21 +51,36 @@ SHAPE=$SCRATCH/config/helix/shape-settings.json
 wait_id set-look:glass-number 20 && echo "ok: the Glass slider is on Appearance" || fail "no glass row"
 click_id set-look:glass-number; wtype "25"; wtype -k Return; sleep 1
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["glass"]==0.25 else 1)' "$SHAPE" && echo "ok: 25 is written as a quarter of the way to tinted" || fail "glass file: $(cat "$SHAPE" 2>&1)"
-echo "--- corner roundness: windows and the shell's own corners follow one choice"
+echo "--- corners: each kind of thing has its own slider"
 SHAPE=$SCRATCH/config/helix/shape-settings.json
-wait_id set-look:corners-round 20 && echo "ok: the Corner roundness row is on Appearance" || fail "no corners row"
-[ "$(field window_corner_radius)" = "0" ] && echo "ok: windows start square, as this configuration says" || fail "start radius: $(field window_corner_radius)"
-click_id set-look:corners-round; sleep 1.2
-[ "$(field window_corner_radius)" = "20" ] && echo "ok: Round gave windows a 20 px corner at once" || fail "round: $(ipc '"HelixLook"')"
-python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["scale"]==1.6 and d["step"]=="round" and d["glass"]==0.25 else 1)' "$SHAPE" && echo "ok: and the shell's scale was written beside it, keeping the glass" || fail "shape file: $(cat "$SHAPE" 2>&1)"
-click_id set-look:corners-soft; sleep 1.2
-[ "$(field window_corner_radius)" = "6" ] && echo "ok: Soft is 6 px" || fail "soft: $(field window_corner_radius)"
-r=$(ipc '{"HelixSetLook":{"window_corner_radius":99}}'); echo "$r" | grep -qi "0 to 32" && echo "ok: an impossible corner is refused" || fail "no refusal: $r"
+for id in look:corner-windows look:corner-helix shape:bar shape:dock shape:panels shape:toasts shape:apps; do wait_id "set-$id-number" 20 && echo "ok: a slider for $id" || fail "no row $id"; done
+[ "$(field window_corner_radius)" = "0" ] && [ "$(field helix_window_corner_radius)" = "0" ] && echo "ok: windows start square, as this configuration says" || fail "start: $(ipc '"HelixLook"')"
+# (the window rows sit above the fold of this small window, so their logic is tested in look.rs; here the compositor takes both)
+r=$(ipc '{"HelixSetLook":{"window_corner_radius":20,"helix_window_corner_radius":2}}'); [ "$r" = '"Handled"' ] && [ "$(field window_corner_radius)" = "20" ] && [ "$(field helix_window_corner_radius)" = "2" ] && echo "ok: the compositor holds one radius for windows and one for Helix apps" || fail "compositor: $(ipc '"HelixLook"')"
+ipc '{"HelixSetLook":{"window_corner_radius":8}}' >/dev/null; sleep 0.5
+[ "$(field window_corner_radius)" = "8" ] && [ "$(field helix_window_corner_radius)" = "2" ] && echo "ok: changing the windows leaves the Helix apps' radius alone" || fail "after windows: $(ipc '"HelixLook"')"
+click_id set-shape:bar-number; wtype "0"; wtype -k Return; sleep 1
+click_id set-shape:dock-number; wtype "150"; wtype -k Return; sleep 1
+click_id set-shape:panels-number; wtype "50"; wtype -k Return; sleep 1
+click_id set-shape:toasts-number; wtype "200"; wtype -k Return; sleep 1
+click_id set-shape:apps-number; wtype "25"; wtype -k Return; sleep 1
+python3 - "$SHAPE" <<'PY' && echo "ok: every part has its own number, and the glass is kept" || fail "shape file: $(cat "$SHAPE")"
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert (d["bar"], d["dock"], d["panels"], d["toasts"], d["apps"]) == (0.0, 1.5, 0.5, 2.0, 0.25), d
+assert d["glass"] == 0.25 and d["windows"] == 12 and d["helix_windows"] is None, d
+PY
+r=$(ipc '{"HelixSetLook":{"helix_window_corner_radius":99}}'); echo "$r" | grep -qi "0 to 32" && echo "ok: an impossible corner is refused" || fail "no refusal: $r"
 python3 - <<'PY'
 import json, os, socket
 s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(b'{"Action":{"LoadConfigFile":{}}}\n'); s.settimeout(5); s.recv(4096)
 PY
 sleep 2
-[ "$(field window_corner_radius)" = "6" ] && echo "ok: the corners survive a reload" || fail "lost on reload: $(field window_corner_radius)"
+[ "$(field window_corner_radius)" = "8" ] && [ "$(field helix_window_corner_radius)" = "2" ] && echo "ok: both corners survive a reload" || fail "lost on reload: $(ipc '"HelixLook"')"
+# Inside Helix apps: with the apps' scale at 0 the page itself is drawn square (looked at in the picture).
+echo '{"version":2,"windows":8,"bar":1,"dock":1,"panels":1,"toasts":1,"apps":0,"glass":0.6}' > "$SHAPE"
+sleep 3; shot look-square
+echo '{"version":2,"windows":8,"bar":1,"dock":1,"panels":1,"toasts":1,"apps":2,"glass":0.6}' > "$SHAPE"
+sleep 3; shot look-round
 shot look-after
 [ "$FAILED" = 0 ] && echo "PASS: settings look" || exit 1
