@@ -1626,10 +1626,37 @@ fn multitask_change(id: String, change: serde_json::Value) -> Result<Vec<RowView
     Ok(multitask_rows())
 }
 
+/// Writes the corner step where the shell reads it (`~/.config/helix/shape-settings.json`, private to the person).
+fn write_shape(step: &helix_config::shape_prefs::Step) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let path = dock_prefs_file()
+        .ok_or("no folder for the settings")?
+        .with_file_name("shape-settings.json");
+    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("tmp");
+    {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        file.write_all(helix_config::shape_prefs::to_json(step).as_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn look_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
     let request = look::parse_change(&id, &change)?;
     helix_compositor::compositor_ipc::set_look_settings(&request)?;
+    // The shell's own corners follow the same step (a file it watches).
+    if let Some(radius) = request.window_corner_radius {
+        write_shape(helix_config::shape_prefs::nearest(radius))?;
+    }
     eprintln!("SETTINGS look {id}");
     Ok(look_rows())
 }

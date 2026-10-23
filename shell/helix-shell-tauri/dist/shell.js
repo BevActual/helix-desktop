@@ -1488,6 +1488,16 @@ function applyDockPrefs(prefs) {
 listen("clock-format", (event) => { clockFormat = event.payload; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
 invoke("bar_prefs").then(applyBarPrefs, () => undefined);
 listen("bar-prefs", (event) => applyBarPrefs(event.payload));
+
+// How round the shell's own corners are (Settings → Appearance → Corner roundness): a scale the bar, dock, panels and toasts multiply their radii by.
+function applyShape(scale) {
+  const value = Number.isFinite(scale) ? Math.min(2, Math.max(0, scale)) : 1;
+  document.documentElement.style.setProperty("--shape", String(value));
+  queueGlass();
+  queueReport();
+}
+listen("shape-scale", (event) => applyShape(event.payload));
+invoke("shape_scale").then(applyShape, () => undefined);
 invoke("clock_format").then((format) => { clockFormat = format; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
 listen("dock-prefs", (event) => applyDockPrefs(event.payload));
 invoke("dock_prefs").then(applyDockPrefs);

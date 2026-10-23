@@ -5,8 +5,10 @@
 use std::path::PathBuf;
 
 use niri_config::appearance::Color;
+use niri_config::appearance::CornerRadius;
 use niri_config::input::FocusFollowsMouse;
 use niri_config::layout::CenterFocusedColumn;
+use niri_config::window_rule::WindowRule;
 use niri_config::Config;
 use niri_ipc::HelixLook;
 
@@ -65,6 +67,9 @@ pub fn validate(look: &HelixLook) -> Result<(), String> {
             return Err("centring is never, always or on-overflow".into());
         }
     }
+    if look.window_corner_radius.is_some_and(|r| r > 32) {
+        return Err("window corners are 0 to 32 pixels".into());
+    }
     Ok(())
 }
 
@@ -110,6 +115,33 @@ fn merge(base: &mut HelixLook, change: &HelixLook) {
     if change.workspace_back_and_forth.is_some() {
         base.workspace_back_and_forth = change.workspace_back_and_forth;
     }
+    if change.window_corner_radius.is_some() {
+        base.window_corner_radius = change.window_corner_radius;
+    }
+}
+
+/// A rule for every window that sets only the corner radius (and clips the window to it), which is what the override is. Later rules win, so it is
+/// put last; the one from an earlier overlay is taken out first so rules do not pile up.
+fn corner_rule(radius: u16) -> WindowRule {
+    WindowRule {
+        geometry_corner_radius: Some(CornerRadius {
+            top_left: f32::from(radius),
+            top_right: f32::from(radius),
+            bottom_right: f32::from(radius),
+            bottom_left: f32::from(radius),
+        }),
+        clip_to_geometry: Some(true),
+        ..WindowRule::default()
+    }
+}
+
+fn is_corner_rule(rule: &WindowRule) -> bool {
+    let mut bare = rule.clone();
+    bare.geometry_corner_radius = None;
+    bare.clip_to_geometry = None;
+    bare == WindowRule::default()
+        && rule.geometry_corner_radius.is_some()
+        && rule.clip_to_geometry == Some(true)
 }
 
 /// Puts the overrides over a configuration.
@@ -136,6 +168,10 @@ pub fn overlay(config: &mut Config, look: &HelixLook) {
     }
     if let Some(on) = look.workspace_back_and_forth {
         config.input.workspace_auto_back_and_forth = on;
+    }
+    if let Some(radius) = look.window_corner_radius {
+        config.window_rules.retain(|rule| !is_corner_rule(rule));
+        config.window_rules.push(corner_rule(radius));
     }
     if let Some([r, g, b]) = look.focus_color.as_deref().and_then(parse_hex) {
         let color = Color::from_rgba8_unpremul(r, g, b, 255);
@@ -164,6 +200,15 @@ pub fn effective(config: &Config) -> HelixLook {
         hot_corner: Some(!config.gestures.hot_corners.off),
         center_focused: Some(center_name(config.layout.center_focused_column).to_string()),
         workspace_back_and_forth: Some(config.input.workspace_auto_back_and_forth),
+        window_corner_radius: Some(
+            config
+                .window_rules
+                .iter()
+                .rev()
+                .find(|rule| is_corner_rule(rule))
+                .and_then(|rule| rule.geometry_corner_radius)
+                .map_or(0, |r| r.top_left.round().clamp(0.0, 32.0) as u16),
+        ),
     }
 }
 
@@ -201,6 +246,10 @@ impl State {
             self.niri.cursor_manager.reload(&theme, size);
             self.niri.cursor_texture_cache.clear();
         }
+        if change.window_corner_radius.is_some() {
+            // Windows that are already open take the new corners now.
+            self.niri.recompute_window_rules();
+        }
         self.niri.queue_redraw_all();
         Ok(())
     }
@@ -209,6 +258,51 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_window_corner_override_is_one_rule_that_is_replaced_not_added() {
+        let mut config = Config::default();
+        let before = config.window_rules.len();
+        assert_eq!(effective(&config).window_corner_radius, Some(0));
+        let set = |config: &mut Config, r: u16| {
+            overlay(
+                config,
+                &HelixLook {
+                    window_corner_radius: Some(r),
+                    ..HelixLook::default()
+                },
+            )
+        };
+        set(&mut config, 18);
+        set(&mut config, 6);
+        assert_eq!(
+            config.window_rules.len(),
+            before + 1,
+            "one rule, not one per change"
+        );
+        assert_eq!(effective(&config).window_corner_radius, Some(6));
+        let rule = config.window_rules.last().unwrap();
+        assert_eq!(rule.clip_to_geometry, Some(true));
+        assert!(rule.matches.is_empty(), "it is for every window");
+        assert!(validate(&HelixLook {
+            window_corner_radius: Some(33),
+            ..HelixLook::default()
+        })
+        .is_err());
+        assert!(validate(&HelixLook {
+            window_corner_radius: Some(32),
+            ..HelixLook::default()
+        })
+        .is_ok());
+        // A person's own rule is left alone.
+        let mut own = Config::default();
+        own.window_rules.push(WindowRule {
+            open_focused: Some(true),
+            ..WindowRule::default()
+        });
+        set(&mut own, 12);
+        assert_eq!(own.window_rules.len(), 2);
+    }
 
     #[test]
     fn overrides_replace_only_what_they_name() {

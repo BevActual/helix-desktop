@@ -49,6 +49,8 @@ pub struct LookSettings {
     /// `never`, `always` or `on-overflow`.
     pub center_focused: Option<String>,
     pub workspace_back_and_forth: Option<bool>,
+    /// Every window's corner radius in pixels, 0 to 32.
+    pub window_corner_radius: Option<u16>,
 }
 
 /// What had the keyboard when Mobius was summoned (`helix-summon`): only what the compositor lists about every window.

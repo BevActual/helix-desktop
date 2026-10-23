@@ -36,6 +36,7 @@ mod polkit_agent;
 mod polkit_helper;
 mod privacy;
 mod role;
+mod shape;
 mod strut;
 mod tray;
 mod ui_scale;
@@ -2110,6 +2111,7 @@ fn main() {
             dock::dock_prefs,
             clock::clock_format,
             bar_prefs::bar_prefs,
+            shape::shape_scale,
             ui_scale::ui_scale,
             privacy::privacy_view,
             agent_display::agent_display_status,
@@ -2284,6 +2286,7 @@ fn main() {
             // Every surface that draws a time (the bar, the control center) hears about the clock choice.
             clock::start(handle.clone());
             bar_prefs::start(handle.clone());
+            shape::start(handle.clone());
             ui_scale::start(handle.clone());
             privacy::start(handle.clone());
             if role.is_bar_side() {

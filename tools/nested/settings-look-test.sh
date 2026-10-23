@@ -46,5 +46,21 @@ s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(
 PY
 sleep 2
 [ "$(field animations)" = "False" ] && [ "$(field window_gaps)" = "12" ] && [ "$(field focus_color)" = "#bf5af2" ] && echo "ok: after a reload the look is still in effect" || fail "lost on reload: $(ipc '"HelixLook"')"
+echo "--- corner roundness: windows and the shell's own corners follow one choice"
+SHAPE=$SCRATCH/config/helix/shape-settings.json
+wait_id set-look:corners-round 20 && echo "ok: the Corner roundness row is on Appearance" || fail "no corners row"
+[ "$(field window_corner_radius)" = "0" ] && echo "ok: windows start square, as this configuration says" || fail "start radius: $(field window_corner_radius)"
+click_id set-look:corners-round; sleep 1.2
+[ "$(field window_corner_radius)" = "20" ] && echo "ok: Round gave windows a 20 px corner at once" || fail "round: $(ipc '"HelixLook"')"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["scale"]==1.6 and d["step"]=="round" else 1)' "$SHAPE" && echo "ok: and the shell's scale was written beside it" || fail "shape file: $(cat "$SHAPE" 2>&1)"
+click_id set-look:corners-soft; sleep 1.2
+[ "$(field window_corner_radius)" = "6" ] && echo "ok: Soft is 6 px" || fail "soft: $(field window_corner_radius)"
+r=$(ipc '{"HelixSetLook":{"window_corner_radius":99}}'); echo "$r" | grep -qi "0 to 32" && echo "ok: an impossible corner is refused" || fail "no refusal: $r"
+python3 - <<'PY'
+import json, os, socket
+s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(b'{"Action":{"LoadConfigFile":{}}}\n'); s.settimeout(5); s.recv(4096)
+PY
+sleep 2
+[ "$(field window_corner_radius)" = "6" ] && echo "ok: the corners survive a reload" || fail "lost on reload: $(field window_corner_radius)"
 shot look-after
 [ "$FAILED" = 0 ] && echo "PASS: settings look" || exit 1

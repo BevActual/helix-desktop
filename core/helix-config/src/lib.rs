@@ -19,6 +19,7 @@ pub mod ordered_lists;
 pub mod palette_names;
 pub mod settings;
 mod settings_defaults_generated;
+pub mod shape_prefs;
 
 // Modules that live in other crates but are named `crate::<module>` throughout this crate.
 pub use helix_base::display;

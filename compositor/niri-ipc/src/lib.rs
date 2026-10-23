@@ -239,6 +239,9 @@ pub struct HelixLook {
     /// Whether switching to the workspace you are on goes back to the one before.
     #[serde(default)]
     pub workspace_back_and_forth: Option<bool>,
+    /// The corner radius of every window in logical pixels, 0 to 32 (0 is square).
+    #[serde(default)]
+    pub window_corner_radius: Option<u16>,
 }
 
 /// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.

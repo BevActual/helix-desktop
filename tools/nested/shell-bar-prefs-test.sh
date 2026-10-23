@@ -46,4 +46,15 @@ sleep 2; shot bar-window
 kill $PROBE 2>/dev/null
 for _ in $(seq 1 20); do grep ACTIVE-WINDOW "$LOG" | tail -1 | grep -q 'title=""' && break; sleep 0.25; done
 grep ACTIVE-WINDOW "$LOG" | tail -1 | grep -q 'title=""' && echo "ok: nothing focused, nothing named" || fail "stale name: $(grep ACTIVE-WINDOW "$LOG" | tail -1)"
+# Corner roundness: the scale in shape-settings.json reaches the page; the bar's corners follow it (the glass the compositor blurs uses the same radius).
+SHAPE=$SCRATCH/config/helix/shape-settings.json
+echo '{"version":1,"step":"square","scale":0}' > "$SHAPE"
+for _ in $(seq 1 20); do grep -q 'SHAPE scale=0' "$LOG" && break; sleep 0.25; done
+grep -q 'SHAPE scale=0' "$LOG" && echo "ok: the shell took the corner scale" || fail "no shape log: $(grep SHAPE "$LOG" | tail -2)"
+echo '{"version":1,"step":"round","scale":1.6}' > "$SHAPE"
+for _ in $(seq 1 20); do grep -q 'SHAPE scale=1.6' "$LOG" && break; sleep 0.25; done
+grep -q 'SHAPE scale=1.6' "$LOG" && echo "ok: and a rounder one" || fail "no second shape log"
+echo 'nonsense' > "$SHAPE"
+for _ in $(seq 1 20); do grep -q 'SHAPE scale=1$' "$LOG" && break; sleep 0.25; done
+grep -q 'SHAPE scale=1$' "$LOG" && echo "ok: a damaged file means the default look" || fail "damaged shape file: $(grep SHAPE "$LOG" | tail -1)"
 [ "$FAILED" = 0 ] && echo "PASS: bar prefs" || exit 1

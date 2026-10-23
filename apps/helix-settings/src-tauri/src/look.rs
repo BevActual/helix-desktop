@@ -62,6 +62,25 @@ pub fn look_rows(look: &LookSettings) -> Vec<RowView> {
             slider(0.0, 64.0, f64::from(look.window_gaps.unwrap_or(16))),
         ),
         row(
+            "look:corners",
+            "Corner roundness",
+            "How round the corners of windows, the bar and the dock are.",
+            Control::Choice {
+                options: helix_config::shape_prefs::STEPS
+                    .iter()
+                    .map(|s| Choice {
+                        value: s.value.into(),
+                        label: s.label.into(),
+                    })
+                    .collect(),
+                current: helix_config::shape_prefs::nearest(
+                    look.window_corner_radius.unwrap_or(12),
+                )
+                .value
+                .into(),
+            },
+        ),
+        row(
             "look:cursor",
             "Cursor size",
             "In pixels. Applies as soon as you let go.",
@@ -166,6 +185,13 @@ pub fn parse_change(id: &str, change: &Value) -> Result<LookSettings, String> {
         ("look:cursor", Some("number")) => {
             out.cursor_size = Some(number()?.round().clamp(16.0, 64.0) as u8)
         }
+        ("look:corners", Some("choice")) => {
+            let step = value
+                .and_then(Value::as_str)
+                .and_then(helix_config::shape_prefs::step)
+                .ok_or("pick a step")?;
+            out.window_corner_radius = Some(step.window_radius);
+        }
         _ => return Err("unknown change".into()),
     }
     Ok(out)
@@ -182,12 +208,14 @@ mod tests {
             animations: Some(false),
             window_gaps: Some(4),
             cursor_size: Some(40),
+            window_corner_radius: Some(18),
             focus_color: None,
             ..LookSettings::default()
         });
         assert!(matches!(rows[0].control, Control::Switch { on: false }));
         assert!(matches!(rows[1].control, Control::Slider { value, .. } if value == 4.0));
-        assert!(matches!(rows[2].control, Control::Slider { value, .. } if value == 40.0));
+        assert!(matches!(&rows[2].control, Control::Choice { current, .. } if current == "round"));
+        assert!(matches!(rows[3].control, Control::Slider { value, .. } if value == 40.0));
     }
 
     #[test]
@@ -208,6 +236,13 @@ mod tests {
                 .animations,
             Some(false)
         );
+        assert_eq!(
+            set("look:corners", "choice", json!("soft"))
+                .unwrap()
+                .window_corner_radius,
+            Some(6)
+        );
+        assert!(set("look:corners", "choice", json!("pointy")).is_err());
         assert!(set("look:gaps", "number", json!("x")).is_err());
         assert!(set("look:nope", "switch", json!(true)).is_err());
     }
