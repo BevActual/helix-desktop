@@ -552,7 +552,8 @@ async fn local_call(
         .receive_signal("Completed")
         .await
         .map_err(|e| e.to_string())?;
-    let mut args = crate::chat_args(messages, pictures, task, model).map_err(|e| e.to_string())?;
+    let mut args =
+        crate::chat_args(messages, pictures, task, model, None).map_err(|e| e.to_string())?;
     args.insert("temperature", zbus::zvariant::Value::F64(0.0));
     args.insert("max_tokens", zbus::zvariant::Value::U32(max_tokens));
     let operation: u64 = proxy

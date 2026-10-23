@@ -80,7 +80,8 @@ async fn ask_model(
     if !is_local {
         return Err("Editing a selection uses the model on this computer. Set the chat route to a local model.".into());
     }
-    let mut args = crate::chat_args(&messages, &[], &task, &model).map_err(|e| e.to_string())?;
+    let mut args =
+        crate::chat_args(&messages, &[], &task, &model, None).map_err(|e| e.to_string())?;
     args.insert("max_tokens", Value::U32(max_tokens));
     args.insert("temperature", Value::F64(0.3));
     let connection = crate::connection().await.map_err(|e| e.to_string())?;

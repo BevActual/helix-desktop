@@ -93,6 +93,15 @@ PATH=$HOME/.local/cuda/bin:$PATH cmake -S third_party/llama.cpp-0.6.0 -B build \
 
 ## Status
 
+* 2026-10-23 (Mobius through the gateway): Mobius's talk turns to any OpenAI-compatible backend (OpenRouter, a LAN machine, a persona's own backend) now
+  go through `org.helix.Inference1.Action("chat", {backend, model, route, remote_timeout, ...})` and stream, instead of Mobius's own non-streaming HTTP
+  call. The gateway takes `backend` (a configured OpenAI-compatible one, never for Act), `route` (OpenRouter's fallbacks / price or speed /
+  private-only, checked and only sent to OpenRouter), `remote_timeout`, enforces the battery-saver rule, and returns the model that answered and
+  the cost (`model`, `cost_micro`) in the result, which Mobius shows. A server that ignores `stream: true` and answers with one JSON body is still
+  understood. Pictures are still not sent to hosted models (unchanged). Kept in Mobius for now: the ChatGPT-plan sign-in flow (`chatgpt.rs`), the
+  agent task loop's own calls (`lan.rs` with native tool calling), and model-list fetching. Nested `mobius-routing`, `mobius-cloud`,
+  `mobius-cloudmodels`, `mobius-chatgpt`, `mobius-picker` pass; Mobius's 147 unit tests pass.
+
 * 2026-10-23 (remote): the gateway answers a slot the person routed to another machine or a hosted service (`src/remote.rs`, OpenAI-compatible
   `/chat/completions`, streaming, usage). Rules enforced in code and tests: the Act slot only ever runs on a local model; a slot routed to a missing
   or unknown-kind backend is an error, never a fall back to local; an output grammar is never sent to another machine; a key is read from

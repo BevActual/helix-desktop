@@ -279,11 +279,20 @@ fn shell_offline() -> String {
     "Helix Shell is not running. Open the session bar and try again.".into()
 }
 
+/// What the gateway is told when a turn goes to another computer or a hosted service rather than the on-device engine.
+struct RemoteArgs {
+    backend: String,
+    timeout_secs: u32,
+    /// OpenRouter's choice among models and providers: fallbacks, `price` or `speed`, privacy.
+    route: Option<(Vec<String>, String, bool)>,
+}
+
 fn chat_args(
     messages: &[(&'static str, String)],
     pictures: &[(usize, Vec<Vec<u8>>)],
     task: &str,
     model: &str,
+    remote: Option<&RemoteArgs>,
 ) -> Result<std::collections::HashMap<&'static str, Value<'static>>, zbus::Error> {
     let variant = Signature::try_from("v").map_err(|e| zbus::Error::Failure(e.to_string()))?;
     let (string, any) = (
@@ -367,6 +376,28 @@ fn chat_args(
     args.insert("temperature", Value::F64(talk.temperature));
     args.insert("max_tokens", Value::U32(talk.max_tokens));
     args.insert("priority", Value::from("interactive".to_string()));
+    if let Some(remote) = remote {
+        args.insert("backend", Value::from(remote.backend.clone()));
+        args.insert("remote_timeout", Value::U32(remote.timeout_secs));
+        if let Some((fallbacks, prefer, private_only)) = &remote.route {
+            let mut list = Array::new(&string);
+            for model in fallbacks {
+                list.append(Value::from(model.clone()))
+                    .map_err(zbus::Error::from)?;
+            }
+            let mut route = zbus::zvariant::Dict::new(&string, &any);
+            for (key, value) in [
+                ("fallbacks", Value::Array(list)),
+                ("prefer", Value::from(prefer.clone())),
+                ("private_only", Value::Bool(*private_only)),
+            ] {
+                route
+                    .append(Value::from(key.to_string()), Value::Value(Box::new(value)))
+                    .map_err(zbus::Error::from)?;
+            }
+            args.insert("route", Value::Dict(route));
+        }
+    }
     Ok(args)
 }
 
@@ -538,6 +569,7 @@ fn auto_title(app: &AppHandle) {
                 &[],
                 &task,
                 &model,
+                None,
             )
             .map_err(|e| e.to_string())?;
             // A name is a few words, and it must never delay the person's next message.
@@ -673,7 +705,20 @@ fn follow_signals(app: AppHandle) {
                             if app.state::<Arc<dictate::Hub>>().deliver(operation, ok, result.clone()) {
                                 continue; // a transcription, not a chat reply
                             }
-                            let outcome = shared(&app).lock().expect("state").chat.complete(operation, ok, &result);
+                            let outcome = {
+                                let shared = shared(&app);
+                                let mut state = shared.lock().expect("state");
+                                // A model on another computer says which model answered (a fallback, perhaps) and what it cost.
+                                if ok && state.chat.owns_operation(operation) {
+                                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&result) {
+                                        if let Some(answered) = value["model"].as_str().filter(|m| !m.is_empty()) {
+                                            state.turn_model = answered.to_string();
+                                        }
+                                        state.chat.pending_cost = value["cost_micro"].as_u64();
+                                    }
+                                }
+                                state.chat.complete(operation, ok, &result)
+                            };
                             if let Some(outcome) = outcome {
                                 ended(&app, outcome);
                             }
@@ -1134,15 +1179,11 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
     }
     emit_view(&app);
 
+    // The person's ChatGPT plan is Mobius's own sign-in flow (their token, never an API key), so that one stays here. Every other model on another
+    // computer or a hosted service is asked for through the gateway, which holds the rules (battery saver, keys, https or LAN only), the keys, the
+    // audit line and the streaming.
+    let mut remote: Option<RemoteArgs> = None;
     if !is_local {
-        if !routing.allow_remote_on_battery_saver && power_saver_active() {
-            shared(&app).lock().expect("state").chat.failed_to_start(
-                turn.generation,
-                "Battery saver is on. Turn on “Use other providers when battery saver is on” in Settings → Generation, or use a model on this computer.",
-            );
-            emit_view(&app);
-            return Ok(());
-        }
         let profile_backend = routing.route(&task).backend;
         let backend_key = if persona.backend.is_empty() {
             profile_backend.as_str()
@@ -1158,96 +1199,74 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             emit_view(&app);
             return Ok(());
         };
-        let generation = turn.generation;
-        let messages = turn.messages.clone();
-        let model = model.clone();
-        let base = backend.base_url.clone();
-        let api_key = secrets::for_backend(&backend.id, &backend.api_key_ref);
-        if base.contains("openrouter.ai") && api_key.is_none() {
-            shared(&app).lock().expect("state").chat.failed_to_start(
-                turn.generation,
-                "Add an OpenRouter API key in Settings → Models.",
-            );
-            emit_view(&app);
-            return Ok(());
-        }
         let talk = routing.talk.clamped();
-        let options = lan::RemoteOptions {
-            temperature: talk.temperature,
-            max_tokens: talk.max_tokens,
-            timeout_secs: u64::from(talk.remote_timeout_secs),
-        };
-        // OpenRouter is asked to choose among models and providers as the job's options say.
-        let route = (backend.id == "openrouter" || base.contains("openrouter.ai")).then(|| {
-            let wanted = cloud::route_options(&task);
-            lan::OpenRouterRoute {
-                fallbacks: wanted.fallbacks,
-                prefer: wanted.prefer,
-                private_only: wanted.private_only,
-            }
-        });
-        let result = if backend.id == chatgpt::BACKEND_ID {
-            // The person's ChatGPT plan: OpenAI's own API with the token they signed in with, never an API key.
-            if model.trim().is_empty() {
+        if backend.id == chatgpt::BACKEND_ID {
+            let generation = turn.generation;
+            let messages = turn.messages.clone();
+            let model = model.clone();
+            let result = if model.trim().is_empty() {
                 Err("Choose a ChatGPT model in Settings → Models.".to_string())
             } else {
-                chatgpt::respond(&model, &messages, options.max_tokens, options.timeout_secs).await
+                chatgpt::respond(
+                    &model,
+                    &messages,
+                    talk.max_tokens,
+                    u64::from(talk.remote_timeout_secs),
+                )
+                .await
+            };
+            let fake_op = generation.saturating_mul(1_000_003).saturating_add(7);
+            {
+                let shared = shared(&app);
+                let mut state = shared.lock().expect("state");
+                let _ = state.chat.started(generation, fake_op);
             }
-        } else {
-            lan::chat_completions_routed(
-                &base,
-                &model,
-                &messages,
-                api_key.as_deref(),
-                options,
-                route.as_ref(),
-            )
-            .await
-        };
-        let fake_op = generation.saturating_mul(1_000_003).saturating_add(7);
-        {
-            let shared = shared(&app);
-            let mut state = shared.lock().expect("state");
-            let _ = state.chat.started(generation, fake_op);
-        }
-        match result {
-            Ok(reply) => {
-                let outcome = {
-                    let shared = shared(&app);
-                    let mut state = shared.lock().expect("state");
-                    // The reply names the model that really answered (a fallback, perhaps) and what it cost.
-                    state.turn_model = reply.model.clone();
-                    state.chat.pending_cost = reply.cost_micro;
-                    let _ = state.chat.delta(fake_op, &reply.text);
-                    state.chat.complete(
-                        fake_op,
-                        true,
-                        &serde_json::json!({"ok": true, "text": reply.text, "backend": label, "task": task, "completion_tokens": reply.completion_tokens})
-                            .to_string(),
-                    )
-                };
-                if let Some(outcome) = outcome {
-                    ended(&app, outcome);
+            match result {
+                Ok(reply) => {
+                    let outcome = {
+                        let shared = shared(&app);
+                        let mut state = shared.lock().expect("state");
+                        state.turn_model = reply.model.clone();
+                        state.chat.pending_cost = reply.cost_micro;
+                        let _ = state.chat.delta(fake_op, &reply.text);
+                        state.chat.complete(
+                            fake_op,
+                            true,
+                            &serde_json::json!({"ok": true, "text": reply.text, "backend": label, "task": task, "completion_tokens": reply.completion_tokens})
+                                .to_string(),
+                        )
+                    };
+                    if let Some(outcome) = outcome {
+                        ended(&app, outcome);
+                    }
+                }
+                Err(reason) => {
+                    let outcome = {
+                        let shared = shared(&app);
+                        let mut state = shared.lock().expect("state");
+                        state.chat.complete(
+                            fake_op,
+                            false,
+                            &serde_json::json!({"ok": false, "error": reason}).to_string(),
+                        )
+                    };
+                    if let Some(outcome) = outcome {
+                        ended(&app, outcome);
+                    } else {
+                        emit_view(&app);
+                    }
                 }
             }
-            Err(reason) => {
-                let outcome = {
-                    let shared = shared(&app);
-                    let mut state = shared.lock().expect("state");
-                    state.chat.complete(
-                        fake_op,
-                        false,
-                        &serde_json::json!({"ok": false, "error": reason}).to_string(),
-                    )
-                };
-                if let Some(outcome) = outcome {
-                    ended(&app, outcome);
-                } else {
-                    emit_view(&app);
-                }
-            }
+            return Ok(());
         }
-        return Ok(());
+        // OpenRouter is asked to choose among models and providers as the job's options say.
+        let route = (backend.id == "openrouter" || backend.base_url.contains("openrouter.ai"))
+            .then(|| cloud::route_options(&task));
+        remote = Some(RemoteArgs {
+            backend: backend.id.clone(),
+            timeout_secs: talk.remote_timeout_secs,
+            route: route.map(|wanted| (wanted.fallbacks, wanted.prefer, wanted.private_only)),
+        });
     }
 
     let outcome = async {
@@ -1261,8 +1280,8 @@ async fn dispatch_turn(app: AppHandle, turn: helix_chat::chat::Turn) -> Result<(
             }
             pictures.push((*at, bytes));
         }
-        let args =
-            chat_args(&turn.messages, &pictures, &task, &model).map_err(|e| e.to_string())?;
+        let args = chat_args(&turn.messages, &pictures, &task, &model, remote.as_ref())
+            .map_err(|e| e.to_string())?;
         shared(&app).lock().expect("state").turn_model = model.clone();
         let operation: u64 = proxy
             .call("Action", &("chat", args))
@@ -4466,7 +4485,7 @@ mod picture_wire_tests {
             ("user", "what is this?".to_string()),
         ];
         let pictures = vec![(1usize, vec![vec![1u8, 2, 3], vec![4u8, 5]])];
-        let args = chat_args(&messages, &pictures, "vision", "").unwrap();
+        let args = chat_args(&messages, &pictures, "vision", "", None).unwrap();
         let images = args.get("images").expect("images are sent");
         assert_eq!(images.value_signature().to_string(), "aay");
         // The whole argument map still encodes as a{sv}, the shape the service reads.
@@ -4478,7 +4497,7 @@ mod picture_wire_tests {
             "a{sv}"
         );
         // Without pictures nothing changes: no images, string content.
-        let plain = chat_args(&messages, &[], "chat", "").unwrap();
+        let plain = chat_args(&messages, &[], "chat", "", None).unwrap();
         assert!(!plain.contains_key("images"));
     }
 }

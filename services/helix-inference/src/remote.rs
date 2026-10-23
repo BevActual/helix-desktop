@@ -267,6 +267,33 @@ impl RemoteChat for OpenAiRemote {
                 let _ = send.send(Piece::Failed(message));
                 return;
             }
+            // A server that ignores `stream: true` answers with the whole completion as one JSON body: read it as the one chunk it is.
+            let plain = response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .is_some_and(|t| t.contains("json"));
+            if plain {
+                let text = response.body_mut().read_to_string().unwrap_or_default();
+                let Ok(value) = serde_json::from_str::<Value>(&text) else {
+                    let _ = send.send(Piece::Failed(
+                        "the backend's answer could not be read".into(),
+                    ));
+                    return;
+                };
+                let content = value
+                    .pointer("/choices/0/message/content")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let chunk = json!({
+                    "model": value.get("model"),
+                    "choices": [{"delta": {"content": content}, "finish_reason": value.pointer("/choices/0/finish_reason")}],
+                    "usage": value.get("usage"),
+                });
+                let _ = send.send(Piece::Data(chunk.to_string()));
+                let _ = send.send(Piece::Done);
+                return;
+            }
             for line in BufReader::new(response.body_mut().as_reader()).lines() {
                 let Ok(line) = line else {
                     let _ = send.send(Piece::Failed("the connection to the backend broke".into()));
@@ -602,5 +629,63 @@ HTTPServer(("127.0.0.1", int(sys.argv[2])), H).serve_forever()
                 .contains("promises not to keep")
         );
         assert!(explain_refusal(500, "boom").is_none());
+    }
+
+    #[test]
+    fn a_server_that_ignores_streaming_is_still_understood() {
+        let _turn = state_lock();
+        if std::process::Command::new("python3")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            return;
+        }
+        // Same scripted server, but it answers with one JSON body whatever was asked.
+        let dir = std::env::temp_dir().join(format!("helix-remote-plain-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("helix")).unwrap();
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        std::fs::write(
+            dir.join("helix/inference-routing.toml"),
+            format!("[[backends]]\nid = \"plain\"\nkind = \"openai\"\nbase_url = \"http://127.0.0.1:{port}/v1\"\n"),
+        )
+        .unwrap();
+        std::env::set_var("HELIX_STATE_HOME", &dir);
+        let script = "import json,sys\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\nclass H(BaseHTTPRequestHandler):\n    def log_message(self,*a): pass\n    def do_POST(self):\n        self.rfile.read(int(self.headers.get('Content-Length',0)))\n        b=json.dumps({'model':'acme/backup','choices':[{'message':{'content':'Whole answer.'},'finish_reason':'stop'}],'usage':{'completion_tokens':7,'cost':0.0012}}).encode()\n        self.send_response(200); self.send_header('Content-Type','application/json'); self.send_header('Content-Length',str(len(b))); self.end_headers(); self.wfile.write(b)\nHTTPServer(('127.0.0.1',int(sys.argv[1])),H).serve_forever()\n";
+        let mut stub = std::process::Command::new("python3")
+            .args(["-c", script, &port.to_string()])
+            .spawn()
+            .unwrap();
+        for _ in 0..100 {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let mut heard = String::new();
+        let out = OpenAiRemote.chat(
+            &ask("plain", "acme/primary"),
+            &mut |d| heard.push_str(d),
+            &|| false,
+        );
+        assert!(out.ok, "{}", out.error);
+        assert_eq!(
+            (
+                heard.as_str(),
+                out.model.as_str(),
+                out.cost_micro,
+                out.completion_tokens
+            ),
+            ("Whole answer.", "acme/backup", Some(1200), 7)
+        );
+        let _ = stub.kill();
+        let _ = stub.wait();
+        std::env::remove_var("HELIX_STATE_HOME");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

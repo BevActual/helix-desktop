@@ -378,7 +378,8 @@ async fn ask(task: &Task) -> Result<String, String> {
         system.push_str(&text);
     }
     let messages = vec![("system", system), ("user", task.prompt.clone())];
-    let args = crate::chat_args(&messages, &[], &route_task, &model).map_err(|e| e.to_string())?;
+    let args =
+        crate::chat_args(&messages, &[], &route_task, &model, None).map_err(|e| e.to_string())?;
     let connection = zbus::Connection::session()
         .await
         .map_err(|e| e.to_string())?;
