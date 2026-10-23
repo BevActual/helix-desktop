@@ -28,7 +28,7 @@ for line in unit.splitlines():
         properties.append(f"{key}={value}")
 
 models = pathlib.Path.home() / ".local/share/helix/models"
-engine = root / "third_party/llama-install"
+engine = root / "third_party/llama-vulkan-install/bin"
 probe_file = pathlib.Path.home() / ".helix-sandbox-probe"
 
 
@@ -36,7 +36,7 @@ def run(label, argv, expect_ok):
     command = ["systemd-run", "--user", "--wait", "--pipe", "--collect", "--quiet"]
     for item in properties:
         command += ["-p", item]
-    command += [f"--setenv=LD_LIBRARY_PATH={engine}/lib64"]
+    command += [f"--setenv=LD_LIBRARY_PATH={engine}"]
     result = subprocess.run(command + argv, capture_output=True, text=True, timeout=60)
     ok = result.returncode == 0
     verdict = "ok " if ok == expect_ok else "FAIL"
@@ -62,7 +62,8 @@ from gi.repository import Gio, GLib  # noqa: E402
 
 UNIT = "helix-inference-sandbox-check"
 binary = next(p for p in (root / "target/fast/helix-inference", root / "target/release/helix-inference", root / "target/debug/helix-inference") if p.exists())
-command = ["systemd-run", "--user", f"--unit={UNIT}", "--collect", "--quiet", "-p", "Type=dbus", "-p", "BusName=org.helix.Inference"]
+command = ["systemd-run", "--user", f"--unit={UNIT}", "--collect", "--quiet", "-p", "Type=dbus", "-p", "BusName=org.helix.Inference",
+           f"--setenv=HELIX_LLAMA_SERVER={engine}/llama-server", f"--setenv=HELIX_LLAMA_LIBS={engine}:{pathlib.Path.home()}/.local/cuda/lib", "--setenv=HELIX_ENGINE_SANDBOX=require"]
 for item in properties:
     command += ["-p", item]
 subprocess.run(command + [str(binary)], check=True)

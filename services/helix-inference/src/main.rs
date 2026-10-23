@@ -11,6 +11,7 @@ mod models;
 mod pictures;
 mod queue;
 mod routing;
+mod sandbox;
 mod server;
 mod service;
 mod workers;
@@ -91,6 +92,7 @@ fn engine_config(model_dir: &str) -> Option<server::ServerConfig> {
             dirs
         }
     };
+    config.sandbox = sandbox::Mode::from_env(&env("HELIX_ENGINE_SANDBOX", "auto"));
     if let Ok(layers) = env("HELIX_GPU_LAYERS", "").parse() {
         config.gpu_layers = layers;
     }

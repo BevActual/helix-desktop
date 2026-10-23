@@ -11,24 +11,29 @@ RestartSec=2
 # Model files are untrusted binary input to a parser written in C++, so the process that reads them is boxed in: no
 # network, no writes outside its own temporary space and private shader cache, no new privileges, only the system calls a normal service needs.
 # It can still read the models under ~/.local/share/helix and use the GPU. tools/check-inference-sandbox.py proves it.
+# The engine (llama-server) is a child of this service and runs in a bubblewrap box of its own (services/helix-inference/src/sandbox.rs): no network,
+# no home folder, read-only system and models, only its socket folder writable, the GPU's device nodes. Making that box means this service may create
+# namespaces and a netlink socket, may mount a fresh /proc for it (which needs the Protect* options below that are set to no), and may call mount.
+# They are safe to relax here: the service has no capabilities (CapabilityBoundingSet is empty) and the engine, the only thing that reads model
+# files, is the one inside the box. If bubblewrap cannot make a box the engine still runs under this unit's limits and the service says so.
 NoNewPrivileges=yes
 PrivateNetwork=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ProtectKernelTunables=yes
+ProtectKernelTunables=no
 ProtectKernelModules=yes
-ProtectKernelLogs=yes
+ProtectKernelLogs=no
 ProtectControlGroups=yes
 ProtectClock=yes
-ProtectHostname=yes
-RestrictAddressFamilies=AF_UNIX
-RestrictNamespaces=yes
+ProtectHostname=no
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=user pid net mnt ipc uts cgroup
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
 SystemCallArchitectures=native
-SystemCallFilter=@system-service
+SystemCallFilter=@system-service @mount @namespaces
 CapabilityBoundingSet=
 UMask=0077
 CacheDirectory=helix-inference

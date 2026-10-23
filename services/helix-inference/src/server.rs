@@ -18,6 +18,7 @@ use serde_json::{json, Value};
 use crate::backend::*;
 use crate::grammar;
 use crate::models;
+use crate::sandbox;
 
 #[derive(Clone, Debug)]
 pub struct ServerConfig {
@@ -31,6 +32,8 @@ pub struct ServerConfig {
     pub context_tokens: u32,
     /// How long a model may take to load.
     pub load_timeout: Duration,
+    /// Whether the engine runs in a `bwrap` box of its own (see sandbox.rs).
+    pub sandbox: sandbox::Mode,
 }
 
 impl ServerConfig {
@@ -46,6 +49,7 @@ impl ServerConfig {
             gpu_layers: -1,
             context_tokens: 4096,
             load_timeout: Duration::from_secs(240),
+            sandbox: sandbox::Mode::Off,
         }
     }
 }
@@ -90,8 +94,8 @@ impl ServerBackend {
         }
     }
 
-    fn command(&self) -> Command {
-        let mut command = Command::new(&self.config.binary);
+    /// What the engine is given to run with (the box starts with nothing else).
+    fn environment(&self, work: &Path) -> Vec<(String, String)> {
         let mut paths: Vec<String> = self
             .config
             .library_dirs
@@ -101,13 +105,76 @@ impl ServerBackend {
         if let Some(existing) = std::env::var_os("LD_LIBRARY_PATH") {
             paths.push(existing.to_string_lossy().into_owned());
         }
-        command.env("LD_LIBRARY_PATH", paths.join(":"));
-        // Compiled-kernel caches go to the service's own space, not a home folder that is read-only to it.
-        if let Ok(dir) = private_dir() {
-            command.env("CUDA_CACHE_PATH", dir.join("cuda-cache"));
-            command.env("XDG_CACHE_HOME", dir.join("cache"));
+        let mut env = vec![
+            ("LD_LIBRARY_PATH".to_string(), paths.join(":")),
+            // Compiled-kernel caches go to the engine's own space, not a home folder.
+            (
+                "CUDA_CACHE_PATH".to_string(),
+                work.join("cuda-cache").to_string_lossy().into_owned(),
+            ),
+            (
+                "XDG_CACHE_HOME".to_string(),
+                work.join("cache").to_string_lossy().into_owned(),
+            ),
+        ];
+        // Choices about which device to use pass through.
+        for key in [
+            "CUDA_VISIBLE_DEVICES",
+            "VK_ICD_FILENAMES",
+            "GGML_VK_VISIBLE_DEVICES",
+            "HIP_VISIBLE_DEVICES",
+        ] {
+            if let Ok(value) = std::env::var(key) {
+                env.push((key.to_string(), value));
+            }
         }
+        env
+    }
+
+    /// The engine program, boxed or not as the mode and the machine allow.
+    fn command(&self) -> Result<Command, String> {
+        let work = private_dir().map_err(|e| format!("no private folder for the engine: {e}"))?;
+        let env = self.environment(&work);
+        let boxed = match self.config.sandbox {
+            sandbox::Mode::Off => false,
+            sandbox::Mode::Auto => match sandbox::works() {
+                Ok(()) => true,
+                Err(why) => {
+                    static SAID: std::sync::Once = std::sync::Once::new();
+                    SAID.call_once(|| {
+                        eprintln!(
+                            "helix-inference: the engine runs without a box of its own: {why}"
+                        )
+                    });
+                    false
+                }
+            },
+            sandbox::Mode::Require => {
+                sandbox::works()
+                    .map_err(|why| format!("the engine would not start without its box: {why}"))?;
+                true
+            }
+        };
+        if !boxed {
+            let mut command = Command::new(&self.config.binary);
+            command.envs(env);
+            return Ok(command);
+        }
+        let devices = sandbox::gpu_devices();
+        let spec = sandbox::Spec {
+            binary: &self.config.binary,
+            library_dirs: &self.config.library_dirs,
+            model_dir: &self.config.model_dir,
+            work_dir: &work,
+            devices: &devices,
+            env: &env,
+        };
+        let mut command = Command::new("bwrap");
         command
+            .args(sandbox::bwrap_args(&spec, &|p| p.exists()))
+            .arg("--")
+            .arg(&self.config.binary);
+        Ok(command)
     }
 
     /// Starts the engine on `model` and waits until it answers. The previous one, if any, is stopped first.
@@ -117,7 +184,7 @@ impl ServerBackend {
             private_dir().map_err(|e| format!("no private folder for the engine's socket: {e}"))?;
         let socket = dir.join("engine.sock");
         let _ = std::fs::remove_file(&socket);
-        let mut command = self.command();
+        let mut command = self.command()?;
         command
             .arg("-m")
             .arg(&path)
@@ -230,10 +297,16 @@ impl ServerBackend {
         }
         let text = self
             .command()
-            .arg("--list-devices")
-            .stdin(Stdio::null())
-            .stderr(Stdio::null())
-            .output()
+            .map(|mut c| {
+                c.arg("--list-devices");
+                c
+            })
+            .and_then(|mut c| {
+                c.stdin(Stdio::null())
+                    .stderr(Stdio::null())
+                    .output()
+                    .map_err(|e| e.to_string())
+            })
             .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
             .unwrap_or_default();
         let value = parse_devices(&text);
@@ -840,6 +913,9 @@ mod tests {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default(),
+        );
+        config.sandbox = sandbox::Mode::from_env(
+            &std::env::var("HELIX_ENGINE_SANDBOX").unwrap_or_else(|_| "require".into()),
         );
         Some(ServerBackend::new(config))
     }
