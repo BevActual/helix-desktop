@@ -236,6 +236,9 @@ pub struct HelixLook {
     /// When the focused column is centred: `never`, `always` or `on-overflow`.
     #[serde(default)]
     pub center_focused: Option<String>,
+    /// One rule per application, replacing the whole list (an empty list clears it); at most 64.
+    #[serde(default)]
+    pub app_rules: Option<Vec<HelixAppRule>>,
     /// Whether the pointer jumps to a window when the keyboard focuses it.
     #[serde(default)]
     pub warp_mouse_to_focus: Option<bool>,
@@ -263,6 +266,23 @@ pub struct HelixLook {
     /// The width of the ring around the focused window in pixels, 0 (none) to 8.
     #[serde(default)]
     pub focus_ring_width: Option<u8>,
+}
+
+/// What the person wants done with one application's windows.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixAppRule {
+    /// The application, as the window reports it (`org.gnome.Nautilus`): letters, digits, dots, dashes and underscores.
+    pub app_id: String,
+    /// How its windows open: `floating`, `maximized` or `fullscreen`; none means the way the layout opens them.
+    #[serde(default)]
+    pub open: Option<String>,
+    /// Kept out of screen sharing and screenshots.
+    #[serde(default)]
+    pub private: bool,
+    /// How solid its windows are, 20 to 100 percent; none means fully.
+    #[serde(default)]
+    pub opacity: Option<u8>,
 }
 
 /// The pointer and keyboard settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.

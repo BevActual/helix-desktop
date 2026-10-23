@@ -1619,13 +1619,37 @@ fn look_rows() -> Vec<RowView> {
 #[tauri::command]
 fn multitask_rows() -> Vec<RowView> {
     helix_compositor::compositor_ipc::look_settings()
-        .map(|look| look::multitask_rows(&look))
+        .map(|look| {
+            let mut rows = look::multitask_rows(&look);
+            rows.extend(look::app_rows(&look, &running_app_ids()));
+            rows
+        })
         .unwrap_or_default()
+}
+
+/// The applications that have a window open now.
+fn running_app_ids() -> Vec<String> {
+    let Some(ok) = helix_compositor::compositor_ipc::request_json("\"Windows\"") else {
+        return Vec::new();
+    };
+    ok.get("Windows")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|w| w.get("app_id").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect()
 }
 
 #[tauri::command]
 fn multitask_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
-    let request = look::parse_multitask_change(&id, &change)?;
+    let current = helix_compositor::compositor_ipc::look_settings()
+        .and_then(|look| look.app_rules)
+        .unwrap_or_default();
+    let request = match look::parse_app_change(&id, &change, &current) {
+        Some(request) => request?,
+        None => look::parse_multitask_change(&id, &change)?,
+    };
     helix_compositor::compositor_ipc::set_look_settings(&request)?;
     eprintln!("SETTINGS multitasking {id}");
     Ok(multitask_rows())

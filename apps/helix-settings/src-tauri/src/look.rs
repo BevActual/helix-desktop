@@ -1,7 +1,7 @@
 //! The Appearance rows the compositor holds: animations, the space between windows, the cursor size, and the focus ring's colour (which follows the
 //! accent). Like the input settings they are applied by the Helix compositor at once and remembered by it; another compositor reports nothing.
 
-use helix_compositor::compositor_ipc::LookSettings;
+use helix_compositor::compositor_ipc::{AppRule, LookSettings};
 use helix_config::catalog::{Choice, Control, RowView};
 use serde_json::Value;
 
@@ -240,6 +240,122 @@ pub fn multitask_rows(look: &LookSettings) -> Vec<RowView> {
     ]
 }
 
+/// One group of rows for each application that has a rule or has a window open now: how its windows open, whether it is hidden from screen sharing,
+/// and how solid it is.
+pub fn app_rows(look: &LookSettings, running: &[String]) -> Vec<RowView> {
+    let rules = look.app_rules.clone().unwrap_or_default();
+    let mut apps: Vec<String> = rules.iter().map(|r| r.app_id.clone()).collect();
+    for id in running {
+        if !apps.contains(id) && valid_app_id(id) {
+            apps.push(id.clone());
+        }
+    }
+    apps.sort_by_key(|a| a.to_lowercase());
+    apps.into_iter()
+        .flat_map(|app| {
+            let rule = rules.iter().find(|r| r.app_id == app).cloned().unwrap_or_default();
+            let group = format!("Application: {app}");
+            let row = |kind: &str, title: &str, description: &str, control: Control| RowView {
+                id: format!("app:{app}:{kind}"),
+                title: title.into(),
+                group: group.clone(),
+                description: description.into(),
+                overridden: false,
+                control,
+            };
+            vec![
+                row(
+                    "open",
+                    "Opens",
+                    "How new windows of this application start. Windows already open stay as they are.",
+                    Control::Choice {
+                        options: [("default", "As the layout does"), ("floating", "Floating"), ("maximized", "Maximized"), ("fullscreen", "Fullscreen")]
+                            .iter()
+                            .map(|(value, label)| Choice { value: (*value).into(), label: (*label).into() })
+                            .collect(),
+                        current: rule.open.clone().unwrap_or_else(|| "default".into()),
+                    },
+                ),
+                row(
+                    "private",
+                    "Hide from screen sharing",
+                    "Its windows show as black boxes in recordings, screenshots and shared screens.",
+                    Control::Switch { on: rule.private },
+                ),
+                row(
+                    "opacity",
+                    "Opacity",
+                    "How solid its windows are, in percent.",
+                    Control::Slider { min: 20.0, max: 100.0, integer: true, value: f64::from(rule.opacity.unwrap_or(100)) },
+                ),
+            ]
+        })
+        .collect()
+}
+
+fn valid_app_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
+/// A change to one application's rule, as the whole new list (the compositor replaces it). `None` when `id` is not an application row.
+pub fn parse_app_change(
+    id: &str,
+    change: &Value,
+    current: &[AppRule],
+) -> Option<Result<LookSettings, String>> {
+    let rest = id.strip_prefix("app:")?;
+    let (app, kind) = rest.rsplit_once(':')?;
+    Some((|| {
+        if !valid_app_id(app) {
+            return Err("unknown application".to_string());
+        }
+        let mut rules = current.to_vec();
+        let at = match rules.iter().position(|r| r.app_id == app) {
+            Some(at) => at,
+            None => {
+                rules.push(AppRule {
+                    app_id: app.into(),
+                    ..AppRule::default()
+                });
+                rules.len() - 1
+            }
+        };
+        let value = change.get("value");
+        match kind {
+            "open" => {
+                let open = value.and_then(Value::as_str).ok_or("not text")?;
+                rules[at].open = match open {
+                    "" | "default" => None,
+                    "floating" | "maximized" | "fullscreen" => Some(open.to_string()),
+                    _ => return Err("pick how it opens".into()),
+                };
+            }
+            "private" => {
+                rules[at].private = value.and_then(Value::as_bool).ok_or("not a boolean")?
+            }
+            "opacity" => {
+                let percent = value
+                    .and_then(Value::as_f64)
+                    .filter(|n| n.is_finite())
+                    .ok_or("not a number")?;
+                let percent = percent.round().clamp(20.0, 100.0) as u8;
+                rules[at].opacity = (percent < 100).then_some(percent);
+            }
+            _ => return Err("unknown change".into()),
+        }
+        // A rule that says nothing is no rule.
+        rules.retain(|r| r.open.is_some() || r.private || r.opacity.is_some());
+        Ok(LookSettings {
+            app_rules: Some(rules),
+            ..LookSettings::default()
+        })
+    })())
+}
+
 pub fn parse_multitask_change(id: &str, change: &Value) -> Result<LookSettings, String> {
     let kind = change.get("kind").and_then(Value::as_str);
     let value = change.get("value");
@@ -375,6 +491,63 @@ mod tests {
             .all(|r| matches!(r.control, Control::Slider { value, .. } if value == 100.0)));
         assert!(set("look:gaps", "number", json!("x")).is_err());
         assert!(set("look:nope", "switch", json!(true)).is_err());
+    }
+
+    #[test]
+    fn application_rows_and_changes() {
+        let look = LookSettings {
+            app_rules: Some(vec![AppRule {
+                app_id: "signal".into(),
+                private: true,
+                ..AppRule::default()
+            }]),
+            ..LookSettings::default()
+        };
+        let rows = app_rows(
+            &look,
+            &[
+                "org.gnome.Nautilus".into(),
+                "signal".into(),
+                "bad id".into(),
+            ],
+        );
+        let ids: Vec<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            [
+                "app:org.gnome.Nautilus:open",
+                "app:org.gnome.Nautilus:private",
+                "app:org.gnome.Nautilus:opacity",
+                "app:signal:open",
+                "app:signal:private",
+                "app:signal:opacity"
+            ]
+        );
+        assert!(matches!(rows[4].control, Control::Switch { on: true }));
+        let current = look.app_rules.clone().unwrap();
+        let set = |id: &str, kind: &str, v: Value| {
+            parse_app_change(id, &json!({"kind": kind, "value": v}), &current).unwrap()
+        };
+        let rules = set("app:org.gnome.Nautilus:open", "choice", json!("floating"))
+            .unwrap()
+            .app_rules
+            .unwrap();
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[1].open.as_deref(), Some("floating"));
+        // Turning the last thing off removes the rule.
+        let rules = set("app:signal:private", "switch", json!(false))
+            .unwrap()
+            .app_rules
+            .unwrap();
+        assert!(rules.is_empty());
+        let rules = set("app:signal:opacity", "number", json!(5))
+            .unwrap()
+            .app_rules
+            .unwrap();
+        assert_eq!(rules[0].opacity, Some(20));
+        assert!(set("app:x y:open", "choice", json!("floating")).is_err());
+        assert!(set("app:signal:open", "choice", json!("tiny")).is_err());
+        assert!(parse_app_change("mt:focus", &json!({}), &current).is_none());
     }
 
     #[test]

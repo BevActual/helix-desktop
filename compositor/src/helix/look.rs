@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 
+use niri_config::appearance::BlockOutFrom;
 use niri_config::appearance::Color;
 use niri_config::appearance::CornerRadius;
 use niri_config::appearance::{BackgroundEffectRule, LiquidGlassPart};
@@ -11,9 +12,9 @@ use niri_config::input::{FocusFollowsMouse, ModKey, WarpMouseToFocus};
 use niri_config::layer_rule::{LayerRule, Match as LayerMatch};
 use niri_config::layout::CenterFocusedColumn;
 use niri_config::utils::RegexEq;
-use niri_config::window_rule::WindowRule;
+use niri_config::window_rule::{Match as WindowMatch, WindowRule};
 use niri_config::Config;
-use niri_ipc::HelixLook;
+use niri_ipc::{HelixAppRule, HelixLook};
 
 use crate::niri::State;
 
@@ -63,6 +64,34 @@ pub fn validate(look: &HelixLook) -> Result<(), String> {
     if let Some(color) = &look.focus_color {
         if parse_hex(color).is_none() {
             return Err("a colour is #rrggbb".into());
+        }
+    }
+    if let Some(rules) = &look.app_rules {
+        if rules.len() > 64 {
+            return Err("at most 64 application rules".into());
+        }
+        for rule in rules {
+            let ok = !rule.app_id.is_empty()
+                && rule.app_id.len() <= 128
+                && rule
+                    .app_id
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
+            if !ok {
+                return Err(
+                    "an application is letters, digits, dots, dashes and underscores".into(),
+                );
+            }
+            if rule
+                .open
+                .as_deref()
+                .is_some_and(|o| !matches!(o, "floating" | "maximized" | "fullscreen"))
+            {
+                return Err("windows open floating, maximized or fullscreen".into());
+            }
+            if rule.opacity.is_some_and(|o| !(20..=100).contains(&o)) {
+                return Err("opacity is 20 to 100 percent".into());
+            }
         }
     }
     if let Some(key) = &look.mod_key {
@@ -131,6 +160,9 @@ fn merge(base: &mut HelixLook, change: &HelixLook) {
     }
     if change.hot_corner.is_some() {
         base.hot_corner = change.hot_corner;
+    }
+    if change.app_rules.is_some() {
+        base.app_rules = change.app_rules.clone();
     }
     if change.warp_mouse_to_focus.is_some() {
         base.warp_mouse_to_focus = change.warp_mouse_to_focus;
@@ -203,6 +235,68 @@ fn radius_of(config: &Config) -> Option<u16> {
 const GLASS_NAMESPACE: &str = "^helix-panels?$";
 
 /// The blur passes and offset for a strength: light is one pass and a small offset, heavy is five passes and a wide one.
+/// What marks a window rule as one of ours, so it can be replaced and read back: an exclusion nothing can match.
+const APP_RULE_MARK: &str = "^\\x00helix-app-rule$";
+
+fn is_app_rule(rule: &WindowRule) -> bool {
+    rule.excludes.iter().any(|m| {
+        m.title
+            .as_ref()
+            .is_some_and(|t| t.0.as_str() == APP_RULE_MARK)
+    })
+}
+
+fn app_rule(rule: &HelixAppRule) -> Option<WindowRule> {
+    let pattern = format!("^{}$", rule.app_id.replace('.', "\\."));
+    let mut out = WindowRule {
+        matches: vec![WindowMatch {
+            app_id: pattern.parse().ok(),
+            ..WindowMatch::default()
+        }],
+        excludes: vec![WindowMatch {
+            title: APP_RULE_MARK.parse().ok(),
+            ..WindowMatch::default()
+        }],
+        ..WindowRule::default()
+    };
+    match rule.open.as_deref() {
+        Some("floating") => out.open_floating = Some(true),
+        Some("maximized") => out.open_maximized = Some(true),
+        Some("fullscreen") => out.open_fullscreen = Some(true),
+        _ => {}
+    }
+    if rule.private {
+        out.block_out_from = Some(BlockOutFrom::ScreenCapture);
+    }
+    out.opacity = rule.opacity.map(|o| f32::from(o) / 100.0);
+    Some(out)
+}
+
+fn app_rule_of(rule: &WindowRule) -> Option<HelixAppRule> {
+    if !is_app_rule(rule) {
+        return None;
+    }
+    let pattern = rule.matches.first()?.app_id.as_ref()?.0.as_str();
+    let app_id = pattern
+        .strip_prefix('^')?
+        .strip_suffix('$')?
+        .replace("\\.", ".");
+    Some(HelixAppRule {
+        app_id,
+        open: if rule.open_floating == Some(true) {
+            Some("floating".into())
+        } else if rule.open_fullscreen == Some(true) {
+            Some("fullscreen".into())
+        } else if rule.open_maximized == Some(true) {
+            Some("maximized".into())
+        } else {
+            None
+        },
+        private: rule.block_out_from.is_some(),
+        opacity: rule.opacity.map(|o| (o * 100.0).round() as u8),
+    })
+}
+
 fn mod_of(name: &str) -> Option<ModKey> {
     match name {
         "super" => Some(ModKey::Super),
@@ -289,6 +383,12 @@ pub fn overlay(config: &mut Config, look: &HelixLook) {
         config.layout.focus_ring.off = width == 0;
         config.layout.focus_ring.width = f64::from(width.min(8));
     }
+    if let Some(rules) = &look.app_rules {
+        config.window_rules.retain(|rule| !is_app_rule(rule));
+        config
+            .window_rules
+            .extend(rules.iter().filter_map(app_rule));
+    }
     if let Some(radius) = look.window_corner_radius {
         config.window_rules.retain(|rule| !is_corner_rule(rule));
         config.window_rules.push(corner_rule(radius));
@@ -319,6 +419,7 @@ pub fn effective(config: &Config) -> HelixLook {
         focus_follows_mouse: Some(config.input.focus_follows_mouse.is_some()),
         hot_corner: Some(!config.gestures.hot_corners.off),
         warp_mouse_to_focus: Some(config.input.warp_mouse_to_focus.is_some()),
+        app_rules: Some(config.window_rules.iter().filter_map(app_rule_of).collect()),
         mod_key: Some(
             match config.input.mod_key {
                 Some(ModKey::Alt) => "alt",
@@ -441,7 +542,7 @@ impl State {
             self.niri.cursor_manager.reload(&theme, size);
             self.niri.cursor_texture_cache.clear();
         }
-        if change.window_corner_radius.is_some() {
+        if change.window_corner_radius.is_some() || change.app_rules.is_some() {
             // Windows that are already open take the new corners now.
             self.niri.recompute_window_rules();
         }
@@ -599,6 +700,87 @@ mod tests {
             ..HelixLook::default()
         })
         .is_err());
+    }
+
+    #[test]
+    fn application_rules_are_replaced_whole_and_read_back() {
+        let mut config = Config::default();
+        let rule =
+            |id: &str, open: Option<&str>, private: bool, opacity: Option<u8>| HelixAppRule {
+                app_id: id.into(),
+                open: open.map(String::from),
+                private,
+                opacity,
+            };
+        let first = vec![
+            rule("org.gnome.Nautilus", Some("floating"), false, None),
+            rule("signal", None, true, Some(90)),
+        ];
+        overlay(
+            &mut config,
+            &HelixLook {
+                app_rules: Some(first.clone()),
+                ..HelixLook::default()
+            },
+        );
+        assert_eq!(effective(&config).app_rules, Some(first));
+        // Setting the list again replaces it; the rules do not pile up.
+        let second = vec![rule("signal", Some("maximized"), false, None)];
+        overlay(
+            &mut config,
+            &HelixLook {
+                app_rules: Some(second.clone()),
+                ..HelixLook::default()
+            },
+        );
+        assert_eq!(effective(&config).app_rules, Some(second));
+        assert_eq!(config.window_rules.len(), 1);
+        overlay(
+            &mut config,
+            &HelixLook {
+                app_rules: Some(vec![]),
+                ..HelixLook::default()
+            },
+        );
+        assert!(config.window_rules.is_empty());
+    }
+
+    #[test]
+    fn impossible_application_rules_are_refused() {
+        let bad = |r: HelixAppRule| {
+            validate(&HelixLook {
+                app_rules: Some(vec![r]),
+                ..HelixLook::default()
+            })
+        };
+        assert!(bad(HelixAppRule {
+            app_id: "a b".into(),
+            ..HelixAppRule::default()
+        })
+        .is_err());
+        assert!(bad(HelixAppRule {
+            app_id: ".*".into(),
+            ..HelixAppRule::default()
+        })
+        .is_err());
+        assert!(bad(HelixAppRule {
+            app_id: "x".into(),
+            open: Some("tiny".into()),
+            ..HelixAppRule::default()
+        })
+        .is_err());
+        assert!(bad(HelixAppRule {
+            app_id: "x".into(),
+            opacity: Some(5),
+            ..HelixAppRule::default()
+        })
+        .is_err());
+        assert!(bad(HelixAppRule {
+            app_id: "org.x.Y".into(),
+            opacity: Some(50),
+            ..HelixAppRule::default()
+        })
+        .is_ok());
     }
 
     #[test]

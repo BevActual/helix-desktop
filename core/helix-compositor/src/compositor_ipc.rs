@@ -39,6 +39,20 @@ pub struct InputSettings {
     pub keyboard_layout: Option<String>,
 }
 
+/// What is done with one application's windows (`HelixAppRule`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct AppRule {
+    pub app_id: String,
+    /// `floating`, `maximized` or `fullscreen`; none is the layout's own way.
+    #[serde(default)]
+    pub open: Option<String>,
+    #[serde(default)]
+    pub private: bool,
+    /// 20 to 100.
+    #[serde(default)]
+    pub opacity: Option<u8>,
+}
+
 /// How things look, as far as the compositor lets Settings change it (`HelixLook`). In what it reports every field is set; in a change only the set
 /// fields are applied.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -54,6 +68,8 @@ pub struct LookSettings {
     pub center_focused: Option<String>,
     pub workspace_back_and_forth: Option<bool>,
     pub warp_mouse_to_focus: Option<bool>,
+    /// One per application; setting it replaces the whole list.
+    pub app_rules: Option<Vec<AppRule>>,
     /// `super`, `alt` or `ctrl`.
     pub mod_key: Option<String>,
     /// Every window's corner radius in pixels, 0 to 32.

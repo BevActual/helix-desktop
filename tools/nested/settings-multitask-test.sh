@@ -47,5 +47,16 @@ s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(
 PY
 sleep 2
 [ "$(field focus_follows_mouse)" = "True" ] && [ "$(field center_focused)" = "always" ] && [ "$(field hot_corner)" = "False" ] && echo "ok: after a reload they are still in effect" || fail "lost on reload: $(ipc '"HelixLook"')"
+echo "--- per-application rules"
+r=$(ipc '{"HelixSetLook":{"app_rules":[{"app_id":"org.gnome.Nautilus","open":"floating","private":true,"opacity":80}]}}'); [ "$r" = '"Handled"' ] && echo "ok: the compositor takes an application rule" || fail "rule: $r"
+python3 -c 'import json,sys; d=json.loads(sys.argv[1]); r=d["app_rules"]; sys.exit(0 if len(r)==1 and r[0]["app_id"]=="org.gnome.Nautilus" and r[0]["open"]=="floating" and r[0]["private"] is True and r[0]["opacity"]==80 else 1)' "$(ipc '"HelixLook"')" && echo "ok: and reads it back" || fail "read back: $(ipc '"HelixLook"')"
+r=$(ipc '{"HelixSetLook":{"app_rules":[{"app_id":".*"}]}}'); echo "$r" | grep -qi "letters, digits" && echo "ok: a pattern in place of a name is refused" || fail "no refusal: $r"
+python3 - <<'PY'
+import json, os, socket
+s = socket.socket(socket.AF_UNIX); s.connect(os.environ["NIRI_SOCKET"]); s.send(b'{"Action":{"LoadConfigFile":{}}}\n'); s.settimeout(5); s.recv(4096)
+PY
+sleep 2
+python3 -c 'import json,sys; d=json.loads(sys.argv[1]); sys.exit(0 if len(d["app_rules"])==1 else 1)' "$(ipc '"HelixLook"')" && echo "ok: the rule survives a reload, and is not doubled" || fail "after reload: $(ipc '"HelixLook"')"
+# (the application rows are unit-tested in look.rs: centring moved this window, so it is not clicked again here)
 shot multitask-after
 [ "$FAILED" = 0 ] && echo "PASS: settings multitask" || exit 1
