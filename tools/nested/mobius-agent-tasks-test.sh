@@ -18,6 +18,7 @@ PY
 click_id() { refresh_geometry; local pos; pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" "$1" "${2:-0.5}"); "$PT" $pos click; sleep 0.8; }
 wait_id() { for _ in $(seq 1 ${2:-60}); do has_id "$1" && return; sleep 0.25; done; echo "FAIL: missing $1"; exit 1; }
 paste_id() { click_id "$1"; wl-copy --primary "$2"; refresh_geometry; local pos; pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" "$1"); "$PT" $pos mclick; sleep 0.3; }
+shot() { niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/$1.png"; }
 TASKS="$SCRATCH/data/helix/mobius/tasks"
 PROJECT="$SCRATCH/home/project"
 newest_task() { ls -t "$TASKS"/*.json 2>/dev/null | head -1 | xargs -r basename -s .json; }
@@ -310,4 +311,10 @@ t=json.load(open(sys.argv[1]))
 assert t['steps'][0]['tool']=='mcp' and t['steps'][0]['ok'] and 'sum=42' in t['steps'][0]['outcome'],t['steps']
 assert 'calc/add' in t['policy']['allow_tools'],t['policy']['allow_tools']
 PY
+click_id "agent-task-$THIRTEEN"
+sleep 2
+shot agents-final
+click_id "agent-task-$FIVE"
+sleep 2
+shot agents-applied
 echo "PASS: background tasks ask in the sheet, run when allowed, run checks without asking under the folder policy, practise, stop, leave a chat with the steps, review a git project's changes on a copy (apply and discard), remember Always allow per folder, wait for a plan to be approved or edited, start a task from a chat message, save, use and delete a skill, keep a private task on this computer, and call a tool server's tool after asking"

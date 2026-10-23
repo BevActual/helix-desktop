@@ -17,8 +17,8 @@ const ago = (secs: number) => {
   const d = Math.max(0, Date.now() / 1000 - secs);
   return d < 90 ? "just now" : d < 5400 ? `${Math.round(d / 60)} min ago` : d < 129600 ? `${Math.round(d / 3600)} h ago` : `${Math.round(d / 86400)} days ago`;
 };
-const label = (t: AgentTask) => t.state.state === "running" ? "Working" : t.state.state === "waiting" ? "Needs you" : t.state.state === "done" ? "Done" : t.state.state === "failed" ? "Failed" : t.state.state === "stopped" ? "Stopped" : "Starting";
-const TOOLS: Record<string, string> = { web_search: "Searched the web", web_read: "Read a page", terminal: "Ran a command", edit_file: "Edited a file", display_launch: "Opened an app", display_look: "Looked at the screen", display_click: "Clicked", display_type: "Typed", display_key: "Pressed a key", display_scroll: "Scrolled", display_help: "Asked for help" };
+const label = (t: AgentTask) => t.review === "pending" && t.state.state === "done" ? "Changes to review" : t.state.state === "running" ? "Working" : t.state.state === "waiting" ? "Needs you" : t.state.state === "done" ? "Done" : t.state.state === "failed" ? "Failed" : t.state.state === "stopped" ? "Stopped" : "Starting";
+const TOOLS: Record<string, string> = { web_search: "Searched the web", web_read: "Read a page", terminal: "Ran a command", edit_file: "Edited a file", display_launch: "Opened an app", display_look: "Looked at the screen", display_click: "Clicked", display_type: "Typed", display_key: "Pressed a key", display_scroll: "Scrolled", display_help: "Asked for help", mcp: "Used a tool server", skill_read: "Read a skill" };
 const group = (t: AgentTask) => t.state.state === "waiting" ? 0 : t.state.state === "running" || t.state.state === "queued" ? 1 : t.review === "pending" ? 2 : 3;
 const GROUPS = ["Needs you", "Working", "Ready to review", "Earlier"];
 
@@ -151,7 +151,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
   const detail = task && <article className="agents-detail" data-test="agent-task-detail">
     <header>
       <h3>{task.goal}</h3>
-      <p className="agents-meta"><span className={`agents-dot ${task.state.state}`} />{label(task)} · {task.steps.length} step{task.steps.length === 1 ? "" : "s"} · {ago(task.updated)} · {task.policy.name} · {task.policy.cloud === "never" ? "Private" : task.policy.cloud === "screen" ? "Best" : "Balanced"}{[...new Set(task.steps.filter((s) => s.place !== "local").map((s) => s.place))].map((p) => <span key={p} className="agents-badge remote" title="These steps ran on a remote model">{p}</span>)}{task.steps.every((s) => s.place === "local") && <span className="agents-badge" title="Every step ran on this computer">On this computer</span>}</p>
+      <p className="agents-meta"><span className={`agents-dot ${task.state.state}`} />{label(task)} · {task.steps.length} step{task.steps.length === 1 ? "" : "s"} · {ago(task.updated)} · {task.policy.name} · {task.policy.cloud === "never" ? "Private" : task.policy.cloud === "screen" ? "Best" : "Balanced"}{task.policy.folder ? ` · ${task.policy.folder.split("/").filter(Boolean).pop()}` : ""}{[...new Set(task.steps.filter((s) => s.place !== "local").map((s) => s.place))].map((p) => <span key={p} className="agents-badge remote" title="These steps ran on a remote model">{p}</span>)}{task.steps.every((s) => s.place === "local") && <span className="agents-badge" title="Every step ran on this computer">On this computer</span>}</p>
     </header>
     {task.state.state === "waiting" && task.state.why.startsWith("Review the plan") ? <section className="agents-plan" data-test="agent-task-plan">
       <strong>Plan to approve</strong>
@@ -177,7 +177,7 @@ export function AgentTasks({ register, visible, onOpenChat }: { register: (handl
     <h4>Steps</h4>
     {task.steps.length === 0 ? <p className="sheet-note">Nothing yet.</p> : <ol className="task-steps agents-steps" data-test="agent-task-steps">{task.steps.length > 6 && allSteps !== task.id && <li className="agents-more"><button type="button" className="link" data-test="agent-task-earlier" onClick={() => setAllSteps(task.id)}>{task.steps.length - 5} earlier steps</button></li>}{(allSteps === task.id || task.steps.length <= 6 ? task.steps : task.steps.slice(-5)).map((s) => <li key={s.n} className={s.ok ? "" : "bad"}>
       <strong>{TOOLS[s.tool] ?? s.tool}</strong>{s.place !== "local" && <span className="agents-badge remote">{s.place}</span>}
-      {s.input ? <code>{s.input.slice(0, 200)}</code> : null}
+      {s.input ? (s.tool === "edit_file" ? <pre className="diff" data-test="agent-task-step-diff">{s.input.slice(0, 1200).split("\n").map((line, i) => <span key={i} className={i === 0 ? "diff-head" : line.startsWith("+ ") ? "diff-add" : line.startsWith("- ") ? "diff-del" : ""}>{line || " "}</span>)}</pre> : <code>{s.input.slice(0, 200)}</code>) : null}
       <span>{s.ok ? "" : "Failed: "}{s.outcome.slice(0, 300)}</span>
       {s.would_ask ? <span className="agents-callout" data-test="agent-task-would-ask">Would have asked: {s.would_ask}</span> : null}
     </li>)}</ol>}
