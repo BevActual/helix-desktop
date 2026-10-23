@@ -4,11 +4,14 @@
 
 mod backend;
 mod fake;
+mod grammar;
 #[cfg(helix_llama)]
 mod llama;
+mod models;
 mod pictures;
 mod queue;
 mod routing;
+mod server;
 mod service;
 mod workers;
 
@@ -51,6 +54,52 @@ fn sibling(name: &str) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(name))
 }
 
+/// The `llama-server` program and its libraries, when there is one: `HELIX_LLAMA_SERVER`, else the usual places. `HELIX_LLAMA_LIBS` (a `:` list)
+/// overrides where its libraries are; by default the program's own folder, `../lib64` and `../lib`, and a CUDA runtime under `~/.local/cuda/lib`.
+fn engine_config(model_dir: &str) -> Option<server::ServerConfig> {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let mut candidates: Vec<PathBuf> = std::env::var_os("HELIX_LLAMA_SERVER")
+        .map(PathBuf::from)
+        .into_iter()
+        .collect();
+    if candidates.is_empty() {
+        candidates.extend(
+            home.iter()
+                .map(|h| h.join(".local/libexec/helix/llama-server")),
+        );
+        candidates.extend(
+            [
+                "/usr/local/libexec/helix/llama-server",
+                "/usr/libexec/helix/llama-server",
+            ]
+            .map(PathBuf::from),
+        );
+    }
+    let binary = candidates.into_iter().find(|p| p.is_file())?;
+    let mut config = server::ServerConfig::new(binary.clone(), PathBuf::from(model_dir));
+    config.library_dirs = match std::env::var("HELIX_LLAMA_LIBS") {
+        Ok(list) if !list.is_empty() => list.split(':').map(PathBuf::from).collect(),
+        _ => {
+            let folder = binary.parent().map(PathBuf::from).unwrap_or_default();
+            let mut dirs = vec![
+                folder.clone(),
+                folder.join("../lib64"),
+                folder.join("../lib"),
+            ];
+            dirs.extend(home.iter().map(|h| h.join(".local/cuda/lib")));
+            dirs.retain(|d| d.is_dir());
+            dirs
+        }
+    };
+    if let Ok(layers) = env("HELIX_GPU_LAYERS", "").parse() {
+        config.gpu_layers = layers;
+    }
+    if let Ok(tokens) = env("HELIX_CONTEXT_TOKENS", "").parse() {
+        config.context_tokens = tokens;
+    }
+    Some(config)
+}
+
 #[tokio::main]
 async fn main() {
     // An engine worker may fail before reading its input.
@@ -69,14 +118,18 @@ async fn main() {
             &env("HELIX_FAKE_REPLY", "hello from the fake backend"),
             Duration::from_millis(delay),
         ))
+    } else if let Some(config) = engine_config(&model_dir) {
+        // The engine is a supervised `llama-server` child process (see server.rs).
+        Arc::new(server::ServerBackend::new(config))
     } else {
         #[cfg(helix_llama)]
         {
+            // No `llama-server` found: the in-process engine, until it is retired.
             Arc::new(llama::LlamaBackend::new(std::path::Path::new(&model_dir)))
         }
         #[cfg(not(helix_llama))]
         {
-            eprintln!("helix-inference: built without an engine; set HELIX_INFERENCE_BACKEND=fake to test");
+            eprintln!("helix-inference: no engine found (set HELIX_LLAMA_SERVER, or HELIX_INFERENCE_BACKEND=fake to test)");
             std::process::exit(1);
         }
     };

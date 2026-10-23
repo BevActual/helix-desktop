@@ -77,6 +77,14 @@ PATH=$HOME/.local/cuda/bin:$PATH cmake -S third_party/llama.cpp-0.6.0 -B build \
 
 ## Status
 
+* 2026-10-23 (later): `helix-inference` has a `llama-server` backend (`src/server.rs`): it starts the engine on the model asked for over a private
+  Unix socket (`--host <path>.sock` in a 0700 folder; no TCP port), waits for health, streams OpenAI chat chunks, passes pictures as PNG data URLs
+  with the model's `mmproj`, constrains tool calls with the same GBNF the C++ engine used (`src/grammar.rs`, ported), reports prompt-cache hits,
+  cancels by closing the connection, restarts an engine that died between requests, and kills it with the service (`PR_SET_PDEATHSIG`). Model
+  discovery (shards, projectors, only-listed-models-load) is `src/models.rs`. Real-engine tests (`--ignored`) pass: streaming, prompt cache,
+  grammar-constrained call, cancel, kill-and-restart, refusal of an unlisted path, and reading a picture. Selected when `HELIX_LLAMA_SERVER` (or
+  `~/.local/libexec/helix/llama-server`) exists; otherwise the C shim is still used.
+
 * 2026-10-23: llama.cpp 0.6.0 builds from the vendored source with CPU variants, CUDA 13.4 and Vulkan as loadable backends and lists the RTX 4080
   Laptop GPU under both. Same 7B Q4 model, short chat reply on this laptop (the desktop is also using the GPU): **CPU 4.1 tokens/s, Vulkan 27.7,
   CUDA 28.6**, so the GPU is about 7x the CPU engine the installed service uses now. CUDA and Vulkan are within a few percent here; Vulkan stays
