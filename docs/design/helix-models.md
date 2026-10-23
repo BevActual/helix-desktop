@@ -77,6 +77,12 @@ PATH=$HOME/.local/cuda/bin:$PATH cmake -S third_party/llama.cpp-0.6.0 -B build \
 
 ## Status
 
+* 2026-10-23 (live): the running user service now uses it (`~/.config/systemd/user/helix-inference.service.d/95-llama-server.conf`; remove that file
+  to go back to the C++ build). Under the real unit sandbox (no network, read-only home, private temp) the engine starts, uses the GPU (4.7 GB of
+  VRAM for the 7B) and answers. `tools/bench/mobius-bench.py`, same 7B model, first request including the load: **30.7 s before, 4.8 s now**; a
+  507-character answer in 2.8 s. The engine child currently inherits the service's sandbox; a `bwrap` sandbox of its own is needed before the
+  service itself is given network access for LAN and cloud backends.
+
 * 2026-10-23 (later): `helix-inference` has a `llama-server` backend (`src/server.rs`): it starts the engine on the model asked for over a private
   Unix socket (`--host <path>.sock` in a 0700 folder; no TCP port), waits for health, streams OpenAI chat chunks, passes pictures as PNG data URLs
   with the model's `mmproj`, constrains tool calls with the same GBNF the C++ engine used (`src/grammar.rs`, ported), reports prompt-cache hits,
