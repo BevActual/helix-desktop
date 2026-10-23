@@ -278,6 +278,18 @@ pub struct HelixInput {
     /// Touchpad: `clickfinger` (the number of fingers decides the button) or `button-areas`.
     #[serde(default)]
     pub touchpad_click_method: Option<String>,
+    /// Touchpad: tap, then drag with the same finger.
+    #[serde(default)]
+    pub touchpad_tap_and_drag: Option<bool>,
+    /// Touchpad: a drag carries on after the finger lifts, until another tap.
+    #[serde(default)]
+    pub touchpad_drag_lock: Option<bool>,
+    /// Touchpad: `two-finger` or `edge`.
+    #[serde(default)]
+    pub touchpad_scroll_method: Option<String>,
+    /// Touchpad: switched off while an external mouse is plugged in.
+    #[serde(default)]
+    pub touchpad_off_with_mouse: Option<bool>,
     /// Mouse: content follows the wheel the other way.
     #[serde(default)]
     pub mouse_natural_scroll: Option<bool>,

@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use niri_config::input::{AccelProfile, ClickMethod};
+use niri_config::input::{AccelProfile, ClickMethod, ScrollMethod};
 use niri_config::{FloatOrInt, Input};
 use niri_ipc::HelixInput;
 
@@ -53,6 +53,11 @@ pub fn validate(input: &HelixInput) -> Result<(), String> {
             return Err("click method is clickfinger or button-areas".into());
         }
     }
+    if let Some(method) = &input.touchpad_scroll_method {
+        if !matches!(method.as_str(), "two-finger" | "edge") {
+            return Err("scrolling is two-finger or edge".into());
+        }
+    }
     if let Some(profile) = &input.mouse_accel_profile {
         if !matches!(profile.as_str(), "adaptive" | "flat") {
             return Err("acceleration is adaptive or flat".into());
@@ -94,6 +99,10 @@ fn merge(base: &mut HelixInput, change: &HelixInput) {
         touchpad_speed,
         touchpad_disable_while_typing,
         touchpad_click_method,
+        touchpad_tap_and_drag,
+        touchpad_drag_lock,
+        touchpad_scroll_method,
+        touchpad_off_with_mouse,
         mouse_natural_scroll,
         mouse_speed,
         mouse_accel_profile,
@@ -124,6 +133,22 @@ pub fn overlay(input: &mut Input, o: &HelixInput) {
             "button-areas" => Some(ClickMethod::ButtonAreas),
             _ => input.touchpad.click_method,
         };
+    }
+    if let Some(v) = o.touchpad_tap_and_drag {
+        input.touchpad.drag = Some(v);
+    }
+    if let Some(v) = o.touchpad_drag_lock {
+        input.touchpad.drag_lock = v;
+    }
+    if let Some(v) = &o.touchpad_scroll_method {
+        input.touchpad.scroll_method = match v.as_str() {
+            "two-finger" => Some(ScrollMethod::TwoFinger),
+            "edge" => Some(ScrollMethod::Edge),
+            _ => input.touchpad.scroll_method,
+        };
+    }
+    if let Some(v) = o.touchpad_off_with_mouse {
+        input.touchpad.disabled_on_external_mouse = v;
     }
     if let Some(v) = o.mouse_natural_scroll {
         input.mouse.natural_scroll = v;
@@ -171,6 +196,16 @@ pub fn effective(input: &Input) -> HelixInput {
         touchpad_speed: Some(input.touchpad.accel_speed.0),
         touchpad_disable_while_typing: Some(input.touchpad.dwt),
         touchpad_click_method: click(input.touchpad.click_method),
+        touchpad_tap_and_drag: Some(input.touchpad.drag.unwrap_or(input.touchpad.tap)),
+        touchpad_drag_lock: Some(input.touchpad.drag_lock),
+        touchpad_scroll_method: Some(
+            match input.touchpad.scroll_method {
+                Some(ScrollMethod::Edge) => "edge",
+                _ => "two-finger",
+            }
+            .to_string(),
+        ),
+        touchpad_off_with_mouse: Some(input.touchpad.disabled_on_external_mouse),
         mouse_natural_scroll: Some(input.mouse.natural_scroll),
         mouse_speed: Some(input.mouse.accel_speed.0),
         mouse_accel_profile: Some(
@@ -256,6 +291,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn touchpad_extras_are_set_and_read_back() {
+        let mut input = Input::default();
+        overlay(
+            &mut input,
+            &HelixInput {
+                touchpad_tap_and_drag: Some(false),
+                touchpad_drag_lock: Some(true),
+                touchpad_scroll_method: Some("edge".into()),
+                touchpad_off_with_mouse: Some(true),
+                ..HelixInput::default()
+            },
+        );
+        let now = effective(&input);
+        assert_eq!(now.touchpad_tap_and_drag, Some(false));
+        assert_eq!(now.touchpad_drag_lock, Some(true));
+        assert_eq!(now.touchpad_scroll_method.as_deref(), Some("edge"));
+        assert_eq!(now.touchpad_off_with_mouse, Some(true));
+        assert_eq!(
+            effective(&Input::default())
+                .touchpad_scroll_method
+                .as_deref(),
+            Some("two-finger")
+        );
+    }
+
+    #[test]
     fn overrides_replace_only_what_they_name() {
         let mut input = Input::default();
         input.touchpad.natural_scroll = true;
@@ -334,6 +395,10 @@ mod tests {
             },
             HelixInput {
                 touchpad_click_method: Some("tripleclick".into()),
+                ..HelixInput::default()
+            },
+            HelixInput {
+                touchpad_scroll_method: Some("circular".into()),
                 ..HelixInput::default()
             },
             HelixInput {

@@ -107,6 +107,19 @@ pub fn pointer_rows(input: &InputSettings) -> Vec<RowView> {
                 input.touchpad_click_method.as_deref().unwrap_or("clickfinger"),
             ),
         ),
+        row(
+            "Touchpad",
+            "touchpad:scroll",
+            "Scrolling",
+            "Two fingers anywhere, or one finger along the right edge.",
+            choice(
+                &[("two-finger", "Two fingers"), ("edge", "Edge")],
+                input.touchpad_scroll_method.as_deref().unwrap_or("two-finger"),
+            ),
+        ),
+        row("Touchpad", "touchpad:drag", "Tap and drag", "Tap, then keep your finger down and move to drag.", on(input.touchpad_tap_and_drag)),
+        row("Touchpad", "touchpad:drag-lock", "Drag lock", "A drag carries on when you lift your finger, until you tap again.", on(input.touchpad_drag_lock)),
+        row("Touchpad", "touchpad:off-with-mouse", "Off while a mouse is plugged in", "", on(input.touchpad_off_with_mouse)),
         row("Mouse", "mouse:natural", "Natural scrolling", "The wheel scrolls the other way.", on(input.mouse_natural_scroll)),
         row("Mouse", "mouse:speed", "Pointer speed", "", speed(input.mouse_speed)),
         row(
@@ -191,6 +204,14 @@ pub fn parse_change(id: &str, change: &Value) -> Result<InputSettings, String> {
         ("touchpad:speed", Some("number")) => out.touchpad_speed = Some(number()?.clamp(-1.0, 1.0)),
         ("touchpad:dwt", Some("switch")) => out.touchpad_disable_while_typing = Some(switch()?),
         ("touchpad:click", Some("choice")) => out.touchpad_click_method = Some(text()?.to_string()),
+        ("touchpad:scroll", Some("choice")) => {
+            out.touchpad_scroll_method = Some(text()?.to_string())
+        }
+        ("touchpad:drag", Some("switch")) => out.touchpad_tap_and_drag = Some(switch()?),
+        ("touchpad:drag-lock", Some("switch")) => out.touchpad_drag_lock = Some(switch()?),
+        ("touchpad:off-with-mouse", Some("switch")) => {
+            out.touchpad_off_with_mouse = Some(switch()?)
+        }
         ("mouse:natural", Some("switch")) => out.mouse_natural_scroll = Some(switch()?),
         ("mouse:speed", Some("number")) => out.mouse_speed = Some(number()?.clamp(-1.0, 1.0)),
         ("mouse:accel", Some("choice")) => out.mouse_accel_profile = Some(text()?.to_string()),
@@ -239,7 +260,7 @@ mod tests {
         let pointer = pointer_rows(&input);
         assert!(matches!(pointer[0].control, Control::Switch { on: true }));
         assert!(
-            matches!(&pointer[7].control, Control::Choice { current, .. } if current == "flat")
+            matches!(&pointer[11].control, Control::Choice { current, .. } if current == "flat")
         );
         let typing = typing_rows(&input, &[("us".into(), "English (US)".into())]);
         match &typing[0].control {
