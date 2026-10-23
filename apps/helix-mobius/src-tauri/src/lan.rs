@@ -419,7 +419,13 @@ mod tests {
                 data.extend_from_slice(&chunk[..n]);
                 let text = String::from_utf8_lossy(&data).to_string();
                 if let Some(split) = text.find("\r\n\r\n") {
-                    let length = text[..split].to_lowercase().split("content-length:").nth(1).and_then(|l| l.lines().next()).and_then(|l| l.trim().parse::<usize>().ok()).unwrap_or(0);
+                    let length = text[..split]
+                        .to_lowercase()
+                        .split("content-length:")
+                        .nth(1)
+                        .and_then(|l| l.lines().next())
+                        .and_then(|l| l.trim().parse::<usize>().ok())
+                        .unwrap_or(0);
                     if data.len() >= split + 4 + length {
                         break;
                     }
@@ -441,17 +447,40 @@ mod tests {
         let reply = json!({"choices": [{"message": {"content": null, "tool_calls": [{"function": {"name": "web_search", "arguments": "{\"query\":\"rust docs\"}"}}]}}]});
         let (base, server) = serve_once(reply).await;
         let tools = json!([{"type": "function", "function": {"name": "web_search", "parameters": {"type": "object"}}}]);
-        let text = chat_completions_with_tools(&base, "m", &[("user", "find docs".to_string())], None, RemoteOptions::default(), &tools).await.unwrap();
-        assert_eq!(serde_json::from_str::<Value>(&text).unwrap(), json!({"tool": "web_search", "query": "rust docs"}));
+        let text = chat_completions_with_tools(
+            &base,
+            "m",
+            &[("user", "find docs".to_string())],
+            None,
+            RemoteOptions::default(),
+            &tools,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&text).unwrap(),
+            json!({"tool": "web_search", "query": "rust docs"})
+        );
         let sent = server.await.unwrap();
-        assert!(sent.contains("\"tools\"") && sent.contains("\"tool_choice\":\"auto\""), "the tools were offered: {sent}");
+        assert!(
+            sent.contains("\"tools\"") && sent.contains("\"tool_choice\":\"auto\""),
+            "the tools were offered: {sent}"
+        );
     }
 
     #[tokio::test]
     async fn a_plain_call_never_offers_tools_and_ignores_a_function_call() {
         let reply = json!({"choices": [{"message": {"content": "hello", "tool_calls": [{"function": {"name": "terminal", "arguments": "{}"}}]}}]});
         let (base, server) = serve_once(reply).await;
-        let text = chat_completions(&base, "m", &[("user", "hi".to_string())], None, RemoteOptions::default()).await.unwrap();
+        let text = chat_completions(
+            &base,
+            "m",
+            &[("user", "hi".to_string())],
+            None,
+            RemoteOptions::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(text, "hello");
         assert!(!server.await.unwrap().contains("\"tools\""));
     }

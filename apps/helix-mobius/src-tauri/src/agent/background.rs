@@ -537,6 +537,7 @@ async fn work(
     let mut observations = String::new();
     let mut activities: Vec<helix_chat::chat::ToolActivity> = Vec::new();
     let mut display: Option<surface::Surface> = None;
+    let mut last_look = String::new();
     let mut private = false;
     let research = app.state::<web::Research>();
     let mut planned = 0usize;
@@ -750,7 +751,7 @@ async fn work(
                 tokio::select! {
                     biased;
                     _ = cancel.changed() => return Err("Task stopped.".into()),
-                    result = display_step(&mut display, &request, &watching) => result,
+                    result = display_step(&mut display, &mut last_look, &request, &watching) => result,
                 }
             }
             Request::Mcp { server, name, args } => {

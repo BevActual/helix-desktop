@@ -608,11 +608,40 @@ async fn see(picture: Vec<u8>, cancel: watch::Receiver<bool>) -> Result<String, 
 }
 
 /// Runs one display command through the Agent Surface and returns what to tell the planner.
+/// What the screen says when text is about to be typed on it: a prompt for a password or a code is for the person, never the agent
+/// (`docs/design/computer-use.md`). `look` is the latest description of the screen.
+fn typing_guard(look: &str) -> Option<&'static str> {
+    let look = look.to_lowercase();
+    const CUES: [&str; 12] = [
+        "password",
+        "passcode",
+        "passphrase",
+        "card number",
+        "credit card",
+        "cvv",
+        "cvc",
+        "security code",
+        "verification code",
+        "one-time",
+        "two-factor",
+        "2fa",
+    ];
+    CUES.iter().any(|cue| look.contains(cue)).then_some(
+        "The screen looks like it is asking for a password, a code or a card. Use display_help so the person types it; an agent never types these.",
+    )
+}
+
 async fn display_step(
     surface: &mut Option<surface::Surface>,
+    last_look: &mut String,
     request: &Request,
     cancel: &watch::Receiver<bool>,
 ) -> Result<String, String> {
+    if matches!(request, Request::DisplayType { .. }) {
+        if let Some(refusal) = typing_guard(last_look) {
+            return Err(refusal.into());
+        }
+    }
     let (tool, tier, argv, literal): (&str, &str, Vec<String>, Vec<String>) = match request {
         Request::DisplayLaunch { app } => (
             "display-launch",
@@ -652,9 +681,19 @@ async fn display_step(
                 .ok_or_else(|| reply.text.clone())?
                 .to_string();
             let bytes = tokio::fs::read(&path).await.map_err(|e| e.to_string())?;
-            see(bytes, cancel.clone()).await
+            let described = see(bytes, cancel.clone()).await?;
+            *last_look = described.clone();
+            Ok(described)
         }
-        Request::DisplayHelp { .. } => wait_for_help(surface, cancel.clone()).await,
+        Request::DisplayHelp { .. } => {
+            // The person has done the step, so what was last seen is out of date.
+            last_look.clear();
+            wait_for_help(surface, cancel.clone()).await
+        }
+        Request::DisplayLaunch { .. } => {
+            last_look.clear();
+            Ok(reply.text)
+        }
         _ => Ok(reply.text),
     }
 }
@@ -971,6 +1010,7 @@ async fn execute(
     let mut taken = 0usize;
     let mut budget = 6usize;
     let mut display: Option<surface::Surface> = None;
+    let mut last_look = String::new();
     while taken < budget {
         let step = taken;
         taken += 1;
@@ -1229,7 +1269,7 @@ async fn execute(
                 tokio::select! {
                     biased;
                     _ = cancel.changed() => return Err("Tools task stopped.".into()),
-                    result = display_step(&mut display, &request, &watching) => result,
+                    result = display_step(&mut display, &mut last_look, &request, &watching) => result,
                 }
             }
             Request::Mcp { .. } => {
@@ -1392,6 +1432,18 @@ pub async fn pick_folder() -> Result<Option<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn typing_is_refused_on_a_screen_that_asks_for_a_password_or_a_code() {
+        assert!(typing_guard(
+            "A sign-in page with an Email field and a Password field at (640, 400)."
+        )
+        .is_some());
+        assert!(typing_guard("Enter the 6-digit Verification Code we sent you").is_some());
+        assert!(typing_guard("Card number, expiry and CVV fields").is_some());
+        assert!(typing_guard("A search page with a box at (640, 120) and results below").is_none());
+        assert!(typing_guard("").is_none());
+    }
+
     #[test]
     fn every_function_offered_to_a_remote_model_is_a_form_the_loop_reads() {
         let examples = serde_json::json!({
