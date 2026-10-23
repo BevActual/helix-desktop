@@ -10,6 +10,8 @@ pub struct BackendInfo {
     pub kind: String, // local | openai
     pub base_url: String,
     pub label: String,
+    /// Where the key is kept (`<state>/secrets/backend-<ref>`); empty means the backend's own id.
+    pub api_key_ref: String,
 }
 
 #[derive(Clone, Debug)]
@@ -56,6 +58,7 @@ impl RoutingTable {
                 kind: "local".into(),
                 base_url: String::new(),
                 label: "On this computer".into(),
+                api_key_ref: String::new(),
             });
         }
         for task in ["act", "chat", "summarize", "vision", "code"] {
@@ -135,6 +138,7 @@ impl RoutingTable {
                     "kind" => current.kind = value,
                     "base_url" => current.base_url = value,
                     "label" => current.label = value,
+                    "api_key_ref" => current.api_key_ref = value,
                     _ => {}
                 }
             } else if key == "allow_remote_on_battery_saver" {
@@ -162,6 +166,10 @@ impl RoutingTable {
 
     pub fn route(&self, task: &str) -> ProfileRoute {
         self.profiles.get(task).cloned().unwrap_or_default()
+    }
+
+    pub fn backend(&self, id: &str) -> Option<&BackendInfo> {
+        self.backends.iter().find(|b| b.id == id)
     }
 
     pub fn is_local(&self, task: &str) -> bool {

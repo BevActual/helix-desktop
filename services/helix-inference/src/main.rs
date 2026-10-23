@@ -10,6 +10,7 @@ mod llama;
 mod models;
 mod pictures;
 mod queue;
+mod remote;
 mod routing;
 mod sandbox;
 mod server;
@@ -190,6 +191,7 @@ async fn main() {
         transcriber,
         image_generator,
     ));
+    service.set_remote(Arc::new(remote::OpenAiRemote));
     // Registered through a thin wrapper so the main loop keeps a handle for owner-gone and idle ticks.
     if let Err(error) = connection
         .object_server()

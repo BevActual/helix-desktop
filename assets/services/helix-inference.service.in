@@ -9,7 +9,9 @@ Restart=on-failure
 RestartSec=2
 
 # Model files are untrusted binary input to a parser written in C++, so the process that reads them is boxed in: no
-# network, no writes outside its own temporary space and private shader cache, no new privileges, only the system calls a normal service needs.
+# network (see the engine's own box below), no writes outside its own temporary space and private shader cache, no new privileges, only the system calls a normal service needs.
+# The service itself may reach the network, to ask the LAN and hosted models the person has routed a slot to (services/helix-inference/src/remote.rs); it
+# never reads model files, and the engine that does has no network.
 # It can still read the models under ~/.local/share/helix and use the GPU. tools/check-inference-sandbox.py proves it.
 # The engine (llama-server) is a child of this service and runs in a bubblewrap box of its own (services/helix-inference/src/sandbox.rs): no network,
 # no home folder, read-only system and models, only its socket folder writable, the GPU's device nodes. Making that box means this service may create
@@ -17,7 +19,6 @@ RestartSec=2
 # They are safe to relax here: the service has no capabilities (CapabilityBoundingSet is empty) and the engine, the only thing that reads model
 # files, is the one inside the box. If bubblewrap cannot make a box the engine still runs under this unit's limits and the service says so.
 NoNewPrivileges=yes
-PrivateNetwork=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
@@ -27,7 +28,7 @@ ProtectKernelLogs=no
 ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=no
-RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
 RestrictNamespaces=user pid net mnt ipc uts cgroup
 RestrictRealtime=yes
 RestrictSUIDSGID=yes

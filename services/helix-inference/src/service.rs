@@ -217,13 +217,30 @@ fn parse_chat(
     }
     // Local model slots: when the client omits model, use the profile from inference-routing.toml.
     if request.model.is_empty() {
-        if !routing.is_local(&task) {
-            return Err(invalid(format!(
-                "task \"{task}\" is routed to a non-local backend; the sandboxed engine only runs local GGUF \
-                 (use Mobius for LAN/cloud talk)"
-            )));
+        let route = routing.route(&task);
+        if routing.is_local(&task) {
+            request.model = route.model;
+        } else {
+            // The person routed this slot to another machine or a hosted service: that is the explicit choice. The Act slot is the exception: only a
+            // model on this computer may emit tools for the desktop.
+            if task == "act" {
+                return Err(invalid("the act task only runs on a local model"));
+            }
+            let Some(backend) = routing.backend(&route.backend) else {
+                return Err(invalid(format!(
+                    "task \"{task}\" is routed to a backend that is not configured: {}",
+                    route.backend
+                )));
+            };
+            if backend.kind != "openai" {
+                return Err(invalid(format!(
+                    "backend {} is of a kind this service does not speak",
+                    backend.id
+                )));
+            }
+            request.backend = backend.id.clone();
+            request.model = route.model;
         }
-        request.model = routing.route(&task).model;
     }
     if let Some(value) = args.get("schema") {
         let Some(text) = value.as_str() else {
@@ -233,7 +250,7 @@ fn parse_chat(
         if task != "act" {
             return Err(invalid("schema is only allowed for task \"act\""));
         }
-        if !routing.is_local(&task) {
+        if !request.backend.is_empty() {
             return Err(invalid("schema requires a local act backend"));
         }
         request.json_schema = text.to_string();
@@ -268,6 +285,10 @@ fn parse_chat(
 }
 
 impl Inner {
+    pub fn set_remote(&self, remote: Arc<dyn RemoteChat>) {
+        self.queue.set_remote(remote);
+    }
+
     pub fn new(
         connection: Connection,
         config: Config,
@@ -718,4 +739,52 @@ impl Service {
 
     #[zbus(signal)]
     async fn changed(emitter: &zbus::object_server::SignalEmitter<'_>) -> zbus::Result<()>;
+}
+
+#[cfg(test)]
+mod routing_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn table() -> RoutingTable {
+        RoutingTable::parse(
+            "[[backends]]\nid = \"lan\"\nkind = \"openai\"\nbase_url = \"http://studio:8080/v1\"\n\
+             [[backends]]\nid = \"odd\"\nkind = \"carrier-pigeon\"\n\
+             [profiles.chat]\nbackend = \"lan\"\nmodel = \"big\"\n\
+             [profiles.code]\nbackend = \"odd\"\nmodel = \"x\"\n\
+             [profiles.summarize]\nbackend = \"missing\"\n\
+             [profiles.act]\nbackend = \"lan\"\nmodel = \"big\"\n\
+             [profiles.vision]\nbackend = \"local\"\nmodel = \"small.gguf\"\n",
+        )
+    }
+
+    fn args(task: &str) -> Map<String, Json> {
+        let v = json!({"messages": [{"role": "user", "content": "hi"}], "task": task});
+        v.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn a_slot_the_person_routed_elsewhere_goes_there_and_nothing_else_does() {
+        let routing = table();
+        let request = parse_chat(&args("chat"), "c", &routing, vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("lan", "big")
+        );
+        // A local slot stays on the engine.
+        let request = parse_chat(&args("vision"), "c", &routing, vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("", "small.gguf")
+        );
+        // Only a model on this computer may act for the desktop, wherever the slot is routed.
+        assert!(parse_chat(&args("act"), "c", &routing, vec![]).is_err());
+        // A backend that is missing or of an unknown kind is an error, never a fall back to local.
+        assert!(parse_chat(&args("summarize"), "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&args("code"), "c", &routing, vec![]).is_err());
+        // An output grammar never goes to another machine.
+        let mut with_schema = args("chat");
+        with_schema.insert("schema".into(), json!("{}"));
+        assert!(parse_chat(&with_schema, "c", &routing, vec![]).is_err());
+    }
 }

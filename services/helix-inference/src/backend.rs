@@ -24,6 +24,8 @@ pub struct ChatRequest {
     pub client: String,
     /// Empty = the backend's default.
     pub model: String,
+    /// Which configured backend answers (`inference-routing.toml`); empty or `local` is the on-device engine.
+    pub backend: String,
     /// `[{role, content}, ...]`; content is a string or a list of `{"type":"text","text":..}` / `{"type":"image","index":N}`.
     pub messages: Value,
     pub images: Vec<ImageInput>,
@@ -50,6 +52,7 @@ impl Default for ChatRequest {
         Self {
             client: String::new(),
             model: String::new(),
+            backend: String::new(),
             messages: Value::Null,
             images: Vec::new(),
             generate_image: false,
@@ -122,6 +125,17 @@ pub trait Backend: Send + Sync {
     fn snapshot(&self) -> Value;
     /// Told how far loading a model has got (0..1) while `load` runs, on the worker thread.
     fn set_progress(&self, _progress: ProgressFn) {}
+}
+
+/// Talk, summarise, vision and code answered by a model on another machine or a hosted service: only what the person routed there.
+pub trait RemoteChat: Send + Sync {
+    /// Must return promptly once `cancelled()` is true.
+    fn chat(
+        &self,
+        request: &ChatRequest,
+        on_delta: &mut dyn FnMut(&str),
+        cancelled: &dyn Fn() -> bool,
+    ) -> Outcome;
 }
 
 pub trait Transcriber: Send + Sync {

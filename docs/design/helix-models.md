@@ -93,6 +93,15 @@ PATH=$HOME/.local/cuda/bin:$PATH cmake -S third_party/llama.cpp-0.6.0 -B build \
 
 ## Status
 
+* 2026-10-23 (remote): the gateway answers a slot the person routed to another machine or a hosted service (`src/remote.rs`, OpenAI-compatible
+  `/chat/completions`, streaming, usage). Rules enforced in code and tests: the Act slot only ever runs on a local model; a slot routed to a missing
+  or unknown-kind backend is an error, never a fall back to local; an output grammar is never sent to another machine; a key is read from
+  `<state>/secrets/backend-<ref>` (a short plain name, never a path) and is sent only over `https`, or over `http` to the local network; each call
+  writes an audit line (client, backend, model, token counts, ok; never text); cancelling returns at once. The unit template now lets the service
+  use the network (the engine in its box still has none), and `tools/check-inference-sandbox.py` proves it end to end under the unit's hardening: a
+  scripted OpenAI server on loopback, a key, the chat slot routed to it, and the answer comes back. Next: Mobius's talk path goes through the
+  gateway instead of its own `lan.rs`/`cloud.rs`/`chatgpt.rs` clients (native tool calling and the ChatGPT-plan flow still need their own steps).
+
 * 2026-10-23 (box): the engine runs in its own `bwrap` box (`src/sandbox.rs`): `--unshare-all` (so no network), no home folder, the system, the models,
   the engine and its libraries read-only, one writable socket folder, a cleared environment, all capabilities dropped, and only the GPU's device
   nodes. `HELIX_ENGINE_SANDBOX=off|auto|require` (default auto: a box when bubblewrap works, else the old behaviour with a message). Tests: the

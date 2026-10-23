@@ -605,7 +605,7 @@ fn png_data_url(image: &ImageInput) -> Result<String, String> {
 }
 
 /// The service's messages (`{"type":"image","index":N}` parts) as OpenAI chat messages (`image_url` parts carrying the picture).
-fn chat_messages(messages: &Value, images: &[ImageInput]) -> Result<Value, String> {
+pub(crate) fn chat_messages(messages: &Value, images: &[ImageInput]) -> Result<Value, String> {
     let mut out = Vec::new();
     for message in messages.as_array().ok_or("messages is a list")? {
         let role = message
@@ -663,6 +663,42 @@ fn request_body(request: &ChatRequest) -> Result<String, String> {
         body["grammar"] = json!(grammar);
     }
     Ok(body.to_string())
+}
+
+/// One `data:` payload of an OpenAI-style chat stream: the text so far, why it stopped, and what it cost.
+pub(crate) fn absorb(
+    data: &str,
+    outcome: &mut Outcome,
+    finish: &mut String,
+    spoke: &mut bool,
+    on_delta: &mut dyn FnMut(&str),
+) {
+    let Ok(value) = serde_json::from_str::<Value>(data) else {
+        return;
+    };
+    if let Some(delta) = value
+        .pointer("/choices/0/delta/content")
+        .and_then(Value::as_str)
+    {
+        if !delta.is_empty() {
+            *spoke = true;
+            outcome.text.push_str(delta);
+            on_delta(delta);
+        }
+    }
+    if let Some(reason) = value
+        .pointer("/choices/0/finish_reason")
+        .and_then(Value::as_str)
+    {
+        *finish = reason.to_string();
+    }
+    if let Some(usage) = value.get("usage").filter(|u| u.is_object()) {
+        outcome.prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0) as u32;
+        outcome.completion_tokens = usage["completion_tokens"].as_u64().unwrap_or(0) as u32;
+    }
+    if let Some(cached) = value.pointer("/timings/cache_n").and_then(Value::as_u64) {
+        outcome.cached_prompt_tokens = cached as u32;
+    }
 }
 
 impl Backend for ServerBackend {
@@ -741,34 +777,7 @@ impl Backend for ServerBackend {
                     if data == "[DONE]" {
                         return false;
                     }
-                    let Ok(value) = serde_json::from_str::<Value>(data) else {
-                        return true;
-                    };
-                    if let Some(delta) = value
-                        .pointer("/choices/0/delta/content")
-                        .and_then(Value::as_str)
-                    {
-                        if !delta.is_empty() {
-                            spoke = true;
-                            outcome.text.push_str(delta);
-                            on_delta(delta);
-                        }
-                    }
-                    if let Some(reason) = value
-                        .pointer("/choices/0/finish_reason")
-                        .and_then(Value::as_str)
-                    {
-                        finish = reason.to_string();
-                    }
-                    if let Some(usage) = value.get("usage").filter(|u| u.is_object()) {
-                        outcome.prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0) as u32;
-                        outcome.completion_tokens =
-                            usage["completion_tokens"].as_u64().unwrap_or(0) as u32;
-                    }
-                    if let Some(cached) = value.pointer("/timings/cache_n").and_then(Value::as_u64)
-                    {
-                        outcome.cached_prompt_tokens = cached as u32;
-                    }
+                    absorb(data, &mut outcome, &mut finish, &mut spoke, on_delta);
                     true
                 },
             );
