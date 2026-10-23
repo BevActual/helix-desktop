@@ -170,6 +170,129 @@ fn describe(action: &Action) -> (String, String) {
     (kebab, detail.chars().take(200).collect())
 }
 
+/// Splits `a, b(c, d), e` at the commas that are not inside brackets.
+fn top_level_args(text: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let (mut depth, mut start, mut quoted) = (0i32, 0usize, false);
+    for (i, c) in text.char_indices() {
+        match c {
+            '"' => quoted = !quoted,
+            '(' | '[' | '{' if !quoted => depth += 1,
+            ')' | ']' | '}' if !quoted => depth -= 1,
+            ',' if !quoted && depth == 0 => {
+                parts.push(text[start..i].trim().to_string());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    let last = text[start..].trim();
+    if !last.is_empty() {
+        parts.push(last.to_string());
+    }
+    parts
+}
+
+fn number_text(n: &str) -> Option<String> {
+    let f: f64 = n.parse().ok()?;
+    Some(if f.fract() == 0.0 {
+        format!("{}", f as i64)
+    } else {
+        format!("{f}")
+    })
+}
+
+/// One printed argument as a config writes it, or `None` to leave it out. Booleans become properties, named in turn from `props`.
+fn argument(token: &str, props: &mut std::slice::Iter<'_, &str>) -> Option<Option<String>> {
+    if token == "None" {
+        return Some(None);
+    }
+    if token == "true" || token == "false" {
+        return Some(Some(format!("{}={token}", props.next()?)));
+    }
+    if let Some(inner) = token
+        .strip_prefix("Some(")
+        .and_then(|t| t.strip_suffix(')'))
+    {
+        return argument(inner, props);
+    }
+    for (wrapper, f) in [
+        ("Index(", 0),
+        ("Name(", 1),
+        ("SetProportion(", 2),
+        ("AdjustProportion(", 3),
+        ("SetFixed(", 4),
+        ("AdjustFixed(", 5),
+    ] {
+        if let Some(inner) = token
+            .strip_prefix(wrapper)
+            .and_then(|t| t.strip_suffix(')'))
+        {
+            let n = number_text(inner);
+            return Some(Some(match f {
+                0 => n?,
+                1 => inner.to_string(),
+                2 => format!("\"{}%\"", n?),
+                3 => {
+                    let n = n?;
+                    format!("\"{}{n}%\"", if n.starts_with('-') { "" } else { "+" })
+                }
+                4 => n?,
+                _ => {
+                    let n = n?;
+                    format!("\"{}{n}\"", if n.starts_with('-') { "" } else { "+" })
+                }
+            }));
+        }
+    }
+    Some(Some(token.to_string()))
+}
+
+/// The action as a config writes it, worked out from how it prints (`Spawn([\"a\", \"b\"])` → `spawn \"a\" \"b\"`) and kept only if that text reads back
+/// as the very same action: so what is shown can be put on another chord without losing anything. `None` for an action that does not come out right.
+fn written(action: &Action) -> Option<String> {
+    let debug = format!("{action:?}");
+    let (name, _) = describe(action);
+    let Some((_, rest)) = debug.split_once('(') else {
+        return Some(name).filter(|n| verified(n, action));
+    };
+    let inner = rest.strip_suffix(')')?.trim();
+    // One level of list becomes the arguments themselves.
+    let inner = inner
+        .strip_prefix('[')
+        .and_then(|i| i.strip_suffix(']'))
+        .unwrap_or(inner);
+    let tokens = top_level_args(inner);
+    // Which property each boolean is, tried in the orders a config could mean.
+    let orders: &[&[&str]] = &[
+        &["focus"],
+        &["skip-confirmation"],
+        &["show-pointer"],
+        &["write-to-disk", "show-pointer"],
+        &["write-to-disk"],
+        &["show-pointer", "write-to-disk"],
+    ];
+    orders.iter().find_map(|order| {
+        let mut props = order.iter();
+        let mut words = Vec::new();
+        for token in &tokens {
+            words.extend(argument(token, &mut props)?);
+        }
+        // Properties go after the plain arguments.
+        words.sort_by_key(|w| w.contains('=') && !w.starts_with('"'));
+        let text = if words.is_empty() {
+            name.clone()
+        } else {
+            format!("{name} {}", words.join(" "))
+        };
+        verified(&text, action).then_some(text)
+    })
+}
+
+fn verified(text: &str, action: &Action) -> bool {
+    action_text_ok(text) && parse_bind("F24", text).is_ok_and(|bind| bind.action == *action)
+}
+
 /// Puts the overrides over a configuration that was just loaded.
 pub fn overlay(config: &mut Config, overrides: &Overrides) {
     for entry in &overrides.binds {
@@ -214,7 +337,9 @@ fn report(config: &Config, overrides: &Overrides) -> Vec<HelixBind> {
                 detail,
                 title: bind.hotkey_overlay_title.clone().flatten(),
                 source: if mine.is_some() { "helix" } else { "config" }.into(),
-                action_kdl: mine.and_then(|e| e.action.clone()),
+                action_kdl: mine
+                    .and_then(|e| e.action.clone())
+                    .or_else(|| written(&bind.action)),
             }
         })
         .collect();
@@ -437,5 +562,32 @@ mod tests {
             ("helix-shell", "launcher")
         );
         assert!(shown.iter().all(|b| b.source == "config"));
+        assert_eq!(
+            shown[0].action_kdl.as_deref(),
+            Some("spawn \"foot\" \"-e\" \"htop\"")
+        );
+        assert_eq!(shown[1].action_kdl.as_deref(), Some("focus-column-left"));
+        assert_eq!(
+            shown[2].action_kdl.as_deref(),
+            Some("helix-shell \"launcher\"")
+        );
+    }
+
+    #[test]
+    fn most_of_nirics_own_binds_can_be_moved() {
+        // The default config ships with niri; where it is not installed there is nothing to check.
+        let Ok(text) = std::fs::read_to_string("/usr/share/doc/niri/default-config.kdl") else {
+            return;
+        };
+        let loaded = config(&text);
+        let shown = report(&loaded, &Overrides::default());
+        let movable = shown.iter().filter(|b| b.action_kdl.is_some()).count();
+        let missing: Vec<_> = shown
+            .iter()
+            .filter(|b| b.action_kdl.is_none())
+            .map(|b| format!("{} {} {}", b.chord, b.action, b.detail))
+            .collect();
+        eprintln!("{movable} of {} movable; not: {missing:?}", shown.len());
+        assert!(movable * 10 >= shown.len() * 9, "{missing:?}");
     }
 }

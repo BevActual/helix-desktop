@@ -232,7 +232,7 @@ pub struct HelixBind {
     pub title: Option<String>,
     /// `config` (the person's files and niri's defaults) or `helix` (an override made in Settings).
     pub source: String,
-    /// For an override: the action as it is written in a config, so Settings can show and edit it.
+    /// The action as a config writes it, when that can be worked out exactly (so it can be put on another chord): always for an override.
     pub action_kdl: Option<String>,
 }
 
