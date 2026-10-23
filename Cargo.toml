@@ -29,6 +29,7 @@ members = [
     "services/helix-desktop",
     "services/helix-assistant",
     "services/helix-inference",
+    "services/helix-agents",
     "services/helix-image",
     "services/helix-system-upgrade",
     "shell/helix-shell-tauri/src-tauri",

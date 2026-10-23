@@ -100,6 +100,19 @@ auto-approve scopes, an always-on gateway agent for system chores (updates, clea
 (not only the agent desk) with hand-off, agents that edit Helix itself in a staging copy, proactive suggestions, screen-aware context (opt-in, local,
 encrypted, never uploaded; the Recall lesson). The point is to move fast on what the owner wants to try without making it the default for everyone.
 
+## Status
+
+* 2026-10-23: `helix-agents` (`services/helix-agents`) starts the *regular* Claude Code, OpenCode and Codex CLIs (nothing is replaced or forked; running
+  `claude` yourself still works exactly as before). `helix-agents run <agent> [--profile ask|auto|open|danger] [--dir PATH|focused] [--for 30m] [-- flags]`
+  adds, for that run only and without editing any of the agent's own config files: a bubblewrap box (project folder and the agent's own state writable,
+  network on, system and tool folders read-only, the rest of the home folder, SSH keys, other programs' logins and the D-Bus session bus absent), the
+  Helix desktop tools over an MCP socket bridge (the real adapter runs outside the box; the agent only gets a proxy), a short note about Helix, and
+  a launch log. Profiles: `ask` (boxed, the agent's prompts stay), `auto` (boxed, prompts off: the one to live in), `open` (no box), `danger` (no box, no
+  prompts, needs `--for`). Also `terminal` (new terminal in the focused window's folder), `default`, `list`, `doctor`, `install-links`
+  (`helix-claude`, `helix-opencode`, `helix-codex`, `ha`). 11 unit tests and `tools/agents-test.sh` (a pretend agent: what the box hides, per-profile flags,
+  logging, and a real MCP round trip through the proxy to the real adapter). The three real CLIs were started inside the box (`--version`).
+  Not yet: the global key and bar entry, installing the links, the agents panel, snapshots.
+
 ## Build order (this stance)
 
 1. **Agent launchers and sandbox profiles** (lazy stubs, default agent, global key, per-agent Surface identity, MCP and skill pre-wired).

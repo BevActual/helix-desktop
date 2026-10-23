@@ -2893,6 +2893,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-agents"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde_json",
+]
+
+[[package]]
 name = "helix-assistant"
 version = "0.1.0"
 dependencies = [
