@@ -13,7 +13,7 @@ PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
 for _ in $(seq 1 120); do grep -q "SETTINGS bluetooth" "$LOG" && break; sleep 0.25; done; sleep 2
-for page in appearance wallpaper accessibility displays network bluetooth sound keyboard multitask pointer defaults startup datetime topbar dock notifications power agents about; do
+for page in appearance wallpaper accessibility displays network bluetooth sound keyboard multitask pointer defaults startup datetime topbar dock notifications power users agents about; do
   click_id "page-$page" 2>/dev/null; sleep 1.8; shot "$page"
 done
 echo "tour done"

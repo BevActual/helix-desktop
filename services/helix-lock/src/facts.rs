@@ -1,6 +1,6 @@
 //! The plain facts the lock screen shows: whose screen it is, the accent colour, the clock text, and which PAM service checks the password.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The eight accents Settings offers, as the dark theme draws them.
 pub const ACCENTS: &[(&str, [u8; 3])] = &[
@@ -69,6 +69,23 @@ pub fn who() -> (String, String) {
         let shown = if full.is_empty() { login.clone() } else { full };
         (login, shown)
     }
+}
+
+/// The account's picture: the one the account service keeps for the login (what Settings sets), else `~/.face`. `HELIX_LOCK_AVATAR` names one for tests.
+pub fn avatar_path(login: &str, home: &str) -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("HELIX_LOCK_AVATAR").filter(|p| !p.is_empty()) {
+        let path = PathBuf::from(path);
+        return path.is_file().then_some(path);
+    }
+    if login.is_empty() || login.contains('/') {
+        return None;
+    }
+    [
+        PathBuf::from("/var/lib/AccountsService/icons").join(login),
+        PathBuf::from(home).join(".face"),
+    ]
+    .into_iter()
+    .find(|p| p.is_file())
 }
 
 /// What the battery says: the charge in percent and whether it is charging.
@@ -235,5 +252,25 @@ mod tests {
         );
         assert_eq!(pam_service(|s| s == "swaylock"), "swaylock");
         assert_eq!(pam_service(|_| false), "login");
+    }
+
+    #[test]
+    fn the_avatar_is_the_accounts_picture_or_the_face_file() {
+        let dir = std::env::temp_dir().join(format!("helix-lock-avatar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let home = dir.to_string_lossy().to_string();
+        assert_eq!(avatar_path("nobody-like-this", &home), None);
+        std::fs::write(dir.join(".face"), b"x").unwrap();
+        assert_eq!(
+            avatar_path("nobody-like-this", &home),
+            Some(dir.join(".face"))
+        );
+        assert_eq!(
+            avatar_path("../etc", &home),
+            None,
+            "a login is a name, not a path"
+        );
+        assert_eq!(avatar_path("", &home), None);
     }
 }

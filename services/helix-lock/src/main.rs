@@ -76,6 +76,8 @@ struct App {
     pictures: HashMap<PathBuf, Option<ImageSurface>>,
     login: String,
     name: String,
+    /// The account's picture, square and sized for the card, when it has one.
+    avatar: Option<ImageSurface>,
     accent: [u8; 3],
     service: &'static str,
     twelve: bool,
@@ -223,6 +225,7 @@ impl App {
                         date: &date,
                         name: &self.name,
                         initials: &initials,
+                        avatar: self.avatar.as_ref(),
                         dots,
                         message,
                         complaint,
@@ -669,6 +672,9 @@ fn main() {
         ctrl: false,
         entry: Entry::default(),
         pictures: HashMap::new(),
+        avatar: facts::avatar_path(&login, &home)
+            .and_then(|path| paint::load_picture(&path, 256))
+            .and_then(|picture| paint::square_avatar(&picture, 152)),
         login,
         name,
         accent,

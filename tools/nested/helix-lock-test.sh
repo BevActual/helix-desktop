@@ -36,6 +36,8 @@ export HELIX_LOCK_POWER_DIR=$SCRATCH/power
 # The interface scale (the shell writes this file): the lock screen is laid out larger by it.
 mkdir -p "$XDG_RUNTIME_DIR"; printf 1.25 > "$XDG_RUNTIME_DIR/helix-ui-scale"
 export HELIX_LOCK_PAM_DIR=$PAM HELIX_LOCK_PAM_SERVICE=helix-lock-test
+# No account picture for the first lock (this machine's own would otherwise replace the initials circle that is measured below).
+export HELIX_LOCK_AVATAR=$SCRATCH/no-such-picture
 sleep 3
 echo "--- locking"
 "$BIN" --daemonize 2>"$SCRATCH/lock.err"; code=$?
@@ -66,4 +68,25 @@ for _ in $(seq 1 30); do kill -0 "$LOCKER" 2>/dev/null || break; sleep 0.25; don
 kill -0 "$LOCKER" 2>/dev/null && fail "the right password did not release the lock: $(cat "$SCRATCH/lock.err")" || echo "ok: the right password released it and the locker left"
 sleep 1
 niri msg --json outputs >/dev/null 2>&1 && echo "ok: the compositor is running normally after the unlock" || fail "compositor gone"
+echo "--- an account picture replaces the initials"
+python3 - "$SCRATCH/face.png" <<'PY'
+import sys
+from PIL import Image
+Image.new("RGB", (300, 200), (0, 200, 0)).save(sys.argv[1])
+PY
+HELIX_LOCK_AVATAR=$SCRATCH/face.png "$BIN" --daemonize 2>"$SCRATCH/lock2.err"
+sleep 1.5
+LOCKER=$(pgrep -x helix-lock | head -1)
+snap locked-picture
+python3 - "$SCRATCH/locked-picture.png" <<'PY' && echo "ok: the picture is in the avatar circle and the accent circle is gone" || fail "no picture on the lock screen"
+import sys
+from PIL import Image
+img = Image.open(sys.argv[1]).convert("RGB"); w, h = img.size
+green = [(x, y) for y in range(h) for x in range(w) if img.getpixel((x, y)) == (0, 200, 0)]
+accent = [1 for y in range(0, h, 2) for x in range(0, w, 2) if img.getpixel((x, y)) == (0x0a, 0x84, 0xff)]
+assert len(green) > 3000 and not accent, (len(green), len(accent))
+PY
+wtype "correct horse"; sleep 0.3; wtype -k Return
+for _ in $(seq 1 30); do kill -0 "$LOCKER" 2>/dev/null || break; sleep 0.25; done
+kill -0 "$LOCKER" 2>/dev/null && fail "could not unlock the second time" || echo "ok: unlocked again"
 [ "$FAILED" = 0 ] && echo "PASS: helix-lock" || exit 1

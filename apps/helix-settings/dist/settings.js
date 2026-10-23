@@ -36,6 +36,7 @@ const PAGES = [
   { name: "dock", title: "Dock", icon: "grid", rows: false },
   { name: "notifications", title: "Notifications", icon: "bell", rows: false },
   { name: "power", title: "Power & lock", icon: "lock", rows: false },
+  { name: "users", title: "Users", icon: "user", rows: false },
   { name: "agents", title: "Privacy & agents", icon: "shield", rows: false },
   { name: "about", title: "About", icon: "sparkle", rows: false },
 ];
@@ -52,7 +53,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "topbar" || page.name === "multitask" || page.name === "startup" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime" || page.name === "pointer" || page.name === "defaults") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "topbar" || page.name === "multitask" || page.name === "startup" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime" || page.name === "users" || page.name === "pointer" || page.name === "defaults") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;

@@ -6,12 +6,30 @@ use std::path::Path;
 use cairo::{Context, Extend, Filter, Format, ImageSurface};
 use helix_wallpaper_model::{cover_crop, Source};
 
+/// The avatar's radius in logical pixels.
+pub const AVATAR_RADIUS: f64 = 38.0;
+
+/// A picture cropped to its centre square and scaled to `side` pixels, for the avatar.
+pub fn square_avatar(source: &ImageSurface, side: i32) -> Option<ImageSurface> {
+    let out = ImageSurface::create(Format::ARgb32, side, side).ok()?;
+    let c = Context::new(&out).ok()?;
+    let (w, h) = (f64::from(source.width()), f64::from(source.height()));
+    let edge = w.min(h);
+    let zoom = f64::from(side) / edge;
+    c.scale(zoom, zoom);
+    let _ = c.set_source_surface(source, -(w - edge) / 2.0, -(h - edge) / 2.0);
+    let _ = c.paint();
+    Some(out)
+}
+
 /// What the screen says right now.
 pub struct Frame<'a> {
     pub time: &'a str,
     pub date: &'a str,
     pub name: &'a str,
     pub initials: &'a str,
+    /// The account's picture, already cut to a square of `2 * AVATAR_RADIUS` logical pixels (or more); when there is none the initials are drawn.
+    pub avatar: Option<&'a ImageSurface>,
     pub dots: usize,
     pub message: &'a str,
     /// The message is a complaint (drawn in red).
@@ -88,22 +106,39 @@ pub fn draw(c: &Context, w: f64, h: f64, frame: &Frame) {
 
     let card_w = 340.0;
     let card_top = (h * 0.40).max(h * 0.15 + time_h + 70.0);
-    // The avatar.
-    let r = 38.0;
+    // The avatar: the account's picture in a circle, else the initials on the accent colour.
+    let r = AVATAR_RADIUS;
     let ay = card_top + r;
-    rgb(c, frame.accent, 1.0);
-    c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
-    let _ = c.fill();
-    c.set_source_rgba(1.0, 1.0, 1.0, 1.0);
-    let initials_size = 28.0;
-    centred(
-        c,
-        frame.initials,
-        cx,
-        ay - initials_size * 0.62,
-        initials_size,
-        "Bold",
-    );
+    if let Some(picture) = frame.avatar {
+        let _ = c.save();
+        c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
+        c.clip();
+        let side = f64::from(picture.width().min(picture.height()));
+        let zoom = (2.0 * r) / side;
+        c.translate(cx - r, ay - r);
+        c.scale(zoom, zoom);
+        let _ = c.set_source_surface(picture, 0.0, 0.0);
+        let _ = c.paint();
+        let _ = c.restore();
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.35);
+        c.set_line_width(1.5);
+        c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
+        let _ = c.stroke();
+    } else {
+        rgb(c, frame.accent, 1.0);
+        c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
+        let _ = c.fill();
+        c.set_source_rgba(1.0, 1.0, 1.0, 1.0);
+        let initials_size = 28.0;
+        centred(
+            c,
+            frame.initials,
+            cx,
+            ay - initials_size * 0.62,
+            initials_size,
+            "Bold",
+        );
+    }
     // The name.
     c.set_source_rgba(1.0, 1.0, 1.0, 0.96);
     let name_h = centred(c, frame.name, cx, ay + r + 14.0, 21.0, "Bold");
@@ -292,6 +327,7 @@ mod tests {
             date: "Wednesday, October 21",
             name: "Ada Lovelace",
             initials: "AL",
+            avatar: None,
             dots,
             message: if complaint {
                 "That is not right. Try again."
@@ -307,6 +343,46 @@ mod tests {
                 charging: false,
             }),
         }
+    }
+
+    fn pixel(surface: &mut ImageSurface, x: i32, y: i32) -> (u8, u8, u8) {
+        let stride = surface.stride() as usize;
+        let data = surface.data().unwrap();
+        let at = y as usize * stride + x as usize * 4;
+        (data[at + 2], data[at + 1], data[at])
+    }
+
+    #[test]
+    fn the_account_picture_replaces_the_initials_inside_a_circle() {
+        // A wide solid green picture: cropped to its centre square and drawn in the avatar's circle.
+        let picture = ImageSurface::create(Format::ARgb32, 200, 120).unwrap();
+        {
+            let c = Context::new(&picture).unwrap();
+            c.set_source_rgb(0.0, 0.8, 0.0);
+            c.paint().unwrap();
+        }
+        let square = square_avatar(&picture, 152).unwrap();
+        assert_eq!((square.width(), square.height()), (152, 152));
+        let mut with = frame(0, false);
+        with.avatar = Some(&square);
+        let (cx, ay) = (400, (600.0f64 * 0.40 + AVATAR_RADIUS) as i32);
+        let mut shown = render(&with);
+        let (r, g, b) = pixel(&mut shown, cx, ay);
+        assert!(
+            g > 150 && r < 60 && b < 60,
+            "the picture is in the circle: {r},{g},{b}"
+        );
+        let (r, _, b) = pixel(&mut shown, cx + (AVATAR_RADIUS as i32) + 6, ay);
+        assert!(
+            r < 60 && b < 90,
+            "nothing of it outside the circle: {r},{b}"
+        );
+        let mut plain = render(&frame(0, false));
+        let (r, g, b) = pixel(&mut plain, cx - 30, ay);
+        assert!(
+            b > 150 && g > 100 && r < 60,
+            "without a picture the accent circle is drawn: {r},{g},{b}"
+        );
     }
 
     fn render(frame: &Frame) -> ImageSurface {

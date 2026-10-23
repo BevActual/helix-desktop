@@ -4,6 +4,7 @@ import { invoke, type Change, type RowView } from "@helix/ui";
 import { RowsPage, type PageHandle, type PageSpec } from "./pages/RowsPage";
 import { AboutPage } from "./pages/AboutPage";
 import { DisplaysPage } from "./pages/DisplaysPage";
+import { UsersPage } from "./pages/UsersPage";
 import { AppearancePage } from "./pages/AppearancePage";
 import { KeyboardPage } from "./pages/KeyboardPage";
 import { WallpaperPage } from "./pages/WallpaperPage";
@@ -115,6 +116,7 @@ const custom: Record<string, (props: { register: (handle: PageHandle) => void; o
   bluetooth: ({ register }) => <BluetoothPage register={register} />,
   sound: ({ register }) => <SoundPage register={register} />,
   agents: ({ register }) => <AgentsPage register={register} />,
+  users: ({ register }) => <UsersPage register={register} report={report} />,
 };
 
 function mountPage(name: string, host: HTMLElement, options: MountOptions): Controller | null {

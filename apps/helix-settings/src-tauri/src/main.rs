@@ -11,6 +11,7 @@ mod look;
 mod powerprofile;
 mod startup;
 mod topbar;
+mod users;
 mod wallhaven;
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -2847,6 +2848,10 @@ fn main() {
             displays_rows,
             display_layout,
             display_move,
+            users::users_view,
+            users::users_set_name,
+            users::users_choose_picture,
+            users::users_clear_picture,
             display_identify,
             displays_change,
             datetime_rows,
