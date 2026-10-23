@@ -151,6 +151,11 @@ pub enum Request {
     /// Helix: the window that had the keyboard when `helix-summon` was last used, once. Empty when it was never used, was a minute ago or
     /// more, or was already taken.
     HelixSummonContext,
+    /// Helix: every key bind in effect now, with where it came from.
+    HelixBinds,
+    /// Helix: change key binds: set some (replacing what is on the same chord), unbind some, and give some back to what `config.kdl` says. Remembered,
+    /// applied again whenever the configuration is loaded, and in effect at once.
+    HelixSetBinds(HelixBindsChange),
 }
 
 /// Reply from niri to client.
@@ -209,6 +214,51 @@ pub enum Response {
     HelixInput(HelixInput),
     /// Helix look settings.
     HelixLook(HelixLook),
+    /// Helix key binds.
+    HelixBinds(Vec<HelixBind>),
+}
+
+/// One key bind in effect.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixBind {
+    /// The chord as it is written in a config: `Mod+Shift+E`, `XF86AudioMute`, `Mod+WheelScrollDown`.
+    pub chord: String,
+    /// What it does, by name: `focus-column-left`, `spawn`, `helix-shell`; `none` when Settings unbound it.
+    pub action: String,
+    /// The action's arguments, for reading: `helix-panel launcher`.
+    pub detail: String,
+    /// The title the hotkey overlay shows for it, if the config gave one.
+    pub title: Option<String>,
+    /// `config` (the person's files and niri's defaults) or `helix` (an override made in Settings).
+    pub source: String,
+    /// For an override: the action as it is written in a config, so Settings can show and edit it.
+    pub action_kdl: Option<String>,
+}
+
+/// What `HelixSetBinds` changes.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixBindsChange {
+    /// Binds to set: the chord and the action as a config writes it (`focus-column-left`, `helix-shell "launcher"`, `spawn "foot"`).
+    #[serde(default)]
+    pub set: Vec<HelixBindSet>,
+    /// Chords to leave unbound.
+    #[serde(default)]
+    pub unbind: Vec<String>,
+    /// Chords to give back to what the config says (the override is forgotten).
+    #[serde(default)]
+    pub reset: Vec<String>,
+}
+
+/// A bind to set.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixBindSet {
+    /// The chord.
+    pub chord: String,
+    /// The action as a config writes it.
+    pub action: String,
 }
 
 /// The look settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.
@@ -394,6 +444,9 @@ pub struct HelixCapabilities {
     /// Whether `HelixLook` and `HelixSetLook` are available.
     #[serde(default)]
     pub look_settings: bool,
+    /// Whether `HelixBinds` and `HelixSetBinds` are available.
+    #[serde(default)]
+    pub bind_settings: bool,
     /// Whether the `helix-shell "<command>"` bind action is available.
     #[serde(default)]
     pub shell_action: bool,

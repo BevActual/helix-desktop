@@ -25,4 +25,9 @@ a hand-edited `config.kdl` (niri's defaults plus ours, about 150 binds), a read-
 
 * Step 1 done: the `helix-shell` action, its capability flag, `tools/nested/helix-shell-action-test.sh`. Existing binds are *not* rewritten yet:
   an older compositor refuses a config with an action it does not know, so binds move to it only once the new compositor has been running.
-* Steps 2 to 6 not started.
+* Steps 2 and 3 (compositor side) done: `HelixBinds` reports every bind with its source (`config` or `helix`); `HelixSetBinds` sets, unbinds or
+  resets chords. Overrides are stored in `bind-overrides.json`, laid over the config at start and on reload, and take effect at once. An action is
+  parsed by the config's own parser from `binds { <chord> { <action>; } }`, after refusing anything that is not one plain action; `helix-summon`,
+  `show-hotkey-overlay` and `quit` binds cannot be replaced or unbound. The report cannot say "niri default" apart from "my config" (the loaded
+  config does not remember which file a bind came from), so there are two sources, not three.
+* Settings page, registration (step 5) and clean-up (step 6) not started.

@@ -1586,6 +1586,7 @@ impl State {
         // What the person set in Settings stays over a freshly loaded file.
         crate::helix::input::apply_saved(&mut config.input);
         crate::helix::look::apply_saved(&mut config);
+        crate::helix::binds::apply_saved(&mut config);
 
         // Find & orphan removed named workspaces.
         let mut removed_workspaces: Vec<String> = vec![];

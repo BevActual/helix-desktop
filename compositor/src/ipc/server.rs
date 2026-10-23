@@ -474,6 +474,7 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             input_settings: true,
             look_settings: true,
             shell_action: true,
+            bind_settings: true,
         }),
         Request::HelixSaveDisplayProfile
         | Request::HelixApplyDisplayProfile
@@ -542,6 +543,27 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             rx.recv()
                 .await
                 .map_err(|_| String::from("look settings change failed"))??;
+            Response::Handled
+        }
+        Request::HelixBinds => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_binds());
+            });
+            let binds = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("key bind query failed"))?;
+            Response::HelixBinds(binds)
+        }
+        Request::HelixSetBinds(change) => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_set_binds(change));
+            });
+            rx.recv()
+                .await
+                .map_err(|_| String::from("key bind change failed"))??;
             Response::Handled
         }
         Request::HelixSetInput(change) => {

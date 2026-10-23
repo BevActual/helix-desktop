@@ -107,6 +107,9 @@ pub struct HelixCaps {
     /// `HelixLook` and `HelixSetLook`.
     #[serde(default)]
     pub look_settings: bool,
+    /// `HelixBinds` and `HelixSetBinds`.
+    #[serde(default)]
+    pub bind_settings: bool,
     /// The `helix-shell "<command>"` bind action.
     #[serde(default)]
     pub shell_action: bool,

@@ -166,6 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_includes = config_load_result.includes;
     niri::helix::input::apply_saved(&mut config.input);
     niri::helix::look::apply_saved(&mut config);
+    niri::helix::binds::apply_saved(&mut config);
 
     let spawn_at_startup = mem::take(&mut config.spawn_at_startup);
     let spawn_sh_at_startup = mem::take(&mut config.spawn_sh_at_startup);
