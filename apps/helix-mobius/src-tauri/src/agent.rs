@@ -146,6 +146,101 @@ async fn scripted_step(step: usize) -> Result<Option<String>, String> {
     ))
 }
 
+/// The task's tools as a function list for a remote model that supports them. Names and fields are exactly the JSON forms `parse` reads (see PLAN).
+fn tool_schemas() -> serde_json::Value {
+    use serde_json::json;
+    let function = |name: &str, about: &str, properties: serde_json::Value, required: &[&str]| {
+        json!({"type": "function", "function": {"name": name, "description": about,
+            "parameters": {"type": "object", "properties": properties, "required": required, "additionalProperties": false}}})
+    };
+    json!([
+        function(
+            "web_search",
+            "Search the public web.",
+            json!({"query": {"type": "string"}}),
+            &["query"]
+        ),
+        function(
+            "web_read",
+            "Read a public web page.",
+            json!({"url": {"type": "string"}}),
+            &["url"]
+        ),
+        function(
+            "terminal",
+            "Run a shell command in the project folder (shown as /workspace).",
+            json!({"command": {"type": "string"}}),
+            &["command"]
+        ),
+        function(
+            "edit_file",
+            "Change a file: old must match exactly once (empty to create the file).",
+            json!({"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}),
+            &["path", "old", "new"]
+        ),
+        function(
+            "display_launch",
+            "Open an installed app on the agent display.",
+            json!({"app": {"type": "string"}}),
+            &["app"]
+        ),
+        function(
+            "display_look",
+            "Describe what is on the agent display (1280x720, 0,0 top left).",
+            json!({}),
+            &[]
+        ),
+        function(
+            "display_click",
+            "Click at a pixel position on the agent display.",
+            json!({"x": {"type": "integer"}, "y": {"type": "integer"}}),
+            &["x", "y"]
+        ),
+        function(
+            "display_type",
+            "Type one line of text on the agent display.",
+            json!({"text": {"type": "string"}}),
+            &["text"]
+        ),
+        function(
+            "display_key",
+            "Press a key such as Return or Control_L+a on the agent display.",
+            json!({"key": {"type": "string"}}),
+            &["key"]
+        ),
+        function(
+            "display_scroll",
+            "Scroll the agent display; positive goes down.",
+            json!({"steps": {"type": "integer"}}),
+            &["steps"]
+        ),
+        function(
+            "display_help",
+            "Ask the person to do a step only they can (sign in, a code, a payment).",
+            json!({"reason": {"type": "string"}}),
+            &["reason"]
+        ),
+        function(
+            "skill_read",
+            "Read one of the person's saved skills.",
+            json!({"name": {"type": "string"}}),
+            &["name"]
+        ),
+        function(
+            "mcp",
+            "Call a tool of one of the person's tool servers.",
+            json!({"server": {"type": "string"}, "name": {"type": "string"}, "args": {"type": "object"}}),
+            &["server", "name"]
+        ),
+        function(
+            "finish",
+            "Stop using tools: the task is done or nothing more can be done.",
+            json!({}),
+            &[]
+        ),
+    ])
+}
+
 /// The agent display's size in pixels (`docs/design/computer-use.md`).
 const DISPLAY_WIDTH: i32 = 1280;
 const DISPLAY_HEIGHT: i32 = 720;
@@ -403,10 +498,26 @@ impl Model {
             return Err("Tools task stopped.".into());
         }
         if !self.local {
+            let options = crate::lan::RemoteOptions {
+                temperature: 0.0,
+                max_tokens,
+                timeout_secs: 120,
+            };
+            // A planning step offers the tools natively (a function call comes back as the JSON the loop reads); a backend that refuses them
+            // is asked again without, and the answer is read as text as before.
+            let planning = max_tokens <= 512;
             return tokio::select! {
                 biased;
                 _ = cancelled.changed() => Err("Tools task stopped.".into()),
-                result = crate::lan::chat_completions(&self.base, &self.model, messages, self.key.as_deref(), crate::lan::RemoteOptions { temperature: 0.0, max_tokens, timeout_secs: 120 }) => result,
+                result = async {
+                    if planning {
+                        let with = crate::lan::chat_completions_with_tools(&self.base, &self.model, messages, self.key.as_deref(), options, &tool_schemas()).await;
+                        if with.is_ok() {
+                            return with;
+                        }
+                    }
+                    crate::lan::chat_completions(&self.base, &self.model, messages, self.key.as_deref(), options).await
+                } => result,
             };
         }
         local_call(
@@ -1281,6 +1392,37 @@ pub async fn pick_folder() -> Result<Option<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn every_function_offered_to_a_remote_model_is_a_form_the_loop_reads() {
+        let examples = serde_json::json!({
+            "web_search": {"query": "x"}, "web_read": {"url": "https://example.com/"}, "terminal": {"command": "ls"},
+            "edit_file": {"path": "a", "old": "", "new": "b"}, "display_launch": {"app": "Firefox"}, "display_look": {},
+            "display_click": {"x": 1, "y": 2}, "display_type": {"text": "hi"}, "display_key": {"key": "Return"},
+            "display_scroll": {"steps": 3}, "display_help": {"reason": "sign in"}, "skill_read": {"name": "a-b"},
+            "mcp": {"server": "calc", "name": "add", "args": {"a": 1}}, "finish": {},
+        });
+        let schemas = tool_schemas();
+        let names: Vec<&str> = schemas
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["function"]["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            names.len(),
+            examples.as_object().unwrap().len(),
+            "a tool without an example (or the other way round)"
+        );
+        for name in names {
+            let mut call = examples[name].clone();
+            call["tool"] = serde_json::json!(name);
+            assert!(
+                parse(&call.to_string()).is_ok(),
+                "{name} is offered but the loop would not read it: {call}"
+            );
+        }
+    }
+
     #[test]
     fn tool_server_calls_are_checked_before_they_are_made() {
         let ok =
