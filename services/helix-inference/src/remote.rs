@@ -182,6 +182,75 @@ fn explain_refusal(status: u16, detail: &str) -> Option<String> {
     }
 }
 
+/// Asks a configured backend which models it offers (`GET <base>/models`), with its key, for the management app's "Test" button. The app never sees the
+/// key: this is the only place that reads it. Returns `{ok, models, trust, error}`; `trust` is `lan` or `cloud`.
+pub fn probe(backend_id: &str) -> Value {
+    let routing = RoutingTable::load();
+    let Some(backend) = routing.backend(backend_id).cloned() else {
+        return json!({"ok": false, "error": format!("no such backend: {backend_id}")});
+    };
+    let trust = if host_of(&backend.base_url).is_some_and(is_local_network) {
+        "lan"
+    } else {
+        "cloud"
+    };
+    let url = match endpoint(&backend.base_url) {
+        Ok(url) => url.trim_end_matches("/chat/completions").to_string() + "/models",
+        Err(error) => return json!({"ok": false, "trust": trust, "error": error}),
+    };
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(10)))
+        .http_status_as_error(false)
+        .build()
+        .into();
+    let mut call = agent.get(&url).header("Accept", "application/json");
+    if let Some(key) = key_for(&backend) {
+        call = call.header("Authorization", &format!("Bearer {key}"));
+    }
+    let mut response = match call.call() {
+        Ok(response) => response,
+        Err(error) => {
+            return json!({"ok": false, "trust": trust, "error": format!("could not reach it: {error}")})
+        }
+    };
+    let status = response.status().as_u16();
+    let text = response.body_mut().read_to_string().unwrap_or_default();
+    if status != 200 {
+        let detail = serde_json::from_str::<Value>(&text).ok().and_then(|v| {
+            v.pointer("/error/message")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        });
+        let message = explain_refusal(status, detail.as_deref().unwrap_or(""))
+            .or(detail)
+            .unwrap_or_else(|| format!("it answered {status}"));
+        return json!({"ok": false, "trust": trust, "error": message});
+    }
+    let models = models_of(&text);
+    json!({"ok": true, "trust": trust, "models": models})
+}
+
+/// The model ids of a `/models` answer (OpenAI's `{data: [{id}]}`, or Ollama-style `{models: [{name}]}`), at most 300.
+fn models_of(text: &str) -> Vec<String> {
+    let value: Value = serde_json::from_str(text).unwrap_or(Value::Null);
+    let list = value
+        .get("data")
+        .or_else(|| value.get("models"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    list.iter()
+        .filter_map(|m| {
+            m.get("id")
+                .or_else(|| m.get("name"))
+                .and_then(Value::as_str)
+        })
+        .filter(|id| !id.is_empty() && id.len() <= 200)
+        .take(300)
+        .map(str::to_string)
+        .collect()
+}
+
 enum Piece {
     Data(String),
     Done,
@@ -371,6 +440,17 @@ mod tests {
             endpoint("https://x.test/v1/").unwrap(),
             "https://x.test/v1/chat/completions"
         );
+    }
+
+    #[test]
+    fn model_lists_are_read_in_openai_and_ollama_shapes() {
+        assert_eq!(models_of(r#"{"data":[{"id":"a"},{"id":"b"}]}"#), ["a", "b"]);
+        assert_eq!(
+            models_of(r#"{"models":[{"name":"llama3:8b"}]}"#),
+            ["llama3:8b"]
+        );
+        assert!(models_of("nonsense").is_empty());
+        assert_eq!(probe("nowhere")["ok"], false);
     }
 
     #[test]

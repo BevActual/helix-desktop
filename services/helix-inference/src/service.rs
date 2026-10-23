@@ -640,6 +640,22 @@ impl Service {
             .unwrap_or_default()
     }
 
+    /// Asks a configured backend which models it offers, for the management app; the key stays here. JSON: `{ok, models, trust, error}`.
+    async fn probe(&self, backend: String) -> Result<String, InferenceError> {
+        if backend.is_empty() || backend.len() > 64 {
+            return Err(invalid("backend is a short id"));
+        }
+        let result = tokio::task::spawn_blocking(move || crate::remote::probe(&backend))
+            .await
+            .map_err(|e| InferenceError::Failed(e.to_string()))?;
+        Ok(result.to_string())
+    }
+
+    /// Frees the model now if nothing is running or waiting. True when it did.
+    async fn unload(&self) -> bool {
+        self.0.queue.unload_if_idle(Duration::ZERO)
+    }
+
     async fn list_models(&self) -> Vec<OwnedValue> {
         self.0
             .queue
