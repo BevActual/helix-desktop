@@ -954,6 +954,11 @@ fn about(app: AppHandle) -> AboutView {
 /// The key binds in the compositor's config files (read only: Settings never writes them).
 #[tauri::command]
 fn shortcuts_view() -> Vec<ShortcutGroup> {
+    // The Helix compositor says what is bound, from every file and from Settings, so nothing has to be read out of the config. Another
+    // compositor gets the read-only list read from its files.
+    if let Some(live) = helix_compositor::compositor_ipc::binds() {
+        return shortcuts::view(&shortcuts::from_compositor(&live));
+    }
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
         .or_else(|| {
@@ -984,6 +989,70 @@ fn shortcuts_view() -> Vec<ShortcutGroup> {
         }
     }
     shortcuts::view(&binds)
+}
+
+/// The shortcut Settings would change: the bind on `chord`, as the compositor reports it now.
+fn live_bind(chord: &str) -> Result<helix_compositor::compositor_ipc::CompositorBind, String> {
+    helix_compositor::compositor_ipc::binds()
+        .ok_or("This compositor cannot change shortcuts.".to_string())?
+        .into_iter()
+        .find(|b| b.chord == chord)
+        .ok_or_else(|| "That shortcut is not there any more.".to_string())
+}
+
+/// Moves a shortcut to other keys. If the keys are already used the answer is `taken: <what uses them>` and nothing changes, until the same request
+/// is made again with `replace` (the other shortcut is then turned off).
+#[tauri::command]
+fn shortcut_move(chord: String, to: String, replace: bool) -> Result<(), String> {
+    use helix_compositor::compositor_ipc::{binds, set_binds};
+    let from = live_bind(&chord)?;
+    let action = from
+        .action_kdl
+        .clone()
+        .ok_or("This shortcut cannot be moved from here.".to_string())?;
+    let all = binds().ok_or("This compositor cannot change shortcuts.")?;
+    let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+    if let Some(taken) = all
+        .iter()
+        .find(|b| same(&b.chord, &to) && b.action != "none" && !same(&b.chord, &chord))
+    {
+        if !replace {
+            let what = shortcuts::view(&shortcuts::from_compositor(std::slice::from_ref(taken)))
+                .into_iter()
+                .flat_map(|g| g.rows)
+                .next()
+                .map(|r| r.title)
+                .unwrap_or_default();
+            return Err(format!("taken: {what}"));
+        }
+    }
+    // The keys it leaves: an override is forgotten (what the config had there comes back); a bind from the config is turned off.
+    let (unbind, reset) = if from.source == "helix" {
+        (vec![], vec![chord])
+    } else {
+        (vec![chord], vec![])
+    };
+    set_binds(&[(to, action)], &unbind, &reset)?;
+    eprintln!("SETTINGS shortcut moved");
+    Ok(())
+}
+
+/// Turns a shortcut off.
+#[tauri::command]
+fn shortcut_off(chord: String) -> Result<(), String> {
+    live_bind(&chord)?;
+    helix_compositor::compositor_ipc::set_binds(&[], &[chord], &[])?;
+    eprintln!("SETTINGS shortcut off");
+    Ok(())
+}
+
+/// Gives a shortcut back to what the config says.
+#[tauri::command]
+fn shortcut_reset(chord: String) -> Result<(), String> {
+    live_bind(&chord)?;
+    helix_compositor::compositor_ipc::set_binds(&[], &[], &[chord])?;
+    eprintln!("SETTINGS shortcut reset");
+    Ok(())
 }
 
 /// Helix Shell Navigation keybinds from the service catalog (editable via UpdateOrderedList).
@@ -2955,6 +3024,9 @@ fn main() {
             wallhaven::wallhaven_thumb,
             wallhaven::wallhaven_use,
             shortcuts_view,
+            shortcut_move,
+            shortcut_off,
+            shortcut_reset,
             keybinds_view,
             keybinds_set,
             about,

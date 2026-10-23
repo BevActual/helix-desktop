@@ -58,7 +58,7 @@ pick helix-lock    && run helix-lock helix-lock-test.sh idle-program.sh
 pick nightlight    && run nightlight nightlight-test.sh nightlight-nested.sh HELIX_NESTED_GAMMA=1
 pick nightlight-sun && run nightlight-sun nightlight-sun-test.sh nightlight-sun-nested.sh HELIX_NESTED_GAMMA=1
 pick island         && run island island-test.sh tauri-shell.sh
-pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }; include \"$ROOT/tools/nested/fixtures/niri-binds.kdl\""
 pick settings-net   && run settings-net settings-net-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-sound && run settings-sound settings-sound-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-title   && run mobius-title mobius-title-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_AUTO_TITLE=1 "HELIX_FAKE_REPLY=Cron versus systemd timers"
@@ -98,6 +98,7 @@ pick settings-defaults && run settings-defaults settings-defaults-test.sh settin
 pick settings-accent && run settings-accent settings-accent-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-look && run settings-look settings-look-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-multitask && run settings-multitask settings-multitask-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-shortcuts && run settings-shortcuts settings-shortcuts-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=binds { Mod+F7 { focus-column-left; }; }"
 pick helix-shell-action && run helix-shell-action helix-shell-action-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-wallpaper && run settings-wallpaper settings-wallpaper-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick notifications-prefs && run notifications-prefs notifications-prefs-test.sh tauri-shell.sh

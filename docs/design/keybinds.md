@@ -30,4 +30,9 @@ a hand-edited `config.kdl` (niri's defaults plus ours, about 150 binds), a read-
   parsed by the config's own parser from `binds { <chord> { <action>; } }`, after refusing anything that is not one plain action; `helix-summon`,
   `show-hotkey-overlay` and `quit` binds cannot be replaced or unbound. The report cannot say "niri default" apart from "my config" (the loaded
   config does not remember which file a bind came from), so there are two sources, not three.
-* Settings page, registration (step 5) and clean-up (step 6) not started.
+* Step 4 (page) in part: Keyboard → Compositor lists what the compositor reports, grouped (Helix, Windows and apps, Media keys), with Change (choose
+  the modifiers, press the key; Super is a switch because holding it would run the shortcuts it is used for), Turn off, and Reset. A clash is
+  caught before anything changes (`taken: <what>`), and Replace turns the other one off. Only shortcuts whose action reads back exactly can be
+  moved (all of niri's own can). Not yet: adding a shortcut, choosing a different action, merging the shell's in-app chords into the same list.
+* Registration (step 5) and clean-up (step 6) not started. Existing binds still use `helix-panel`; they move to `helix-shell` once the compositor
+  that knows it has been running.

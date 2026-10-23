@@ -195,6 +195,42 @@ pub fn set_input_settings(change: &InputSettings) -> Result<(), String> {
     request_result(&line).map(|_| ())
 }
 
+/// One key bind in effect (`HelixBind`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompositorBind {
+    pub chord: String,
+    /// `focus-column-left`, `spawn`, `helix-shell`; `none` when it was turned off in Settings.
+    pub action: String,
+    pub detail: String,
+    pub title: Option<String>,
+    /// `config` or `helix`.
+    pub source: String,
+    /// The action as a config writes it, when that can be worked out exactly.
+    pub action_kdl: Option<String>,
+}
+
+/// Every key bind in effect (`None` when the compositor cannot say, as stock niri cannot).
+pub fn binds() -> Option<Vec<CompositorBind>> {
+    let ok = request_json("\"HelixBinds\"")?;
+    serde_json::from_value(ok.get("HelixBinds")?.clone()).ok()
+}
+
+/// Sets chords to actions, turns chords off, and gives chords back to the config; all at once, remembered by the compositor.
+pub fn set_binds(
+    set: &[(String, String)],
+    unbind: &[String],
+    reset: &[String],
+) -> Result<(), String> {
+    let set: Vec<_> = set
+        .iter()
+        .map(|(chord, action)| serde_json::json!({"chord": chord, "action": action}))
+        .collect();
+    let line =
+        serde_json::json!({ "HelixSetBinds": {"set": set, "unbind": unbind, "reset": reset} })
+            .to_string();
+    request_result(&line).map(|_| ())
+}
+
 /// The look settings in effect (`None` when the compositor cannot say).
 pub fn look_settings() -> Option<LookSettings> {
     let ok = request_json("\"HelixLook\"")?;
