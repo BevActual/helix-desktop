@@ -6,8 +6,11 @@ use std::path::PathBuf;
 
 use niri_config::appearance::Color;
 use niri_config::appearance::CornerRadius;
+use niri_config::appearance::{BackgroundEffectRule, LiquidGlassPart};
 use niri_config::input::FocusFollowsMouse;
+use niri_config::layer_rule::{LayerRule, Match as LayerMatch};
 use niri_config::layout::CenterFocusedColumn;
+use niri_config::utils::RegexEq;
 use niri_config::window_rule::WindowRule;
 use niri_config::Config;
 use niri_ipc::HelixLook;
@@ -212,8 +215,47 @@ pub fn effective(config: &Config) -> HelixLook {
     }
 }
 
+/// The shell's glass sees what is really behind it. A layer surface that asks for blur is, unless a rule says otherwise, blurred against the wallpaper
+/// alone ("x-ray"), which is why a clear panel showed the wallpaper and not the windows under it. Helix's own surfaces (`helix-panel`, `helix-panels`) get
+/// a rule that turns that off and adds a little refraction at the edges, unless the person has written a rule for them. It goes first, so any rule of theirs
+/// that matches later still wins.
+pub fn ensure_glass_rule(config: &mut Config) {
+    let covered = config.layer_rules.iter().any(|rule| {
+        rule.matches.iter().any(|m| {
+            m.namespace
+                .as_ref()
+                .is_some_and(|ns| ns.0.is_match("helix-panel") || ns.0.is_match("helix-panels"))
+        })
+    });
+    if covered {
+        return;
+    }
+    let Ok(namespace) = "^helix-panels?$".parse::<RegexEq>() else {
+        return;
+    };
+    config.layer_rules.insert(
+        0,
+        LayerRule {
+            matches: vec![LayerMatch {
+                namespace: Some(namespace),
+                ..LayerMatch::default()
+            }],
+            background_effect: BackgroundEffectRule {
+                xray: Some(false),
+                liquid_glass: Some(LiquidGlassPart {
+                    refraction_strength: Some(niri_config::utils::FloatOrInt(0.35)),
+                    ..LiquidGlassPart::default()
+                }),
+                ..BackgroundEffectRule::default()
+            },
+            ..LayerRule::default()
+        },
+    );
+}
+
 /// Applies the remembered overrides to a configuration that was just loaded (start-up and every reload).
 pub fn apply_saved(config: &mut Config) {
+    ensure_glass_rule(config);
     overlay(config, &load());
 }
 
@@ -258,6 +300,55 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_shells_glass_is_not_x_ray_unless_the_person_wrote_their_own_rule() {
+        let mut config = Config::default();
+        let before = config.layer_rules.len();
+        ensure_glass_rule(&mut config);
+        ensure_glass_rule(&mut config);
+        assert_eq!(
+            config.layer_rules.len(),
+            before + 1,
+            "once, however often the configuration is applied"
+        );
+        let rule = &config.layer_rules[0];
+        assert_eq!(rule.background_effect.xray, Some(false));
+        assert!(rule.matches[0]
+            .namespace
+            .as_ref()
+            .unwrap()
+            .0
+            .is_match("helix-panel"));
+        assert!(rule.matches[0]
+            .namespace
+            .as_ref()
+            .unwrap()
+            .0
+            .is_match("helix-panels"));
+        assert!(!rule.matches[0]
+            .namespace
+            .as_ref()
+            .unwrap()
+            .0
+            .is_match("helix-wallpaper"));
+        // Their own rule for these surfaces is respected.
+        let mut own = Config::default();
+        own.layer_rules.push(LayerRule {
+            matches: vec![LayerMatch {
+                namespace: Some("helix-panel".parse::<RegexEq>().unwrap()),
+                ..LayerMatch::default()
+            }],
+            background_effect: BackgroundEffectRule {
+                xray: Some(true),
+                ..BackgroundEffectRule::default()
+            },
+            ..LayerRule::default()
+        });
+        let count = own.layer_rules.len();
+        ensure_glass_rule(&mut own);
+        assert_eq!(own.layer_rules.len(), count);
+    }
 
     #[test]
     fn the_window_corner_override_is_one_rule_that_is_replaced_not_added() {
