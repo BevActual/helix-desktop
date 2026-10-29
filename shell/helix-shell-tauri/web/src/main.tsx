@@ -10,6 +10,7 @@ import { Tray, TrayMenu, type TrayHooks, type TrayMenuHandle } from "./tray";
 import { DockItems, type DockHandle, type DockHooks, type DockItem } from "./dock";
 import { QuickInsert, type QuickInsertHandle } from "./quickinsert";
 import { Writing, type WritingHandle } from "./writing";
+import { Pointer, type PointerHandle } from "./pointer";
 
 type Subscriber = (set: (view: NotificationsView) => void) => void;
 
@@ -82,6 +83,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   writing: (host: HTMLElement) => {
     const run = handled<WritingHandle>(host, (register) => <Writing register={register} />);
+    return { open: () => run((h) => h.open()) };
+  },
+  pointer: (host: HTMLElement) => {
+    const run = handled<PointerHandle>(host, (register) => <Pointer host={host} register={register} />);
     return { open: () => run((h) => h.open()) };
   },
   controls: (host: HTMLElement) => {

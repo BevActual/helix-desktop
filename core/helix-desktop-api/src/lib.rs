@@ -513,6 +513,19 @@ impl Desktop {
         proxy.call("UndoAction", &(entry,)).await
     }
 
+    /// `Configuration1.RunAppAction(action, params)`: runs an app's action for the person; the app's reply, with `history` and `sentence`.
+    pub async fn run_app_action(
+        &self,
+        action: &str,
+        params: &serde_json::Value,
+    ) -> zbus::Result<serde_json::Value> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        let text: String = proxy
+            .call("RunAppAction", &(action, params.to_string()))
+            .await?;
+        Ok(serde_json::from_str(&text).unwrap_or(serde_json::Value::Null))
+    }
+
     /// `Configuration1.Update(id, value)` for a boolean, a string or a number (whole numbers as 64-bit integers). The service validates the id and the value again.
     pub async fn update_setting(&self, id: &str, value: &serde_json::Value) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Configuration).await?;

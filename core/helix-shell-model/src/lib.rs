@@ -14,6 +14,7 @@ pub mod launcher;
 pub mod notifications;
 pub mod panel_surface;
 pub mod panels_ipc;
+pub mod pointer;
 pub mod privacy;
 pub mod quick_insert;
 pub mod shell_surface;

@@ -91,6 +91,30 @@ pub struct SummonContext {
     pub age_ms: u64,
 }
 
+/// Where the pointer was when the person asked about what is under it (`helix-shell "point"`), and the window there.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PointContext {
+    pub output: String,
+    /// The pointer within the output, logical pixels.
+    pub x: f64,
+    pub y: f64,
+    pub window: Option<PointWindow>,
+    pub age_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PointWindow {
+    pub id: u64,
+    pub title: Option<String>,
+    pub app_id: Option<String>,
+    pub pid: Option<i32>,
+    /// The pointer within the window, logical pixels from its top left.
+    pub x: f64,
+    pub y: f64,
+    pub width: i32,
+    pub height: i32,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HelixCaps {
     pub liquid_glass: bool,
@@ -291,6 +315,20 @@ pub fn take_summon_context() -> Option<SummonContext> {
 
 fn parse_summon(ok: &Value) -> Option<SummonContext> {
     let inner = ok.get("HelixSummonContext")?;
+    if inner.is_null() {
+        return None;
+    }
+    serde_json::from_value(inner.clone()).ok()
+}
+
+/// Where the pointer was at the last `helix-shell "point"`, once (the compositor forgets it as it hands it over, and after a minute).
+pub fn take_point_context() -> Option<PointContext> {
+    let ok = request_json("\"HelixPointContext\"")?;
+    parse_point(&ok)
+}
+
+fn parse_point(ok: &Value) -> Option<PointContext> {
+    let inner = ok.get("HelixPointContext")?;
     if inner.is_null() {
         return None;
     }
@@ -868,6 +906,18 @@ mod tests {
             ),
             (Some(0.25), Some("us"), None)
         );
+    }
+
+    #[test]
+    fn the_point_note_is_read_when_there_is_one() {
+        let some = serde_json::json!({"HelixPointContext": {"output": "DP-1", "x": 400.0, "y": 300.5, "age_ms": 12,
+            "window": {"id": 7, "title": "Recipe", "app_id": "firefox", "pid": 9, "x": 120.0, "y": 80.0, "width": 1200, "height": 800}}});
+        let note = parse_point(&some).unwrap();
+        assert_eq!(note.output, "DP-1");
+        assert_eq!(note.window.as_ref().map(|w| w.id), Some(7));
+        let bare = serde_json::json!({"HelixPointContext": {"output": "DP-1", "x": 1.0, "y": 2.0, "age_ms": 0, "window": null}});
+        assert!(parse_point(&bare).unwrap().window.is_none());
+        assert!(parse_point(&serde_json::json!({"HelixPointContext": null})).is_none());
     }
 
     #[test]

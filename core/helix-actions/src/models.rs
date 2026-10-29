@@ -38,6 +38,7 @@ pub fn actions() -> Vec<Action> {
             params: json!({ "type": "object", "properties": {}, "additionalProperties": false }),
             risk: Risk::Observe,
             undo: Undo::None,
+            selection: None,
         },
         Action {
             id: USE.into(),
@@ -56,6 +57,7 @@ pub fn actions() -> Vec<Action> {
             }),
             risk: Risk::Act,
             undo: Undo::Restore,
+            selection: None,
         },
         Action {
             id: UNLOAD.into(),
@@ -64,6 +66,7 @@ pub fn actions() -> Vec<Action> {
             params: json!({ "type": "object", "properties": {}, "additionalProperties": false }),
             risk: Risk::Act,
             undo: Undo::None,
+            selection: None,
         },
         Action {
             id: DOWNLOAD.into(),
@@ -82,6 +85,7 @@ pub fn actions() -> Vec<Action> {
             }),
             risk: Risk::Confirm,
             undo: Undo::None,
+            selection: None,
         },
     ]
 }

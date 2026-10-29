@@ -452,6 +452,7 @@ mod live_tests {
             title: None,
             source: source.into(),
             action_kdl: Some(action.into()),
+            properties: Default::default(),
         }
     }
 

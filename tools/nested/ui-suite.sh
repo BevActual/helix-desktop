@@ -30,6 +30,7 @@ pick() { [ ${#sel[@]} -eq 0 ] && return 0; for n in "${sel[@]}"; do [ "$n" = "$1
 pick launcher       && run launcher launcher-test.sh tauri-shell.sh
 pick presence       && run presence presence-test.sh tauri-shell.sh
 pick writing        && run writing writing-test.sh writing-nested.sh "HELIX_FAKE_REPLY=The cat sat on the mat." HELIX_FAKE_DELAY_MS=40 "HELIX_WRITING_TEST_SELECTION=/tmp/helix-nested/suite-writing/selection.txt"
+pick pointer        && run pointer pointer-test.sh writing-nested.sh "HELIX_FAKE_REPLY=A grey cat on a mat." HELIX_FAKE_DELAY_MS=40 "HELIX_POINTER_TEST_SELECTION=/tmp/helix-nested/suite-pointer/selection.txt"
 pick qs             && run qs quick-settings-test.sh tauri-fake-desktop.sh
 pick shell-auto-theme && run shell-auto-theme shell-auto-theme-test.sh tauri-fake-desktop.sh
 pick net            && run net network-test.sh tauri-fake-desktop.sh

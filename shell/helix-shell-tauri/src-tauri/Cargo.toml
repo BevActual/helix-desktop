@@ -20,6 +20,7 @@ helix-config = { workspace = true }
 helix-models = { workspace = true }
 helix-nightlight-model = { workspace = true }
 helix-shell-model = { workspace = true }
+image = { workspace = true, features = ["png"] }
 gtk = { workspace = true }
 gtk-layer-shell = { workspace = true, features = ["v0_6"] }
 libc = { workspace = true }

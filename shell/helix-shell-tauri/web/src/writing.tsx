@@ -11,6 +11,7 @@ export interface WritingView {
   result: string;
   error: string;
   replaceable: boolean;
+  local: boolean;
 }
 
 export interface WritingHandle {
@@ -103,7 +104,7 @@ export function Writing({ register }: { register: (handle: WritingHandle) => voi
       ) : null}
       {view && view.phase === "done" ? (
         <div className="wt-actions">
-          <span className="wt-note">On this computer</span>
+          <span className="wt-note">{view.local ? "On this computer" : "Answered online"}</span>
           <button type="button" data-test="writing-copy" onClick={() => invoke("writing_copy").then(() => setCopied(true)).catch(() => undefined)}>
             {copied ? "Copied" : "Copy"}
           </button>

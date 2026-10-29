@@ -106,6 +106,13 @@ agents in their boxes; local-first privacy; the compositor as part of the produc
   (focus is handed back first; never multi-line into a terminal), Copy copies. The selection is the primary selection, else a copy made in
   that window with the clipboard put back (never the copy key in a terminal). `helix_shell_model::writing`, `shell/…/writing.rs`.
   Nested: `tools/nested/ui-suite.sh writing`.
-* Next: the Magic Pointer on top of Writing Tools (what is under the pointer, the same tools and actions beside it).
+* 2026-10-29 (later still): **the Magic Pointer**: point at anything and press Mod+/ (`helix-shell "point"`). The compositor notes where the
+  pointer was and the window under it (`HelixPointContext`); the shell opens a glass bubble at that corner of the pointer with "What's this?",
+  "Copy text" (read from the picture, put on the clipboard), "Ask about this…", Writing Tools on the selection (already running), and the
+  actions apps add that fit (`"selection"` / `"apps"` in a manifest; run as the person, with the app's own Undo). The window is captured only
+  when something is picked: that window alone (the bubble is never in it), cut to the patch around the pointer, kept in memory while the
+  bubble is open, on the Vision task (labelled "On this computer" or "Answered online" from the routing). An answer takes the menu's place,
+  with a back button. `helix_shell_model::pointer`, `shell/…/pointer.rs`, `compositor/src/helix/point.rs`. Nested: `ui-suite.sh pointer`.
+* Next: notification summaries (intelligence in place, continued), then the Setup Assistant and settings audit.
 
 The roadmap's other sections (foundations, Settings pages, apps) continue, but new work there is built as actions from the start.

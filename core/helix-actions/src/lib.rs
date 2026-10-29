@@ -66,6 +66,10 @@ pub struct Action {
     /// The usual risk. A provider may make one call riskier than this (one setting, one argument), never less.
     pub risk: Risk,
     pub undo: Undo,
+    /// The string parameter that takes the text the person has selected, when the action can work on a selection ("Add to Notes"):
+    /// the Magic Pointer offers it beside any selection and fills that parameter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<String>,
 }
 
 /// Who did something.

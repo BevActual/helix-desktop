@@ -51,6 +51,10 @@ confirm for the desktop-acting task; a local model must be installed; undo puts 
 (`notes.add`); `settings` and `models` are Helix's. A manifest in the person's own folder cannot call an action read-only (it is held to
 `act`); only one installed with the system can. A reply may say what was done (`"done"`) and how to undo it (`"undo": {action, params}`):
 the history keeps that call, and Undo makes it. Nested: `tools/nested/ui-suite.sh providers` (a pretend Notes app).
+Two optional fields put an app's actions under the Magic Pointer: `"apps": ["<app id>", …]` on the provider (its actions that need nothing
+are offered over the app's own windows) and `"selection": "<param>"` on an action (offered beside any selected text, that string parameter
+filled with it: "Add to Notes"). The person runs them with `Configuration1.RunAppAction(action, params)`: recorded as theirs, with the app's
+own Undo; blocked actions are refused, and the bubble asks a second click for "confirm" ones.
 
 **Next:** Software (install, remove, update: confirm) once it has a small service to carry them out, then Mobius's environments.
 

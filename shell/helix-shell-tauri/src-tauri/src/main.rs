@@ -33,6 +33,7 @@ mod mobius_talk;
 mod niri_query;
 mod notify;
 mod panels_bridge;
+mod pointer;
 mod polkit_agent;
 mod polkit_helper;
 mod privacy;
@@ -135,6 +136,7 @@ struct ShellState {
     seen_change: u64,
     /// Writing Tools: the selection it works on and its answer (`writing`).
     writing: writing::Writing,
+    pointer: pointer::Pointer,
     /// The screen edges stay lit until then after an agent changed something (`island::glow`).
     glow_until: Option<std::time::Instant>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
@@ -385,6 +387,11 @@ fn open_panel(app: &AppHandle, id: &str) {
         writing::capture_then_open(app.clone());
         return;
     }
+    // The Magic Pointer takes the compositor's note of where the pointer was, and what is selected, before it opens.
+    if id == "point" && !pointer::take_ready() {
+        pointer::capture_then_open(app.clone());
+        return;
+    }
     // Agents is a Mobius door, not a second panel.
     if id == "agents" {
         open_mobius_panel(app, MobiusMode::Agents);
@@ -427,7 +434,7 @@ fn open_panel_local(app: &AppHandle, id: &str) {
         shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
-    if id == "quick-insert" || id == "writing" {
+    if id == "quick-insert" || id == "writing" || id == "point" {
         shell.insert_target = shell.niri.focused_window().map(|w| w.id);
     }
     if id == "notifications" {
@@ -453,6 +460,9 @@ fn open_panel_local(app: &AppHandle, id: &str) {
     // After the lock above is let go: Writing Tools takes it again to store what it will work on.
     if id == "writing" {
         writing::opened(app);
+    }
+    if id == "point" {
+        pointer::opened(app);
     }
 }
 
@@ -623,6 +633,7 @@ fn control(app: &AppHandle, command: &str) {
         }
         "quick-insert" => open_panel(app, "quick-insert"),
         "writing" => open_panel(app, "writing"),
+        "point" => open_panel(app, "point"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
         "agent-stop-all" => {
@@ -1910,6 +1921,7 @@ pub(crate) fn ask(app: &AppHandle, text: &str) -> Result<(), String> {
         eprintln!("ASK do");
         return mobius_act_from_talk(app.clone(), Some(text));
     }
+    eprintln!("ASK answer");
     let open = shell_state(app)
         .lock()
         .expect("shell state")
@@ -2324,6 +2336,13 @@ fn main() {
             writing::writing_run,
             writing::writing_replace,
             writing::writing_copy,
+            pointer::pointer_view,
+            pointer::pointer_ask,
+            pointer::pointer_writing,
+            pointer::pointer_offer,
+            pointer::pointer_undo,
+            pointer::pointer_copy,
+            pointer::pointer_back,
             island::island_undo,
             island::media_toggle,
             island::media_next,
@@ -2449,6 +2468,7 @@ fn main() {
                 recent_change: None,
                 seen_change: 0,
                 writing: writing::Writing::default(),
+                pointer: pointer::Pointer::default(),
                 glow_until: None,
                 insert_target: None,
                 tray: helix_shell_model::tray::Tray::default(),

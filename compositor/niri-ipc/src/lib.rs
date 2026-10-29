@@ -157,6 +157,9 @@ pub enum Request {
     /// Helix: the window that had the keyboard when `helix-summon` was last used, once. Empty when it was never used, was a minute ago or
     /// more, or was already taken.
     HelixSummonContext,
+    /// Helix: where the pointer was, and what window was under it, when `helix-shell "point"` was last used, once. Empty when it was
+    /// never used, was a minute ago or more, or was already taken.
+    HelixPointContext,
     /// Helix: every key bind in effect now, with where it came from.
     HelixBinds,
     /// Helix: change key binds: set some (replacing what is on the same chord), unbind some, and give some back to what `config.kdl` says. Remembered,
@@ -216,6 +219,8 @@ pub enum Response {
     HelixDisplayProfile(HelixDisplayProfile),
     /// Helix summon context.
     HelixSummonContext(Option<HelixSummonContext>),
+    /// Helix pointer context.
+    HelixPointContext(Option<HelixPointContext>),
     /// Helix pointer and keyboard settings.
     HelixInput(HelixInput),
     /// Helix look settings.
@@ -450,6 +455,45 @@ pub struct HelixSummonContext {
     pub pid: Option<i32>,
     /// Milliseconds since the summon.
     pub age_ms: u64,
+}
+
+/// Where the pointer was when the person asked about what is under it (`helix-shell "point"`), and the window there. Only what the
+/// compositor already tells every client about windows, plus the pointer's place.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixPointContext {
+    /// The output the pointer was on.
+    pub output: String,
+    /// The pointer's distance from the output's left edge, in logical pixels.
+    pub x: f64,
+    /// The pointer's distance from the output's top edge, in logical pixels.
+    pub y: f64,
+    /// The window under the pointer, if any.
+    pub window: Option<HelixPointWindow>,
+    /// Milliseconds since the key press.
+    pub age_ms: u64,
+}
+
+/// The window under the pointer.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixPointWindow {
+    /// The window's id (as in `Windows`), for a screenshot of it.
+    pub id: u64,
+    /// The window's title, if it set one.
+    pub title: Option<String>,
+    /// The window's application id, if it set one.
+    pub app_id: Option<String>,
+    /// The process that owns the window's connection, if known.
+    pub pid: Option<i32>,
+    /// The pointer's distance from the left edge of the window's surface (shadows included, as a window screenshot has it), in logical pixels.
+    pub x: f64,
+    /// The pointer's distance from the top edge of the window's surface, in logical pixels.
+    pub y: f64,
+    /// The width of the window's surface in logical pixels.
+    pub width: i32,
+    /// The height of the window's surface in logical pixels.
+    pub height: i32,
 }
 
 /// Whether a display setup is remembered for the set of displays connected now.

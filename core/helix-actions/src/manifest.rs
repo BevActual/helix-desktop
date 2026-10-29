@@ -23,6 +23,9 @@ pub struct Provider {
     /// Where `Invoke` is called.
     pub bus: String,
     pub path: String,
+    /// The application ids of the app's windows: the Magic Pointer offers the app's actions that need nothing over its windows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apps: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -79,6 +82,11 @@ pub fn parse(text: &str, origin: Origin) -> Result<Manifest, String> {
     if !bus_ok(&manifest.provider.bus) || !path_ok(&manifest.provider.path) {
         return Err("the provider's bus name or object path is not valid".into());
     }
+    manifest
+        .provider
+        .apps
+        .retain(|app| !app.is_empty() && app.len() <= 255);
+    manifest.provider.apps.truncate(20);
     if manifest.actions.is_empty() || manifest.actions.len() > 100 {
         return Err("a provider offers between 1 and 100 actions".into());
     }
@@ -98,6 +106,19 @@ pub fn parse(text: &str, origin: Origin) -> Result<Manifest, String> {
                 "action \"{}\": params must be a JSON Schema object",
                 action.id
             ));
+        }
+        if let Some(param) = &action.selection {
+            let declared = action
+                .params
+                .pointer(&format!("/properties/{param}/type"))
+                .and_then(Value::as_str)
+                == Some("string");
+            if !declared {
+                return Err(format!(
+                    "action \"{}\": \"selection\" must name one of its string parameters",
+                    action.id
+                ));
+            }
         }
         action.title = action.title.chars().take(60).collect();
         action.summary = action.summary.chars().take(400).collect();
@@ -171,6 +192,48 @@ pub fn find<'a>(manifests: &'a [Manifest], id: &str) -> Option<(&'a Provider, &'
     })
 }
 
+/// The parameters an action requires.
+fn required(action: &Action) -> Vec<&str> {
+    action
+        .params
+        .get("required")
+        .and_then(Value::as_array)
+        .map(|r| r.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default()
+}
+
+/// What the Magic Pointer offers from the apps: actions that take the selection (when there is one), wherever it is; and, over one of an
+/// app's own windows, its actions that need nothing. Never a blocked one. Each with the parameters it would run with.
+pub fn for_pointer<'a>(
+    manifests: &'a [Manifest],
+    app_id: Option<&str>,
+    selection: Option<&str>,
+) -> Vec<(&'a Provider, &'a Action, Value)> {
+    let mut offered = Vec::new();
+    for m in manifests {
+        let own_window = app_id.is_some_and(|app| m.provider.apps.iter().any(|a| a == app));
+        for action in &m.actions {
+            if action.risk == Risk::Blocked {
+                continue;
+            }
+            let needs = required(action);
+            match (
+                &action.selection,
+                selection.filter(|s| !s.trim().is_empty()),
+            ) {
+                (Some(param), Some(text)) if needs.iter().all(|n| n == param) => {
+                    offered.push((&m.provider, action, serde_json::json!({ param: text })));
+                }
+                _ if own_window && needs.is_empty() => {
+                    offered.push((&m.provider, action, serde_json::json!({})));
+                }
+                _ => {}
+            }
+        }
+    }
+    offered
+}
+
 /// What a provider's reply may carry: a sentence for the history, and the call that undoes what it did.
 pub fn reply_parts(reply: &Value) -> (Option<String>, Option<Value>) {
     let done = reply
@@ -222,6 +285,37 @@ mod tests {
         assert!(parse(&text("settings", "settings.set", "act"), Origin::System).is_err());
         assert!(parse(&text("Notes!", "Notes!.add", "act"), Origin::System).is_err());
         assert!(parse(&text("notes", "notes.Add Thing", "act"), Origin::System).is_err());
+    }
+
+    #[test]
+    fn the_pointer_offers_selection_actions_anywhere_and_bare_ones_over_the_apps_windows() {
+        let text = json!({
+            "provider": { "id": "notes", "title": "Notes", "bus": "org.example.Notes", "path": "/org/example/Notes", "apps": ["org.example.Notes"] },
+            "actions": [
+                { "id": "notes.add", "title": "Add to Notes", "summary": "Adds a note.", "risk": "act", "undo": "restore", "selection": "text",
+                  "params": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
+                { "id": "notes.new", "title": "New note", "summary": "Opens a new note.", "risk": "act", "undo": "none",
+                  "params": { "type": "object" } },
+                { "id": "notes.remove", "title": "Remove a note", "summary": "Removes one.", "risk": "act", "undo": "none",
+                  "params": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+            ]
+        })
+        .to_string();
+        let m = vec![parse(&text, Origin::System).unwrap()];
+        let ids = |app, sel| {
+            for_pointer(&m, app, sel)
+                .iter()
+                .map(|(_, a, p)| format!("{} {p}", a.id))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            ids(Some("firefox"), Some("Milk")),
+            ["notes.add {\"text\":\"Milk\"}"]
+        );
+        assert_eq!(ids(Some("org.example.Notes"), None), ["notes.new {}"]);
+        assert!(ids(Some("firefox"), Some("  ")).is_empty());
+        let bad = text.replace("\"selection\":\"text\"", "\"selection\":\"nope\"");
+        assert!(parse(&bad, Origin::System).is_err());
     }
 
     #[test]

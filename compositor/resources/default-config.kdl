@@ -610,6 +610,10 @@ binds {
     // Helix: note which window has the keyboard, then raise Mobius (or start it). Mobius shows what you were using as a chip you can remove.
     // Mod+Shift+A     { helix-summon; }
 
+    // Helix: the Magic Pointer. Point at anything and press it: a bubble beside the pointer says what it is, copies the text in it,
+    // answers a question about it, opens Writing Tools on the selection, and offers the actions apps add.
+    Mod+Slash hotkey-overlay-title="Magic Pointer: what's under the pointer" { helix-shell "point"; }
+
     // Mod+Space       { switch-layout "next"; }
     // Mod+Shift+Space { switch-layout "prev"; }
 

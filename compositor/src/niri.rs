@@ -438,6 +438,8 @@ pub struct Niri {
     pub helix_profile_key: Option<Vec<String>>,
     /// What had the keyboard when `helix-summon` was pressed, and when.
     pub helix_summon: Option<(Instant, niri_ipc::HelixSummonContext)>,
+    /// Where the pointer was, and the window under it, when `helix-shell "point"` was pressed (`crate::helix::point`).
+    pub helix_point: Option<(Instant, niri_ipc::HelixPointContext)>,
     /// The light at the screen edges while an agent acts (`HelixSetGlow`; `crate::helix::glow`).
     pub helix_agent_glow: bool,
     pub ipc_outputs_changed: bool,
@@ -2828,6 +2830,7 @@ impl Niri {
             helix_place_on_agent_desk: 0,
             helix_profile_key: None,
             helix_summon: None,
+            helix_point: None,
             helix_agent_glow: false,
             ipc_outputs_changed: false,
 

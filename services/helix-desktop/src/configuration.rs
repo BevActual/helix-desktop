@@ -351,6 +351,50 @@ impl Configuration {
         history_json(&state, limit as usize)
     }
 
+    /// Runs an app's action (one its manifest describes) for the person at the computer, from a Helix surface they used (the Magic
+    /// Pointer): recorded in the history as theirs, with the app's own Undo. Blocked actions are refused; the surface asks before an
+    /// action marked "confirm". Returns the app's reply as JSON.
+    async fn run_app_action(
+        &self,
+        #[zbus(connection)] connection: &Connection,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        action: &str,
+        params: &str,
+    ) -> fdo::Result<String> {
+        let params: JsonValue = serde_json::from_str(params)
+            .map_err(|e| fdo::Error::InvalidArgs(format!("params: {e}")))?;
+        let manifests = crate::actions_run::manifests();
+        let (provider, found) = helix_actions::manifest::find(&manifests, action)
+            .ok_or_else(|| fdo::Error::InvalidArgs(format!("unknown action {action}")))?;
+        if found.risk == helix_actions::Risk::Blocked {
+            return Err(fdo::Error::AccessDenied(format!(
+                "{} cannot be run from here.",
+                found.title
+            )));
+        }
+        let reply = crate::actions_run::invoke_provider(connection, provider, action, &params)
+            .await
+            .map_err(fdo::Error::Failed)?;
+        let (done, undo) = helix_actions::manifest::reply_parts(&reply);
+        let sentence = done.unwrap_or_else(|| format!("{}: {}", provider.title, found.title));
+        let entry = self.state.lock().await.history.record_call(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs()),
+            action,
+            &helix_actions::Actor::person(),
+            &sentence,
+            undo,
+        );
+        Self::changed(&emitter).await.ok();
+        let mut reply = reply;
+        if let Some(object) = reply.as_object_mut() {
+            object.insert("history".into(), serde_json::json!(entry));
+            object.insert("sentence".into(), serde_json::json!(sentence));
+        }
+        Ok(reply.to_string())
+    }
+
     /// Undoes one change from the history. Only the newest change of a thing can be undone.
     async fn undo_action(
         &self,

@@ -13,6 +13,7 @@ let reactToday = null;
 let reactControls = null;
 let reactQuickInsert = null;
 let reactWriting = null;
+let reactPointer = null;
 let reactMobius = null;
 let reactIsland = null;
 let reactTray = null;
@@ -233,6 +234,8 @@ listen("shell-mode", (event) => {
     invoke("battery_view").then(drawBattery);
   } else if (panel === "writing" && reactWriting) {
     reactWriting.open();
+  } else if (panel === "point" && reactPointer) {
+    reactPointer.open();
   } else if (panel === "quick-insert" && reactQuickInsert) {
     reactQuickInsert.open();
   } else if (panel === "quick-insert") {
@@ -1605,7 +1608,7 @@ queueInteractive();
 // Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
-const GLASS_PANEL = { "agent-display": "agentview", "control-center": "controls", notifications: "notifs", today: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert", writing: "writing" };
+const GLASS_PANEL = { "agent-display": "agentview", "control-center": "controls", notifications: "notifs", today: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert", writing: "writing", point: "pointer" };
 // The interface scale (Settings, Accessibility). The page is zoomed by it, so everything the page measures is in zoomed pixels; the compositor and the
 // tests want real ones, so what is reported is multiplied by it.
 let uiScale = 1;
@@ -1645,7 +1648,9 @@ listen("blur-active", (event) => { document.documentElement.dataset.blur = event
 new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
 const glassResize = new ResizeObserver(queueGlass);
-["bar", "controls", "notifs", "launcher", "panel", "quickinsert", "writing", "toasts", "osd", "dock", "tray-menu", "island"].forEach((id) => glassResize.observe($(id)));
+["bar", "controls", "notifs", "launcher", "panel", "quickinsert", "writing", "pointer", "toasts", "osd", "dock", "tray-menu", "island"].forEach((id) => glassResize.observe($(id)));
+// The pointer's bubble moves to wherever the pointer is: its glass follows.
+new MutationObserver(queueGlass).observe($("pointer"), { attributes: true, attributeFilter: ["style"] });
 window.addEventListener("resize", queueGlass);
 queueGlass();
 

@@ -34,6 +34,7 @@ pub fn actions() -> Vec<Action> {
             }),
             risk: Risk::Observe,
             undo: Undo::None,
+            selection: None,
         },
         Action {
             id: GET.into(),
@@ -47,6 +48,7 @@ pub fn actions() -> Vec<Action> {
             }),
             risk: Risk::Observe,
             undo: Undo::None,
+            selection: None,
         },
         Action {
             id: SET.into(),
@@ -65,6 +67,7 @@ pub fn actions() -> Vec<Action> {
             }),
             risk: Risk::Act,
             undo: Undo::Restore,
+            selection: None,
         },
     ]
 }

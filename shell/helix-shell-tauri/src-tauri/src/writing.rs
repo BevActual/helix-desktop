@@ -42,6 +42,8 @@ pub struct WritingView {
     result: String,
     error: String,
     replaceable: bool,
+    /// Whether the Summaries task runs on this computer (else the answer comes from the service the person routed it to).
+    local: bool,
 }
 
 fn view(w: &Writing) -> WritingView {
@@ -55,6 +57,7 @@ fn view(w: &Writing) -> WritingView {
         replaceable: w.tool.is_some_and(Tool::replaces)
             && w.phase == Phase::Done
             && !w.result.is_empty(),
+        local: helix_config::inference_routing::load().is_local_route("summarize"),
     }
 }
 
@@ -162,6 +165,19 @@ pub fn capture_then_open(app: AppHandle) {
     });
 }
 
+/// Writing Tools on text already in hand (the Magic Pointer's selection), optionally running one tool straight away.
+pub fn open_with(app: &AppHandle, source: String, tool: Option<Tool>) {
+    *CAPTURED.lock().expect("captured") = source;
+    READY.store(true, std::sync::atomic::Ordering::SeqCst);
+    crate::open_panel(app, "writing");
+    if let Some(tool) = tool {
+        let running = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = writing_run(running, tool.id().to_string(), None).await;
+        });
+    }
+}
+
 /// Called as the panel opens: what it will work on.
 pub fn opened(app: &AppHandle) {
     let source = std::mem::take(&mut *CAPTURED.lock().expect("captured"));
@@ -242,15 +258,21 @@ pub async fn writing_run(
     Ok(())
 }
 
-async fn stream(
-    app: &AppHandle,
-    generation: u64,
-    messages: &[(String, String)],
+/// A piece of a streamed answer: more text, or (at the end) the whole of it.
+pub(crate) enum Piece {
+    More(String),
+    Whole(String),
+}
+
+/// Streams one model call (`Inference1.Action("chat", args)`) into `take`, which returns false when the answer is no longer wanted
+/// (the call is then cancelled). The completed message's whole text comes last; the stream's last pieces can arrive after it.
+pub(crate) async fn stream_chat(
+    args: std::collections::HashMap<&'static str, zbus::zvariant::Value<'static>>,
+    mut take: impl FnMut(Piece) -> bool,
 ) -> Result<(), String> {
     let proxy = crate::mobius_talk::inference_proxy()
         .await
         .map_err(|why| format!("The model service is not running ({why})."))?;
-    let args = crate::mobius_talk::chat_args_for(messages, "summarize")?;
     let deltas = proxy
         .receive_signal("Delta")
         .await
@@ -278,20 +300,10 @@ async fn stream(
                 Some(Ev::Delta(message)) => {
                     if let Ok((op, chunk)) = message.body().deserialize::<(u64, String)>() {
                         if op != operation { continue; }
-                        let current = {
-                            let state = shell_state(app);
-                            let mut shell = state.lock().expect("shell state");
-                            let current = shell.writing.generation == generation;
-                            if current {
-                                shell.writing.result.push_str(&chunk);
-                            }
-                            current
-                        };
-                        if !current {
+                        if !take(Piece::More(chunk)) {
                             let _ = proxy.call_method("Cancel", &(operation,)).await;
                             return Ok(());
                         }
-                        emit(app);
                     }
                 }
                 Some(Ev::Done(message)) => {
@@ -301,13 +313,8 @@ async fn stream(
                         if !ok {
                             return Err(value.get("error").and_then(|e| e.as_str()).unwrap_or("The model could not answer.").to_string());
                         }
-                        {
-                            let state = shell_state(app);
-                            let mut shell = state.lock().expect("shell state");
-                            // The completed message carries the whole answer; the last pieces of the stream can arrive after it.
-                            if let Some(text) = value.get("text").and_then(|t| t.as_str()).filter(|t| !t.is_empty()) {
-                                shell.writing.result = text.to_string();
-                            }
+                        if let Some(text) = value.get("text").and_then(|t| t.as_str()).filter(|t| !t.is_empty()) {
+                            take(Piece::Whole(text.to_string()));
                         }
                         return Ok(());
                     }
@@ -315,6 +322,33 @@ async fn stream(
             }
         }
     }
+}
+
+async fn stream(
+    app: &AppHandle,
+    generation: u64,
+    messages: &[(String, String)],
+) -> Result<(), String> {
+    let args = crate::mobius_talk::chat_args_for(messages, "summarize")?;
+    stream_chat(args, |piece| {
+        let current = {
+            let state = shell_state(app);
+            let mut shell = state.lock().expect("shell state");
+            let current = shell.writing.generation == generation;
+            if current {
+                match piece {
+                    Piece::More(chunk) => shell.writing.result.push_str(&chunk),
+                    Piece::Whole(text) => shell.writing.result = text,
+                }
+            }
+            current
+        };
+        if current {
+            emit(app);
+        }
+        current
+    })
+    .await
 }
 
 /// Replace: the panel closes, the keyboard goes back to the window that had it, and the rewrite is pasted over the selection.

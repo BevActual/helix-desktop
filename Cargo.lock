@@ -3272,6 +3272,7 @@ dependencies = [
  "helix-models",
  "helix-nightlight-model",
  "helix-shell-model",
+ "image",
  "libc",
  "nix 0.29.0",
  "serde",

@@ -74,7 +74,7 @@ input:focus { outline: none; background: var(--fill-2); box-shadow: 0 0 0 2px co
 .panel { position: fixed; display: flex; flex-direction: column; gap: 12px; padding: 16px; opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.965);
          transform-origin: top right; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
 body[data-panel="control-center"] #controls, body[data-panel="notifications"] #notifs, body[data-panel="today"] #notifs, body[data-panel="agent-display"] #agentview,
-body[data-panel="launcher"] #launcher, body[data-panel="quick-insert"] #quickinsert, body[data-panel="writing"] #writing, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+body[data-panel="launcher"] #launcher, body[data-panel="quick-insert"] #quickinsert, body[data-panel="writing"] #writing, body[data-panel="point"] #pointer, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
 /* Split shell: each process only paints its half (same HTML, role from shell-mode). */
 body[data-role="bar"] #panel,
@@ -84,6 +84,7 @@ body[data-role="bar"] #agentview,
 body[data-role="bar"] #launcher,
 body[data-role="bar"] #quickinsert,
 body[data-role="bar"] #writing,
+body[data-role="bar"] #pointer,
 body[data-role="bar"] #scrim { display: none !important; }
 body[data-role="panels"] #bar,
 body[data-role="panels"] #dock,
@@ -2532,7 +2533,7 @@ body.hx-shell.hx-modern { --spring: cubic-bezier(.2, 1.15, .32, 1); --r-panel: c
 body.hx-shell.hx-modern .glass { background-image: var(--sheen); background-color: var(--glass); box-shadow: 0 24px 70px rgba(0,0,0,.42), 0 2px 8px rgba(0,0,0,.18), var(--rim); }
 body.hx-shell.hx-modern .panel { transform: translateY(-8px) scale(.955); transition: opacity 200ms var(--ease), transform 320ms cubic-bezier(.2, .9, .25, 1), visibility 0s linear 320ms; }
 body.hx-shell.hx-modern[data-panel="control-center"] #controls, body.hx-shell.hx-modern[data-panel="notifications"] #notifs, body.hx-shell.hx-modern[data-panel="today"] #notifs,
-body.hx-shell.hx-modern[data-panel="launcher"] #launcher, body.hx-shell.hx-modern[data-panel="quick-insert"] #quickinsert, body.hx-shell.hx-modern[data-panel="writing"] #writing, body.hx-shell.hx-modern[data-panel="assistant"] #panel,
+body.hx-shell.hx-modern[data-panel="launcher"] #launcher, body.hx-shell.hx-modern[data-panel="quick-insert"] #quickinsert, body.hx-shell.hx-modern[data-panel="writing"] #writing, body.hx-shell.hx-modern[data-panel="point"] #pointer, body.hx-shell.hx-modern[data-panel="assistant"] #panel,
 body.hx-shell.hx-modern[data-panel="agent-display"] #agentview { transform: none; transition-delay: 0s; }
 
 /* The bar: a slim floating capsule of glass; its buttons are capsules that light softly under the pointer. */
@@ -2769,3 +2770,37 @@ body.hx-shell.hx-modern #results .row .row-sym { width: 34px; height: 34px; bord
 .wt-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .wt-actions button { border-radius: 999px; padding: 6px 16px; }
 .wt-note { margin-right: auto; color: var(--label-3); font-size: 12px; }
+/* The Magic Pointer: a compact bubble beside the pointer, grown from the corner nearest it. */
+#pointer { left: 0; top: 0; width: 340px; padding: 12px; gap: 10px; border-radius: 22px; transform-origin: top left; overflow-y: auto; overscroll-behavior: contain; }
+body.hx-shell.hx-modern #pointer { transform: scale(.92); }
+body.hx-shell.hx-modern[data-panel="point"] #pointer { transform: none; }
+.mp-head { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+.mp-orb { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: conic-gradient(from 200deg, #ff6ac1, #ffb547, #5ac8fa, #a259ff, #ff6ac1); box-shadow: 0 3px 12px rgba(162, 89, 255, .35); }
+.mp-orb svg.i { width: 14px; height: 14px; }
+.mp-back { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; padding: 0; background: color-mix(in srgb, var(--label) 9%, transparent); }
+.mp-back svg.i { width: 15px; height: 15px; }
+.mp-where { min-width: 0; flex: 1; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-ask input { width: 100%; border-radius: 999px; padding: 8px 14px; font-size: 13.5px; }
+.mp-list { display: flex; flex-direction: column; gap: 2px; }
+.mp-list:empty { display: none; }
+.mp-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; font-size: 13.5px; text-align: left; background: transparent; }
+.mp-row:hover:not(:disabled), .mp-row.current { background: color-mix(in srgb, var(--label) 9%, transparent); }
+.mp-row.confirming { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.mp-row svg.i { width: 16px; height: 16px; color: var(--accent); flex: none; }
+.mp-row span:first-of-type { flex: 1; min-width: 0; }
+.mp-app { color: var(--label-3); font-size: 12px; }
+.mp-writing { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; background: color-mix(in srgb, var(--label) 6%, transparent);
+  box-shadow: inset 0 0 0 .5px var(--hairline); }
+.mp-label { display: flex; align-items: center; gap: 8px; color: var(--label-2); font-size: 12.5px; min-width: 0; }
+.mp-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-label svg.i { width: 14px; height: 14px; color: var(--accent); flex: none; }
+.mp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mp-chips button { border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; }
+.mp-result { max-height: 34vh; font-size: 13.5px; }
+.mp-empty { color: var(--label-2); font-size: 13px; padding: 4px 2px; }
+.mp-copied { color: var(--label-2); font-size: 12.5px; }
+.mp-done { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 2px; }
+.mp-done svg.i { width: 16px; height: 16px; color: var(--accent); flex: none; }
+.mp-done span { flex: 1; min-width: 0; }
+.mp-done button { border-radius: 999px; padding: 5px 14px; }

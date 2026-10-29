@@ -593,6 +593,17 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                 .map_err(|_| String::from("summon context query failed"))?;
             Response::HelixSummonContext(context)
         }
+        Request::HelixPointContext => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let _ = tx.send_blocking(state.helix_take_point_context());
+            });
+            let context = rx
+                .recv()
+                .await
+                .map_err(|_| String::from("point context query failed"))?;
+            Response::HelixPointContext(context)
+        }
         Request::HelixAgentDesk => {
             let (tx, rx) = async_channel::bounded(1);
             ctx.event_loop.insert_idle(move |state| {

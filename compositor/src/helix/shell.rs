@@ -21,6 +21,7 @@ const PANELS: &[&str] = &[
     "notifications",
     "quick-insert",
     "writing",
+    "point",
 ];
 
 fn call_for(command: &str) -> Option<Call> {
@@ -91,6 +92,10 @@ impl State {
         if !command_ok(&command) {
             warn!("helix-shell: refusing the command {command:?}");
             return;
+        }
+        // Where the pointer is matters to the panel that opens beside it: noted now, before anything moves.
+        if command == "point" {
+            self.helix_note_point();
         }
         // The bus call can wait for the shell, so it is made off the compositor's thread; if it cannot be made the old way is used.
         let fallback = vec![helix_panel(), command.clone()];
