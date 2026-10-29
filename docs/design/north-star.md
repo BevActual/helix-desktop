@@ -71,6 +71,11 @@ agents in their boxes; local-first privacy; the compositor as part of the produc
   Mobius's tool loop. **Presence, first parts:** the bar's island shows an agent's change in plain words with Undo, and the compositor lights
   the screen edges while an agent acts (`HelixSetGlow`, `compositor/src/helix/glow.rs`: pink, blue, purple and orange light fading inward,
   under trusted surfaces, still rather than animated). Nested: `tools/nested/ui-suite.sh actions`, `mobius-actions`.
-* Next: one invocation for asking (the entry points become ways to open it), the focused app's current thing, then more providers.
+* 2026-10-29 (later): **One place to ask, first step.** The launcher (`Mod+space`) finds apps and settings by what they do (the actions
+  catalogue's search): Enter flips a switch setting there (the person's change, recorded with Undo) or opens the setting's page; anything
+  typed can be asked of Mobius (the last row, the only one when nothing matches), which opens Mobius in the bar with the words. The
+  "act …" prefix still lists desktop actions. Nested: `tools/nested/ui-suite.sh presence`.
+* Next: Mobius in the bar answers and acts with the same catalogue (Talk gets the settings actions), the bar's ✦ and Caps Lock "Ask"
+  open the same place, the focused app's current thing, then more providers (Models, Software).
 
 The roadmap's other sections (foundations, Settings pages, apps) continue, but new work there is built as actions from the start.

@@ -39,22 +39,25 @@ shot launcher-recent; wtype "helix test"; sleep 1; grep "LAUNCHER results" "$LOG
 echo escape >> "$CONTROL"; wait_for "PANEL closed" 2 20
 echo "--- 3. an application that is hidden or needs a terminal is not offered"
 echo launcher >> "$CONTROL"; wait_for "PANEL open" 3; sleep 0.8; wtype "hidden thing"; sleep 0.8; wtype -k Return; gone hidden-thing
+# Nothing matched, so the only row was Ask Mobius (the launcher is the one place to ask): Enter asked Mobius, which opened in the bar.
+wait_for "LAUNCHER ask" 1 20 && echo "ok: with no application found, Enter asked Mobius instead" || echo "FAIL: Enter did not ask Mobius"
+wait_for "PANEL open" 4 20
 wtype -M ctrl a -m ctrl; wtype "terminal thing"; sleep 0.8; wtype -k Return; gone terminal-thing
 echo "--- 4. no match: Enter does nothing, Escape closes"
 wtype -M ctrl a -m ctrl; wtype "zzzqqq"; sleep 0.8; shot launcher-nomatch; wtype -k Return; sleep 0.8; wtype -k Escape
 wait_for "PANEL closed" 3 20 && echo "ok: Escape closed the launcher"
 echo "--- 5. a click launches the first row (the shorter name ranks first: Another Tool)"
-echo launcher >> "$CONTROL"; wait_for "PANEL open" 4; sleep 0.8; wtype "another"; sleep 1
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 5; sleep 0.8; wtype "another"; sleep 1
 source "$ROOT/tools/nested/ui-lib.sh"; LAYOUT=$SCRATCH/state/layout.json
 if has_id "launcher-row:another-tool.desktop"; then click_id "launcher-row:another-tool.desktop"; else "$PT" 0.5 0.262 click; fi   # the React rows are named by the application they stand for; the hand-written ones are found by position
 wait_for "LAUNCH another-tool.desktop" 1 20 && echo "ok: click launched"; sleep 1
 [ -e "$M/another-tool" ] && echo "ok: the application ran (marker exists)" || echo "FAIL: marker missing"
 echo "--- 6. arrow keys move the selection (query limited to the fake apps: Another Tool, then Another Thing)"
-echo launcher >> "$CONTROL"; wait_for "PANEL open" 5; sleep 0.8; wtype "another"; sleep 1; wtype -k Down; sleep 0.4; wtype -k Return
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 6; sleep 0.8; wtype "another"; sleep 1; wtype -k Down; sleep 0.4; wtype -k Return
 wait_for "LAUNCH another-thing.desktop" 1 20 && echo "ok: Down moved to the second result and launched it"; sleep 1
 [ -e "$M/another-thing" ] && echo "ok: the application ran (marker exists)" || echo "FAIL: marker missing"
 echo "--- 7. act prefix lists desktop actions without launching apps"
-echo launcher >> "$CONTROL"; wait_for "PANEL open" 6; sleep 0.8; wtype "act agent"; sleep 1
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 7; sleep 0.8; wtype "act agent"; sleep 1
 grep "LAUNCHER results" "$LOG" | tail -1 | grep -q "helix:desktop:agent-desk" && echo "ok: act agent surfaces agent desk" || echo "FAIL: act agent missing from launcher results"
 wtype -k Escape; wait_for "PANEL closed" 3 20
 echo "--- 8. nothing but the fake applications was ever launched"

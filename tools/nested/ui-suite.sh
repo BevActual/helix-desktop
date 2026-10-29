@@ -28,6 +28,7 @@ WIDE=$'HELIX_NESTED_KDL=layout {\n gaps 0\n default-column-width { fixed 1100; }
 sel=("$@")
 pick() { [ ${#sel[@]} -eq 0 ] && return 0; for n in "${sel[@]}"; do [ "$n" = "$1" ] && return 0; done; return 1; }
 pick launcher       && run launcher launcher-test.sh tauri-shell.sh
+pick presence       && run presence presence-test.sh tauri-shell.sh
 pick qs             && run qs quick-settings-test.sh tauri-fake-desktop.sh
 pick shell-auto-theme && run shell-auto-theme shell-auto-theme-test.sh tauri-fake-desktop.sh
 pick net            && run net network-test.sh tauri-fake-desktop.sh

@@ -144,6 +144,8 @@ struct ShellState {
     activity: Activity,
     /// The last settings list, for the dark-theme and night-light tiles.
     quick: Quick,
+    /// The same list as rows, for finding a setting by what it does from the launcher (`helix_actions::settings`).
+    setting_rows: Vec<serde_json::Value>,
     /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
     icons: std::collections::HashMap<String, String>,
     started: Instant,
@@ -1196,7 +1198,12 @@ async fn refresh_quick(app: &AppHandle) {
         helix_desktop_api::LocalTime::now(),
     ));
     let view = quick.view();
-    shell_state(app).lock().expect("shell state").quick = quick;
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        shell.quick = quick;
+        shell.setting_rows = settings.as_array().cloned().unwrap_or_default();
+    }
     let _ = app.emit("quick-view", view);
 }
 
@@ -1976,6 +1983,35 @@ struct AppHit {
 }
 
 const LAUNCHER_ROWS: usize = 8;
+
+/// A Settings page id as the person sees it in Settings' sidebar.
+fn settings_page_title(page: &str) -> String {
+    let title = match page {
+        "appearance" => "Appearance",
+        "wallpaper" => "Wallpaper",
+        "accessibility" => "Accessibility",
+        "displays" => "Displays",
+        "network" => "Network",
+        "bluetooth" => "Bluetooth",
+        "sound" => "Sound",
+        "keyboard" => "Keyboard",
+        "multitask" => "Multitasking",
+        "pointer" => "Mouse & touchpad",
+        "startup" => "Startup apps",
+        "defaults" => "Default apps",
+        "datetime" => "Date & time",
+        "topbar" => "Top bar",
+        "dock" => "Dock",
+        "notifications" => "Notifications",
+        "power" => "Power & lock",
+        "users" => "Users",
+        "agents" => "Privacy & agents",
+        "about" => "About",
+        "" => return String::new(),
+        other => return format!("Settings · {other}"),
+    };
+    format!("Settings · {title}")
+}
 const MAX_QUERY_CHARS: usize = 100;
 
 /// The best matches for what was typed. Names are already display-safe; the page shows them as text.
@@ -1997,7 +2033,46 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
             icon: String::new(),
         });
     }
-    let app_slots = LAUNCHER_ROWS.saturating_sub(hits.len());
+    // Settings found by what they do (the actions catalogue's search), at most three.
+    if !query.trim().is_empty() && !helix_shell_model::desktop_actions::parse_act_query(&query).0 {
+        for found in helix_actions::settings::search(&shell.setting_rows, &query, None, 3) {
+            let id = found
+                .get("setting")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let row = shell
+                .setting_rows
+                .iter()
+                .find(|r| r.get("id").and_then(|v| v.as_str()) == Some(id));
+            let page = found
+                .get("page")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let value = row
+                .and_then(|r| r.get("value"))
+                .filter(|_| found.get("value").is_some());
+            let shown = match (row, value) {
+                (Some(row), Some(value)) => helix_actions::settings::shown(row, value),
+                _ => String::new(),
+            };
+            hits.push(AppHit {
+                id: format!("helix:setting:{id}"),
+                name: found
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(id)
+                    .to_string(),
+                generic: [settings_page_title(page), shown]
+                    .iter()
+                    .filter(|t| !t.is_empty())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" · "),
+                icon: String::new(),
+            });
+        }
+    }
+    let app_slots = LAUNCHER_ROWS.saturating_sub(hits.len() + 1);
     let found = if app_slots == 0 {
         Vec::new()
     } else {
@@ -2022,6 +2097,15 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
             icon,
         });
     }
+    // Anything typed can be asked of Mobius: the last row, and the first choice when nothing else matches.
+    if !query.trim().is_empty() && !helix_shell_model::desktop_actions::parse_act_query(&query).0 {
+        hits.push(AppHit {
+            id: "helix:ask".into(),
+            name: "Ask Mobius".into(),
+            generic: query.trim().chars().take(80).collect(),
+            icon: String::new(),
+        });
+    }
     eprintln!(
         "LAUNCHER results {} first {} icons {}",
         hits.len(),
@@ -2034,11 +2118,71 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
 /// Starts the application with this id and closes the launcher. The page can only name an application the scan found; it
 /// supplies no command, arguments or paths.
 #[tauri::command]
-fn launcher_launch(app: AppHandle, id: String) -> bool {
+fn launcher_launch(app: AppHandle, id: String, query: Option<String>) -> bool {
     let state = shell_state(&app);
     let shell = state.lock().expect("shell state");
     if shell.surface.open_panel_id() != Some("launcher") {
         return false;
+    }
+    if id == "helix:ask" {
+        let text: String = query
+            .unwrap_or_default()
+            .trim()
+            .chars()
+            .take(MAX_QUERY_CHARS)
+            .collect();
+        if text.is_empty() {
+            return false;
+        }
+        drop(shell);
+        eprintln!("LAUNCHER ask");
+        close_panel(&app);
+        // Opened here, on the main thread (GTK's layer shell may not be touched from a worker); the words follow from a task.
+        open_mobius_panel(&app, MobiusMode::Talk);
+        tauri::async_runtime::spawn(async move {
+            if let Err(error) = mobius_talk::submit(app, text).await {
+                eprintln!("LAUNCHER ask failed: {error}");
+            }
+        });
+        return true;
+    }
+    if let Some(setting) = id.strip_prefix("helix:setting:") {
+        let row = shell
+            .setting_rows
+            .iter()
+            .find(|r| r.get("id").and_then(|v| v.as_str()) == Some(setting))
+            .cloned();
+        drop(shell);
+        let Some(row) = row else { return false };
+        close_panel(&app);
+        // A switch is flipped here (the person's own change, recorded with Undo); anything else opens its page in Settings.
+        if let Some(on) = row
+            .get("value")
+            .and_then(|v| v.as_bool())
+            .filter(|_| row.get("type").and_then(|t| t.as_str()) == Some("boolean"))
+        {
+            let id = setting.to_string();
+            eprintln!("LAUNCHER setting {id} -> {}", !on);
+            tauri::async_runtime::spawn(async move {
+                if let Some(desktop) = desktop().await {
+                    if let Err(error) = desktop
+                        .update_setting(&id, &serde_json::Value::Bool(!on))
+                        .await
+                    {
+                        eprintln!("LAUNCHER setting failed: {error}");
+                    }
+                }
+            });
+        } else {
+            let page = row
+                .get("page")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            eprintln!("LAUNCHER open settings {page}");
+            let _ = desktop_action::spawn_settings((!page.is_empty()).then_some(page.as_str()));
+        }
+        return true;
     }
     if id.starts_with("helix:desktop:") {
         let ok = desktop_action::run(&app, &id).is_ok();
@@ -2263,6 +2407,7 @@ fn main() {
                     )),
                 ),
                 quick: Quick::default(),
+                setting_rows: Vec::new(),
                 icons: std::collections::HashMap::new(),
                 started,
                 last_phase: Phase::Idle,

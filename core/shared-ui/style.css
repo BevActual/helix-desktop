@@ -2733,3 +2733,13 @@ body.chat.hx-modern .code-block pre code { background: transparent; box-shadow: 
 #island .isl-undo { height: 20px; padding: 0 10px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--accent) 85%, transparent); color: var(--on-accent);
   font: 650 11.5px/20px var(--font); transition: filter 120ms var(--ease), transform 160ms cubic-bezier(.2, 1.15, .32, 1); }
 #island .isl-undo:hover { filter: brightness(1.1); } #island .isl-undo:active { transform: scale(.94); }
+
+/* The launcher as the one place to ask: settings it found, and Ask Mobius, carry their own rounded symbol where an app's icon would be. */
+#results .row .row-sym { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px; color: #fff;
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 65%); }
+#results .row .row-sym svg.i { width: 17px; height: 17px; }
+#results .row .row-sym.setting { background-color: #8e8e93; }
+#results .row .row-sym.ask { background: conic-gradient(from 200deg, #ff6ac1, #ffb547, #5ac8fa, #a259ff, #ff6ac1); }
+#results .row.ask .name { font-weight: 650; }
+#results .row.ask .generic { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+body.hx-shell.hx-modern #results .row .row-sym { width: 34px; height: 34px; border-radius: 9px; }

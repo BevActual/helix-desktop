@@ -89,7 +89,7 @@ fn spawn_bin(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn spawn_settings(page: Option<&str>) -> Result<(), String> {
+pub(crate) fn spawn_settings(page: Option<&str>) -> Result<(), String> {
     let mut command = std::process::Command::new("helix-settings");
     crate::apps::scrub_shell_env(&mut command);
     if let Some(page) = page {

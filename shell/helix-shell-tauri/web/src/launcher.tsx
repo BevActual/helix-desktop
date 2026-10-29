@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
+import { Icon } from "./icon";
 
 /** What Rust offers for an application: display-safe text and a `data:` image (or none). Mirrors `AppHit` in the shell's main.rs. */
 export interface AppHit {
@@ -77,7 +78,7 @@ export function Launcher({ register }: { register: (handle: LauncherHandle) => v
 
   const launch = (index: number) => {
     const hit = hits[index];
-    if (hit) invoke("launcher_launch", { id: hit.id });
+    if (hit) invoke("launcher_launch", { id: hit.id, query });
   };
 
   return (
@@ -85,7 +86,7 @@ export function Launcher({ register }: { register: (handle: LauncherHandle) => v
       <input
         id="lq"
         ref={input}
-        placeholder="Apps, or act … for desktop actions"
+        placeholder="Search apps and settings, or ask Mobius"
         autoComplete="off"
         spellCheck={false}
         value={query}
@@ -119,15 +120,19 @@ export function Launcher({ register }: { register: (handle: LauncherHandle) => v
         {hits.map((hit, index) => (
           <div
             key={hit.id}
-            className={`row${index === selected ? " selected" : ""}${hit.id.startsWith("helix:desktop:") ? " action" : ""}`}
+            className={`row${index === selected ? " selected" : ""}${hit.id.startsWith("helix:desktop:") ? " action" : ""}${hit.id.startsWith("helix:setting:") ? " setting" : ""}${hit.id === "helix:ask" ? " ask" : ""}`}
             data-test={`launcher-row:${hit.id}`}
             // The pointer only moves the selection when it really moves (a list that redraws under a still pointer must not steal it).
             onMouseMove={() => { if (selected !== index) setSelected(index); }}
             onClick={() => launch(index)}
           >
-            {hit.icon ? <img className="icon" alt="" src={hit.icon} /> : <LetterTile name={hit.name} />}
+            {hit.id === "helix:ask" ? (
+              <span className="row-sym ask"><Icon name="sparkle" /></span>
+            ) : hit.id.startsWith("helix:setting:") ? (
+              <span className="row-sym setting"><Icon name="settings" /></span>
+            ) : hit.icon ? <img className="icon" alt="" src={hit.icon} /> : <LetterTile name={hit.name} />}
             <span className="name">
-              <Highlighted text={hit.name} query={query} />
+              {hit.id === "helix:ask" ? hit.name : <Highlighted text={hit.name} query={query} />}
             </span>
             {hit.generic ? <span className="generic">{hit.generic}</span> : null}
             {index === selected ? <span className="enter-hint" aria-hidden="true">↵</span> : null}

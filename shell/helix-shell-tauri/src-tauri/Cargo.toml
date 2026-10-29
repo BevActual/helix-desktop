@@ -11,6 +11,7 @@ tauri-build = { workspace = true }
 
 [dependencies]
 helix-desktop-api = { workspace = true }
+helix-actions = { workspace = true }
 helix-agent = { workspace = true }
 helix-base = { workspace = true }
 helix-chat = { workspace = true }

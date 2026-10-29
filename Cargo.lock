@@ -3251,6 +3251,7 @@ dependencies = [
  "gdkwayland-sys",
  "gtk",
  "gtk-layer-shell",
+ "helix-actions",
  "helix-agent",
  "helix-base",
  "helix-chat",
