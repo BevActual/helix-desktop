@@ -31,15 +31,20 @@ like a raw web form. This note says how Apple would refine Helix, what is done, 
 * Settings: coloured page tiles, a header card on every page, glass toolbar title, tiled list icons, capsule segments, the red window dot.
 * Shell: Liquid-glass panels with rim and sheen; control centre as modules (round toggles that fill with the accent when on, tall capsule
   sliders, round system buttons); Spotlight-style launcher; glass toasts with a spring; dock with a lit rim and springy icons; capsule OSD.
+* Mobius: floating glass sidebar with a coloured tile per workspace (a rail of tiles when a stage is open), tinted selection, glass
+  composer capsule, start cards with tiles, capsule starters, glass title bar.
+* System Monitor: the Overview is widgets (CPU and memory as wide widgets with the last minute as a filled area, swap ring, network, load,
+  graphics), coloured page tiles, large titles.
+* Login (greeter): no card; a large bold clock high up, then a lit avatar, the name and a glass password capsule on the wallpaper; glass
+  restart and shut down. High contrast and solid glass keep the card.
+* The shell's desktop layer is scoped to `body.hx-shell.hx-modern` so its generic names (`.panel`, `.tile`, `.row`) never reach an app.
 
 ## Next, in order
 
-1. **Mobius** on the modern layer (floating sidebar, capsule composer controls, header cards for workspaces).
-2. **System Monitor** as a widget dashboard (gauges, sparklines).
-3. **Control centre, deeper**: a connectivity module (Wi-Fi, Bluetooth, VPN as circles in one module), a media module with artwork, slider icons
+1. **Control centre, deeper**: a connectivity module (Wi-Fi, Bluetooth, VPN as circles in one module), a media module with artwork, slider icons
    inside the fill for brightness too, modules the person can rearrange.
-4. **Menu bar**: an option for a fully transparent bar over the wallpaper (Tahoe), with only grouped items in glass.
-5. **Lock screen and greeter**: large clock, glass password capsule, wallpaper depth.
-6. **App icons**: one squircle grid and shading for Helix's own icons so the dock and launcher look like one family.
-7. **Sound and feel**: short, quiet UI sounds (off by default), and a consistent focus ring.
-8. Make `hx-modern` the default for every Helix surface and delete the older styles it replaces.
+2. **Menu bar**: an option for a fully transparent bar over the wallpaper (Tahoe), with only grouped items in glass.
+3. **Lock screen** (drawn natively): match the login's bold clock and lit avatar.
+4. **App icons**: one squircle grid and shading for Helix's own icons so the dock and launcher look like one family.
+5. **Sound and feel**: short, quiet UI sounds (off by default), and a consistent focus ring.
+6. Make `hx-modern` the default for every Helix surface and delete the older styles it replaces.

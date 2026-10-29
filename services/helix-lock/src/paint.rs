@@ -1,4 +1,4 @@
-//! The picture: a blurred, dimmed wallpaper, the clock, and a card with the account's avatar and the password field, in the same grammar as the
+//! The picture: a blurred, dimmed wallpaper, the date and a large clock, the account's avatar and a glass password capsule, in the same grammar as the
 //! login screen. Drawn with Cairo and Pango into any cairo context, so a test can draw into a plain image and look at it.
 
 use std::path::Path;
@@ -91,24 +91,30 @@ fn rounded(c: &Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
 /// Everything on the screen except the background, in logical pixels on a `w` x `h` screen.
 pub fn draw(c: &Context, w: f64, h: f64, frame: &Frame) {
     let cx = w / 2.0;
-    // The clock sits in the upper part, the card in the middle: the same order as the login screen.
-    c.set_source_rgba(1.0, 1.0, 1.0, 0.96);
+    // The date, then a large bold clock, in the upper part; the person in the middle: the same order as the login screen (and a Mac's).
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.85);
+    let date_h = centred(c, frame.date, cx, h * 0.13, 20.0, "Semi-Bold");
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.97);
+    let time_top = h * 0.13 + date_h + 2.0;
     let time_h = centred(
         c,
         frame.time,
         cx,
-        h * 0.15,
-        (h * 0.13).clamp(56.0, 120.0),
-        "Light",
+        time_top,
+        (h * 0.14).clamp(60.0, 132.0),
+        "Bold",
     );
-    c.set_source_rgba(1.0, 1.0, 1.0, 0.62);
-    centred(c, frame.date, cx, h * 0.15 + time_h + 4.0, 20.0, "Regular");
 
-    let card_w = 340.0;
-    let card_top = (h * 0.40).max(h * 0.15 + time_h + 70.0);
-    // The avatar: the account's picture in a circle, else the initials on the accent colour.
+    let card_w = 280.0;
+    let card_top = (h * 0.40).max(time_top + time_h + 50.0);
+    // The avatar: the account's picture in a circle, else the initials on the accent colour, lifted by a soft shadow and a lit ring.
     let r = AVATAR_RADIUS;
     let ay = card_top + r;
+    for (spread, alpha) in [(10.0, 0.05), (6.0, 0.07), (3.0, 0.09)] {
+        c.set_source_rgba(0.0, 0.0, 0.0, alpha);
+        c.arc(cx, ay + 4.0, r + spread, 0.0, std::f64::consts::TAU);
+        let _ = c.fill();
+    }
     if let Some(picture) = frame.avatar {
         let _ = c.save();
         c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
@@ -120,12 +126,13 @@ pub fn draw(c: &Context, w: f64, h: f64, frame: &Frame) {
         let _ = c.set_source_surface(picture, 0.0, 0.0);
         let _ = c.paint();
         let _ = c.restore();
-        c.set_source_rgba(1.0, 1.0, 1.0, 0.35);
-        c.set_line_width(1.5);
-        c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
-        let _ = c.stroke();
     } else {
-        rgb(c, frame.accent, 1.0);
+        let [ar, ag, ab] = frame.accent.map(|v| f64::from(v) / 255.0);
+        let shade = cairo::LinearGradient::new(cx - r, ay - r, cx + r * 0.4, ay + r);
+        shade.add_color_stop_rgb(0.0, ar * 0.88 + 0.12, ag * 0.88 + 0.12, ab * 0.88 + 0.12);
+        shade.add_color_stop_rgb(0.55, ar, ag, ab);
+        shade.add_color_stop_rgb(1.0, ar * 0.7, ag * 0.7, ab * 0.7);
+        let _ = c.set_source(&shade);
         c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
         let _ = c.fill();
         c.set_source_rgba(1.0, 1.0, 1.0, 1.0);
@@ -139,23 +146,40 @@ pub fn draw(c: &Context, w: f64, h: f64, frame: &Frame) {
             "Bold",
         );
     }
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.3);
+    c.set_line_width(3.0);
+    // A fresh path: the initials leave the current point where their text ended, and an arc would otherwise join it with a line.
+    c.new_path();
+    c.arc(cx, ay, r + 1.5, 0.0, std::f64::consts::TAU);
+    let _ = c.stroke();
     // The name.
     c.set_source_rgba(1.0, 1.0, 1.0, 0.96);
     let name_h = centred(c, frame.name, cx, ay + r + 14.0, 21.0, "Bold");
     // The field.
     let fx = cx - card_w / 2.0 + frame.shake;
     let fy = ay + r + 14.0 + name_h + 18.0;
-    let (fw, fh) = (card_w, 46.0);
+    let (fw, fh) = (card_w, 44.0);
+    // A capsule of glass: a light fill, a lit top edge, a hairline; red only when the password was wrong.
     rounded(c, fx, fy, fw, fh, fh / 2.0);
-    c.set_source_rgba(1.0, 1.0, 1.0, 0.12);
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.16);
     let _ = c.fill_preserve();
     if frame.complaint {
         c.set_source_rgba(1.0, 0.27, 0.23, 0.9);
+        c.set_line_width(1.5);
     } else {
-        rgb(c, frame.accent, 0.85);
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.3);
+        c.set_line_width(1.0);
     }
-    c.set_line_width(1.5);
     let _ = c.stroke();
+    let _ = c.save();
+    rounded(c, fx, fy, fw, fh, fh / 2.0);
+    c.clip();
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.22);
+    c.set_line_width(1.0);
+    c.move_to(fx + fh / 2.0, fy + 1.0);
+    c.line_to(fx + fw - fh / 2.0, fy + 1.0);
+    let _ = c.stroke();
+    let _ = c.restore();
     if frame.dots == 0 && !frame.checking {
         c.set_source_rgba(1.0, 1.0, 1.0, 0.45);
         centred(

@@ -53,17 +53,20 @@ pill_y() { python3 - "$SCRATCH/$1.png" <<'PY'
 import sys
 from PIL import Image
 img = Image.open(sys.argv[1]).convert("RGB")
-ys = [y for y in range(img.size[1]) if img.getpixel((100, y)) == (0x0a, 0x84, 0xff)]
+# The selected sidebar row is tinted with the accent (Settings' modern look): look right of the label, where only the tint is.
+def tinted(r, g, b):
+    return b > r + 30 and b > g + 10
+ys = [y for y in range(img.size[1]) if tinted(*img.getpixel((210, y)))]
 print(round(sum(ys) / len(ys)) if ys else -1)
 PY
 }
 before=$(pill_y frame)
-echo 'agent-display-input {"op":"click","button":"left","x":80,"y":352}' >> "$CONTROL"
+echo 'agent-display-input {"op":"click","button":"left","x":80,"y":370}' >> "$CONTROL"
 wait_log "AGENT-DISPLAY input ok" 40 && echo "ok: the click was delivered" || fail "no click: $(grep 'AGENT-DISPLAY input' "$LOG")"
 # The page answers a click after a moment on a display with no GPU: look again until the highlight has moved.
 after=$before
 for _ in $(seq 1 12); do sleep 1; frame after-click; after=$(pill_y after-click); [ "$after" != "$before" ] && break; done
-[ "$before" -lt 150 ] && [ "$after" -gt 330 ] && [ "$after" -lt 375 ] && echo "ok: the click chose Keyboard in the sidebar (highlight moved from y=$before to y=$after)" || fail "highlight $before -> $after"
+[ "$before" -lt 150 ] && [ "$after" -gt 345 ] && [ "$after" -lt 395 ] && echo "ok: the click chose Keyboard in the sidebar (highlight moved from y=$before to y=$after)" || fail "highlight $before -> $after"
 echo 'agent-display-input {"op":"click","button":"left","x":120,"y":67}' >> "$CONTROL"; sleep 1
 frame before-typing
 echo 'agent-display-input {"op":"text","text":"dock"}' >> "$CONTROL"
@@ -110,7 +113,7 @@ wait_log "AGENT-DISPLAY person in control" 20 && echo "ok: Take over put the dis
 echo 'agent-display-agent-input {"op":"move","x":10,"y":10}' >> "$CONTROL"
 wait_log "AGENT-DISPLAY agent input failed: the person is in control" 20 && echo "ok: an agent's command is refused while the person is in control" || fail "agent not refused: $(grep 'agent input' "$LOG")"
 # The person clicks Appearance in the picture (the sidebar's first item, at x 80, y 113 of the display), which goes to the display.
-[ "$(pill_y after-click)" -gt 330 ] || fail "precondition: Keyboard was selected"
+[ "$(pill_y after-click)" -gt 345 ] || fail "precondition: Keyboard was selected"
 python3 - "$SCRATCH/state/layout.json" <<'PY' > "$SCRATCH/picture-point"
 import json, sys
 d = json.load(open(sys.argv[1])); e = d["elements"]["av-frame"]

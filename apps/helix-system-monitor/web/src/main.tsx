@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { closeWindow, invoke, listen, useLayoutReport } from "@helix/ui";
 
@@ -21,10 +21,10 @@ interface ProcessRow { pid: number; name: string; state: string; threads: number
 interface ScreenTimeRow { app: string; seconds: number; }
 interface MonitorView { overview: Overview; processes: ProcessRow[]; screen_time: ScreenTimeRow[]; gpu_shown: boolean; }
 
-const PAGES: { id: Page; title: string; icon: string }[] = [
-  { id: "overview", title: "Overview", icon: "sun" },
-  { id: "processes", title: "Processes", icon: "grid" },
-  { id: "screen-time", title: "Screen Time", icon: "sparkle" },
+const PAGES: { id: Page; title: string; icon: string; tint: string }[] = [
+  { id: "overview", title: "Overview", icon: "sun", tint: "#0a84ff" },
+  { id: "processes", title: "Processes", icon: "grid", tint: "#8e8e93" },
+  { id: "screen-time", title: "Screen Time", icon: "clock", tint: "#5e5ce6" },
 ];
 const SORTS: { id: Sort; title: string }[] = [
   { id: "cpu", title: "CPU" },
@@ -59,22 +59,6 @@ function cpuTime(ticks: number): string {
   return seconds >= 60 ? duration(Math.round(seconds)) : `${seconds.toFixed(1)} s`;
 }
 
-/** A thin line of the last minute of samples. */
-function Spark({ values, test }: { values: number[]; test: string }) {
-  const width = 120;
-  const height = 28;
-  const points = values.map((value, index) => {
-    const x = (index / (HISTORY - 1)) * width;
-    const y = height - (Math.max(0, Math.min(100, value)) / 100) * height;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  return (
-    <svg className="spark" data-test={test} viewBox={`0 0 ${width} ${height}`} width={width} height={height} aria-hidden="true">
-      {points.length > 1 ? <polyline points={points.join(" ")} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" /> : null}
-    </svg>
-  );
-}
-
 function Meter({ percent }: { percent: number }) {
   return (
     <div className="meter" aria-hidden="true">
@@ -83,29 +67,82 @@ function Meter({ percent }: { percent: number }) {
   );
 }
 
-function Stat({ test, title, value, percent, history }: { test: string; title: string; value: string; percent?: number; history?: number[] }) {
+/** The last minute as a filled area, its line on top: the shape of a widget's history. */
+function Area({ values, test, tint }: { values: number[]; test: string; tint: string }) {
+  const width = 300;
+  const height = 64;
+  const id = `area-${test}`;
+  const points = values.map((value, index) => [
+    (index / (HISTORY - 1)) * width,
+    height - 2 - (Math.max(0, Math.min(100, value)) / 100) * (height - 4),
+  ]);
+  const line = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = points.length > 1 ? `0,${height} ${line} ${points[points.length - 1][0].toFixed(1)},${height}` : "";
   return (
-    <div className="setting-row stat-row" data-test={test}>
-      <div className="setting-text stat-text">
-        <div className="setting-title">{title}</div>
-        <div className="setting-about">{value}</div>
-        {percent !== undefined ? <Meter percent={percent} /> : null}
-      </div>
-      {history ? <Spark values={history} test={`${test}-history`} /> : null}
+    <svg className="area" data-test={test} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={tint} stopOpacity=".45" />
+          <stop offset="1" stopColor={tint} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {points.length > 1 ? <polygon points={area} fill={`url(#${id})`} /> : null}
+      {points.length > 1 ? <polyline points={line} fill="none" stroke={tint} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" /> : null}
+    </svg>
+  );
+}
+
+function Ring({ percent, tint }: { percent: number; tint: string }) {
+  const r = 22;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg className="ring" width="56" height="56" viewBox="0 0 56 56" fill="none" strokeWidth="6" aria-hidden="true">
+      <circle cx="28" cy="28" r={r} stroke="var(--fill-2)" />
+      <circle cx="28" cy="28" r={r} stroke={tint} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0, Math.min(100, percent)) / 100)} transform="rotate(-90 28 28)" />
+    </svg>
+  );
+}
+
+function Widget({ test, icon: name, label, tint, wide, children }: { test: string; icon: string; label: string; tint: string; wide?: boolean; children: ReactNode }) {
+  return (
+    <div className={`hx-widget${wide ? " wide" : ""}`} style={{ ["--tint" as string]: tint }} data-test={test}>
+      <div className="label"><Icon name={name} />{label}</div>
+      {children}
     </div>
   );
 }
 
+const CPU = "#0a84ff", MEMORY = "#30d158", SWAP = "#ff9f0a", NETWORK = "#5e5ce6", LOAD = "#bf5af2", GPU = "#ff375f";
+
 function OverviewPage({ view, cpu, mem }: { view: MonitorView; cpu: number[]; mem: number[] }) {
   const o = view.overview;
+  const [whole, part] = pct(o.cpu_percent).replace("%", "").split(".");
   return (
-    <div className="rows-card">
-      <Stat test="stat-cpu" title="CPU" value={pct(o.cpu_percent)} percent={o.cpu_percent} history={cpu} />
-      <Stat test="stat-mem" title="Memory" value={`${pct(o.mem_percent)} · ${bytes(o.mem_used)} / ${bytes(o.mem_total)}`} percent={o.mem_percent} history={mem} />
-      <Stat test="stat-swap" title="Swap" value={pct(o.swap_percent)} percent={o.swap_percent} />
-      <Stat test="stat-net" title="Network" value={`↓ ${bytes(o.net_rx)}   ↑ ${bytes(o.net_tx)}`} />
-      <Stat test="stat-load" title="Load" value={`${o.load_1} / ${o.load_5} / ${o.load_15}`} />
-      <Stat test="stat-gpu" title="GPU" value={view.gpu_shown ? "Probing while Overview is open" : "Hidden"} />
+    <div className="monitor-widgets">
+      <Widget test="stat-cpu" icon="bolt" label="CPU" tint={CPU} wide>
+        <div className="big">{whole}<small className="fraction">.{part}%</small></div>
+        <Area values={cpu} test="stat-cpu-history" tint={CPU} />
+      </Widget>
+      <Widget test="stat-mem" icon="grid" label="Memory" tint={MEMORY} wide>
+        <div className="big">{bytes(o.mem_used).split(" ")[0]}<small>{bytes(o.mem_used).split(" ")[1]} of {bytes(o.mem_total)}</small></div>
+        <Area values={mem} test="stat-mem-history" tint={MEMORY} />
+      </Widget>
+      <Widget test="stat-swap" icon="folder" label="Swap" tint={SWAP}>
+        <Ring percent={o.swap_percent} tint={SWAP} />
+        <div className="big">{Math.round(o.swap_percent)}<small>%</small></div>
+      </Widget>
+      <Widget test="stat-net" icon="wifi" label="Network" tint={NETWORK}>
+        <div className="flow"><span className="down">↓</span>{bytes(o.net_rx)}</div>
+        <div className="flow"><span className="up">↑</span>{bytes(o.net_tx)}</div>
+      </Widget>
+      <Widget test="stat-load" icon="sun" label="Load" tint={LOAD}>
+        <div className="big">{o.load_1}</div>
+        <div className="line">{o.load_5} · {o.load_15} over 5 and 15 min</div>
+      </Widget>
+      <Widget test="stat-gpu" icon="eye" label="Graphics" tint={GPU}>
+        <div className="big small-big">{view.gpu_shown ? "Watching" : "Hidden"}</div>
+        <div className="line">{view.gpu_shown ? "Probed while Overview is open" : "Shown on Overview"}</div>
+      </Widget>
     </div>
   );
 }
@@ -199,7 +236,7 @@ function Monitor({ startPage }: { startPage: Page | null }) {
         <nav id="pages">
           {PAGES.map((entry) => (
             <button key={entry.id} className={`page-link${entry.id === page ? " current" : ""}`} data-page={entry.id} data-test={`page-${entry.id}`} onClick={() => setPage(entry.id)}>
-              <Icon name={entry.icon} />
+              <span className="page-tile" style={{ ["--tile" as string]: entry.tint }}><Icon name={entry.icon} /></span>
               <span>{entry.title}</span>
             </button>
           ))}
@@ -238,6 +275,7 @@ function Monitor({ startPage }: { startPage: Page | null }) {
 function mount(host: HTMLElement) {
   const start = new URLSearchParams(location.search).get("page");
   const page = PAGES.some((entry) => entry.id === start) ? (start as Page) : null;
+  document.body.classList.add("hx-modern", "monitor");
   createRoot(host).render(<Monitor startPage={page} />);
 }
 

@@ -2520,85 +2520,208 @@ body.settings.hx-modern .list-row.active .row-lead svg { background: var(--accen
 body.settings.hx-modern .list-row + .list-row { border-top: .5px solid var(--hairline); }
 body.settings.hx-modern #content { scroll-padding-top: 64px; }
 
-/* ===== The desktop in the modern look (body.hx-modern in the shell) ==================================================================
+/* ===== The desktop in the modern look (body.hx-shell.hx-modern) ==================================================================
    How Apple would refine it: one glass material with a lit rim and depth, radii that nest (outer = inner + padding), controls that are
    round, colour only where something is on, and springy motion that starts where you clicked. */
-body.hx-modern { --spring: cubic-bezier(.2, 1.15, .32, 1); --r-panel: calc(28px * var(--shape-ui)); --r-card: calc(20px * var(--shape-ui)); --r-ctl: calc(14px * var(--shape-ui));
+body.hx-shell.hx-modern { --spring: cubic-bezier(.2, 1.15, .32, 1); --r-panel: calc(28px * var(--shape-ui)); --r-card: calc(20px * var(--shape-ui)); --r-ctl: calc(14px * var(--shape-ui));
   --rim: inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 0 .5px rgba(255,255,255,.14), inset 0 -1px 0 rgba(255,255,255,.03);
   --sheen: linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,.02) 35%, rgba(255,255,255,0) 60%); }
-:root[data-theme="light"] body.hx-modern { --rim: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 .5px rgba(0,0,0,.08); --sheen: linear-gradient(160deg, rgba(255,255,255,.55), rgba(255,255,255,0) 55%); }
+:root[data-theme="light"] body.hx-shell.hx-modern { --rim: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 .5px rgba(0,0,0,.08); --sheen: linear-gradient(160deg, rgba(255,255,255,.55), rgba(255,255,255,0) 55%); }
 /* Liquid glass: the panel colour under a sheen, a lit top edge and a soft deep shadow. */
-body.hx-modern .glass { background-image: var(--sheen); background-color: var(--glass); box-shadow: 0 24px 70px rgba(0,0,0,.42), 0 2px 8px rgba(0,0,0,.18), var(--rim); }
-body.hx-modern .panel { transform: translateY(-8px) scale(.955); transition: opacity 200ms var(--ease), transform 320ms cubic-bezier(.2, .9, .25, 1), visibility 0s linear 320ms; }
-body.hx-modern[data-panel="control-center"] #controls, body.hx-modern[data-panel="notifications"] #notifs, body.hx-modern[data-panel="today"] #notifs,
-body.hx-modern[data-panel="launcher"] #launcher, body.hx-modern[data-panel="quick-insert"] #quickinsert, body.hx-modern[data-panel="assistant"] #panel,
-body.hx-modern[data-panel="agent-display"] #agentview { transform: none; transition-delay: 0s; }
+body.hx-shell.hx-modern .glass { background-image: var(--sheen); background-color: var(--glass); box-shadow: 0 24px 70px rgba(0,0,0,.42), 0 2px 8px rgba(0,0,0,.18), var(--rim); }
+body.hx-shell.hx-modern .panel { transform: translateY(-8px) scale(.955); transition: opacity 200ms var(--ease), transform 320ms cubic-bezier(.2, .9, .25, 1), visibility 0s linear 320ms; }
+body.hx-shell.hx-modern[data-panel="control-center"] #controls, body.hx-shell.hx-modern[data-panel="notifications"] #notifs, body.hx-shell.hx-modern[data-panel="today"] #notifs,
+body.hx-shell.hx-modern[data-panel="launcher"] #launcher, body.hx-shell.hx-modern[data-panel="quick-insert"] #quickinsert, body.hx-shell.hx-modern[data-panel="assistant"] #panel,
+body.hx-shell.hx-modern[data-panel="agent-display"] #agentview { transform: none; transition-delay: 0s; }
 
 /* The bar: a slim floating capsule of glass; its buttons are capsules that light softly under the pointer. */
-body.hx-modern #bar { height: 34px; margin: 5px 10px 0; border-radius: min(17px, calc(17px * var(--shape-bar))); background-image: var(--sheen); background-color: var(--glass);
+body.hx-shell.hx-modern #bar { height: 34px; margin: 5px 10px 0; border-radius: min(17px, calc(17px * var(--shape-bar))); background-image: var(--sheen); background-color: var(--glass);
   box-shadow: 0 6px 22px rgba(0,0,0,.28), var(--rim); }
-body.hx-modern .bar-btn { border-radius: min(13px, calc(13px * var(--shape-bar))); transition: background 160ms var(--ease), transform 200ms var(--spring); }
-body.hx-modern .bar-btn:active { transform: scale(.94); }
-body.hx-modern #clock { font-weight: 650; letter-spacing: -.015em; }
-body.hx-modern #status { gap: 11px; padding: 0 4px; }
-body.hx-modern #island { background: color-mix(in srgb, var(--label) 10%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.hx-shell.hx-modern .bar-btn { border-radius: min(13px, calc(13px * var(--shape-bar))); transition: background 160ms var(--ease), transform 200ms var(--spring); }
+body.hx-shell.hx-modern .bar-btn:active { transform: scale(.94); }
+body.hx-shell.hx-modern #clock { font-weight: 650; letter-spacing: -.015em; }
+body.hx-shell.hx-modern #status { gap: 11px; padding: 0 4px; }
+body.hx-shell.hx-modern #island { background: color-mix(in srgb, var(--label) 10%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
 
 /* Control centre: modules. A toggle is a round button that fills with colour when on; the module itself stays glass. */
-body.hx-modern #controls { width: 372px; padding: 14px; gap: 12px; }
-body.hx-modern #qs-time { font: 700 34px/1 var(--font-display); letter-spacing: -.035em; }
-body.hx-modern #tiles { gap: 10px; }
-body.hx-modern .tile { min-height: 62px; border-radius: var(--r-card); padding: 10px 8px 10px 10px; background: color-mix(in srgb, var(--label) 7%, transparent);
+body.hx-shell.hx-modern #controls { width: 372px; padding: 14px; gap: 12px; }
+body.hx-shell.hx-modern #qs-time { font: 700 34px/1 var(--font-display); letter-spacing: -.035em; }
+body.hx-shell.hx-modern #tiles { gap: 10px; }
+body.hx-shell.hx-modern .tile { min-height: 62px; border-radius: var(--r-card); padding: 10px 8px 10px 10px; background: color-mix(in srgb, var(--label) 7%, transparent);
   box-shadow: inset 0 0 0 .5px var(--hairline); transition: background 200ms var(--ease), transform 260ms var(--spring); }
-body.hx-modern .tile:hover { background: color-mix(in srgb, var(--label) 11%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
-body.hx-modern .tile:active { transform: scale(.96); }
-body.hx-modern .tile .tile-ico { width: 38px; height: 38px; background: color-mix(in srgb, var(--label) 14%, transparent); transition: background 220ms var(--ease), color 220ms var(--ease), transform 300ms var(--spring); }
-body.hx-modern .tile.on { background: color-mix(in srgb, var(--label) 7%, transparent); color: var(--label); }
-body.hx-modern .tile.on:hover { background: color-mix(in srgb, var(--label) 11%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
-body.hx-modern .tile.on .tile-ico { background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent); }
-body.hx-modern .tile.on .tile-sub { color: var(--label-2); }
-body.hx-modern .tile.on .tile-open { color: var(--label-2); } body.hx-modern .tile.on .tile-open:hover { background: var(--fill-2); color: var(--label); }
+body.hx-shell.hx-modern .tile:hover { background: color-mix(in srgb, var(--label) 11%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.hx-shell.hx-modern .tile:active { transform: scale(.96); }
+body.hx-shell.hx-modern .tile .tile-ico { width: 38px; height: 38px; background: color-mix(in srgb, var(--label) 14%, transparent); transition: background 220ms var(--ease), color 220ms var(--ease), transform 300ms var(--spring); }
+body.hx-shell.hx-modern .tile.on { background: color-mix(in srgb, var(--label) 7%, transparent); color: var(--label); }
+body.hx-shell.hx-modern .tile.on:hover { background: color-mix(in srgb, var(--label) 11%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.hx-shell.hx-modern .tile.on .tile-ico { background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent); }
+body.hx-shell.hx-modern .tile.on .tile-sub { color: var(--label-2); }
+body.hx-shell.hx-modern .tile.on .tile-open { color: var(--label-2); } body.hx-shell.hx-modern .tile.on .tile-open:hover { background: var(--fill-2); color: var(--label); }
 /* Sliders: tall glass capsules, filled in white, with the icon inside the track. */
-body.hx-modern #brightslider, body.hx-modern #volslider, body.hx-modern #micslider { height: 40px; border-radius: 20px; background: color-mix(in srgb, var(--label) 9%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
-body.hx-modern #brightfill, body.hx-modern #volfill, body.hx-modern #micfill { border-radius: 20px; opacity: 1; box-shadow: 0 0 18px rgba(255,255,255,.15); }
-body.hx-modern #volico { top: 11px; left: 14px; }
-body.hx-modern #percent, body.hx-modern #micpercent, body.hx-modern #bright-percent { font-size: 12px; font-weight: 600; }
-body.hx-modern .qs-media { border-radius: var(--r-card); background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
-body.hx-modern .qs-system { gap: 10px; }
-body.hx-modern .qs-system button { height: 46px; border-radius: 23px; background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); transition: background 160ms var(--ease), transform 260ms var(--spring); }
-body.hx-modern .qs-system button:hover { background: color-mix(in srgb, var(--label) 13%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
-body.hx-modern .qs-system button:active { transform: scale(.94); }
-body.hx-modern .qs-sheet { border-radius: var(--r-card); }
-body.hx-modern .row, body.hx-modern .net { border-radius: 12px; }
+body.hx-shell.hx-modern #brightslider, body.hx-shell.hx-modern #volslider, body.hx-shell.hx-modern #micslider { height: 40px; border-radius: 20px; background: color-mix(in srgb, var(--label) 9%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.hx-shell.hx-modern #brightfill, body.hx-shell.hx-modern #volfill, body.hx-shell.hx-modern #micfill { border-radius: 20px; opacity: 1; box-shadow: 0 0 18px rgba(255,255,255,.15); }
+body.hx-shell.hx-modern #volico { top: 11px; left: 14px; }
+body.hx-shell.hx-modern #percent, body.hx-shell.hx-modern #micpercent, body.hx-shell.hx-modern #bright-percent { font-size: 12px; font-weight: 600; }
+body.hx-shell.hx-modern .qs-media { border-radius: var(--r-card); background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.hx-shell.hx-modern .qs-system { gap: 10px; }
+body.hx-shell.hx-modern .qs-system button { height: 46px; border-radius: 23px; background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); transition: background 160ms var(--ease), transform 260ms var(--spring); }
+body.hx-shell.hx-modern .qs-system button:hover { background: color-mix(in srgb, var(--label) 13%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.hx-shell.hx-modern .qs-system button:active { transform: scale(.94); }
+body.hx-shell.hx-modern .qs-sheet { border-radius: var(--r-card); }
+body.hx-shell.hx-modern .row, body.hx-shell.hx-modern .net { border-radius: 12px; }
 
 /* The launcher, Spotlight-style: a large floating search capsule; results sit beneath in the same glass, selection a soft accent. */
-body.hx-modern #launcher { width: 680px; margin-left: -340px; top: 18%; padding: 8px; border-radius: 30px; }
-body.hx-modern #launcher #lq { font: 450 22px/1.2 var(--font-display); padding: 16px 22px; border-radius: 22px; background: transparent; letter-spacing: -.02em; }
-body.hx-modern #launcher #lq:focus { background: transparent; }
-body.hx-modern #results { padding: 0 2px 2px; } body.hx-modern #results:not(:empty) { border-top: .5px solid var(--hairline); padding-top: 6px; }
-body.hx-modern #results .row { border-radius: 16px; padding: 8px 12px; }
-body.hx-modern #results .row .icon { width: 34px; height: 34px; }
-body.hx-modern #results .row.selected { background: color-mix(in srgb, var(--accent) 85%, transparent); box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+body.hx-shell.hx-modern #launcher { width: 680px; margin-left: -340px; top: 18%; padding: 8px; border-radius: 30px; }
+body.hx-shell.hx-modern #launcher #lq { font: 450 22px/1.2 var(--font-display); padding: 16px 22px; border-radius: 22px; background: transparent; letter-spacing: -.02em; }
+body.hx-shell.hx-modern #launcher #lq:focus { background: transparent; }
+body.hx-shell.hx-modern #results { padding: 0 2px 2px; } body.hx-shell.hx-modern #results:not(:empty) { border-top: .5px solid var(--hairline); padding-top: 6px; }
+body.hx-shell.hx-modern #results .row { border-radius: 16px; padding: 8px 12px; }
+body.hx-shell.hx-modern #results .row .icon { width: 34px; height: 34px; }
+body.hx-shell.hx-modern #results .row.selected { background: color-mix(in srgb, var(--accent) 85%, transparent); box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
 
 /* Notifications: glass cards that slide in with a spring; the app's icon is a rounded tile. */
-body.hx-modern .toast { border-radius: calc(22px * var(--shape-toasts)); background-image: var(--sheen); background-color: var(--glass);
+body.hx-shell.hx-modern .toast { border-radius: calc(22px * var(--shape-toasts)); background-image: var(--sheen); background-color: var(--glass);
   box-shadow: 0 14px 40px rgba(0,0,0,.35), var(--rim); animation: toastin-modern 520ms var(--spring) both; }
 @keyframes toastin-modern { from { opacity: 0; transform: translateX(40px) scale(.92); } }
-body.hx-modern .nico { border-radius: 10px; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18), 0 2px 6px rgba(0,0,0,.2); background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0) 60%); }
-body.hx-modern .napp { text-transform: none; letter-spacing: 0; font-size: 11.5px; }
-body.hx-modern .nrow { border-radius: 18px; background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
-body.hx-modern #notifs { width: 392px; }
+body.hx-shell.hx-modern .nico { border-radius: 10px; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.18), 0 2px 6px rgba(0,0,0,.2); background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0) 60%); }
+body.hx-shell.hx-modern .napp { text-transform: none; letter-spacing: 0; font-size: 11.5px; }
+body.hx-shell.hx-modern .nrow { border-radius: 18px; background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.hx-shell.hx-modern #notifs { width: 392px; }
 
 /* The dock: a glass shelf with a lit rim; icons spring; a running app has a small dot. */
-body.hx-modern #dock { padding: 8px 9px 10px; border-radius: calc(28px * var(--shape-dock)); background-image: var(--sheen);
+body.hx-shell.hx-modern #dock { padding: 8px 9px 10px; border-radius: calc(28px * var(--shape-dock)); background-image: var(--sheen);
   box-shadow: 0 18px 50px rgba(0,0,0,.4), var(--rim); transition: transform 460ms var(--spring), opacity 220ms var(--ease); }
-body.hx-modern .dock-item { transition: transform 160ms var(--spring); }
-body.hx-modern .dock-item img, body.hx-modern .dock-item .dock-tile { filter: drop-shadow(0 3px 6px rgba(0,0,0,.28)); }
-body.hx-modern .dock-item.running::after { width: 5px; height: 5px; margin-left: -2.5px; bottom: -7px; }
-body.hx-modern #dock-tip { border-radius: var(--r-pill); padding: 5px 12px; background-image: var(--sheen); box-shadow: 0 6px 18px rgba(0,0,0,.3), var(--rim); }
-body.hx-modern #dock-menu, body.hx-modern #tray-menu { border-radius: 18px; padding: 6px; }
-body.hx-modern .dock-menu-item, body.hx-modern .menu-row { border-radius: 10px; }
+body.hx-shell.hx-modern .dock-item { transition: transform 160ms var(--spring); }
+body.hx-shell.hx-modern .dock-item img, body.hx-shell.hx-modern .dock-item .dock-tile { filter: drop-shadow(0 3px 6px rgba(0,0,0,.28)); }
+body.hx-shell.hx-modern .dock-item.running::after { width: 5px; height: 5px; margin-left: -2.5px; bottom: -7px; }
+body.hx-shell.hx-modern #dock-tip { border-radius: var(--r-pill); padding: 5px 12px; background-image: var(--sheen); box-shadow: 0 6px 18px rgba(0,0,0,.3), var(--rim); }
+body.hx-shell.hx-modern #dock-menu, body.hx-shell.hx-modern #tray-menu { border-radius: 18px; padding: 6px; }
+body.hx-shell.hx-modern .dock-menu-item, body.hx-shell.hx-modern .menu-row { border-radius: 10px; }
 
 /* The on-screen indicator: a glass capsule. */
-body.hx-modern #osd { border-radius: 30px; padding: 14px 20px; background-image: var(--sheen); box-shadow: 0 20px 60px rgba(0,0,0,.4), var(--rim);
+body.hx-shell.hx-modern #osd { border-radius: 30px; padding: 14px 20px; background-image: var(--sheen); box-shadow: 0 20px 60px rgba(0,0,0,.4), var(--rim);
   transition: opacity 200ms var(--ease), transform 440ms var(--spring); }
-body.hx-modern #osd-bar { height: 10px; border-radius: 5px; } body.hx-modern #osd-fill { border-radius: 5px; }
+body.hx-shell.hx-modern #osd-bar { height: 10px; border-radius: 5px; } body.hx-shell.hx-modern #osd-fill { border-radius: 5px; }
+
+/* ===== Mobius in the modern look (body.chat.hx-modern) ===============================================================================
+   The floating glass sidebar of the other Helix apps, a coloured tile for each workspace, a tinted selection, a glass composer capsule, and
+   start cards with tiles. */
+body.chat.hx-modern #side { margin: 8px 0 8px 8px; padding: 0 8px 8px; border-radius: 18px; min-height: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02) 40%), var(--sidebar-solid);
+  box-shadow: inset 0 0 0 .5px rgba(255,255,255,.12), inset 0 1px 0 rgba(255,255,255,.08), 0 10px 30px rgba(0,0,0,.28); }
+:root[data-theme="light"] body.chat.hx-modern #side { background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.4)), var(--sidebar-solid);
+  box-shadow: inset 0 0 0 .5px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.08); }
+:root[data-blur="1"] body.chat.hx-modern #side { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02) 40%), var(--sidebar); }
+body.chat.hx-modern #titlebar { height: 44px; padding: 0 4px 0 8px; }
+/* Workspaces: a coloured tile each, the chosen one on a soft tint. */
+body.chat.hx-modern .mode-row { gap: 10px; padding: 5px 8px; border-radius: 10px; color: var(--label); font-weight: 550; }
+body.chat.hx-modern .mode-row svg { width: 24px; height: 24px; padding: 4.5px; border-radius: 7px; color: #fff; background: var(--tile, #8e8e93);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 65%); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.14); }
+body.chat.hx-modern #mode-chat { --tile: #0a84ff; } body.chat.hx-modern #mode-write { --tile: #ff9f0a; } body.chat.hx-modern #mode-image { --tile: #ff375f; }
+body.chat.hx-modern #mode-code { --tile: #5e5ce6; } body.chat.hx-modern #mode-analyze { --tile: #30b0c7; } body.chat.hx-modern #mode-projects { --tile: #64d2ff; }
+body.chat.hx-modern #mode-scheduled { --tile: #8e8e93; } body.chat.hx-modern #mode-tasks { --tile: #bf5af2; } body.chat.hx-modern #mode-artifacts { --tile: #34c759; }
+body.chat.hx-modern .mode-row:hover { background: var(--fill-1); }
+body.chat.hx-modern .mode-row.active { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--label); }
+body.chat.hx-modern .chat-search { border-radius: 999px; padding-left: 12px; background: var(--fill-1); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.chat.hx-modern .chat-row { border-radius: 10px; }
+body.chat.hx-modern .chat-row.current { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--label); }
+body.chat.hx-modern .chat-row.current .chat-open-project, body.chat.hx-modern .chat-row.current .chat-open-snippet, body.chat.hx-modern .chat-row.current .chat-pin-mark { color: var(--label-2); }
+body.chat.hx-modern .chat-row.current .chat-delete { color: var(--label-2); }
+body.chat.hx-modern #side-footer { border-top: 0; }
+body.chat.hx-modern #side-footer .temp-chat, body.chat.hx-modern #side-footer .open-models, body.chat.hx-modern #side-footer .hub-toggle { border-radius: 999px; }
+/* The conversation: a glass title bar, the composer as a floating capsule of glass. */
+body.chat.hx-modern #chat-surface > header { background: color-mix(in srgb, var(--content) 72%, transparent); backdrop-filter: blur(24px) saturate(1.8); }
+body.chat.hx-modern .chat-title { font-weight: 700; }
+body.chat.hx-modern #composer { border-radius: calc(26px * var(--shape-ui)); background-image: linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,0) 50%);
+  box-shadow: inset 0 0 0 .5px var(--hairline), inset 0 1px 0 rgba(255,255,255,.08), 0 14px 40px rgba(0,0,0,.32); }
+body.chat.hx-modern #composer:focus-within { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent), 0 14px 40px rgba(0,0,0,.32), 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
+body.chat.hx-modern .meta-chip { border-radius: 999px; }
+body.chat.hx-modern .empty-title { font: 700 40px/44px var(--font-display); letter-spacing: -.04em; }
+/* Start cards: rounded glass with a coloured tile; starters are capsules. */
+body.chat.hx-modern .welcome-tool { border-radius: 18px; background: var(--group, var(--fill-1)); box-shadow: inset 0 0 0 .5px var(--hairline), 0 1px 2px rgba(0,0,0,.12);
+  transition: transform 200ms cubic-bezier(.2, 1.15, .32, 1), background 160ms var(--ease); }
+body.chat.hx-modern .welcome-tool:hover { transform: translateY(-2px); background: var(--fill-1); }
+body.chat.hx-modern .welcome-tool-icon { border-radius: 9px; color: #fff; background: var(--accent); background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 65%); }
+body.chat.hx-modern .welcome-tool[data-test="welcome-research"] .welcome-tool-icon { background-color: #5e5ce6; }
+body.chat.hx-modern .welcome-tool[data-test="welcome-write"] .welcome-tool-icon { background-color: #ff9f0a; }
+body.chat.hx-modern .welcome-tool[data-test="welcome-image"] .welcome-tool-icon { background-color: #ff375f; }
+body.chat.hx-modern .welcome-tool[data-test="welcome-code"] .welcome-tool-icon { background-color: #5e5ce6; }
+body.chat.hx-modern .suggestion { border-radius: 999px; padding: 9px 16px; background: var(--group, var(--fill-1)); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.chat.hx-modern .suggestion:hover { background: var(--fill-1); }
+/* With the stage open the sidebar is a rail of tiles: keep the floating card narrow and the tiles centred. */
+@media (max-width: 1399px) and (min-width: 900px) { body.chat.hx-modern.stage-open #side { padding: 0 6px 8px; } body.chat.hx-modern.stage-open .mode-row { padding: 5px 0; } }
+
+/* System Monitor's Overview: widgets, like the ones on a Mac's desktop. Two wide ones with the last minute as a filled area, then four small. */
+.monitor-widgets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.monitor-widgets .hx-widget { min-height: 128px; }
+.monitor-widgets .hx-widget.wide { grid-column: span 2; min-height: 168px; }
+@media (max-width: 760px) { .monitor-widgets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.monitor-widgets .big { margin-top: 6px; }
+.monitor-widgets .small-big { font-size: 20px; line-height: 26px; }
+.monitor-widgets .area { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 64px; }
+.monitor-widgets .hx-widget.wide .big { margin-top: 4px; }
+.monitor-widgets .ring { position: absolute; right: 12px; top: 12px; }
+.monitor-widgets .ring circle { transition: stroke-dashoffset 600ms var(--ease); }
+.monitor-widgets .flow { display: flex; align-items: baseline; gap: 6px; font: 650 17px/22px var(--font-display); font-variant-numeric: tabular-nums; margin-top: 6px; }
+.monitor-widgets .flow .down { color: var(--tint); } .monitor-widgets .flow .up { color: var(--label-2); }
+.monitor-widgets .hx-widget .label svg.i { color: var(--tint); }
+/* System Monitor has no header cards, so its pages keep a large title. */
+body.settings.hx-modern.monitor header { height: 76px; padding-top: 18px; position: static; background: transparent; backdrop-filter: none; margin: 0; padding-left: 0; padding-right: 0; }
+body.settings.hx-modern.monitor h2 { font: 700 30px/36px var(--font-display); letter-spacing: -.03em; }
+body.settings.hx-modern.monitor #search { width: 220px; }
+
+/* ---- Mobius, pushed: the conversation itself ----------------------------------------------------------------------------------------
+   Apple Intelligence's cue: a soft many-coloured light around the composer while you write to it, flowing while Mobius answers.
+   Code as a dark inset card with a compact bar; actions as quiet capsules; round glass header buttons; settings tiles like the sidebar's. */
+body.chat.hx-modern #composer { position: relative; isolation: isolate; }
+body.chat.hx-modern #composer::before { content: ""; position: absolute; inset: 0; padding: 1.5px; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, #ff6ac1, #ffb547, #5ac8fa, #a259ff, #ff6ac1, #ffb547) 0 0 / 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  transition: opacity 360ms var(--ease); }
+body.chat.hx-modern #composer:focus-within::before { opacity: .85; }
+body.chat.hx-modern #composer:focus-within { box-shadow: inset 0 0 0 .5px var(--hairline), 0 14px 40px rgba(0,0,0,.32),
+  -18px 0 40px -18px rgba(255,106,193,.45), 18px 0 40px -18px rgba(90,200,250,.45), 0 10px 40px -16px rgba(162,89,255,.45); }
+body.chat.hx-modern #composer:has(#stop:not([hidden]))::before { opacity: 1; animation: hx-aura 3.2s linear infinite; }
+body.chat.hx-modern #composer:has(#stop:not([hidden])) { animation: hx-aura-glow 3.2s ease-in-out infinite; }
+@keyframes hx-aura { to { background-position: 150% 0; } }
+@keyframes hx-aura-glow {
+  0%, 100% { box-shadow: inset 0 0 0 .5px var(--hairline), 0 14px 40px rgba(0,0,0,.32), -20px 0 44px -16px rgba(255,106,193,.5), 20px 0 44px -16px rgba(90,200,250,.5); }
+  50% { box-shadow: inset 0 0 0 .5px var(--hairline), 0 14px 40px rgba(0,0,0,.32), -20px 0 44px -16px rgba(162,89,255,.5), 20px 0 44px -16px rgba(255,181,71,.5); }
+}
+@media (prefers-reduced-motion: reduce) { body.chat.hx-modern #composer:has(#stop:not([hidden]))::before, body.chat.hx-modern #composer:has(#stop:not([hidden])) { animation: none; } }
+body.chat.hx-modern #send { box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,.25); transition: transform 200ms cubic-bezier(.2, 1.15, .32, 1), opacity 160ms var(--ease); }
+body.chat.hx-modern #send:not(:disabled):active { transform: scale(.9); }
+body.chat.hx-modern #send:disabled { box-shadow: none; }
+/* While Mobius writes: the waiting words shimmer like Apple Intelligence's text. */
+body.chat.hx-modern .typing, body.chat.hx-modern .typing-dots { background: linear-gradient(90deg, var(--label-3) 20%, var(--label) 40%, var(--label-3) 60%) 0 0 / 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: hx-shimmer 2s linear infinite; }
+body.chat.hx-modern .typing-dots .dot { background: var(--label-3); }
+@keyframes hx-shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+/* Messages. */
+body.chat.hx-modern .msg.user .msg-body { border-radius: 20px 20px 8px 20px; padding: 10px 16px;
+  background-image: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,0) 60%); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 25%, transparent); }
+body.chat.hx-modern .msg-body code { border-radius: 6px; background: var(--fill-1); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.chat.hx-modern .code-block { border-radius: 16px; background: rgba(0,0,0,.28); box-shadow: inset 0 0 0 .5px var(--hairline), 0 1px 2px rgba(0,0,0,.12); }
+:root[data-theme="light"] body.chat.hx-modern .code-block { background: rgba(0,0,0,.04); }
+body.chat.hx-modern .code-bar { background: transparent; border-bottom: .5px solid var(--hairline); padding: 6px 8px 6px 14px; gap: 4px; justify-content: flex-start; }
+body.chat.hx-modern .code-bar > :first-child { margin-right: auto; font-weight: 650; letter-spacing: .02em; text-transform: uppercase; font-size: 10.5px; color: var(--label-3); }
+body.chat.hx-modern .code-block pre { padding: 12px 14px; }
+body.chat.hx-modern button.mini { border-radius: 999px; padding: 4px 11px; }
+body.chat.hx-modern .msg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+/* Header: round glass buttons and a capsule route chip. */
+body.chat.hx-modern .icon-btn { border-radius: 50%; }
+body.chat.hx-modern .icon-btn:hover, body.chat.hx-modern .icon-btn:focus-visible { background: var(--fill-1); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.chat.hx-modern .chat-title { border-radius: 999px; color: var(--label); font-weight: 650; }
+/* Settings: a rail like the sidebar, each section with its tile, the chosen one on a soft tint; groups as rounded cards. */
+body.chat.hx-modern .models-nav-btn { border-radius: 10px; padding: 6px 10px; color: var(--label); font-weight: 550; }
+body.chat.hx-modern .models-nav-btn.active { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--label); }
+body.chat.hx-modern .set-nav .models-nav-btn svg { width: 24px; height: 24px; padding: 4.5px; border-radius: 7px; color: #fff; background: var(--tile, #8e8e93);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 65%); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.14); }
+body.chat.hx-modern [data-models-section="models"] { --tile: #0a84ff; } body.chat.hx-modern [data-models-section="picker"] { --tile: #5e5ce6; }
+body.chat.hx-modern [data-models-section="library"] { --tile: #bf5af2; } body.chat.hx-modern [data-models-section="cloud"] { --tile: #64d2ff; }
+body.chat.hx-modern [data-models-section="knowledge"] { --tile: #ff9f0a; } body.chat.hx-modern [data-models-section="memory"] { --tile: #ff375f; }
+body.chat.hx-modern [data-models-section="agents"] { --tile: #30d158; } body.chat.hx-modern [data-models-section="providers"] { --tile: #0a84ff; }
+body.chat.hx-modern [data-models-section="generation"] { --tile: #8e8e93; } body.chat.hx-modern [data-models-section="experiments"] { --tile: #ff2d55; }
+body.chat.hx-modern .set-nav-label { margin-left: 10px; }
+.monitor-widgets .big small.fraction { margin-left: 0; }
+body.chat.hx-modern .code-block pre code { background: transparent; box-shadow: none; padding: 0; border-radius: 0; }

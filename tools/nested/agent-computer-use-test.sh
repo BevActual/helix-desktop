@@ -30,7 +30,10 @@ pill_y() { python3 - "$1" <<'PY'
 import sys
 from PIL import Image
 img = Image.open(sys.argv[1]).convert("RGB")
-ys = [y for y in range(img.size[1]) if img.getpixel((100, y)) == (0x0a, 0x84, 0xff)]
+# The selected sidebar row is tinted with the accent (Settings' modern look): look right of the label, where only the tint is.
+def tinted(r, g, b):
+    return b > r + 30 and b > g + 10
+ys = [y for y in range(img.size[1]) if tinted(*img.getpixel((210, y)))]
 print(round(sum(ys) / len(ys)) if ys else -1)
 PY
 }
@@ -50,10 +53,10 @@ path=$(picture before)
 [ "$(stat -c %a "$path")" = 600 ] && echo "ok: the file is private to the person" || fail "mode $(stat -c %a "$path")"
 before=$(pill_y "$SCRATCH/before.png")
 echo "--- clicks, keys and typing"
-expect_ok "display-click 80 352"
+expect_ok "display-click 80 370"
 after=$before
 for _ in $(seq 1 12); do sleep 1; picture shot >/dev/null; after=$(pill_y "$SCRATCH/shot.png"); [ "$after" != "$before" ] && break; done
-[ "$before" -lt 150 ] && [ "$after" -gt 330 ] && echo "ok: the click chose Keyboard (highlight $before -> $after)" || fail "highlight $before -> $after"
+[ "$before" -lt 150 ] && [ "$after" -gt 345 ] && echo "ok: the click chose Keyboard (highlight $before -> $after)" || fail "highlight $before -> $after"
 expect_ok "display-click 120 67"
 sleep 1; picture b4 >/dev/null
 expect_ok "display-type dock"

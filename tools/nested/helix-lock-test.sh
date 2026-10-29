@@ -50,7 +50,10 @@ python3 - "$SCRATCH/locked-empty.png" <<'PY' && echo "ok: at an interface scale 
 import sys
 from PIL import Image
 img = Image.open(sys.argv[1]).convert("RGB"); w, h = img.size
-xs = [x for y in range(h) for x in range(w) if img.getpixel((x, y)) == (0x0a, 0x84, 0xff)]
+# The initials circle is the accent, shaded lighter at the top and darker at the bottom: measure every pixel of that blue.
+def accent(r, g, b):
+    return b > 150 and r < 70 and 80 <= g <= 175
+xs = [x for y in range(0, h, 2) for x in range(w) if accent(*img.getpixel((x, y)))]
 width = max(xs) - min(xs) + 1
 assert abs(width - 95) <= 3, width
 PY
@@ -83,8 +86,11 @@ import sys
 from PIL import Image
 img = Image.open(sys.argv[1]).convert("RGB"); w, h = img.size
 green = [(x, y) for y in range(h) for x in range(w) if img.getpixel((x, y)) == (0, 200, 0)]
-accent = [1 for y in range(0, h, 2) for x in range(0, w, 2) if img.getpixel((x, y)) == (0x0a, 0x84, 0xff)]
-assert len(green) > 3000 and not accent, (len(green), len(accent))
+# None of the shaded accent circle is left (the same test of "that blue" as above; the circle would be well over a thousand samples).
+def shade(r, g, b):
+    return b > 150 and r < 70 and 80 <= g <= 175
+accent = [1 for y in range(0, h, 2) for x in range(0, w, 2) if shade(*img.getpixel((x, y)))]
+assert len(green) > 3000 and len(accent) < 50, (len(green), len(accent))
 PY
 wtype "correct horse"; sleep 0.3; wtype -k Return
 for _ in $(seq 1 30); do kill -0 "$LOCKER" 2>/dev/null || break; sleep 0.25; done
