@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { AppFrame, Banner, Button, Chip, EmptyState, Group, HxRow, Meter, Popup, Sheet, Sidebar, SidebarItem, HxSwitch, invoke, useLayoutReport } from "@helix/ui";
+import { ActionMenu, AppFrame, Banner, Button, Chip, EmptyState, Group, HxRow, HxSwitch, Icon, IconTile, Popup, ProgressRing, Sheet, Sidebar, SidebarItem, Spinner, hueOf, invoke, useLayoutReport } from "@helix/ui";
 
 type Page = "overview" | "backends" | "models" | "routing";
 type Trust = "this" | "lan" | "cloud";
@@ -27,11 +27,11 @@ interface View {
   slots: SlotView[];
   allow_remote_on_battery_saver: boolean;
 }
+interface Probe { ok: boolean; trust?: string; models?: string[]; error?: string }
 interface HubFile { path: string; size: number }
 interface DownloadView { id: number; repo: string; title: string; total: number; done: number; state: "running" | "done" | "failed" | "cancelled"; message: string }
 interface Choice { path: string; label: string; size: number }
-interface GetDraft { repo: string; fixed: boolean; files: HubFile[] | null; pick: string; projector: boolean; looking: boolean; error: string; about?: string }
-interface Probe { ok: boolean; trust?: string; models?: string[]; error?: string }
+interface GetDraft { repo: string; fixed: boolean; files: HubFile[] | null; pick: string; projector: boolean; looking: boolean; error: string; entry?: Entry }
 
 const PAGES: { id: Page; title: string; icon: string }[] = [
   { id: "overview", title: "Overview", icon: "sparkle" },
@@ -39,13 +39,14 @@ const PAGES: { id: Page; title: string; icon: string }[] = [
   { id: "models", title: "Models", icon: "folder" },
   { id: "routing", title: "Routing", icon: "grid" },
 ];
-const SLOT_TITLES: Record<string, { title: string; about: string }> = {
-  act: { title: "Act", about: "Changes the desktop for you. Only ever runs on this computer." },
-  chat: { title: "Talk", about: "Conversations in Mobius and the bar." },
-  summarize: { title: "Summarise", about: "Short summaries and titles." },
-  vision: { title: "Pictures", about: "Reading images and screenshots." },
-  code: { title: "Code", about: "Writing and explaining code." },
+const SLOTS: Record<string, { title: string; about: string; icon: string; hue: number }> = {
+  act: { title: "Act", about: "Changes the desktop for you. Only ever runs on this computer.", icon: "bolt", hue: 28 },
+  chat: { title: "Talk", about: "Conversations in Mobius and the bar.", icon: "chat", hue: 212 },
+  summarize: { title: "Summarise", about: "Short summaries and titles.", icon: "doc", hue: 268 },
+  vision: { title: "Pictures", about: "Reading images and screenshots.", icon: "image", hue: 150 },
+  code: { title: "Code", about: "Writing and explaining code.", icon: "code", hue: 238 },
 };
+const slotInfo = (slot: string) => SLOTS[slot] ?? { title: slot, about: "", icon: "sparkle", hue: hueOf(slot) };
 const TRUST: Record<Trust, { label: string; tone?: "accent" | "ok" | "warn" }> = {
   this: { label: "This computer", tone: "ok" },
   lan: { label: "Your network", tone: "accent" },
@@ -58,40 +59,122 @@ function bytes(n: number): string {
   return `${Math.round(n / 1e3)} KB`;
 }
 const shortName = (id: string) => id.replace(/\.gguf$/, "");
+const QUANT = /[-_.]((?:I?Q\d[\w]*)|BF16|F16|F32)$/i;
+const SHARD = /-(\d{5})-of-(\d{5})\.gguf$/;
+
+/** `Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf` → "Qwen2.5 Coder 7B Instruct" and "Q4_K_M". */
+function nameOf(id: string): { name: string; quant: string } {
+  const plain = id.replace(SHARD, "").replace(/\.gguf$/, "");
+  const quant = plain.match(QUANT)?.[1] ?? "";
+  const name = (quant ? plain.slice(0, plain.length - quant.length - 1) : plain).replace(/[-_]/g, " ");
+  return { name: name || plain, quant: quant.toUpperCase() };
+}
+/** One colour per model family ("Qwen3 4B" and "Qwen2.5 Coder" are both Qwen). */
+const familyHue = (name: string) => hueOf(name.split(/[\s-]/)[0].toLowerCase().replace(/[\d.]+$/, ""));
+const ModelTile = ({ name, large }: { name: string; large?: boolean }) => (
+  <IconTile large={large} letter={Array.from(name)[0]?.toUpperCase() || "•"} hue={familyHue(name)} />
+);
+const homeless = (path: string) => path.replace(/^\/home\/[^/]+/, "~");
 
 function errorText(error: unknown): string {
   return typeof error === "string" ? error : error instanceof Error ? error.message : String(error);
 }
 
+/** A row that is a button as a whole (opens something), with a chevron. */
+function LinkRow({ onOpen, test, children }: { onOpen: () => void; test?: string; children: ReactNode }) {
+  return (
+    <div tabIndex={0} role="button" className="hx-row-button" data-test={test} onClick={onOpen}
+      onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) { event.preventDefault(); onOpen(); } }}>
+      {children}
+    </div>
+  );
+}
+const Chevron = () => <span className="hx-chevron"><Icon name="chevron-right" /></span>;
+
 // --- Overview -------------------------------------------------------------------------------------------------------------------------
 
-function Overview({ view, onUnload, goto }: { view: View; onUnload: () => void; goto: (page: Page) => void }) {
+function Gauge({ percent }: { percent: number }) {
+  const r = 20, c = 2 * Math.PI * r;
+  return (
+    <svg className="hx-gauge" width="48" height="48" viewBox="0 0 48 48" fill="none" strokeWidth="5" aria-hidden="true">
+      <circle className="track" cx="24" cy="24" r={r} />
+      <circle className="arc" cx="24" cy="24" r={r} strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0, Math.min(100, percent)) / 100)} transform="rotate(-90 24 24)" />
+    </svg>
+  );
+}
+
+function Widget({ icon, label, tint, children, line, onOpen, test }: { icon: string; label: string; tint: string; children: ReactNode; line?: ReactNode; onOpen?: () => void; test?: string }) {
+  return (
+    <div className={`hx-widget${onOpen ? " button" : ""}`} style={{ ["--tint" as string]: tint }} data-test={test} tabIndex={onOpen ? 0 : undefined} role={onOpen ? "button" : undefined}
+      onClick={onOpen} onKeyDown={(e) => { if (onOpen && e.key === "Enter") onOpen(); }}>
+      <div className="label"><Icon name={icon} />{label}</div>
+      <div className="big">{children}</div>
+      {line ? <div className="line">{line}</div> : null}
+    </div>
+  );
+}
+
+/** "4.7" and "GB", so the unit can be drawn smaller. */
+function figure(n: number): [string, string] {
+  if (n >= 1e9) return [(n / 1e9).toFixed(1), "GB"];
+  if (n >= 1e6) return [(n / 1e6).toFixed(0), "MB"];
+  return [String(Math.round(n / 1e3)), "KB"];
+}
+
+function Overview({ view, jobs, onUnload, goto }: { view: View; jobs: DownloadView[]; onUnload: () => void; goto: (page: Page) => void }) {
   const s = view.snapshot;
   const gpu = (s.devices ?? []).find((d) => d.gpu);
   const loaded = s.loaded ?? "";
-  const busy = !!s.queue?.running || (s.queue?.waiting ?? 0) > 0;
+  const waiting = s.queue?.waiting ?? 0;
+  const busy = !!s.queue?.running || waiting > 0;
+  const used = gpu ? gpu.memory_total - gpu.memory_free : 0;
+  const usedPercent = gpu && gpu.memory_total ? (used / gpu.memory_total) * 100 : 0;
+  const onDisk = view.models.reduce((sum, m) => sum + m.bytes, 0);
+  const running = jobs.filter((j) => j.state === "running");
+  const remote = view.backends.filter((b) => b.kind !== "local").length;
+  const away = view.slots.filter((slot) => view.backends.find((b) => b.id === slot.backend)?.kind === "openai").length;
+  const state = busy ? "busy" : loaded ? "ready" : "idle";
+  const tint = state === "busy" ? "#0a84ff" : state === "ready" ? "#30d158" : "#8e8ea0";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }} data-test="overview">
-      <Group title="Engine">
-        <HxRow test="engine-row" title={loaded ? shortName(loaded) : "No model is loaded"}
-          sub={loaded ? (busy ? "Answering now" : "Ready. Freed after a few idle minutes.") : "A model loads when something asks for it."}
-          trailing={loaded ? <Button small data-test="unload" disabled={busy} onClick={onUnload}>Free memory</Button> : undefined} />
-        <HxRow test="accelerator-row" title={gpu ? gpu.description : "Processor only"}
-          sub={gpu ? `${bytes(gpu.memory_free)} free of ${bytes(gpu.memory_total)} video memory` : "No graphics card is being used. Answers are slower."}
-          trailing={<Chip tone={gpu ? "ok" : undefined}>{gpu ? "Graphics card" : "CPU"}</Chip>} />
-        {s.queue ? <HxRow test="queue-row" title="Waiting" sub={`${s.queue.waiting} of ${s.queue.max} places in line`} /> : null}
-      </Group>
-      <Group title="Where requests go">
+    <div className="hx-stack" data-test="overview">
+      <div className="hx-status-hero" data-state={state} style={{ ["--tint" as string]: tint }} data-test="engine-row">
+        <div className="hx-orb"><Icon name="sparkle" /></div>
+        <div className="text">
+          <div className="state">{state === "busy" ? "Answering" : state === "ready" ? "Ready" : "Resting"}</div>
+          <div className="line">{loaded
+            ? `${nameOf(loaded).name} is loaded${waiting ? ` · ${waiting} waiting` : ""}${state === "ready" ? " · freed after a few idle minutes" : ""}`
+            : view.models.length ? "A model loads the moment something asks." : "No models yet. Get one to answer on this computer."}</div>
+        </div>
+        {loaded ? <Button small data-test="unload" disabled={busy} onClick={onUnload}>Free Memory</Button>
+          : view.models.length ? null : <Button kind="primary" small data-test="first-model" onClick={() => goto("models")}>Get a Model</Button>}
+      </div>
+      <div className="hx-widgets">
+        <Widget icon="bolt" label={gpu ? "Graphics Memory" : "Processor"} tint={gpu ? "#30d158" : "#8e8ea0"} test="accelerator-row"
+          line={gpu ? gpu.description : "No graphics card"}>
+          {gpu ? <>{figure(used)[0]}<small>of {figure(gpu.memory_total).join(" ")}</small><Gauge percent={usedPercent} /></> : <>CPU</>}
+        </Widget>
+        <Widget icon="folder" label="Models" tint="#bf5af2" onOpen={() => goto("models")} test="widget-models"
+          line={running.length ? `${running.length} downloading` : `${figure(onDisk).join(" ")} on disk`}>
+          {view.models.length}{running.length ? <span className="corner"><ProgressRing percent={running[0].total ? (running[0].done / running[0].total) * 100 : null} label="Downloading" /></span> : null}
+        </Widget>
+        <Widget icon="wifi" label="Elsewhere" tint="#0a84ff" onOpen={() => goto("backends")} test="widget-backends"
+          line={away ? `${away} of ${view.slots.length} tasks go elsewhere` : "All tasks stay here"}>
+          {remote}<small>{remote === 1 ? "backend" : "backends"}</small>
+        </Widget>
+      </div>
+      <Group title="Where Requests Go">
         {view.slots.map((slot) => {
           const backend = view.backends.find((b) => b.id === slot.backend);
           const trust = backend ? TRUST[backend.trust] : TRUST.this;
+          const info = slotInfo(slot.slot);
           return (
-            <HxRow key={slot.slot} test={`slot-summary:${slot.slot}`} title={SLOT_TITLES[slot.slot]?.title ?? slot.slot}
-              sub={`${backend?.label ?? slot.backend}${slot.model ? ` · ${shortName(slot.model)}` : ""}`}
-              trailing={<Chip tone={trust.tone}>{trust.label}</Chip>} />
+            <LinkRow key={slot.slot} onOpen={() => goto("routing")}>
+              <HxRow test={`slot-summary:${slot.slot}`} leading={<IconTile name={info.icon} hue={info.hue} />} title={info.title}
+                sub={`${backend?.label ?? slot.backend}${slot.model ? ` · ${nameOf(slot.model).name}` : ""}`}
+                trailing={<><Chip tone={trust.tone}>{trust.label}</Chip><Chevron /></>} />
+            </LinkRow>
           );
         })}
-        <HxRow title="Change where they go" trailing={<Button small data-test="to-routing" onClick={() => goto("routing")}>Routing</Button>} />
       </Group>
     </div>
   );
@@ -104,33 +187,45 @@ const NEW_DRAFT: Draft = { id: "", label: "", base_url: "", key: "", editing: fa
 const PRESETS: { title: string; draft: Partial<Draft> }[] = [
   { title: "OpenRouter", draft: { id: "openrouter", label: "OpenRouter", base_url: "https://openrouter.ai/api/v1" } },
   { title: "OpenAI", draft: { id: "openai", label: "OpenAI", base_url: "https://api.openai.com/v1" } },
-  { title: "Another computer", draft: { id: "", label: "", base_url: "http://" } },
+  { title: "Another Computer", draft: { id: "", label: "", base_url: "http://" } },
 ];
 
+function BackendTile({ b }: { b: BackendView }) {
+  if (b.kind === "local") return <IconTile name="sparkle" hue={258} />;
+  if (b.trust === "lan") return <IconTile name="wifi" hue={212} />;
+  return <IconTile letter={Array.from(b.label)[0]?.toUpperCase() || "•"} hue={hueOf(b.label)} />;
+}
+
+/** A label on the left and a borderless field on the right, inside a group (macOS account sheets). */
+function FieldRow({ label, children }: { label: string; children: ReactNode }) {
+  return <label className="hx-field-row"><span className="hx-field-label">{label}</span>{children}</label>;
+}
+
 function BackendSheet({ draft, setDraft, onSave, onCancel, error }: { draft: Draft; setDraft: (d: Draft) => void; onSave: () => void; onCancel: () => void; error: string }) {
-  const field = (name: keyof Draft, label: string, props: { placeholder?: string; type?: string; disabled?: boolean } = {}) => (
-    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span className="setting-about">{label}</span>
-      <input className="text-input" data-test={`backend-${name}`} value={String(draft[name])} placeholder={props.placeholder} type={props.type ?? "text"} disabled={props.disabled}
-        autoComplete="off" onChange={(e) => setDraft({ ...draft, [name]: e.target.value })} />
-    </label>
+  const input = (name: keyof Draft, props: { placeholder?: string; type?: string; disabled?: boolean; autoFocus?: boolean } = {}) => (
+    <input className="hx-field-input" data-test={`backend-${name}`} value={String(draft[name])} placeholder={props.placeholder} type={props.type ?? "text"} disabled={props.disabled}
+      autoFocus={props.autoFocus} autoComplete="off" spellCheck={false} onChange={(e) => setDraft({ ...draft, [name]: e.target.value })}
+      onKeyDown={(e) => { if (e.key === "Enter") onSave(); }} />
   );
   return (
-    <Sheet title={draft.editing ? "Edit backend" : "Add a backend"} test="backend-sheet" onCancel={onCancel}
-      actions={<><Button data-test="backend-cancel" onClick={onCancel}>Cancel</Button><Button kind="primary" data-test="backend-save" onClick={onSave}>Save</Button></>}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {!draft.editing ? (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {PRESETS.map((p) => <Button key={p.title} small data-test={`preset:${p.title}`} onClick={() => setDraft({ ...draft, ...p.draft })}>{p.title}</Button>)}
-          </div>
-        ) : null}
-        {field("label", "Name", { placeholder: "Studio desktop" })}
-        {field("id", "Short id", { placeholder: "studio", disabled: draft.editing })}
-        {field("base_url", "Address", { placeholder: "http://192.168.1.20:8080/v1" })}
-        {field("key", draft.had_key ? "API key (leave empty to keep the saved one)" : "API key (if it needs one)", { type: "password" })}
-        <div className="setting-about">An address on the internet must be https. A computer on your own network may use http. The key goes to the model service, which keeps it; this page never shows it again.</div>
-        {error ? <Banner tone="error" test="backend-error">{error}</Banner> : null}
+    <Sheet title={draft.editing ? `Edit ${draft.label || "Backend"}` : "Add a Backend"} test="backend-sheet" onCancel={onCancel}
+      actions={<><Button data-test="backend-cancel" onClick={onCancel}>Cancel</Button><Button kind="primary" data-test="backend-save" onClick={onSave}>{draft.editing ? "Save" : "Add"}</Button></>}>
+      {!draft.editing ? (
+        <div className="hx-presets">
+          {PRESETS.map((p) => (
+            <button key={p.title} type="button" className={`hx-preset${draft.base_url === p.draft.base_url && draft.id === p.draft.id ? " current" : ""}`} data-test={`preset:${p.title}`}
+              onClick={() => setDraft({ ...draft, ...p.draft })}>{p.title}</button>
+          ))}
+        </div>
+      ) : null}
+      <div className="hx-group">
+        <FieldRow label="Name">{input("label", { placeholder: "Studio desktop", autoFocus: true })}</FieldRow>
+        <FieldRow label="Short ID">{input("id", { placeholder: "studio", disabled: draft.editing })}</FieldRow>
+        <FieldRow label="Address">{input("base_url", { placeholder: "http://192.168.1.20:8080/v1" })}</FieldRow>
+        <FieldRow label="API Key">{input("key", { type: "password", placeholder: draft.had_key ? "Saved · type to replace" : "Optional" })}</FieldRow>
       </div>
+      <div className="setting-about">An address on the internet must use https; a computer on your own network may use http. The key is kept by the model service and never shown again.</div>
+      {error ? <Banner tone="error" test="backend-error">{error}</Banner> : null}
     </Sheet>
   );
 }
@@ -139,32 +234,40 @@ function Backends({ view, probes, probing, onProbe, onEdit, onAdd, onRemove, onC
   view: View; probes: Record<string, Probe>; probing: string; onProbe: (id: string) => void; onEdit: (b: BackendView) => void; onAdd: () => void; onRemove: (b: BackendView) => void; onClearKey: (b: BackendView) => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }} data-test="backends">
+    <div className="hx-stack" data-test="backends">
       <Group>
         {view.backends.map((b) => {
           const result = probes[b.id];
+          const where = b.kind === "local" ? "Runs models on this computer" : b.base_url;
+          const key = b.kind !== "local" && b.has_key ? " · Key saved" : "";
           return (
-            <HxRow key={b.id} test={`backend:${b.id}`} title={b.label}
-              sub={<>{b.kind === "local" ? "The model engine on this computer" : b.base_url}
-                {result ? <div className="setting-about" data-test={`probe-result:${b.id}`} style={{ color: result.ok ? undefined : "var(--danger, #d33)" }}>
-                  {result.ok ? `Reachable · ${result.models?.length ?? 0} models offered` : result.error}</div> : null}</>}
+            <HxRow key={b.id} test={`backend:${b.id}`} leading={<BackendTile b={b} />} title={b.label}
+              sub={<>
+                <span className="hx-truncate">{where}</span>
+                {probing === b.id ? <div className="hx-status" data-state="busy">Testing…</div>
+                  : result ? <div className="hx-status" data-state={result.ok ? "ok" : "bad"} data-test={`probe-result:${b.id}`}>
+                      {result.ok ? `Reachable · ${result.models?.length ?? 0} models${key}` : result.error}</div>
+                  : key ? <div className="hx-status">{key.slice(3)}</div> : null}
+              </>}
               trailing={<>
                 <Chip tone={TRUST[b.trust].tone}>{TRUST[b.trust].label}</Chip>
-                {b.kind !== "local" ? <Chip tone={b.has_key ? "ok" : undefined}>{b.has_key ? "Key saved" : "No key"}</Chip> : null}
-              </>}>
-              {b.kind !== "local" ? (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                  <Button small data-test={`probe:${b.id}`} disabled={probing === b.id} onClick={() => onProbe(b.id)}>{probing === b.id ? "Testing…" : "Test"}</Button>
-                  <Button small data-test={`edit:${b.id}`} onClick={() => onEdit(b)}>Edit</Button>
-                  {b.has_key ? <Button small data-test={`clear-key:${b.id}`} onClick={() => onClearKey(b)}>Forget key</Button> : null}
-                  <Button small kind="destructive" data-test={`remove:${b.id}`} onClick={() => onRemove(b)}>Remove</Button>
-                </div>
-              ) : null}
-            </HxRow>
+                {b.kind !== "local" ? (
+                  <>
+                    <Button small data-test={`probe:${b.id}`} disabled={probing === b.id} onClick={() => onProbe(b.id)}>Test</Button>
+                    <ActionMenu label={`${b.label} actions`} test={`more:${b.id}`} items={[
+                      { id: "edit", label: "Edit…", onSelect: () => onEdit(b) },
+                      ...(b.has_key ? [{ id: "forget-key", label: "Forget Key…", onSelect: () => onClearKey(b) }] : []),
+                      { id: "remove", label: "Remove…", destructive: true, onSelect: () => onRemove(b) },
+                    ]} />
+                  </>
+                ) : null}
+              </>} />
           );
         })}
+        <LinkRow onOpen={onAdd} test="add-backend">
+          <HxRow leading={<span className="hx-add-tile"><Icon name="plus" /></span>} title={<span className="hx-accent-text">Add a Backend…</span>} />
+        </LinkRow>
       </Group>
-      <div><Button kind="primary" data-test="add-backend" onClick={onAdd}>Add a backend…</Button></div>
       <div className="setting-about">Anything that speaks the OpenAI chat protocol works: another computer running llama-server, Ollama or LM Studio, or a hosted service. A key is only ever sent over https, or to a computer on your own network.</div>
     </div>
   );
@@ -172,18 +275,23 @@ function Backends({ view, probes, probing, onProbe, onEdit, onAdd, onRemove, onC
 
 // --- Models ---------------------------------------------------------------------------------------------------------------------------
 
-// Models people commonly start with, all GGUF from their makers or ggml-org. Files and sizes are looked up when asked for.
-const CATALOGUE: { repo: string; title: string; about: string; pictures?: boolean }[] = [
-  { repo: "Qwen/Qwen3-4B-GGUF", title: "Qwen3 4B", about: "Small and quick. Good for talking, summaries and acting on the desktop." },
-  { repo: "Qwen/Qwen3-8B-GGUF", title: "Qwen3 8B", about: "A stronger all-rounder for a graphics card with 8 GB or more." },
-  { repo: "ggml-org/gemma-3-4b-it-GGUF", title: "Gemma 3 4B", about: "Small, and reads pictures.", pictures: true },
-  { repo: "ggml-org/gemma-3-12b-it-GGUF", title: "Gemma 3 12B", about: "Reads pictures and writes well. Needs a large graphics card.", pictures: true },
-  { repo: "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF", title: "Qwen2.5 Coder 7B", about: "Writing and explaining code." },
-  { repo: "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF", title: "Qwen2.5 VL 7B", about: "Reads screenshots and documents.", pictures: true },
-  { repo: "Qwen/Qwen2.5-1.5B-Instruct-GGUF", title: "Qwen2.5 1.5B", about: "Tiny. For older computers and quick titles." },
+interface Entry { repo: string; approx: number; title: string; maker: string; about: string; pictures?: boolean }
+// Models people commonly start with, all GGUF from their makers or ggml-org. `approx` is the Q4_K_M download in GB (with the picture projector
+// where there is one), for the fit hint before anything is looked up; the real files and sizes are looked up when asked for.
+const CATALOGUE: Entry[] = [
+  { repo: "Qwen/Qwen3-4B-GGUF", approx: 2.5, title: "Qwen3 4B", maker: "Qwen", about: "Small and quick. Talk, summaries and acting on the desktop." },
+  { repo: "Qwen/Qwen3-8B-GGUF", approx: 5.0, title: "Qwen3 8B", maker: "Qwen", about: "A stronger all-rounder for 8 GB graphics cards." },
+  { repo: "ggml-org/gemma-3-4b-it-GGUF", approx: 3.3, title: "Gemma 3 4B", maker: "Google", about: "Small, and reads pictures.", pictures: true },
+  { repo: "ggml-org/gemma-3-12b-it-GGUF", approx: 8.0, title: "Gemma 3 12B", maker: "Google", about: "Reads pictures and writes well.", pictures: true },
+  { repo: "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF", approx: 4.7, title: "Qwen2.5 Coder 7B", maker: "Qwen", about: "Writing and explaining code." },
+  { repo: "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF", approx: 5.4, title: "Qwen2.5 VL 7B", maker: "Qwen", about: "Reads screenshots and documents.", pictures: true },
+  { repo: "Qwen/Qwen2.5-1.5B-Instruct-GGUF", approx: 1.1, title: "Qwen2.5 1.5B", maker: "Qwen", about: "Tiny. For older computers and quick titles." },
 ];
-
-const SHARD = /-(\d{5})-of-(\d{5})\.gguf$/;
+/** Installed when a model file starts with the repository's name (less `-GGUF`). */
+const installedFrom = (repo: string, models: ModelView[]) => {
+  const stem = repo.split("/").pop()!.replace(/-GGUF$/i, "").toLowerCase() + "-";
+  return models.some((m) => m.id.toLowerCase().startsWith(stem));
+};
 
 /** The model files a repository offers, a split model counted once with its parts' sizes added. */
 function choicesOf(files: HubFile[]): Choice[] {
@@ -192,7 +300,8 @@ function choicesOf(files: HubFile[]): Choice[] {
     if (f.path.startsWith("mmproj")) continue;
     const shard = f.path.match(SHARD);
     const key = shard ? f.path.replace(SHARD, "") : f.path;
-    const label = shard ? `${key} (${Number(shard[2])} parts)` : shortName(f.path);
+    const quant = nameOf(f.path).quant;
+    const label = `${quant || shortName(key)}${shard ? ` (${Number(shard[2])} parts)` : ""}`;
     const have = out.get(key);
     if (have) {
       have.size += f.size;
@@ -204,7 +313,7 @@ function choicesOf(files: HubFile[]): Choice[] {
   return [...out.values()].sort((a, b) => a.size - b.size);
 }
 
-/** Q4_K_M when there is one, a balance of size and quality, else the smallest above 4 bits, else the smallest. */
+/** Q4_K_M when there is one, a balance of size and quality, else the smallest of 4 to 6 bits, else the smallest. */
 function preferred(choices: Choice[]): string {
   const q4 = choices.find((c) => /q4_k_m/i.test(c.path));
   if (q4) return q4.path;
@@ -212,73 +321,157 @@ function preferred(choices: Choice[]): string {
   return (middling ?? choices[0])?.path ?? "";
 }
 
-function fit(size: number, view: View, memory: number): { label: string; tone?: "ok" | "warn" | "danger" } {
+function fit(size: number, view: View, memory: number): { label: string; state: "ok" | "warn" | "bad" | "" } {
   const gpu = Math.max(0, ...(view.snapshot.devices ?? []).filter((d) => d.gpu).map((d) => d.memory_total));
   const need = size * 1.2; // the context and the engine's own working memory
-  if (gpu && need <= gpu) return { label: "Fits the graphics card", tone: "ok" };
-  if (memory && need <= memory * 0.6) return { label: gpu ? "Partly on the graphics card, slower" : "Runs from memory, slower", tone: "warn" };
-  if (!memory && !gpu) return { label: bytes(size) };
-  return { label: "Too large for this computer", tone: "danger" };
+  if (gpu && need <= gpu) return { label: "Fits the graphics card", state: "ok" };
+  if (memory && need <= memory * 0.6) return { label: gpu ? "Partly on the graphics card · slower" : "Runs from memory · slower", state: "warn" };
+  if (!memory && !gpu) return { label: "Unknown", state: "" };
+  return { label: "Too large for this computer", state: "bad" };
+}
+
+/** Bytes per second for each running download, from the last few polls. */
+function useRates(jobs: DownloadView[]): Record<number, number> {
+  const samples = useRef(new Map<number, { t: number; done: number }[]>());
+  const [rates, setRates] = useState<Record<number, number>>({});
+  useEffect(() => {
+    const now = performance.now();
+    const next: Record<number, number> = {};
+    for (const j of jobs) {
+      if (j.state !== "running") { samples.current.delete(j.id); continue; }
+      const list = [...(samples.current.get(j.id) ?? []), { t: now, done: j.done }].slice(-6);
+      samples.current.set(j.id, list);
+      const first = list[0];
+      const seconds = (now - first.t) / 1000;
+      if (seconds > 0.5) next[j.id] = (j.done - first.done) / seconds;
+    }
+    setRates(next);
+  }, [jobs]);
+  return rates;
+}
+
+function remaining(left: number, rate: number): string {
+  if (!rate || rate < 1) return "";
+  const s = left / rate;
+  if (s < 60) return "less than a minute left";
+  if (s < 3600) return `about ${Math.round(s / 60)} min left`;
+  return `about ${(s / 3600).toFixed(1)} h left`;
 }
 
 function Downloads({ jobs, onCancel, onDismiss }: { jobs: DownloadView[]; onCancel: (id: number) => void; onDismiss: (id: number) => void }) {
+  const rates = useRates(jobs);
   if (!jobs.length) return null;
   return (
     <Group title="Downloads">
       {jobs.map((j) => {
         const percent = j.total ? (j.done / j.total) * 100 : 0;
-        const sub = j.state === "running" ? `${bytes(j.done)} of ${bytes(j.total)}`
-          : j.state === "done" ? "Ready to use"
-          : j.state === "cancelled" ? "Stopped. Getting it again carries on where it stopped."
+        const rate = rates[j.id] ?? 0;
+        const { name, quant } = nameOf(j.title);
+        const sub = j.state === "running" ? [`${bytes(j.done)} of ${bytes(j.total)}`, rate ? `${bytes(rate)}/s` : "", remaining(j.total - j.done, rate)].filter(Boolean).join(" · ")
+          : j.state === "done" ? "Downloaded · ready to use"
+          : j.state === "cancelled" ? "Stopped · getting it again continues from here"
           : j.message || "The download failed.";
         return (
-          <HxRow key={j.id} test={`download:${j.title}`} title={shortName(j.title)} sub={<span data-test={`download-state:${j.title}`} data-state={j.state}>{sub}</span>}
+          <HxRow key={j.id} test={`download:${j.title}`} leading={<ModelTile name={name} />}
+            title={<>{name} {quant ? <span className="hx-quant">{quant}</span> : null}</>}
+            sub={<span data-test={`download-state:${j.title}`} data-state={j.state} className={j.state === "failed" ? "hx-danger-text" : undefined}>{sub}</span>}
             trailing={j.state === "running"
-              ? <Button small data-test={`download-cancel:${j.title}`} onClick={() => onCancel(j.id)}>Stop</Button>
-              : <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {j.state === "done" ? <Chip tone="ok">Done</Chip> : j.state === "failed" ? <Chip tone="danger">Failed</Chip> : null}
+              ? <ProgressRing percent={percent} label={`Stop downloading ${name} (${Math.round(percent)}%)`} test={`download-cancel:${j.title}`} onStop={() => onCancel(j.id)} />
+              : <>
+                  {j.state === "done" ? <span className="hx-done"><Icon name="check" /></span> : null}
                   <Button small data-test={`download-dismiss:${j.title}`} onClick={() => onDismiss(j.id)}>Clear</Button>
-                </div>}>
-            {j.state === "running" ? <Meter percent={percent} live label={`${Math.round(percent)}%`} /> : null}
-          </HxRow>
+                </>} />
         );
       })}
     </Group>
   );
 }
 
-function Models({ view, jobs, onDelete, onGet, onCancel, onDismiss }: { view: View; jobs: DownloadView[]; onDelete: (m: ModelView) => void; onGet: (repo: string, about?: string) => void; onCancel: (id: number) => void; onDismiss: (id: number) => void }) {
-  if (!view.gateway) return <EmptyState icon="folder">The model service is not answering, so the installed models cannot be listed.</EmptyState>;
-  const running = new Set(jobs.filter((j) => j.state === "running").map((j) => j.repo));
+function CatalogueCard({ entry, installed, job, hint, onGet, onCancel }: { entry: Entry; installed: boolean; job?: DownloadView; hint: { label: string; state: string }; onGet: () => void; onCancel: (id: number) => void }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }} data-test="models">
+    <div className="hx-tile-card tinted" style={{ ["--tint" as string]: `hsl(${familyHue(entry.title)} 60% 55%)` }} tabIndex={0} role="button" data-test={`catalogue:${entry.repo}`} aria-label={entry.title}
+      onClick={() => { if (!job) onGet(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget && !job) onGet(); }}>
+      <ModelTile name={entry.title} large />
+      <div>
+        <div className="name">{entry.title}</div>
+        <div className="maker">{entry.maker}{entry.pictures ? " · Reads pictures" : ""}</div>
+      </div>
+      <div className="sum">{entry.about}</div>
+      <div className="foot">
+        {job ? <ProgressRing percent={job.total ? (job.done / job.total) * 100 : null} label={`Stop downloading ${entry.title}`} onStop={() => onCancel(job.id)} />
+          : installed ? <span className="hx-installed" data-test={`installed:${entry.repo}`}>Installed</span>
+          : <button type="button" className="hx-get" data-test={`get:${entry.repo}`} onClick={(e) => { e.stopPropagation(); onGet(); }}>Get</button>}
+        <span className="aside" title={hint.label}><span className="hx-fit-dot" data-state={hint.state} />{entry.approx} GB</span>
+      </div>
+    </div>
+  );
+}
+
+/** The model this computer suits best and does not have yet: the largest that fits the graphics card, else one that runs from memory. */
+function recommended(view: View, memory: number): Entry | null {
+  const order = ["Qwen/Qwen3-8B-GGUF", "Qwen/Qwen3-4B-GGUF", "Qwen/Qwen2.5-1.5B-Instruct-GGUF"].map((r) => CATALOGUE.find((c) => c.repo === r)!);
+  const pick = order.find((c) => fit(c.approx * 1e9, view, memory).state === "ok") ?? order.find((c) => fit(c.approx * 1e9, view, memory).state === "warn") ?? order[order.length - 1];
+  return installedFrom(pick.repo, view.models) ? null : pick;
+}
+
+function Models({ view, jobs, memory, onDelete, onGet, onCancel, onDismiss }: { view: View; jobs: DownloadView[]; memory: number; onDelete: (m: ModelView) => void; onGet: (entry: Entry | null) => void; onCancel: (id: number) => void; onDismiss: (id: number) => void }) {
+  if (!view.gateway) return <EmptyState icon="folder">The model service is not answering, so the installed models cannot be listed.</EmptyState>;
+  const running = (repo: string) => jobs.find((j) => j.state === "running" && j.repo === repo);
+  const featured = recommended(view, memory);
+  return (
+    <div className="hx-stack" data-test="models">
+      {featured && !running(featured.repo) ? (
+        <div className="hx-hero-card" style={{ ["--hero" as string]: `hsl(${familyHue(featured.title)} 45% 34%)` }} data-test="featured">
+          <ModelTile name={featured.title} large />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="over">Recommended for this computer</div>
+            <h2>{featured.title}</h2>
+            <p>{featured.about}</p>
+            <div className="meta"><span>{featured.maker}</span><span>About {featured.approx} GB</span><span>{fit(featured.approx * 1e9, view, memory).label}</span></div>
+            <button type="button" className="hx-get-hero" data-test="featured-get" onClick={() => onGet(featured)}>Get</button>
+          </div>
+        </div>
+      ) : null}
       <Downloads jobs={jobs} onCancel={onCancel} onDismiss={onDismiss} />
       {view.models.length ? (
-        <Group title="On this computer">
-          {view.models.map((m) => (
-            <HxRow key={m.id} test={`model:${m.id}`} title={shortName(m.id)} sub={bytes(m.bytes)}
-              trailing={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {m.vision ? <Chip>Reads pictures</Chip> : null}
-                {m.loaded ? <Chip tone="ok">In use</Chip> : null}
-                <Button small kind="destructive" data-test={`delete:${m.id}`} onClick={() => onDelete(m)}>Delete</Button>
-              </div>} />
-          ))}
+        <Group title="On This Computer">
+          {view.models.map((m) => {
+            const { name, quant } = nameOf(m.id);
+            return (
+              <HxRow key={m.id} test={`model:${m.id}`} leading={<ModelTile name={name} />}
+                title={<>{name} {quant ? <span className="hx-quant">{quant}</span> : null}</>}
+                sub={[bytes(m.bytes), m.vision ? "Reads pictures" : ""].filter(Boolean).join(" · ")}
+                trailing={<>
+                  {m.loaded ? <Chip tone="ok">In Use</Chip> : null}
+                  <ActionMenu label={`${name} actions`} test={`more:${m.id}`} items={[{ id: "delete", label: "Delete…", destructive: true, onSelect: () => onDelete(m) }]} />
+                </>} />
+            );
+          })}
         </Group>
-      ) : (
-        <div className="setting-about" data-test="no-models">No models are on this computer yet. Get one below, or put GGUF files in {view.snapshot.model_dir ?? "the models folder"}.</div>
-      )}
-      <Group title="Get models">
-        {CATALOGUE.map((c) => (
-          <HxRow key={c.repo} test={`catalogue:${c.repo}`} title={c.title} sub={c.about}
-            trailing={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {c.pictures ? <Chip>Reads pictures</Chip> : null}
-              <Button small data-test={`get:${c.repo}`} disabled={running.has(c.repo)} onClick={() => onGet(c.repo, c.about)}>{running.has(c.repo) ? "Getting…" : "Get…"}</Button>
-            </div>} />
-        ))}
-        <HxRow test="from-hub" title="From Hugging Face…" sub="Any repository with GGUF files, by its name."
-          trailing={<Button small data-test="get-other" onClick={() => onGet("")}>Choose…</Button>} />
-      </Group>
-      <div className="setting-about">Models are kept in {view.snapshot.model_dir ?? "the models folder"}. They are fetched by the model service from huggingface.co, checked against the repository's checksums, and only when you ask. Deleting one removes its files from this computer.</div>
+      ) : null}
+      <section className="hx-shelf">
+        <div className="hx-shelf-head">
+          <h3>Get Models</h3>
+          <button type="button" className="hx-link" data-test="get-other" onClick={() => onGet(null)}>From Hugging Face…</button>
+        </div>
+        <div className="hx-card-grid">
+          {CATALOGUE.map((c) => (
+            <CatalogueCard key={c.repo} entry={c} installed={installedFrom(c.repo, view.models)} job={running(c.repo)} hint={fit(c.approx * 1e9, view, memory)} onGet={() => onGet(c)} onCancel={onCancel} />
+          ))}
+          <div className="hx-tile-card" tabIndex={0} role="button" data-test="catalogue-any" aria-label="Any model from Hugging Face" onClick={() => onGet(null)}
+            onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) onGet(null); }}>
+            <IconTile large name="search" hue={212} />
+            <div>
+              <div className="name">Any Model</div>
+              <div className="maker">Hugging Face</div>
+            </div>
+            <div className="sum">Any repository with GGUF files, by its name.</div>
+            <div className="foot"><button type="button" className="hx-get" onClick={(e) => { e.stopPropagation(); onGet(null); }}>Choose</button></div>
+          </div>
+        </div>
+      </section>
+      <div className="setting-about">Models are kept in {homeless(view.snapshot.model_dir ?? "the models folder")}. The model service downloads them from Hugging Face only when you ask, and checks each file against the repository's checksum.</div>
     </div>
   );
 }
@@ -286,40 +479,58 @@ function Models({ view, jobs, onDelete, onGet, onCancel, onDismiss }: { view: Vi
 function GetSheet({ draft, setDraft, view, memory, onLookUp, onDownload, onCancel }: { draft: GetDraft; setDraft: (d: GetDraft) => void; view: View; memory: number; onLookUp: () => void; onDownload: () => void; onCancel: () => void }) {
   const choices = draft.files ? choicesOf(draft.files) : [];
   const chosen = choices.find((c) => c.path === draft.pick);
-  const hasProjector = !!draft.files?.some((f) => f.path.startsWith("mmproj"));
-  const projector = hasProjector ? Math.min(...draft.files!.filter((f) => f.path.startsWith("mmproj")).map((f) => f.size)) : 0;
-  const total = (chosen?.size ?? 0) + (draft.projector && hasProjector ? projector : 0);
+  const projectors = (draft.files ?? []).filter((f) => f.path.startsWith("mmproj"));
+  const projector = projectors.length ? Math.min(...projectors.map((f) => f.size)) : 0;
+  const total = (chosen?.size ?? 0) + (draft.projector && projectors.length ? projector : 0);
   const hint = chosen ? fit(chosen.size, view, memory) : null;
+  const entry = draft.entry;
+  const repoName = draft.repo.split("/").pop() ?? draft.repo;
   return (
-    <Sheet title={draft.fixed ? draft.repo.split("/").pop() ?? draft.repo : "From Hugging Face"} test="get-sheet" onCancel={onCancel}
+    <Sheet title={entry ? entry.title : draft.fixed ? repoName : "From Hugging Face"} test="get-sheet" onCancel={onCancel}
       actions={<>
         <Button data-test="get-cancel" onClick={onCancel}>Cancel</Button>
-        {draft.files ? <Button kind="primary" data-test="get-download" disabled={!chosen} onClick={onDownload}>Download{total ? ` ${bytes(total)}` : ""}</Button>
-          : <Button kind="primary" data-test="get-lookup" disabled={!draft.repo.includes("/") || draft.looking} onClick={onLookUp}>{draft.looking ? "Looking…" : "Look up"}</Button>}
+        {draft.files ? <Button kind="primary" data-test="get-download" disabled={!chosen} onClick={onDownload}>Download</Button>
+          : <Button kind="primary" data-test="get-lookup" disabled={!draft.repo.includes("/") || draft.looking} onClick={onLookUp}>Look Up</Button>}
       </>}>
-      {draft.fixed ? (draft.about ? <p>{draft.about}</p> : null) : (
+      {draft.fixed ? (
+        <div className="hx-sheet-head">
+          <ModelTile name={entry?.title ?? repoName} large />
+          <div>
+            <div className="hx-sheet-sub">{entry ? `${entry.maker} · ${draft.repo}` : draft.repo}</div>
+            {entry ? <div>{entry.about}</div> : null}
+          </div>
+        </div>
+      ) : (
         <>
-          <input className="text-input" data-test="get-repo" autoFocus value={draft.repo} placeholder="owner/name-GGUF" autoComplete="off" spellCheck={false} style={{ width: "100%" }}
-            onChange={(e) => setDraft({ ...draft, repo: e.target.value, files: null, error: "" })}
-            onKeyDown={(e) => { if (e.key === "Enter" && draft.repo.includes("/") && !draft.files) onLookUp(); }} />
-          <div className="setting-about">The repository's name on huggingface.co, such as Qwen/Qwen3-4B-GGUF.</div>
+          <div className="hx-group">
+            <FieldRow label="Repository">
+              <input className="hx-field-input" data-test="get-repo" autoFocus value={draft.repo} placeholder="owner/name-GGUF" autoComplete="off" spellCheck={false}
+                onChange={(e) => setDraft({ ...draft, repo: e.target.value, files: null, error: "" })}
+                onKeyDown={(e) => { if (e.key === "Enter" && draft.repo.includes("/") && !draft.files) onLookUp(); }} />
+            </FieldRow>
+          </div>
+          {!draft.files ? <div className="setting-about">The repository's name on huggingface.co, such as Qwen/Qwen3-4B-GGUF.</div> : null}
         </>
       )}
-      {draft.looking && draft.fixed ? <div className="setting-about" data-test="get-looking">Looking up the files…</div> : null}
+      {draft.looking ? <div className="hx-looking" data-test="get-looking"><Spinner label="Looking up" /> Looking up the files…</div> : null}
       {draft.error ? <Banner tone="error" test="get-error">{draft.error}</Banner> : null}
       {draft.files && !choices.length ? <Banner tone="warn" test="get-none">This repository has no GGUF model files.</Banner> : null}
       {choices.length ? (
-        <Group>
-          <HxRow title="Version" sub={hint ? <span data-test="get-fit"><Chip tone={hint.tone === "danger" ? "danger" : hint.tone}>{hint.label}</Chip></span> : undefined}
-            trailing={<Popup label="Version" test="get-version" value={draft.pick} onChange={(pick) => setDraft({ ...draft, pick })}
-              options={choices.map((c) => ({ id: c.path, label: `${c.label} · ${bytes(c.size)}` }))} />} />
-          {hasProjector ? (
-            <HxRow title="Include picture support" sub={`Adds ${bytes(projector)} so the model can read images.`}
-              trailing={<HxSwitch test="get-projector" checked={draft.projector} onChange={(projector) => setDraft({ ...draft, projector })} label="Include picture support" />} />
-          ) : null}
-        </Group>
+        <>
+          <div className="hx-group">
+            <HxRow title="Version"
+              trailing={<Popup label="Version" test="get-version" value={draft.pick} onChange={(pick) => setDraft({ ...draft, pick })}
+                options={choices.map((c) => ({ id: c.path, label: `${c.label} · ${bytes(c.size)}` }))} />} />
+            {projectors.length ? (
+              <HxRow title="Picture support" sub={`Adds ${bytes(projector)} so the model can read images`}
+                trailing={<HxSwitch test="get-projector" checked={draft.projector} onChange={(projector) => setDraft({ ...draft, projector })} label="Picture support" />} />
+            ) : null}
+            <HxRow title="Download size" trailing={<span className="hx-value" data-test="get-size">{bytes(total)}</span>} />
+            {hint ? <HxRow title="On this computer" trailing={<span className="hx-status" data-state={hint.state} data-test="get-fit">{hint.label}</span>} /> : null}
+          </div>
+          <div className="setting-about">Smaller versions are quicker and lighter but a little less capable. Q4_K_M is a good balance.</div>
+        </>
       ) : null}
-      {choices.length ? <div className="setting-about">Smaller versions are quicker and lighter but a little less capable. Q4_K_M is a good balance.</div> : null}
     </Sheet>
   );
 }
@@ -330,54 +541,54 @@ const OTHER = "\u0000other";
 
 function Routing({ view, probes, onSlot, onEscalate, onCustom, onBattery }: { view: View; probes: Record<string, Probe>; onSlot: (slot: string, backend: string, model: string) => void; onEscalate: (slot: string, backend: string, model: string) => void; onCustom: (slot: string, backend: string, model: string, escalate: boolean) => void; onBattery: (allow: boolean) => void }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }} data-test="routing">
-      <Group>
-        {view.slots.map((slot) => {
-          const backend = view.backends.find((b) => b.id === slot.backend);
-          const local = !backend || backend.kind === "local";
-          const choices = probes[slot.backend]?.models ?? [];
-          const info = SLOT_TITLES[slot.slot];
-          return (
-            <HxRow key={slot.slot} test={`slot:${slot.slot}`} title={info?.title ?? slot.slot} sub={info?.about}
-              >
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
-                <Popup label={`${info?.title ?? slot.slot}: where it runs`} test={`slot-backend:${slot.slot}`} value={slot.backend}
-                  options={view.backends.map((b) => ({ id: b.id, label: b.label, disabled: slot.local_only && b.kind !== "local", title: slot.local_only && b.kind !== "local" ? "Acting for the desktop only runs on this computer" : undefined }))}
-                  onChange={(id) => onSlot(slot.slot, id, "")} />
-                <Popup label={`${info?.title ?? slot.slot}: model`} test={`slot-model:${slot.slot}`} value={slot.model} placeholder={local ? "First installed" : "Choose a model"}
-                  options={[
-                    ...(local ? [{ id: "", label: "First installed" }] : []),
-                    ...(local ? view.models.map((m) => ({ id: m.id, label: shortName(m.id) })) : choices.map((m) => ({ id: m, label: m }))),
-                    ...(slot.model && !(local ? view.models.map((m) => m.id) : choices).includes(slot.model) ? [{ id: slot.model, label: `${shortName(slot.model)}${local ? " (not installed)" : ""}` }] : []),
-                    ...(local ? [] : [{ id: OTHER, label: "Other…" }]),
-                  ]}
-                  onChange={(id) => (id === OTHER ? onCustom(slot.slot, slot.backend, slot.model, false) : onSlot(slot.slot, slot.backend, id))} />
-              </div>
-              {slot.local_only ? null : (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }} data-test={`escalate:${slot.slot}`}>
-                  <span className="setting-about">When it is not enough</span>
-                  <Popup label={`${info?.title ?? slot.slot}: stronger model backend`} test={`escalate-backend:${slot.slot}`} value={slot.escalate_backend}
+    <div className="hx-stack" data-test="routing">
+      {view.slots.map((slot) => {
+        const backend = view.backends.find((b) => b.id === slot.backend);
+        const local = !backend || backend.kind === "local";
+        const choices = probes[slot.backend]?.models ?? [];
+        const info = slotInfo(slot.slot);
+        const strong = probes[slot.escalate_backend]?.models ?? [];
+        return (
+          <Group key={slot.slot} test={`slot:${slot.slot}`}>
+            <HxRow leading={<IconTile name={info.icon} hue={info.hue} />} title={info.title} sub={info.about} />
+            <HxRow title="Runs on"
+              trailing={<Popup label={`${info.title}: where it runs`} test={`slot-backend:${slot.slot}`} value={slot.backend}
+                options={view.backends.map((b) => ({ id: b.id, label: b.label, disabled: slot.local_only && b.kind !== "local", title: slot.local_only && b.kind !== "local" ? "Acting for the desktop only runs on this computer" : undefined }))}
+                onChange={(id) => onSlot(slot.slot, id, "")} />} />
+            <HxRow title="Model"
+              trailing={<Popup label={`${info.title}: model`} test={`slot-model:${slot.slot}`} value={slot.model} placeholder={local ? "First installed" : "Choose a model"}
+                options={[
+                  ...(local ? [{ id: "", label: "First installed" }] : []),
+                  ...(local ? view.models.map((m) => ({ id: m.id, label: shortName(m.id) })) : choices.map((m) => ({ id: m, label: m }))),
+                  ...(slot.model && !(local ? view.models.map((m) => m.id) : choices).includes(slot.model) ? [{ id: slot.model, label: `${shortName(slot.model)}${local ? " (not installed)" : ""}` }] : []),
+                  ...(local ? [] : [{ id: OTHER, label: "Other…" }]),
+                ]}
+                onChange={(id) => (id === OTHER ? onCustom(slot.slot, slot.backend, slot.model, false) : onSlot(slot.slot, slot.backend, id))} />} />
+            {slot.local_only ? null : (
+              <div data-test={`escalate:${slot.slot}`}>
+                <HxRow title="When it is not enough"
+                  trailing={<Popup label={`${info.title}: stronger model backend`} test={`escalate-backend:${slot.slot}`} value={slot.escalate_backend}
                     options={[{ id: "", label: "Nothing" }, ...view.backends.filter((b) => b.kind !== "local").map((b) => ({ id: b.id, label: b.label }))]}
-                    onChange={(id) => onEscalate(slot.slot, id, "")} />
-                  {slot.escalate_backend ? (
-                    <Popup label={`${info?.title ?? slot.slot}: stronger model`} test={`escalate-model:${slot.slot}`} value={slot.escalate_model} placeholder="Choose a model"
+                    onChange={(id) => onEscalate(slot.slot, id, "")} />} />
+                {slot.escalate_backend ? (
+                  <HxRow title="Stronger model"
+                    trailing={<Popup label={`${info.title}: stronger model`} test={`escalate-model:${slot.slot}`} value={slot.escalate_model} placeholder="Choose a model"
                       options={[
-                        ...(probes[slot.escalate_backend]?.models ?? []).map((m) => ({ id: m, label: m })),
-                        ...(slot.escalate_model && !(probes[slot.escalate_backend]?.models ?? []).includes(slot.escalate_model) ? [{ id: slot.escalate_model, label: slot.escalate_model }] : []),
+                        ...strong.map((m) => ({ id: m, label: m })),
+                        ...(slot.escalate_model && !strong.includes(slot.escalate_model) ? [{ id: slot.escalate_model, label: slot.escalate_model }] : []),
                         { id: OTHER, label: "Other…" },
                       ]}
-                      onChange={(id) => (id === OTHER ? onCustom(slot.slot, slot.escalate_backend, slot.escalate_model, true) : onEscalate(slot.slot, slot.escalate_backend, id))} />
-                  ) : null}
-                </div>
-              )}
-            </HxRow>
-          );
-        })}
-      </Group>
+                      onChange={(id) => (id === OTHER ? onCustom(slot.slot, slot.escalate_backend, slot.escalate_model, true) : onEscalate(slot.slot, slot.escalate_backend, id))} />} />
+                ) : null}
+              </div>
+            )}
+          </Group>
+        );
+      })}
       <Group title="Safety">
-        <HxRow title="Use other computers and services on battery saver" sub="Off by default. While the computer is saving power, only models on this computer are used."
+        <HxRow leading={<IconTile name="battery" hue={120} />} title="Use other computers on battery saver" sub="While the computer is saving power, only models on this computer are used unless this is on."
           trailing={<HxSwitch label="Use other computers and services on battery saver" checked={view.allow_remote_on_battery_saver} test="battery-remote" onChange={onBattery} />} />
-        <HxRow title="Local by default" sub="Nothing leaves this computer unless you route a slot to a backend here. If that backend is unreachable the request fails; it never quietly goes somewhere else." />
+        <HxRow leading={<IconTile name="lock" hue={212} />} title="Local by default" sub="Nothing leaves this computer unless you route a task to a backend here. If that backend cannot be reached, the request fails; it never quietly goes somewhere else." />
       </Group>
     </div>
   );
@@ -414,7 +625,7 @@ function Models_() {
   // Downloads are watched more often than the rest, while there are any or the Models page is open.
   const anyRunning = jobs.some((j) => j.state === "running");
   useEffect(() => {
-    if (page !== "models" && !anyRunning) return;
+    if (page !== "models" && page !== "overview" && !anyRunning) return;
     let last = -1;
     const poll = () => invoke<DownloadView[]>("downloads").then((list) => {
       setJobs(list);
@@ -425,6 +636,8 @@ function Models_() {
     const timer = setInterval(poll, 1000);
     return () => clearInterval(timer);
   }, [page, anyRunning, refresh]);
+  // Each page starts at its top, as a fresh page should.
+  useEffect(() => { document.querySelector(".hx-scroll")?.scrollTo({ top: 0 }); }, [page]);
   useEffect(() => { invoke<number>("machine_memory").then(setMemory, () => {}); }, []);
 
   const lookUp = (draft: GetDraft) => {
@@ -434,9 +647,9 @@ function Models_() {
       (e) => setGet((g) => g && g.repo === draft.repo ? { ...g, looking: false, error: errorText(e) } : g),
     );
   };
-  const openGet = (repo: string, about?: string) => {
-    const draft: GetDraft = { repo, fixed: !!repo, files: null, pick: "", projector: false, looking: false, error: "", about };
-    if (repo) lookUp(draft); else setGet(draft);
+  const openGet = (entry: Entry | null) => {
+    const draft: GetDraft = { repo: entry?.repo ?? "", fixed: !!entry, files: null, pick: "", projector: false, looking: false, error: "", entry: entry ?? undefined };
+    if (entry) lookUp(draft); else setGet(draft);
   };
   const startDownload = () => {
     if (!get) return;
@@ -464,26 +677,27 @@ function Models_() {
   };
 
   const title = PAGES.find((p) => p.id === page)?.title ?? "";
+  const downloading = jobs.filter((j) => j.state === "running").length;
   let body: ReactNode = null;
   if (view) {
-    if (page === "overview") body = <Overview view={view} goto={setPage} onUnload={() => run(invoke("engine_unload"))} />;
+    if (page === "overview") body = <Overview view={view} jobs={jobs} goto={setPage} onUnload={() => run(invoke("engine_unload"))} />;
     if (page === "backends") {
       body = (
         <Backends view={view} probes={probes} probing={probing} onProbe={probe}
           onAdd={() => { setDraftError(""); setDraft({ ...NEW_DRAFT }); }}
           onEdit={(b) => { setDraftError(""); setDraft({ id: b.id, label: b.label, base_url: b.base_url, key: "", editing: true, had_key: b.has_key }); }}
-          onClearKey={(b) => setConfirm({ title: `Forget the key for ${b.label}?`, body: "The saved key is deleted from this computer. You can enter it again later.", action: "Forget key", test: "confirm-clear-key", run: () => invoke("key_clear", { id: b.id }) })}
-          onRemove={(b) => setConfirm({ title: `Remove ${b.label}?`, body: "The backend and its saved key are removed. Slots that use it must be moved first.", action: "Remove", test: "confirm-remove", run: () => invoke("backend_remove", { id: b.id }) })} />
+          onClearKey={(b) => setConfirm({ title: `Forget the key for ${b.label}?`, body: "The saved key is deleted from this computer. You can enter it again later.", action: "Forget Key", test: "confirm-clear-key", run: () => invoke("key_clear", { id: b.id }) })}
+          onRemove={(b) => setConfirm({ title: `Remove ${b.label}?`, body: "The backend and its saved key are removed. Tasks that use it must be moved first.", action: "Remove", test: "confirm-remove", run: () => invoke("backend_remove", { id: b.id }) })} />
       );
     }
     if (page === "models") {
-      body = <Models view={view} jobs={jobs.filter((j) => !dismissed.includes(j.id))} onGet={openGet}
+      body = <Models view={view} memory={memory} jobs={jobs.filter((j) => !dismissed.includes(j.id))} onGet={openGet}
         onCancel={(id) => run(invoke("download_cancel", { id }))} onDismiss={(id) => setDismissed((d) => [...d, id])}
-        onDelete={(m) => setConfirm({ title: `Delete ${shortName(m.id)}?`, body: `${bytes(m.bytes)} are removed from this computer. You can get the model again later.`, action: "Delete", test: "confirm-delete", run: () => invoke("model_delete", { id: m.id }) })} />;
+        onDelete={(m) => setConfirm({ title: `Delete ${nameOf(m.id).name}?`, body: `${bytes(m.bytes)} will be removed from this computer. You can download it again later.`, action: "Delete", test: "confirm-delete", run: () => invoke("model_delete", { id: m.id }) })} />;
     }
     if (page === "routing") {
       body = <Routing view={view} probes={probes} onSlot={(slot, backend, model) => run(invoke("slot_set", { slot, backend, model }))} onEscalate={(slot, backend, model) => run(invoke("slot_escalate", { slot, backend, model }))} onCustom={(slot, backend, model, escalate) => setCustom({ slot, backend, value: model, escalate })} onBattery={(allow) => run(invoke("battery_remote", { allow }))} />;
-      // The models a backend offers are fetched once, so the model field can suggest them.
+      // The models a backend offers are fetched once, so the model menus can offer them.
       view.slots.forEach((s) => { for (const id of [s.backend, s.escalate_backend]) { if (id && id !== "local" && !probes[id] && probing !== id) setTimeout(() => probe(id), 0); } });
     }
   }
@@ -493,7 +707,10 @@ function Models_() {
       <AppFrame
         title={title}
         largeTitle
-        sidebar={<Sidebar>{PAGES.map((p) => <SidebarItem key={p.id} icon={p.icon} label={p.title} test={`page-${p.id}`} current={page === p.id} onClick={() => setPage(p.id)} />)}</Sidebar>}
+        toolbar={page === "backends" ? <button type="button" className="hx-tool" data-test="toolbar-add" title="Add a backend" aria-label="Add a backend" onClick={() => { setDraftError(""); setDraft({ ...NEW_DRAFT }); }}><Icon name="plus" /></button>
+          : page === "models" ? <button type="button" className="hx-tool" data-test="toolbar-hub" title="Find a model on Hugging Face" aria-label="Find a model on Hugging Face" onClick={() => openGet(null)}><Icon name="search" /></button>
+          : undefined}
+        sidebar={<Sidebar>{PAGES.map((p) => <SidebarItem key={p.id} icon={p.icon} label={p.title} test={`page-${p.id}`} current={page === p.id} count={p.id === "models" && downloading ? downloading : undefined} onClick={() => setPage(p.id)} />)}</Sidebar>}
       >
         {view && !view.gateway ? <Banner tone="warn" test="gateway-down">{view.error || "The model service is not answering."}</Banner> : null}
         {error ? <Banner tone="error" test="error">{error}</Banner> : null}
@@ -502,10 +719,14 @@ function Models_() {
       {draft ? <BackendSheet draft={draft} setDraft={setDraft} onSave={saveDraft} onCancel={() => setDraft(null)} error={draftError} /> : null}
       {get && view ? <GetSheet draft={get} setDraft={setGet} view={view} memory={memory} onLookUp={() => lookUp(get)} onDownload={startDownload} onCancel={() => setGet(null)} /> : null}
       {custom ? (
-        <Sheet title="Model name" test="custom-sheet" onCancel={() => setCustom(null)}
+        <Sheet title="Model Name" test="custom-sheet" onCancel={() => setCustom(null)}
           actions={<><Button data-test="custom-cancel" onClick={() => setCustom(null)}>Cancel</Button><Button kind="primary" data-test="custom-save" onClick={() => { const c = custom; setCustom(null); run(invoke(c.escalate ? "slot_escalate" : "slot_set", { slot: c.slot, backend: c.backend, model: c.value })); }}>Use</Button></>}>
-          <input className="text-input" data-test="custom-model" autoFocus value={custom.value} placeholder="Model name" autoComplete="off" style={{ width: "100%" }}
-            onChange={(e) => setCustom({ ...custom, value: e.target.value })} />
+          <div className="hx-group">
+            <FieldRow label="Model">
+              <input className="hx-field-input" data-test="custom-model" autoFocus value={custom.value} placeholder="vendor/model-name" autoComplete="off" spellCheck={false}
+                onChange={(e) => setCustom({ ...custom, value: e.target.value })} />
+            </FieldRow>
+          </div>
           <div className="setting-about">The name the backend knows the model by, such as big-model or vendor/model-name.</div>
         </Sheet>
       ) : null}
@@ -521,7 +742,7 @@ function Models_() {
 
 function mount(host: HTMLElement) {
   document.body.classList.remove("settings");
-  document.body.classList.add("hx");
+  document.body.classList.add("hx", "hx-modern");
   createRoot(host).render(<Models_ />);
 }
 

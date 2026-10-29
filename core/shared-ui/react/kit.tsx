@@ -247,6 +247,81 @@ export function Popup<T extends string>({ value, options, onChange, test, label,
   );
 }
 
+/** A ⋯ button that opens a short menu of actions (a context menu you can see). Destructive items are red and come last. */
+export function ActionMenu({ label, items, test }: {
+  label: string;
+  items: { id: string; label: string; destructive?: boolean; disabled?: boolean; onSelect: () => void }[];
+  test?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: MouseEvent) => {
+      if (!host.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", outside, true);
+    return () => window.removeEventListener("mousedown", outside, true);
+  }, [open]);
+  const run = (index: number) => {
+    const item = items[index];
+    if (!item || item.disabled) return;
+    setOpen(false);
+    item.onSelect();
+  };
+  return (
+    <div className="hx-popup hx-action-menu" ref={host} onClick={(event) => event.stopPropagation()}>
+      <button type="button" className="hx-more-button" aria-haspopup="menu" aria-expanded={open} aria-label={label} data-test={test}
+        onClick={() => { setActive(-1); setOpen(!open); }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (!open) { setOpen(true); setActive(0); return; }
+            const by = event.key === "ArrowDown" ? 1 : -1;
+            setActive((a) => (a + by + items.length) % items.length);
+          } else if (event.key === "Enter" && open && active >= 0) {
+            event.preventDefault();
+            run(active);
+          } else if (event.key === "Escape" && open) {
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}>
+        <Icon name="dots" />
+      </button>
+      {open ? (
+        <div className="hx-popup-menu" role="menu" aria-label={label}>
+          {items.map((item, index) => (
+            <button type="button" key={item.id} role="menuitem" disabled={item.disabled}
+              className={`hx-popup-item${index === active ? " active" : ""}${item.destructive ? " destructive" : ""}`}
+              data-test={test ? `${test}-${item.id}` : undefined}
+              onMouseEnter={() => setActive(index)} onClick={() => run(index)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Determinate progress as a ring around a stop square (App Store style); clicking it stops the work. No percent: it spins. */
+export function ProgressRing({ percent, label, onStop, test }: { percent: number | null; label: string; onStop?: () => void; test?: string }) {
+  const radius = 11;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <button type="button" className={`hx-ring${percent == null ? " indeterminate" : ""}`} data-test={test} aria-label={label}
+      onClick={(event) => { event.stopPropagation(); onStop?.(); }}>
+      <svg viewBox="0 0 28 28" width="28" height="28" fill="none" strokeWidth="2.5">
+        <circle className="track" cx="14" cy="14" r={radius} />
+        <circle className="arc" cx="14" cy="14" r={radius} strokeDasharray={circumference} strokeDashoffset={circumference * (1 - Math.max(0, Math.min(100, percent ?? 25)) / 100)} />
+      </svg>
+      {onStop ? <span className="stop" /> : null}
+    </button>
+  );
+}
+
 export function Switch({ checked, onChange, label, test }: { checked: boolean; onChange: (next: boolean) => void; label: string; test?: string }) {
   return <button className="hx-switch" role="switch" aria-checked={checked} aria-label={label} data-test={test} onClick={() => onChange(!checked)} />;
 }

@@ -2327,6 +2327,144 @@ body.chat .agents-plan-done { margin: 6px 0 12px; font-size: 13px; } body.chat .
 .hx-popup-menu { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; min-width: 100%; max-height: 280px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--glass-solid, var(--bg)); box-shadow: var(--shadow-small), inset 0 0 0 .5px var(--hairline); animation: hx-popup-in 120ms var(--ease, ease-out) both; }
 .hx-popup-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 12px 5px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--label); font: inherit; text-align: left; white-space: nowrap; cursor: default; }
 .hx-popup-item.active:not(:disabled) { background: var(--accent); color: #fff; }
+.hx-popup-item.destructive { color: var(--danger); } .hx-popup-item.destructive.active:not(:disabled) { background: var(--danger); color: #fff; }
+.hx-action-menu .hx-popup-item { padding-left: 12px; }
+.hx-more-button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--fill-1); color: var(--label-2); transition: background 120ms var(--ease); }
+.hx-more-button:hover, .hx-more-button[aria-expanded="true"] { background: var(--fill-2); color: var(--label); }
+.hx-more-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hx-more-button svg.i { width: 16px; height: 16px; }
 .hx-popup-item:disabled { color: var(--label-2); opacity: .55; }
 .hx-popup-tick { width: 14px; text-align: center; font-size: 12px; }
 @keyframes hx-popup-in { from { opacity: 0; transform: translateY(-3px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* Grouped lists, refined: separators start at the text when a row has an icon tile; rows wrapped in buttons or sections still get them. */
+.hx-tile { background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0) 60%); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.12); }
+.hx-row:has(> .hx-tile:first-child)::before, .hx-row:has(> .hx-add-tile:first-child)::before { left: 58px !important; }
+.hx-group > :not(.hx-row) + .hx-row::before,
+.hx-group > * + :not(.hx-row) > .hx-row:first-child::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid var(--hairline); }
+.hx-group > .hx-row-button:first-child > .hx-row, .hx-group > .hx-row-button:first-child { border-top-left-radius: var(--r-group); border-top-right-radius: var(--r-group); }
+.hx-group > .hx-row-button:last-child > .hx-row, .hx-group > .hx-row-button:last-child { border-bottom-left-radius: var(--r-group); border-bottom-right-radius: var(--r-group); }
+.hx-row-button:active > .hx-row { background: var(--fill-2); }
+.hx-chevron { display: grid; place-items: center; color: var(--label-3); margin-right: -4px; }
+.hx-chevron svg.i { width: 14px; height: 14px; }
+.hx-stack { display: flex; flex-direction: column; gap: 24px; }
+.hx-truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-value { color: var(--label-2); font-variant-numeric: tabular-nums; }
+.hx-accent-text { color: var(--accent); font-weight: 500; }
+.hx-danger-text { color: var(--danger); }
+.hx-add-tile { flex: none; width: 30px; height: 30px; border-radius: calc(7px * var(--shape-ui)); display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.hx-add-tile svg.i { width: 16px; height: 16px; }
+/* A status line with a coloured dot: ok, warn, bad, busy. */
+.hx-status { display: inline-flex; align-items: center; gap: 6px; color: var(--label-2); font-size: 12px; }
+.hx-status::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--label-3); }
+.hx-status[data-state="ok"]::before { background: var(--ok); }
+.hx-status[data-state="warn"]::before { background: var(--warn); }
+.hx-status[data-state="bad"]::before { background: var(--danger); } .hx-status[data-state="bad"] { color: var(--danger); }
+.hx-status[data-state="busy"]::before { background: var(--accent); animation: hx-pulse 1s ease-in-out infinite alternate; }
+@keyframes hx-pulse { from { opacity: .35; } to { opacity: 1; } }
+/* A quantisation or version tag beside a name. */
+.hx-quant { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; background: var(--fill-1); color: var(--label-2); font: 600 10px/16px ui-monospace, "SF Mono", monospace; letter-spacing: .02em; vertical-align: 1px; }
+.hx-done { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ok); color: #fff; }
+.hx-done svg.i { width: 13px; height: 13px; }
+/* Labelled fields inside a group (macOS account sheets): label on the left, borderless field filling the rest. */
+.hx-field-row { display: flex; align-items: center; gap: 12px; min-height: var(--row-h); padding: 0 16px; position: relative; }
+.hx-field-row + .hx-field-row::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid var(--hairline); }
+.hx-field-label { flex: none; width: 92px; color: var(--label); font-weight: 500; }
+.hx-field-input { flex: 1; min-width: 0; height: 32px; border: 0; outline: none; background: transparent; color: var(--label); font: inherit; text-align: left; }
+.hx-field-row .hx-field-input, .hx-field-row .hx-field-input:focus, .hx-field-row .hx-field-input:hover { border: 0; outline: none; box-shadow: none; background: transparent; padding: 0; border-radius: 0; }
+.hx-field-input::placeholder { color: var(--label-3); }
+.hx-field-input:disabled { color: var(--label-2); }
+.hx-field-row:focus-within .hx-field-label { color: var(--accent); }
+/* Starting points above a form, as a row of pills. */
+.hx-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.hx-preset { height: 26px; padding: 0 12px; border: 0; border-radius: 13px; background: var(--fill-1); color: var(--label); font: 500 12px/26px inherit; font-family: inherit; transition: background 120ms var(--ease); }
+.hx-preset:hover { background: var(--fill-2); } .hx-preset.current { background: var(--accent); color: #fff; }
+/* App Store style: a grid of cards with a Get pill. */
+.hx-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.hx-card-grid .hx-tile-card { width: auto; }
+.hx-tile-card .maker { color: var(--label-2); font-size: 11px; line-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-get { height: 24px; min-width: 64px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--fill-2); color: var(--accent); font: 700 12px/24px inherit; font-family: inherit; letter-spacing: .01em; transition: background 120ms var(--ease), transform 120ms var(--ease-spring); }
+.hx-get:hover { background: var(--fill-3); } .hx-get:active { transform: scale(.96); }
+.hx-installed { color: var(--label-3); font-size: 12px; font-weight: 600; }
+.hx-link { border: 0; background: transparent; padding: 0; color: var(--accent); font: inherit; font-size: 13px; cursor: default; }
+.hx-link:hover { text-decoration: underline; } .hx-link:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }
+/* A sheet's header: a large tile beside a caption. */
+.hx-sheet-head { display: flex; gap: 14px; align-items: center; color: var(--label); }
+.hx-sheet-sub { color: var(--label-2); font-size: 12px; margin-bottom: 2px; }
+.hx-looking { display: flex; align-items: center; gap: 8px; color: var(--label-2); font-size: 13px; }
+
+/* ===== Modern (body.hx-modern): the current Apple look, opt in per app. Floating glass sidebar, capsule controls, soft tinted selection,
+   floating sheets, widgets and heroes. Everything here refines the base language above; nothing changes for apps that do not opt in. */
+body.hx-modern { --r-group: 14px; --r-widget: 20px; }
+body.hx-modern .hx-app { grid-template-columns: 232px 1fr; }
+body.hx-modern .hx-sidebar { margin: 8px 0 8px 8px; padding: 0 8px 10px; border-radius: 18px; position: relative; z-index: 4;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02) 40%), var(--sidebar-solid);
+  box-shadow: inset 0 0 0 .5px rgba(255,255,255,.12), inset 0 1px 0 rgba(255,255,255,.08), 0 10px 30px rgba(0,0,0,.28); }
+:root[data-theme="light"] body.hx-modern .hx-sidebar { background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.35)), var(--sidebar-solid);
+  box-shadow: inset 0 0 0 .5px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.08); }
+:root[data-blur="1"] body.hx-modern .hx-sidebar { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02) 40%), var(--sidebar); backdrop-filter: blur(40px) saturate(1.6); }
+body.hx-modern .hx-window-controls { height: 44px; padding-left: 8px; }
+body.hx-modern .hx-side-item { height: 32px; padding: 0 10px; border-radius: 10px; gap: 10px; }
+body.hx-modern .hx-side-item.current { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--label); }
+body.hx-modern .hx-side-item.current svg.i { color: var(--accent); }
+body.hx-modern .hx-side-item.current .hx-count { background: var(--accent); color: var(--on-accent, #fff); }
+body.hx-modern .hx-scroll { padding: 60px 32px 40px; }
+body.hx-modern .hx-large-title { font: 700 30px/36px var(--font-display); letter-spacing: -.03em; margin-bottom: -2px; }
+body.hx-modern .hx-titlebar.scrolled { background: color-mix(in srgb, var(--content) 70%, transparent); backdrop-filter: blur(24px) saturate(1.8); }
+body.hx-modern .hx-group { box-shadow: inset 0 0 0 .5px var(--hairline), 0 1px 2px rgba(0,0,0,.12); }
+body.hx-modern .hx-group-title { margin-left: 16px; font-weight: 600; color: var(--label-2); }
+/* Capsules: buttons, pop-up buttons, toolbar buttons. */
+body.hx-modern .hx-btn { border-radius: 999px; padding: 0 16px; }
+body.hx-modern .hx-btn.small { padding: 0 12px; }
+body.hx-modern .hx-btn.primary { box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent); }
+body.hx-modern .hx-popup-button { border-radius: 999px; padding: 3px 10px 3px 14px; }
+body.hx-modern .hx-popup-menu { border-radius: 14px; padding: 5px; backdrop-filter: blur(30px) saturate(1.6); box-shadow: 0 12px 40px rgba(0,0,0,.4), inset 0 0 0 .5px var(--hairline); }
+body.hx-modern .hx-popup-item { border-radius: 8px; padding: 6px 14px 6px 8px; }
+body.hx-modern .hx-tool { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; color: var(--label);
+  background: color-mix(in srgb, var(--fill-1) 100%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline), inset 0 1px 0 rgba(255,255,255,.06); transition: background 120ms var(--ease), transform 120ms var(--ease-spring); }
+body.hx-modern .hx-tool:hover { background: var(--fill-2); } body.hx-modern .hx-tool:active { transform: scale(.94); }
+body.hx-modern .hx-tool svg.i { width: 17px; height: 17px; }
+/* Floating sheets. */
+body.hx-modern .hx-scrim { background: rgba(0,0,0,.38); backdrop-filter: blur(2px); }
+body.hx-modern .hx-sheet { margin-top: 56px; border-radius: 24px; padding: 24px; width: min(460px, calc(100vw - 48px)); gap: 16px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.12) inset, inset 0 1px 0 rgba(255,255,255,.08); animation: hx-sheet-modern 340ms var(--ease-spring) both; }
+@keyframes hx-sheet-modern { from { transform: translateY(-12px) scale(.97); opacity: 0; } }
+body.hx-modern .hx-sheet h3 { font: 700 19px/24px var(--font-display); letter-spacing: -.02em; }
+body.hx-modern .hx-sheet .hx-group { background: var(--fill-1); }
+body.hx-modern .hx-banner { border-radius: 12px; }
+/* Widgets: a grid of rounded tiles with a label, a big figure and a line beneath. */
+.hx-widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 12px; }
+.hx-widget .corner { position: absolute; right: 14px; top: 12px; }
+.hx-widget { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 116px; padding: 14px 16px; border-radius: var(--r-widget, 18px); background: var(--group);
+  box-shadow: inset 0 0 0 .5px var(--hairline), 0 1px 2px rgba(0,0,0,.12); overflow: hidden; }
+.hx-widget .label { display: flex; align-items: center; gap: 6px; color: var(--label-2); font-size: 12px; font-weight: 600; }
+.hx-widget .label svg.i { width: 14px; height: 14px; color: var(--tint, var(--accent)); }
+.hx-widget .big { margin-top: auto; font: 700 28px/32px var(--font-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.hx-widget .big small { font-size: 14px; font-weight: 600; color: var(--label-2); margin-left: 5px; letter-spacing: 0; }
+.hx-widget .line { color: var(--label-2); font-size: 12px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-widget.button { cursor: default; transition: transform 160ms var(--ease-spring), background 160ms var(--ease); outline: none; }
+.hx-widget.button:hover { background: var(--fill-1); transform: translateY(-1px); } .hx-widget.button:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.hx-gauge { position: absolute; right: 12px; top: 12px; width: 40px; height: 40px; }
+.hx-gauge .track { stroke: var(--fill-2); } .hx-gauge .arc { stroke: var(--tint, var(--accent)); stroke-linecap: round; transition: stroke-dashoffset 600ms var(--ease-spring); }
+/* A status hero: a glowing orb, a large state and a line, on a soft tinted gradient. */
+.hx-status-hero { position: relative; display: flex; align-items: center; gap: 18px; padding: 20px 22px; border-radius: 22px; overflow: hidden;
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tint) 32%, transparent), transparent 60%), var(--group);
+  box-shadow: inset 0 0 0 .5px var(--hairline), 0 1px 2px rgba(0,0,0,.12); }
+.hx-orb { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--tint) 60%, white), var(--tint) 60%, color-mix(in srgb, var(--tint) 70%, black));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--tint) 45%, transparent), inset 0 1px 0 rgba(255,255,255,.35); }
+.hx-orb svg.i { width: 24px; height: 24px; }
+.hx-status-hero[data-state="busy"] .hx-orb { animation: hx-breathe 1.6s ease-in-out infinite; }
+@keyframes hx-breathe { 50% { box-shadow: 0 6px 32px color-mix(in srgb, var(--tint) 70%, transparent), inset 0 1px 0 rgba(255,255,255,.35); transform: scale(1.04); } }
+.hx-status-hero .state { font: 700 22px/26px var(--font-display); letter-spacing: -.025em; }
+.hx-status-hero .line { color: var(--label-2); font-size: 13px; margin-top: 2px; }
+.hx-status-hero .text { flex: 1; min-width: 0; }
+/* Cards tinted by their family colour, the way App Store cards carry their icon's colour. */
+.hx-tile-card.tinted { background: linear-gradient(180deg, color-mix(in srgb, var(--tint) 16%, transparent), transparent 55%), var(--group); }
+.hx-tile-card .foot .aside { color: var(--label-3); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+.hx-fit-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--label-3); } .hx-fit-dot[data-state="ok"] { background: var(--ok); }
+.hx-fit-dot[data-state="warn"] { background: var(--warn); } .hx-fit-dot[data-state="bad"] { background: var(--danger); }
+.hx-hero-card .hx-tile.large { width: 64px; height: 64px; border-radius: 15px; font-size: 28px; box-shadow: 0 8px 24px rgba(0,0,0,.3), inset 0 0 0 .5px rgba(255,255,255,.2); }
+.hx-hero-card .hx-get-hero { margin-top: 14px; height: 30px; padding: 0 20px; border: 0; border-radius: 15px; background: #fff; color: #111; font: 700 13px/30px inherit; font-family: inherit; }
+.hx-hero-card .hx-get-hero:active { transform: scale(.97); }
+.hx-hero-card .meta { margin-top: 6px; font-size: 12px; opacity: .8; display: flex; gap: 10px; align-items: center; }

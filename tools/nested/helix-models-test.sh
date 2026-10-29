@@ -74,7 +74,6 @@ wait_id catalogue:Qwen/Qwen3-4B-GGUF 20 && echo "ok: the catalogue is shown" || 
 click_id get:Qwen/Qwen3-4B-GGUF; sleep 0.5
 wait_id get-error 20 && echo "ok: a repository the hub lacks is reported in the sheet" || { shot nogeterror; fail "no lookup error"; }
 click_id get-cancel; sleep 0.6
-for _ in 1 2 3; do wtype -k End; sleep 0.4; done
 click_id get-other; sleep 0.6
 wait_id get-repo 10 && click_id get-repo && wtype "test/Tiny-GGUF" && wtype -k Return; sleep 1
 wait_id get-version 20 && echo "ok: the repository's files are listed" || { shot nofiles; fail "no files"; }
@@ -91,7 +90,6 @@ for _ in $(seq 1 60); do [ -f "$MODELS/tiny-Q4_K_M.gguf" ] && ls "$MODELS" | gre
 ls "$MODELS" | grep -q '^mmproj-tiny' && echo "ok: its picture projector came too, named to pair ($(ls "$MODELS" | grep mmproj))" || fail "no projector: $(ls "$MODELS")"
 wait_id "model:tiny-Q4_K_M.gguf" 20 && echo "ok: it is listed as installed" || { shot noinstalled; fail "not listed"; }
 # The bigger version trickles; Stop ends it and leaves the part to carry on from.
-for _ in 1 2 3; do wtype -k End; sleep 0.4; done
 click_id get-other; sleep 0.6
 wait_id get-repo 10 && click_id get-repo && wtype "test/Tiny-GGUF" && wtype -k Return; sleep 1
 wait_id get-version 20 && click_id get-version; sleep 0.6
