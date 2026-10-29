@@ -1910,7 +1910,6 @@ pub(crate) fn ask(app: &AppHandle, text: &str) -> Result<(), String> {
         eprintln!("ASK do");
         return mobius_act_from_talk(app.clone(), Some(text));
     }
-    eprintln!("ASK answer ({:?})", text.chars().take(24).collect::<String>());
     let open = shell_state(app)
         .lock()
         .expect("shell state")
