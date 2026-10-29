@@ -8,7 +8,7 @@ use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 
-use helix_config::inference_routing::{self, Backend, BackendKind, ProfileRoute};
+use helix_config::inference_routing::{self, Backend, BackendKind};
 use serde::Serialize;
 use serde_json::{json, Value as Json};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
@@ -400,6 +400,68 @@ async fn backend_probe(id: String) -> Result<Json, String> {
     serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
+/// What a Hugging Face repository offers, through the model service (it fetches; this app never does).
+#[tauri::command]
+async fn hub_files(repo: String) -> Result<Json, String> {
+    let proxy = proxy().await?;
+    let text: String = proxy
+        .call("HubFiles", &(repo.trim(),))
+        .await
+        .map_err(|e| gateway_error(&e))?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+/// Starts a download in the model service. Asked for by the person, never on its own.
+#[tauri::command]
+async fn model_download(repo: String, file: String, projector: bool) -> Result<u64, String> {
+    let proxy = proxy().await?;
+    proxy
+        .call("Download", &(repo.trim(), file.as_str(), projector))
+        .await
+        .map_err(|e| gateway_error(&e))
+}
+
+#[tauri::command]
+async fn downloads() -> Result<Json, String> {
+    let proxy = proxy().await?;
+    let text: String = proxy
+        .call("Downloads", &())
+        .await
+        .map_err(|e| gateway_error(&e))?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn download_cancel(id: u64) -> Result<bool, String> {
+    let proxy = proxy().await?;
+    proxy
+        .call("CancelDownload", &(id,))
+        .await
+        .map_err(|e| gateway_error(&e))
+}
+
+/// The machine's memory in bytes, for "does it fit" hints.
+#[tauri::command]
+fn machine_memory() -> u64 {
+    std::fs::read_to_string("/proc/meminfo")
+        .ok()
+        .and_then(|t| {
+            t.lines()
+                .find(|l| l.starts_with("MemTotal:"))
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|kb| kb.parse::<u64>().ok())
+        })
+        .map_or(0, |kb| kb * 1024)
+}
+
+/// The service's own words when it refuses (zbus wraps them).
+fn gateway_error(error: &zbus::Error) -> String {
+    match error {
+        zbus::Error::MethodError(_, Some(text), _) => text.clone(),
+        other => other.to_string(),
+    }
+}
+
 /// Frees the engine's memory now, if nothing is being answered.
 #[tauri::command]
 async fn engine_unload() -> Result<bool, String> {
@@ -611,6 +673,11 @@ fn main() {
             battery_remote,
             engine_unload,
             model_delete,
+            hub_files,
+            model_download,
+            downloads,
+            download_cancel,
+            machine_memory,
             layout_reporting,
             report_layout
         ])

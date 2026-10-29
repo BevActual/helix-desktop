@@ -119,10 +119,12 @@ async fn main() {
 
     let backend: Arc<dyn Backend> = if kind == "fake" {
         let delay: u64 = env("HELIX_FAKE_DELAY_MS", "0").parse().unwrap_or(0);
-        Arc::new(fake::FakeBackend::new(
+        let mut fake = fake::FakeBackend::new(
             &env("HELIX_FAKE_REPLY", "hello from the fake backend"),
             Duration::from_millis(delay),
-        ))
+        );
+        fake.folder = Some(PathBuf::from(&model_dir));
+        Arc::new(fake)
     } else if let Some(config) = engine_config(&model_dir) {
         // The engine is a supervised `llama-server` child process (see server.rs).
         Arc::new(server::ServerBackend::new(config))

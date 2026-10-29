@@ -62,9 +62,50 @@ grep -A5 '^\[profiles.chat\]' "$ROUTING" | grep -q 'model = "big-model"' && echo
 ! has_id escalate:act && echo "ok: Act has no stronger-model choice" || fail "act offers one"
 # The Safety group is below the fold of this window; the keyboard scrolls (the pointer harness cannot).
 for _ in 1 2 3; do wtype -k End; sleep 0.5; done
-click_id battery-remote; sleep 1.2
+click_id battery-remote
+for _ in $(seq 1 20); do grep -q 'allow_remote_on_battery_saver = true' "$ROUTING" && break; sleep 0.25; done
 grep -q 'allow_remote_on_battery_saver = true' "$ROUTING" && echo "ok: the battery switch is remembered" || fail "battery not saved"
 shot models-routing
+echo "--- downloads"
+MODELS=$SCRATCH/data/helix/models
+click_id page-models; sleep 1
+wait_id catalogue:Qwen/Qwen3-4B-GGUF 20 && echo "ok: the catalogue is shown" || { shot nocatalogue; fail "no catalogue"; }
+# A catalogue entry is looked up through the service; the pretend hub does not have it, and the sheet says so.
+click_id get:Qwen/Qwen3-4B-GGUF; sleep 0.5
+wait_id get-error 20 && echo "ok: a repository the hub lacks is reported in the sheet" || { shot nogeterror; fail "no lookup error"; }
+click_id get-cancel; sleep 0.6
+for _ in 1 2 3; do wtype -k End; sleep 0.4; done
+click_id get-other; sleep 0.6
+wait_id get-repo 10 && click_id get-repo && wtype "test/Tiny-GGUF" && wtype -k Return; sleep 1
+wait_id get-version 20 && echo "ok: the repository's files are listed" || { shot nofiles; fail "no files"; }
+python3 - "$SCRATCH/state/layout.json" <<'PY' && echo "ok: Q4_K_M is chosen, picture support is on" || fail "wrong defaults"
+import json, sys
+e = json.load(open(sys.argv[1]))["elements"]
+assert "get-projector" in e and "get-download" in e, sorted(k for k in e if k.startswith("get"))
+PY
+shot get-sheet
+click_id get-download; sleep 1
+wait_id "download:tiny-Q4_K_M.gguf" 20 && echo "ok: the download is listed" || { shot nodownload; fail "no download row"; }
+for _ in $(seq 1 60); do [ -f "$MODELS/tiny-Q4_K_M.gguf" ] && ls "$MODELS" | grep -q "^mmproj-tiny" && break; sleep 0.5; done
+[ -f "$MODELS/tiny-Q4_K_M.gguf" ] && echo "ok: the model reached the models folder" || fail "no model file in $MODELS: $(ls -a "$MODELS" 2>&1)"
+ls "$MODELS" | grep -q '^mmproj-tiny' && echo "ok: its picture projector came too, named to pair ($(ls "$MODELS" | grep mmproj))" || fail "no projector: $(ls "$MODELS")"
+wait_id "model:tiny-Q4_K_M.gguf" 20 && echo "ok: it is listed as installed" || { shot noinstalled; fail "not listed"; }
+# The bigger version trickles; Stop ends it and leaves the part to carry on from.
+for _ in 1 2 3; do wtype -k End; sleep 0.4; done
+click_id get-other; sleep 0.6
+wait_id get-repo 10 && click_id get-repo && wtype "test/Tiny-GGUF" && wtype -k Return; sleep 1
+wait_id get-version 20 && click_id get-version; sleep 0.6
+wait_id "get-version-tiny-Q8_0.gguf" 10 && click_id "get-version-tiny-Q8_0.gguf"; sleep 0.5
+click_id get-projector; sleep 0.3
+click_id get-download; sleep 2
+wait_id "download-cancel:tiny-Q8_0.gguf" 20 && click_id "download-cancel:tiny-Q8_0.gguf"; sleep 1.5
+python3 - "$SCRATCH/state/layout.json" <<'PY' && echo "ok: Stop ended it" || { shot nostop; fail "not stopped"; }
+import json, sys
+e = json.load(open(sys.argv[1]))["elements"]
+assert "download-dismiss:tiny-Q8_0.gguf" in e and "download-cancel:tiny-Q8_0.gguf" not in e
+PY
+[ ! -f "$MODELS/tiny-Q8_0.gguf" ] && ls "$MODELS/.downloads" | grep -q 'tiny-Q8_0.gguf.part' && echo "ok: only a part file is left" || fail "after stop: $(ls -a "$MODELS" "$MODELS/.downloads")"
+shot models-downloads
 echo "--- the service reads it"
 python3 - <<'PY' && echo "ok: the service sees the same routing" || fail "service snapshot differs"
 import subprocess, json

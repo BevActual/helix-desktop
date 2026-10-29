@@ -55,8 +55,8 @@ PATH=$HOME/.local/cuda/bin:$PATH cmake -S third_party/llama.cpp-0.6.0 -B build \
 2. **Backends**: local engines, LAN machines, cloud providers. Name, address, test button, status light, trust label (Local, LAN, Cloud). Keys are
    typed here and go straight to the keyring; the app never shows them again.
 3. **Models**: what is installed (size, quantisation, backend), download and delete, and what fits this machine's VRAM and RAM. Downloads are the
-   gateway's: one models folder, checksums, resume, disk-space checks. A short "recommended for this machine" list (a small fast Act model, a
-   mid Talk model, a vision model). Nothing is fetched without the person starting it.
+   gateway's: one models folder, checksums, resume, disk-space checks. A short catalogue of commonly used GGUF models, with a fit hint for this machine's
+   graphics card and memory, and any Hugging Face repository by name. Nothing is fetched without the person starting it.
 4. **Routing**: one row per task slot (Act, Talk, Vision, Code, Embeddings, Images) with a primary model, a fallback order, and a cloud rule
    (never, ask each time, allowed). Slots that may emit desktop tools stay locked to a local model, shown as such.
 5. **Access**: which apps and agents may call the gateway, which slots and backends each may use, a budget, and revoke. Same idea as Agent
@@ -98,6 +98,17 @@ then optional judges).
 5. Retire the in-process C shim.
 
 ## Status
+
+* 2026-10-29 (model downloads): the gateway fetches models from Hugging Face (`src/downloads.rs`; D-Bus `HubFiles`, `Download`, `Downloads`,
+  `CancelDownload`). It lists a repository's root `.gguf` files with their LFS SHA-256, takes every part of a split model, optionally the picture
+  projector (q8_0, then f16, then bf16, renamed `mmproj-<model>-…` unless it already pairs), checks room first (free space less any part already
+  fetched, plus 1 GB), writes `.downloads/<name>.part`, resumes with Range, checks the SHA-256 while streaming, and renames only when it matches.
+  The unit may write `~/.local/share/helix/models` and nothing else in home. The Models page lists downloads (progress, Stop, Clear), what is on
+  this computer, and a short catalogue (Qwen3 4B/8B, Gemma 3 4B/12B, Qwen2.5 Coder 7B, Qwen2.5 VL 7B, Qwen2.5 1.5B) plus "From Hugging Face…"
+  for any repository. "Get…" opens a sheet that looks the files up through the gateway (the app itself never fetches), picks Q4_K_M, shows
+  each version's size and whether it fits the graphics card or memory, and turns picture support on when the repository has a projector. Nothing
+  is fetched until the person presses Download. Nested `helix-models` runs it against a pretend hub (`HELIX_MODEL_HUB`): lookup error, listing,
+  download with projector, the model appearing as installed, and Stop leaving a part file. The fake engine now also lists the models folder.
 
 * 2026-10-23 (Mobius through the gateway): Mobius's talk turns to any OpenAI-compatible backend (OpenRouter, a LAN machine, a persona's own backend) now
   go through `org.helix.Inference1.Action("chat", {backend, model, route, remote_timeout, ...})` and stream, instead of Mobius's own non-streaming HTTP

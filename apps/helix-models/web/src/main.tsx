@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { AppFrame, Banner, Button, Chip, EmptyState, Group, HxRow, Popup, Sheet, Sidebar, SidebarItem, HxSwitch, invoke, useLayoutReport } from "@helix/ui";
+import { AppFrame, Banner, Button, Chip, EmptyState, Group, HxRow, Meter, Popup, Sheet, Sidebar, SidebarItem, HxSwitch, invoke, useLayoutReport } from "@helix/ui";
 
 type Page = "overview" | "backends" | "models" | "routing";
 type Trust = "this" | "lan" | "cloud";
@@ -27,6 +27,10 @@ interface View {
   slots: SlotView[];
   allow_remote_on_battery_saver: boolean;
 }
+interface HubFile { path: string; size: number }
+interface DownloadView { id: number; repo: string; title: string; total: number; done: number; state: "running" | "done" | "failed" | "cancelled"; message: string }
+interface Choice { path: string; label: string; size: number }
+interface GetDraft { repo: string; fixed: boolean; files: HubFile[] | null; pick: string; projector: boolean; looking: boolean; error: string; about?: string }
 interface Probe { ok: boolean; trust?: string; models?: string[]; error?: string }
 
 const PAGES: { id: Page; title: string; icon: string }[] = [
@@ -168,25 +172,155 @@ function Backends({ view, probes, probing, onProbe, onEdit, onAdd, onRemove, onC
 
 // --- Models ---------------------------------------------------------------------------------------------------------------------------
 
-function Models({ view, onDelete }: { view: View; onDelete: (m: ModelView) => void }) {
-  if (!view.gateway) return <EmptyState icon="folder">The model service is not answering, so the installed models cannot be listed.</EmptyState>;
-  if (!view.models.length) {
-    return <EmptyState icon="folder"><span data-test="no-models">No models are installed. Put GGUF files in {view.snapshot.model_dir ?? "the models folder"}. Downloading from here is coming.</span></EmptyState>;
+// Models people commonly start with, all GGUF from their makers or ggml-org. Files and sizes are looked up when asked for.
+const CATALOGUE: { repo: string; title: string; about: string; pictures?: boolean }[] = [
+  { repo: "Qwen/Qwen3-4B-GGUF", title: "Qwen3 4B", about: "Small and quick. Good for talking, summaries and acting on the desktop." },
+  { repo: "Qwen/Qwen3-8B-GGUF", title: "Qwen3 8B", about: "A stronger all-rounder for a graphics card with 8 GB or more." },
+  { repo: "ggml-org/gemma-3-4b-it-GGUF", title: "Gemma 3 4B", about: "Small, and reads pictures.", pictures: true },
+  { repo: "ggml-org/gemma-3-12b-it-GGUF", title: "Gemma 3 12B", about: "Reads pictures and writes well. Needs a large graphics card.", pictures: true },
+  { repo: "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF", title: "Qwen2.5 Coder 7B", about: "Writing and explaining code." },
+  { repo: "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF", title: "Qwen2.5 VL 7B", about: "Reads screenshots and documents.", pictures: true },
+  { repo: "Qwen/Qwen2.5-1.5B-Instruct-GGUF", title: "Qwen2.5 1.5B", about: "Tiny. For older computers and quick titles." },
+];
+
+const SHARD = /-(\d{5})-of-(\d{5})\.gguf$/;
+
+/** The model files a repository offers, a split model counted once with its parts' sizes added. */
+function choicesOf(files: HubFile[]): Choice[] {
+  const out = new Map<string, Choice>();
+  for (const f of files) {
+    if (f.path.startsWith("mmproj")) continue;
+    const shard = f.path.match(SHARD);
+    const key = shard ? f.path.replace(SHARD, "") : f.path;
+    const label = shard ? `${key} (${Number(shard[2])} parts)` : shortName(f.path);
+    const have = out.get(key);
+    if (have) {
+      have.size += f.size;
+      if (shard && shard[1] === "00001") have.path = f.path;
+    } else {
+      out.set(key, { path: f.path, label, size: f.size });
+    }
   }
+  return [...out.values()].sort((a, b) => a.size - b.size);
+}
+
+/** Q4_K_M when there is one, a balance of size and quality, else the smallest above 4 bits, else the smallest. */
+function preferred(choices: Choice[]): string {
+  const q4 = choices.find((c) => /q4_k_m/i.test(c.path));
+  if (q4) return q4.path;
+  const middling = choices.find((c) => /q[4-6]_/i.test(c.path));
+  return (middling ?? choices[0])?.path ?? "";
+}
+
+function fit(size: number, view: View, memory: number): { label: string; tone?: "ok" | "warn" | "danger" } {
+  const gpu = Math.max(0, ...(view.snapshot.devices ?? []).filter((d) => d.gpu).map((d) => d.memory_total));
+  const need = size * 1.2; // the context and the engine's own working memory
+  if (gpu && need <= gpu) return { label: "Fits the graphics card", tone: "ok" };
+  if (memory && need <= memory * 0.6) return { label: gpu ? "Partly on the graphics card, slower" : "Runs from memory, slower", tone: "warn" };
+  if (!memory && !gpu) return { label: bytes(size) };
+  return { label: "Too large for this computer", tone: "danger" };
+}
+
+function Downloads({ jobs, onCancel, onDismiss }: { jobs: DownloadView[]; onCancel: (id: number) => void; onDismiss: (id: number) => void }) {
+  if (!jobs.length) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }} data-test="models">
-      <Group>
-        {view.models.map((m) => (
-          <HxRow key={m.id} test={`model:${m.id}`} title={shortName(m.id)} sub={bytes(m.bytes)}
+    <Group title="Downloads">
+      {jobs.map((j) => {
+        const percent = j.total ? (j.done / j.total) * 100 : 0;
+        const sub = j.state === "running" ? `${bytes(j.done)} of ${bytes(j.total)}`
+          : j.state === "done" ? "Ready to use"
+          : j.state === "cancelled" ? "Stopped. Getting it again carries on where it stopped."
+          : j.message || "The download failed.";
+        return (
+          <HxRow key={j.id} test={`download:${j.title}`} title={shortName(j.title)} sub={<span data-test={`download-state:${j.title}`} data-state={j.state}>{sub}</span>}
+            trailing={j.state === "running"
+              ? <Button small data-test={`download-cancel:${j.title}`} onClick={() => onCancel(j.id)}>Stop</Button>
+              : <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {j.state === "done" ? <Chip tone="ok">Done</Chip> : j.state === "failed" ? <Chip tone="danger">Failed</Chip> : null}
+                  <Button small data-test={`download-dismiss:${j.title}`} onClick={() => onDismiss(j.id)}>Clear</Button>
+                </div>}>
+            {j.state === "running" ? <Meter percent={percent} live label={`${Math.round(percent)}%`} /> : null}
+          </HxRow>
+        );
+      })}
+    </Group>
+  );
+}
+
+function Models({ view, jobs, onDelete, onGet, onCancel, onDismiss }: { view: View; jobs: DownloadView[]; onDelete: (m: ModelView) => void; onGet: (repo: string, about?: string) => void; onCancel: (id: number) => void; onDismiss: (id: number) => void }) {
+  if (!view.gateway) return <EmptyState icon="folder">The model service is not answering, so the installed models cannot be listed.</EmptyState>;
+  const running = new Set(jobs.filter((j) => j.state === "running").map((j) => j.repo));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }} data-test="models">
+      <Downloads jobs={jobs} onCancel={onCancel} onDismiss={onDismiss} />
+      {view.models.length ? (
+        <Group title="On this computer">
+          {view.models.map((m) => (
+            <HxRow key={m.id} test={`model:${m.id}`} title={shortName(m.id)} sub={bytes(m.bytes)}
+              trailing={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {m.vision ? <Chip>Reads pictures</Chip> : null}
+                {m.loaded ? <Chip tone="ok">In use</Chip> : null}
+                <Button small kind="destructive" data-test={`delete:${m.id}`} onClick={() => onDelete(m)}>Delete</Button>
+              </div>} />
+          ))}
+        </Group>
+      ) : (
+        <div className="setting-about" data-test="no-models">No models are on this computer yet. Get one below, or put GGUF files in {view.snapshot.model_dir ?? "the models folder"}.</div>
+      )}
+      <Group title="Get models">
+        {CATALOGUE.map((c) => (
+          <HxRow key={c.repo} test={`catalogue:${c.repo}`} title={c.title} sub={c.about}
             trailing={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {m.vision ? <Chip>Reads pictures</Chip> : null}
-              {m.loaded ? <Chip tone="ok">In use</Chip> : null}
-              <Button small kind="destructive" data-test={`delete:${m.id}`} onClick={() => onDelete(m)}>Delete</Button>
+              {c.pictures ? <Chip>Reads pictures</Chip> : null}
+              <Button small data-test={`get:${c.repo}`} disabled={running.has(c.repo)} onClick={() => onGet(c.repo, c.about)}>{running.has(c.repo) ? "Getting…" : "Get…"}</Button>
             </div>} />
         ))}
+        <HxRow test="from-hub" title="From Hugging Face…" sub="Any repository with GGUF files, by its name."
+          trailing={<Button small data-test="get-other" onClick={() => onGet("")}>Choose…</Button>} />
       </Group>
-      <div className="setting-about">Models are read from {view.snapshot.model_dir ?? "the models folder"}. Deleting one removes its files from this computer.</div>
+      <div className="setting-about">Models are kept in {view.snapshot.model_dir ?? "the models folder"}. They are fetched by the model service from huggingface.co, checked against the repository's checksums, and only when you ask. Deleting one removes its files from this computer.</div>
     </div>
+  );
+}
+
+function GetSheet({ draft, setDraft, view, memory, onLookUp, onDownload, onCancel }: { draft: GetDraft; setDraft: (d: GetDraft) => void; view: View; memory: number; onLookUp: () => void; onDownload: () => void; onCancel: () => void }) {
+  const choices = draft.files ? choicesOf(draft.files) : [];
+  const chosen = choices.find((c) => c.path === draft.pick);
+  const hasProjector = !!draft.files?.some((f) => f.path.startsWith("mmproj"));
+  const projector = hasProjector ? Math.min(...draft.files!.filter((f) => f.path.startsWith("mmproj")).map((f) => f.size)) : 0;
+  const total = (chosen?.size ?? 0) + (draft.projector && hasProjector ? projector : 0);
+  const hint = chosen ? fit(chosen.size, view, memory) : null;
+  return (
+    <Sheet title={draft.fixed ? draft.repo.split("/").pop() ?? draft.repo : "From Hugging Face"} test="get-sheet" onCancel={onCancel}
+      actions={<>
+        <Button data-test="get-cancel" onClick={onCancel}>Cancel</Button>
+        {draft.files ? <Button kind="primary" data-test="get-download" disabled={!chosen} onClick={onDownload}>Download{total ? ` ${bytes(total)}` : ""}</Button>
+          : <Button kind="primary" data-test="get-lookup" disabled={!draft.repo.includes("/") || draft.looking} onClick={onLookUp}>{draft.looking ? "Looking…" : "Look up"}</Button>}
+      </>}>
+      {draft.fixed ? (draft.about ? <p>{draft.about}</p> : null) : (
+        <>
+          <input className="text-input" data-test="get-repo" autoFocus value={draft.repo} placeholder="owner/name-GGUF" autoComplete="off" spellCheck={false} style={{ width: "100%" }}
+            onChange={(e) => setDraft({ ...draft, repo: e.target.value, files: null, error: "" })}
+            onKeyDown={(e) => { if (e.key === "Enter" && draft.repo.includes("/") && !draft.files) onLookUp(); }} />
+          <div className="setting-about">The repository's name on huggingface.co, such as Qwen/Qwen3-4B-GGUF.</div>
+        </>
+      )}
+      {draft.looking && draft.fixed ? <div className="setting-about" data-test="get-looking">Looking up the files…</div> : null}
+      {draft.error ? <Banner tone="error" test="get-error">{draft.error}</Banner> : null}
+      {draft.files && !choices.length ? <Banner tone="warn" test="get-none">This repository has no GGUF model files.</Banner> : null}
+      {choices.length ? (
+        <Group>
+          <HxRow title="Version" sub={hint ? <span data-test="get-fit"><Chip tone={hint.tone === "danger" ? "danger" : hint.tone}>{hint.label}</Chip></span> : undefined}
+            trailing={<Popup label="Version" test="get-version" value={draft.pick} onChange={(pick) => setDraft({ ...draft, pick })}
+              options={choices.map((c) => ({ id: c.path, label: `${c.label} · ${bytes(c.size)}` }))} />} />
+          {hasProjector ? (
+            <HxRow title="Include picture support" sub={`Adds ${bytes(projector)} so the model can read images.`}
+              trailing={<HxSwitch test="get-projector" checked={draft.projector} onChange={(projector) => setDraft({ ...draft, projector })} label="Include picture support" />} />
+          ) : null}
+        </Group>
+      ) : null}
+      {choices.length ? <div className="setting-about">Smaller versions are quicker and lighter but a little less capable. Q4_K_M is a good balance.</div> : null}
+    </Sheet>
   );
 }
 
@@ -262,6 +396,10 @@ function Models_() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftError, setDraftError] = useState("");
   const [custom, setCustom] = useState<{ slot: string; backend: string; value: string; escalate: boolean } | null>(null);
+  const [jobs, setJobs] = useState<DownloadView[]>([]);
+  const [dismissed, setDismissed] = useState<number[]>([]);
+  const [memory, setMemory] = useState(0);
+  const [get, setGet] = useState<GetDraft | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; body: string; action: string; run: () => Promise<unknown>; test: string } | null>(null);
 
   const refresh = useCallback(() => {
@@ -272,6 +410,42 @@ function Models_() {
     const timer = setInterval(refresh, 3000);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  // Downloads are watched more often than the rest, while there are any or the Models page is open.
+  const anyRunning = jobs.some((j) => j.state === "running");
+  useEffect(() => {
+    if (page !== "models" && !anyRunning) return;
+    let last = -1;
+    const poll = () => invoke<DownloadView[]>("downloads").then((list) => {
+      setJobs(list);
+      const finished = list.filter((j) => j.state === "done").length;
+      if (finished !== last) { if (last >= 0) refresh(); last = finished; }
+    }, () => setJobs([]));
+    poll();
+    const timer = setInterval(poll, 1000);
+    return () => clearInterval(timer);
+  }, [page, anyRunning, refresh]);
+  useEffect(() => { invoke<number>("machine_memory").then(setMemory, () => {}); }, []);
+
+  const lookUp = (draft: GetDraft) => {
+    setGet({ ...draft, looking: true, error: "" });
+    invoke<HubFile[]>("hub_files", { repo: draft.repo.trim() }).then(
+      (files) => setGet((g) => g && g.repo === draft.repo ? { ...g, looking: false, files, pick: preferred(choicesOf(files)), projector: files.some((f) => f.path.startsWith("mmproj")) } : g),
+      (e) => setGet((g) => g && g.repo === draft.repo ? { ...g, looking: false, error: errorText(e) } : g),
+    );
+  };
+  const openGet = (repo: string, about?: string) => {
+    const draft: GetDraft = { repo, fixed: !!repo, files: null, pick: "", projector: false, looking: false, error: "", about };
+    if (repo) lookUp(draft); else setGet(draft);
+  };
+  const startDownload = () => {
+    if (!get) return;
+    const g = get;
+    invoke<number>("model_download", { repo: g.repo.trim(), file: g.pick, projector: g.projector }).then(
+      () => { setGet(null); setPage("models"); invoke<DownloadView[]>("downloads").then(setJobs, () => {}); },
+      (e) => setGet({ ...g, error: errorText(e) }),
+    );
+  };
 
   const run = (promise: Promise<unknown>) => promise.then(() => { setError(""); refresh(); }, (e) => setError(errorText(e)));
   const probe = (id: string) => {
@@ -303,7 +477,9 @@ function Models_() {
       );
     }
     if (page === "models") {
-      body = <Models view={view} onDelete={(m) => setConfirm({ title: `Delete ${shortName(m.id)}?`, body: `${bytes(m.bytes)} are removed from this computer. You can get the model again later.`, action: "Delete", test: "confirm-delete", run: () => invoke("model_delete", { id: m.id }) })} />;
+      body = <Models view={view} jobs={jobs.filter((j) => !dismissed.includes(j.id))} onGet={openGet}
+        onCancel={(id) => run(invoke("download_cancel", { id }))} onDismiss={(id) => setDismissed((d) => [...d, id])}
+        onDelete={(m) => setConfirm({ title: `Delete ${shortName(m.id)}?`, body: `${bytes(m.bytes)} are removed from this computer. You can get the model again later.`, action: "Delete", test: "confirm-delete", run: () => invoke("model_delete", { id: m.id }) })} />;
     }
     if (page === "routing") {
       body = <Routing view={view} probes={probes} onSlot={(slot, backend, model) => run(invoke("slot_set", { slot, backend, model }))} onEscalate={(slot, backend, model) => run(invoke("slot_escalate", { slot, backend, model }))} onCustom={(slot, backend, model, escalate) => setCustom({ slot, backend, value: model, escalate })} onBattery={(allow) => run(invoke("battery_remote", { allow }))} />;
@@ -324,6 +500,7 @@ function Models_() {
         {body}
       </AppFrame>
       {draft ? <BackendSheet draft={draft} setDraft={setDraft} onSave={saveDraft} onCancel={() => setDraft(null)} error={draftError} /> : null}
+      {get && view ? <GetSheet draft={get} setDraft={setGet} view={view} memory={memory} onLookUp={() => lookUp(get)} onDownload={startDownload} onCancel={() => setGet(null)} /> : null}
       {custom ? (
         <Sheet title="Model name" test="custom-sheet" onCancel={() => setCustom(null)}
           actions={<><Button data-test="custom-cancel" onClick={() => setCustom(null)}>Cancel</Button><Button kind="primary" data-test="custom-save" onClick={() => { const c = custom; setCustom(null); run(invoke(c.escalate ? "slot_escalate" : "slot_set", { slot: c.slot, backend: c.backend, model: c.value })); }}>Use</Button></>}>
