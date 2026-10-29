@@ -19,6 +19,7 @@ pub const PANELS: &[&str] = &[
     "today",
     "agent-display",
     "quick-insert",
+    "writing",
 ];
 
 /// One window as the agent may hear of it: no title (a title is the program's own text), and an application name only the desktop entry or the

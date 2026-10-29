@@ -20,6 +20,7 @@ const PANELS: &[&str] = &[
     "agents",
     "notifications",
     "quick-insert",
+    "writing",
 ];
 
 fn call_for(command: &str) -> Option<Call> {

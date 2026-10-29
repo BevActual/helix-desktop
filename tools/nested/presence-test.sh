@@ -70,7 +70,7 @@ rows | grep -q "helix:ask" && fail "Ask Mobius should not be offered in act mode
 echo escape >> "$CONTROL"
 echo "--- 2b. a request to do something is done, from the same box"
 echo escape >> "$CONTROL"; sleep 1
-echo launcher >> "$CONTROL"; sleep 1; wtype "please lower the volume a little"; sleep 1.2
+n=$(grep -c "PANEL open" "$LOG"); echo launcher >> "$CONTROL"; wait_for "PANEL open" $((n + 1)) 20; sleep 0.8; wtype "please lower the volume a little"; sleep 1.2
 rows | grep -q "first helix:ask" && wtype -k Return
 for _ in $(seq 1 20); do grep -q "^ASK do" "$LOG" && break; sleep 0.25; done
 grep -q "^ASK do" "$LOG" && echo "ok: \"please lower the volume a little\" went to doing" || fail "not routed to doing: $(grep '^ASK' "$LOG")"

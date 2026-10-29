@@ -36,6 +36,21 @@ const ACTIONS: &[DesktopAction] = &[
         keywords: &["apps", "launcher", "applications", "run"],
     },
     DesktopAction {
+        id: "helix:desktop:writing",
+        name: "Writing Tools",
+        detail: "Proofread, rewrite, summarise or explain selected text",
+        keywords: &[
+            "writing",
+            "proofread",
+            "rewrite",
+            "summarise",
+            "summarize",
+            "explain",
+            "grammar",
+            "text",
+        ],
+    },
+    DesktopAction {
         id: "helix:desktop:assistant",
         name: "Ask Mobius",
         detail: "It answers, or does it on the desktop",

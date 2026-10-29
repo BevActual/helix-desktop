@@ -100,6 +100,12 @@ agents in their boxes; local-first privacy; the compositor as part of the produc
   opening, is done; "Do it" turns an answer into doing); the launcher's Ask row uses the same decision. People see "Desktop" for the task
   that acts on the desktop, "Agent workspace" (was agent desk) and "Agent screen" (was agent display); stale texts ("settings still use
   Act", "Act never uses a cloud model") are gone.
-* Next: intelligence in place (text actions on any selection, on the fast local model), then the Magic Pointer on top of it.
+* 2026-10-29 (later): **Writing Tools** (intelligence in place, first part): select text in any app, open Writing Tools (the launcher, or a key
+  bound to `helix-shell "writing"`): Proofread, Friendly, Professional, Concise, Summary, Key points, Explain, or ask about it. The answer
+  streams from the small, quick Summaries model on this computer; Replace puts a rewrite back over the selection in the window that had it
+  (focus is handed back first; never multi-line into a terminal), Copy copies. The selection is the primary selection, else a copy made in
+  that window with the clipboard put back (never the copy key in a terminal). `helix_shell_model::writing`, `shell/…/writing.rs`.
+  Nested: `tools/nested/ui-suite.sh writing`.
+* Next: the Magic Pointer on top of Writing Tools (what is under the pointer, the same tools and actions beside it).
 
 The roadmap's other sections (foundations, Settings pages, apps) continue, but new work there is built as actions from the start.

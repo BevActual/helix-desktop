@@ -19,9 +19,10 @@ if (window.HelixShellReact) {
   reactOsd = window.HelixShellReact.osd($("osd"));
   reactMobius = window.HelixShellReact.mobius($("panel"));
   reactQuickInsert = window.HelixShellReact.quickInsert($("quickinsert"));
+  if (window.HelixShellReact.writing) reactWriting = window.HelixShellReact.writing($("writing"));
 }
 // React updates its islands without going through shell.js's draw functions, so the test layout report is asked for after they change.
 if (window.HelixShellReact) {
   const again = new MutationObserver(() => queueReport());
-  ["launcher", "today", "toasts", "notif-list", "controls", "quickinsert", "panel", "island", "osd", "tray", "tray-menu", "dock-items"].forEach((id) => again.observe($(id), { childList: true, subtree: true }));
+  ["launcher", "today", "toasts", "notif-list", "controls", "quickinsert", "writing", "panel", "island", "osd", "tray", "tray-menu", "dock-items"].forEach((id) => again.observe($(id), { childList: true, subtree: true }));
 }

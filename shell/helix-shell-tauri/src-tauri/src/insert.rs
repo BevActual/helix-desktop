@@ -121,7 +121,7 @@ fn describe(outcome: &Outcome) -> String {
 /// Inserts into the window that had the keyboard when the palette opened, and only that one. The palette has closed, so the keyboard is on
 /// its way back: wait (briefly, on shell state that niri's events keep current) until that window has it again. If it never does, or the
 /// text is a line break away from running as commands in a terminal, nothing is inserted and the person is told.
-fn deliver(app: &AppHandle, text: String, paste: bool) {
+pub(crate) fn deliver(app: &AppHandle, text: String, paste: bool) {
     let app = app.clone();
     let target = shell_state(&app).lock().expect("shell state").insert_target;
     eprintln!("INSERT target window {target:?}");

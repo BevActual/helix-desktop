@@ -74,7 +74,7 @@ input:focus { outline: none; background: var(--fill-2); box-shadow: 0 0 0 2px co
 .panel { position: fixed; display: flex; flex-direction: column; gap: 12px; padding: 16px; opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.965);
          transform-origin: top right; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
 body[data-panel="control-center"] #controls, body[data-panel="notifications"] #notifs, body[data-panel="today"] #notifs, body[data-panel="agent-display"] #agentview,
-body[data-panel="launcher"] #launcher, body[data-panel="quick-insert"] #quickinsert, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+body[data-panel="launcher"] #launcher, body[data-panel="quick-insert"] #quickinsert, body[data-panel="writing"] #writing, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
 /* Split shell: each process only paints its half (same HTML, role from shell-mode). */
 body[data-role="bar"] #panel,
@@ -83,6 +83,7 @@ body[data-role="bar"] #notifs,
 body[data-role="bar"] #agentview,
 body[data-role="bar"] #launcher,
 body[data-role="bar"] #quickinsert,
+body[data-role="bar"] #writing,
 body[data-role="bar"] #scrim { display: none !important; }
 body[data-role="panels"] #bar,
 body[data-role="panels"] #dock,
@@ -2531,7 +2532,7 @@ body.hx-shell.hx-modern { --spring: cubic-bezier(.2, 1.15, .32, 1); --r-panel: c
 body.hx-shell.hx-modern .glass { background-image: var(--sheen); background-color: var(--glass); box-shadow: 0 24px 70px rgba(0,0,0,.42), 0 2px 8px rgba(0,0,0,.18), var(--rim); }
 body.hx-shell.hx-modern .panel { transform: translateY(-8px) scale(.955); transition: opacity 200ms var(--ease), transform 320ms cubic-bezier(.2, .9, .25, 1), visibility 0s linear 320ms; }
 body.hx-shell.hx-modern[data-panel="control-center"] #controls, body.hx-shell.hx-modern[data-panel="notifications"] #notifs, body.hx-shell.hx-modern[data-panel="today"] #notifs,
-body.hx-shell.hx-modern[data-panel="launcher"] #launcher, body.hx-shell.hx-modern[data-panel="quick-insert"] #quickinsert, body.hx-shell.hx-modern[data-panel="assistant"] #panel,
+body.hx-shell.hx-modern[data-panel="launcher"] #launcher, body.hx-shell.hx-modern[data-panel="quick-insert"] #quickinsert, body.hx-shell.hx-modern[data-panel="writing"] #writing, body.hx-shell.hx-modern[data-panel="assistant"] #panel,
 body.hx-shell.hx-modern[data-panel="agent-display"] #agentview { transform: none; transition-delay: 0s; }
 
 /* The bar: a slim floating capsule of glass; its buttons are capsules that light softly under the pointer. */
@@ -2743,3 +2744,28 @@ body.chat.hx-modern .code-block pre code { background: transparent; box-shadow: 
 #results .row.ask .name { font-weight: 650; }
 #results .row.ask .generic { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
 body.hx-shell.hx-modern #results .row .row-sym { width: 34px; height: 34px; border-radius: 9px; }
+
+
+/* Writing Tools: what is selected, the tools as tiles, the answer with Replace and Copy. A glass card high in the middle of the screen. */
+#writing { left: 50%; top: 14%; width: 600px; margin-left: -300px; padding: 16px; gap: 12px; transform-origin: top center; }
+.wt-head { display: flex; align-items: center; gap: 12px; }
+.wt-orb { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: conic-gradient(from 200deg, #ff6ac1, #ffb547, #5ac8fa, #a259ff, #ff6ac1); box-shadow: 0 4px 16px rgba(162, 89, 255, .35); }
+.wt-orb svg.i { width: 18px; height: 18px; }
+.wt-title { min-width: 0; flex: 1; } .wt-title h3 { margin: 0; }
+.wt-source { color: var(--label-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-ask input { width: 100%; border-radius: 999px; padding: 10px 16px; font-size: 14px; }
+.wt-tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.wt-tool { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border-radius: 14px; font-size: 12.5px; font-weight: 600;
+  background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
+.wt-tool:hover:not(:disabled) { background: color-mix(in srgb, var(--label) 12%, transparent); }
+.wt-tool.current { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.wt-tool svg.i { width: 18px; height: 18px; color: var(--accent); }
+.wt-result { max-height: 40vh; overflow-y: auto; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--label) 6%, transparent);
+  box-shadow: inset 0 0 0 .5px var(--hairline); line-height: 1.5; user-select: text; white-space: pre-wrap; }
+.wt-result.working .wt-text { background: linear-gradient(90deg, var(--label-2) 20%, var(--label) 40%, var(--label-2) 60%) 0 0 / 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: hx-shimmer 2s linear infinite; }
+.wt-error { color: var(--danger); }
+.wt-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.wt-actions button { border-radius: 999px; padding: 6px 16px; }
+.wt-note { margin-right: auto; color: var(--label-3); font-size: 12px; }

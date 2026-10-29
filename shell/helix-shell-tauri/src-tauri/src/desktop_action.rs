@@ -19,6 +19,10 @@ pub fn run(app: &AppHandle, id: &str) -> Result<(), String> {
             open_panel(app, "launcher");
             Ok(())
         }
+        "helix:desktop:writing" => {
+            open_panel(app, "writing");
+            Ok(())
+        }
         "helix:desktop:assistant" => {
             open_panel(app, "assistant");
             Ok(())

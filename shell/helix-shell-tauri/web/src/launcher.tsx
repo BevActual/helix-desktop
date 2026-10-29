@@ -78,7 +78,8 @@ export function Launcher({ register }: { register: (handle: LauncherHandle) => v
 
   const launch = (index: number) => {
     const hit = hits[index];
-    if (hit) invoke("launcher_launch", { id: hit.id, query });
+    // The field's own value, not the last render's state: Enter can come before the state for the last keystrokes has been drawn.
+    if (hit) invoke("launcher_launch", { id: hit.id, query: input.current?.value ?? query });
   };
 
   return (

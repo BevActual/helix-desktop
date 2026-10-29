@@ -41,6 +41,7 @@ mod shape;
 mod strut;
 mod tray;
 mod ui_scale;
+mod writing;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -132,6 +133,8 @@ struct ShellState {
     recent_change: Option<(helix_shell_model::island::RecentChange, std::time::Instant)>,
     /// The newest history entry already considered, so one change is shown once.
     seen_change: u64,
+    /// Writing Tools: the selection it works on and its answer (`writing`).
+    writing: writing::Writing,
     /// The screen edges stay lit until then after an agent changed something (`island::glow`).
     glow_until: Option<std::time::Instant>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
@@ -377,6 +380,11 @@ fn apply_panel_plan(app: &AppHandle, plan: helix_shell_model::shell_surface::Pla
 }
 
 fn open_panel(app: &AppHandle, id: &str) {
+    // Writing Tools read the selection first, while the window that has it still has the keyboard (the panel would take it).
+    if id == "writing" && !writing::take_ready() {
+        writing::capture_then_open(app.clone());
+        return;
+    }
     // Agents is a Mobius door, not a second panel.
     if id == "agents" {
         open_mobius_panel(app, MobiusMode::Agents);
@@ -419,7 +427,7 @@ fn open_panel_local(app: &AppHandle, id: &str) {
         shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
-    if id == "quick-insert" {
+    if id == "quick-insert" || id == "writing" {
         shell.insert_target = shell.niri.focused_window().map(|w| w.id);
     }
     if id == "notifications" {
@@ -442,6 +450,10 @@ fn open_panel_local(app: &AppHandle, id: &str) {
     apply_panel_plan(app, plan);
     eprintln!("PANEL open");
     emit_view(app, &view);
+    // After the lock above is let go: Writing Tools takes it again to store what it will work on.
+    if id == "writing" {
+        writing::opened(app);
+    }
 }
 
 fn close_panel(app: &AppHandle) {
@@ -610,6 +622,7 @@ fn control(app: &AppHandle, command: &str) {
             });
         }
         "quick-insert" => open_panel(app, "quick-insert"),
+        "writing" => open_panel(app, "writing"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
         "agent-stop-all" => {
@@ -1897,7 +1910,7 @@ pub(crate) fn ask(app: &AppHandle, text: &str) -> Result<(), String> {
         eprintln!("ASK do");
         return mobius_act_from_talk(app.clone(), Some(text));
     }
-    eprintln!("ASK answer");
+    eprintln!("ASK answer ({:?})", text.chars().take(24).collect::<String>());
     let open = shell_state(app)
         .lock()
         .expect("shell state")
@@ -2308,6 +2321,10 @@ fn main() {
             calendar_view,
             report_glass,
             island::island_view,
+            writing::writing_view,
+            writing::writing_run,
+            writing::writing_replace,
+            writing::writing_copy,
             island::island_undo,
             island::media_toggle,
             island::media_next,
@@ -2432,6 +2449,7 @@ fn main() {
                 media: None,
                 recent_change: None,
                 seen_change: 0,
+                writing: writing::Writing::default(),
                 glow_until: None,
                 insert_target: None,
                 tray: helix_shell_model::tray::Tray::default(),

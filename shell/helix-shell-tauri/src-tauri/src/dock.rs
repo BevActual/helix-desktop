@@ -178,7 +178,7 @@ pub(crate) fn niri_action(action: &Value) -> Result<(), String> {
     }
 }
 
-fn focus_window(id: u64) -> Result<(), String> {
+pub(crate) fn focus_window(id: u64) -> Result<(), String> {
     let reply = request(&serde_json::json!({"Action": {"FocusWindow": {"id": id}}}).to_string())?;
     if reply.contains("\"Ok\"") {
         Ok(())

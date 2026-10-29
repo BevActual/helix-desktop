@@ -9,6 +9,7 @@ import { IslandBody, OsdBody, type IslandView, type OsdView } from "./indicators
 import { Tray, TrayMenu, type TrayHooks, type TrayMenuHandle } from "./tray";
 import { DockItems, type DockHandle, type DockHooks, type DockItem } from "./dock";
 import { QuickInsert, type QuickInsertHandle } from "./quickinsert";
+import { Writing, type WritingHandle } from "./writing";
 
 type Subscriber = (set: (view: NotificationsView) => void) => void;
 
@@ -77,6 +78,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   quickInsert: (host: HTMLElement) => {
     const run = handled<QuickInsertHandle>(host, (register) => <QuickInsert register={register} />);
+    return { open: () => run((h) => h.open()) };
+  },
+  writing: (host: HTMLElement) => {
+    const run = handled<WritingHandle>(host, (register) => <Writing register={register} />);
     return { open: () => run((h) => h.open()) };
   },
   controls: (host: HTMLElement) => {
