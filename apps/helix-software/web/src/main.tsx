@@ -311,7 +311,7 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
 function mount(host: HTMLElement) {
   // The hand-written page styles `body.settings #app`; the React page brings its own frame.
   document.body.classList.remove("settings");
-  document.body.classList.add("hx");
+  document.body.classList.add("hx", "hx-modern");
   const params = new URLSearchParams(location.search);
   const startPage = params.get("page");
   const mapped = startPage === "explore" ? "discover" : startPage;
