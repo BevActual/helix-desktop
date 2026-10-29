@@ -181,8 +181,19 @@ function Act({ active, resetKey }: { active: boolean; resetKey: number }) {
   );
 }
 
+interface AgentSession { session: string; agent: string; title: string; profile: string; project: string; boxed: boolean; minutes: number; pid: number }
+
 function Agents({ active, resetKey }: { active: boolean; resetKey: number }) {
   const [view, setView] = useState<ActivityView | null>(null);
+  const [sessions, setSessions] = useState<AgentSession[]>([]);
+  const readSessions = useCallback(() => invoke<AgentSession[]>("agent_sessions").then(setSessions, () => undefined), []);
+  // Coding agents started with helix-agents change as they start and end: look while the pane is open.
+  useEffect(() => {
+    if (!active) return;
+    readSessions();
+    const timer = setInterval(readSessions, 3000);
+    return () => clearInterval(timer);
+  }, [active, resetKey, readSessions]);
   const read = useCallback(() => invoke<ActivityView>("activity_view").then(setView, () => undefined), []);
   useEffect(() => {
     const stop = listen<ActivityView>("activity-view", setView);
@@ -204,6 +215,15 @@ function Agents({ active, resetKey }: { active: boolean; resetKey: number }) {
         <button id="agent-toggle" data-test="agent-toggle" disabled={!v.available} onClick={() => invoke("activity_set_enabled", { enabled: !v.enabled })}>{v.enabled ? "Turn off" : "Turn on"}</button>
       </div>
       <div id="agent-state">{state}</div>
+      <h4>Running now</h4>
+      <div id="agent-sessions" data-test="agent-sessions">
+        {sessions.map((row) => (
+          <Row key={row.session} what={`${row.title} · ${row.profile}${row.boxed ? " · in the box" : " · no box"}`} sub={`${row.project} · ${row.minutes < 1 ? "just started" : `${row.minutes} min`}`}>
+            <button data-test={`session-stop-${row.agent}`} onClick={() => invoke("agent_session_stop", { session: row.session }).then(readSessions, readSessions)}>Stop</button>
+          </Row>
+        ))}
+        {sessions.length ? null : <Row what="No coding agent is running." sub="Start one with the agent key, or helix-claude, helix-opencode, helix-codex." />}
+      </div>
       <h4>Waiting for you</h4>
       <div id="agent-pending">
         {v.pending.map((row, index) => (

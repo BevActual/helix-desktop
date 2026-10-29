@@ -314,7 +314,7 @@ fn launch(
     }
     eprintln!("{}", banner(agent, profile, project, expiry));
     log(
-        json!({"event": "start", "time": now(), "agent": agent.id, "profile": profile.name(), "project": project, "boxed": profile.boxed(), "expires_in": expiry, "desktop_tools": mcp.is_some()}),
+        json!({"event": "start", "session": session, "pid": std::process::id(), "time": now(), "agent": agent.id, "title": agent.title, "profile": profile.name(), "project": project, "boxed": profile.boxed(), "expires_in": expiry, "desktop_tools": mcp.is_some()}),
     );
     // Ctrl-C belongs to the agent: this process only waits.
     // SAFETY: installing a handler that does nothing; the child resets it on exec.
@@ -339,7 +339,7 @@ fn launch(
     let status = child.wait();
     let code = status.as_ref().ok().and_then(|s| s.code()).unwrap_or(1);
     log(
-        json!({"event": "end", "time": now(), "agent": agent.id, "profile": profile.name(), "project": project, "exit": code}),
+        json!({"event": "end", "session": session, "pid": std::process::id(), "time": now(), "agent": agent.id, "profile": profile.name(), "project": project, "exit": code}),
     );
     if let Some(folder) = private {
         let _ = std::fs::remove_dir_all(folder);

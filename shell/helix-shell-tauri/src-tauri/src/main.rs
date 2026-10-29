@@ -13,6 +13,7 @@ mod act_feed;
 mod admin_auth;
 mod agent_display;
 mod agent_ipc;
+mod agent_sessions;
 mod apps;
 mod backlight;
 mod bar;
@@ -2086,6 +2087,8 @@ fn main() {
             network_forget,
             network_vpn,
             activity_view,
+            agent_sessions::agent_sessions,
+            agent_sessions::agent_session_stop,
             notify::notifications_view,
             calendar_view,
             report_glass,
