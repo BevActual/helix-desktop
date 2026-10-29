@@ -3,6 +3,7 @@
 //! engine is added in a later change.
 
 mod backend;
+mod downloads;
 mod fake;
 mod grammar;
 #[cfg(helix_llama)]

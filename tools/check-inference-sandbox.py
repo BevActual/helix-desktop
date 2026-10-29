@@ -26,7 +26,8 @@ for line in unit.splitlines():
         continue
     key, _, value = line.partition("=")
     if key not in SKIP:
-        properties.append(f"{key}={value}")
+        # A transient unit does not expand %h, so it is spelled out here.
+        properties.append(f"{key}={value}".replace("%h", str(pathlib.Path.home())))
 
 models = pathlib.Path.home() / ".local/share/helix/models"
 engine = root / "third_party/llama-vulkan-install/bin"
@@ -50,6 +51,7 @@ def run(label, argv, expect_ok):
 print(f"{len(properties)} hardening properties from the unit file")
 results = [
     run("write a file in the home directory", [sys.executable, "-c", f"open({str(probe_file)!r}, 'w').write('x')"], False),
+    run("write into the model directory (downloads)", [sys.executable, "-c", f"import os; p = os.path.join({str(models)!r}, '.sandbox-probe'); open(p, 'w').write('x'); os.remove(p)"], True),
     run("read the model directory", [sys.executable, "-c", f"import os; assert os.listdir({str(models)!r})"], True),
 ]
 

@@ -3068,6 +3068,7 @@ dependencies = [
  "image",
  "libc",
  "serde_json",
+ "sha2",
  "tokio",
  "ureq",
  "zbus",

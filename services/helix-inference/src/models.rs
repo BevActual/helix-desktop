@@ -29,7 +29,7 @@ fn parse_shard(file: &str) -> Option<(&str, u32, u32)> {
 }
 
 /// `Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf` → `Qwen2.5-VL-7B-Instruct`; a sharded `name-00001-of-00002.gguf` → `name`.
-fn base_of(file: &str) -> String {
+pub(crate) fn base_of(file: &str) -> String {
     let stem = file.strip_suffix(".gguf").unwrap_or(file);
     let as_file = format!("{stem}.gguf");
     let stem = match parse_shard(&as_file) {

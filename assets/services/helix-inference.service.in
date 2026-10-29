@@ -37,6 +37,8 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service @mount @namespaces
 CapabilityBoundingSet=
 UMask=0077
+# Models the person downloads in Helix Models are written here by the service (downloads.rs); nothing else in the home folder is writable.
+ReadWritePaths=-%h/.local/share/helix/models
 CacheDirectory=helix-inference
 CacheDirectoryMode=0700
 Environment=XDG_CACHE_HOME=%C/helix-inference

@@ -63,6 +63,7 @@ pub struct Inner {
     owners: Owners,
     clients: Arc<Mutex<HashMap<String, String>>>,
     connection: Connection,
+    downloads: Arc<crate::downloads::Downloads>,
 }
 
 pub fn outcome_json(outcome: &Outcome) -> Json {
@@ -525,6 +526,7 @@ impl Inner {
             owners,
             clients: Arc::new(Mutex::new(HashMap::new())),
             connection,
+            downloads: Arc::new(crate::downloads::Downloads::default()),
         }
     }
 
@@ -646,6 +648,50 @@ impl Service {
             .await
             .map_err(|e| InferenceError::Failed(e.to_string()))?;
         Ok(result.to_string())
+    }
+
+    /// The GGUF files a Hugging Face repository offers (`owner/name`): JSON `[{path, size}]`.
+    async fn hub_files(&self, repo: String) -> Result<String, InferenceError> {
+        let files = tokio::task::spawn_blocking(move || crate::downloads::list(&repo))
+            .await
+            .map_err(|e| InferenceError::Failed(e.to_string()))?
+            .map_err(InferenceError::Failed)?;
+        Ok(Json::Array(
+            files
+                .iter()
+                .map(|f| json!({"path": f.path, "size": f.size}))
+                .collect(),
+        )
+        .to_string())
+    }
+
+    /// Starts fetching a model file (all of it, if it is split) and, if asked, its vision projector, into the models folder. The id to follow it by.
+    async fn download(
+        &self,
+        repo: String,
+        file: String,
+        projector: bool,
+    ) -> Result<u64, InferenceError> {
+        let dir = std::path::PathBuf::from(&self.0.config.model_dir);
+        let downloads = Arc::clone(&self.0.downloads);
+        tokio::task::spawn_blocking(move || {
+            let files = crate::downloads::list(&repo)?;
+            let items = crate::downloads::plan(&files, &file, projector)?;
+            downloads.start(&repo, items, &dir)
+        })
+        .await
+        .map_err(|e| InferenceError::Failed(e.to_string()))?
+        .map_err(InferenceError::Failed)
+    }
+
+    /// The downloads of this session, newest first: JSON `[{id, repo, title, total, done, state, message}]`.
+    async fn downloads(&self) -> String {
+        self.0.downloads.view().to_string()
+    }
+
+    /// Stops a download; what arrived is kept, so starting it again continues.
+    async fn cancel_download(&self, id: u64) -> bool {
+        self.0.downloads.cancel(id)
     }
 
     /// Frees the model now if nothing is running or waiting. True when it did.
