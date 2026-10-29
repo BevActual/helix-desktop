@@ -124,26 +124,6 @@ pub(crate) fn history_json(state: &State, limit: usize) -> String {
     serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into())
 }
 
-/// Undoes history entry `entry` for `by`, returning the sentence of what was put back.
-pub(crate) fn undo_entry(
-    state: &mut State,
-    entry: u64,
-    by: &helix_actions::Actor,
-) -> Result<String, String> {
-    let (target, before, sentence) = match state.history.undo_plan(entry) {
-        helix_actions::history::UndoPlan::Restore(found) => (
-            found.target.clone(),
-            found.before.clone(),
-            found.sentence.clone(),
-        ),
-        helix_actions::history::UndoPlan::Refused(why) => return Err(why),
-    };
-    // Putting the value back is itself a change; it is recorded, and the undone entry is marked.
-    apply_setting(state, &target, before, by)?;
-    state.history.mark_undone(entry, by);
-    Ok(format!("Undid {sentence}"))
-}
-
 pub struct Configuration {
     pub state: Arc<Mutex<State>>,
 }
@@ -377,10 +357,9 @@ impl Configuration {
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         entry: u64,
     ) -> fdo::Result<String> {
-        let mut state = self.state.lock().await;
-        let done = undo_entry(&mut state, entry, &helix_actions::Actor::person())
+        let done = crate::actions_run::undo(&self.state, entry, &helix_actions::Actor::person())
+            .await
             .map_err(fdo::Error::InvalidArgs)?;
-        drop(state);
         Self::changed(&emitter).await.ok();
         Ok(done)
     }

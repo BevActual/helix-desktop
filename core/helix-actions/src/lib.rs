@@ -6,6 +6,8 @@
 //! whether a caller may run one, runs it through the provider and records the result here.
 
 pub mod history;
+pub mod manifest;
+pub mod models;
 pub mod settings;
 
 use serde::{Deserialize, Serialize};
@@ -102,9 +104,18 @@ impl Actor {
     }
 }
 
-/// Every action Helix offers today, from every provider in this crate.
+/// The actions built into Helix (Settings, Models). Apps add theirs with manifests ([`manifest`]); [`catalogue_with`] lists both.
 pub fn catalogue() -> Vec<Action> {
-    settings::actions()
+    let mut all = settings::actions();
+    all.extend(models::actions());
+    all
+}
+
+/// The built-in actions and those the manifests add.
+pub fn catalogue_with(manifests: &[manifest::Manifest]) -> Vec<Action> {
+    let mut all = catalogue();
+    all.extend(manifests.iter().flat_map(|m| m.actions.iter().cloned()));
+    all
 }
 
 /// The action with this id, if there is one.

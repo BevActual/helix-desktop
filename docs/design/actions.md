@@ -42,8 +42,17 @@ way App Intents use entity queries:
     lock password.
   * **Confirm**: lock screen, idle, location, AI routing, Tailscale, the account picture.
 
-**Next:** Models (slots, downloads, unload), Software (install, remove, update: confirm), the shell's commands as catalogue entries, then
-Mobius's environments (Write, Image and Code operations already have per-stage operation lists to promote).
+**Models (built in).** `models.list` (observe: every task, what answers it, the installed models), `models.use {task, model}` (act;
+confirm for the desktop-acting task; a local model must be installed; undo puts the task's model back), `models.unload` (act),
+`models.download {repo, file, pictures}` (confirm). Carried out by the desktop service with the shared routing file and the model service.
+
+**Any app (manifests).** An app describes its actions in `helix/actions/<provider>.json` under a data directory and carries them out over
+`org.helix.ActionProvider1.Invoke(action, params) → reply` (`protocols/dbus/org.helix.ActionProvider1.xml`). Ids are the provider's own
+(`notes.add`); `settings` and `models` are Helix's. A manifest in the person's own folder cannot call an action read-only (it is held to
+`act`); only one installed with the system can. A reply may say what was done (`"done"`) and how to undo it (`"undo": {action, params}`):
+the history keeps that call, and Undo makes it. Nested: `tools/nested/ui-suite.sh providers` (a pretend Notes app).
+
+**Next:** Software (install, remove, update: confirm) once it has a small service to carry them out, then Mobius's environments.
 
 ## Who uses it
 

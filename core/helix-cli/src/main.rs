@@ -75,7 +75,7 @@ fn params_of(pairs: &[String]) -> Result<Value, String> {
 
 /// The tier an action needs first; the desktop may ask for a stricter one, which is then requested and the call made again.
 fn first_tier(action: &str) -> &'static str {
-    if action.ends_with(".find") || action.ends_with(".get") {
+    if action.ends_with(".find") || action.ends_with(".get") || action.ends_with(".list") {
         "observe"
     } else {
         "act"
@@ -413,6 +413,7 @@ mod tests {
     fn reading_asks_for_less_than_changing() {
         assert_eq!(first_tier("settings.find"), "observe");
         assert_eq!(first_tier("settings.get"), "observe");
+        assert_eq!(first_tier("models.list"), "observe");
         assert_eq!(first_tier("settings.set"), "act");
     }
 }

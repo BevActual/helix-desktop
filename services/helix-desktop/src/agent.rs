@@ -224,21 +224,29 @@ impl Agent {
             })
             .collect();
         // The actions catalogue (`helix-actions`): named `provider.verb`, called with a `params` JSON object.
-        tools.extend(helix_actions::catalogue().into_iter().map(|action| {
-            dict_entry(HashMap::from([
-                ("name", owned_str(&action.id)),
-                ("tier", owned_str(action.risk.name())),
-                ("title", owned_str(&action.title)),
-                ("summary", owned_str(&action.summary)),
-                ("params", owned_str(&action.params.to_string())),
-            ]))
-        }));
+        let manifests = crate::actions_run::manifests();
+        tools.extend(
+            helix_actions::catalogue_with(&manifests)
+                .into_iter()
+                .map(|action| {
+                    dict_entry(HashMap::from([
+                        ("name", owned_str(&action.id)),
+                        ("tier", owned_str(action.risk.name())),
+                        ("title", owned_str(&action.title)),
+                        ("summary", owned_str(&action.summary)),
+                        ("params", owned_str(&action.params.to_string())),
+                    ]))
+                }),
+        );
         tools
     }
 
     /// The actions catalogue as JSON: id, title, summary, params (JSON Schema), risk and undo for each action.
     async fn list_actions(&self) -> String {
-        serde_json::to_string(&helix_actions::catalogue()).unwrap_or_else(|_| "[]".into())
+        serde_json::to_string(&helix_actions::catalogue_with(
+            &crate::actions_run::manifests(),
+        ))
+        .unwrap_or_else(|_| "[]".into())
     }
 
     async fn request_access(
@@ -754,59 +762,6 @@ impl Agent {
     async fn confirmation_ended(emitter: &SignalEmitter<'_>, operation: u64) -> zbus::Result<()>;
 }
 
-/// The tier a catalogue call needs, and the sentence a confirmation shows for it ("Lock screen: On → Off").
-fn catalogue_tier(
-    action: &str,
-    params: &serde_json::Value,
-    rows: &[serde_json::Value],
-) -> (RiskTier, String) {
-    use helix_actions::{settings, Risk};
-    let setting = params
-        .get("setting")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default();
-    let row = rows
-        .iter()
-        .find(|row| row.get("id").and_then(serde_json::Value::as_str) == Some(setting));
-    let (risk, preview) = match action {
-        settings::FIND => (
-            Risk::Observe,
-            format!(
-                "Find settings: {}",
-                params
-                    .get("query")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default()
-            ),
-        ),
-        settings::GET => (settings::risk_to_read(setting), format!("Read {setting}")),
-        settings::SET => {
-            let value = params
-                .get("value")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null);
-            let preview = match row {
-                Some(row) => settings::sentence(
-                    row,
-                    row.get("value").unwrap_or(&serde_json::Value::Null),
-                    &value,
-                ),
-                None => format!("Change {setting}"),
-            };
-            (settings::risk_to_change(setting), preview)
-        }
-        _ => (Risk::Blocked, action.to_string()),
-    };
-    let tier = match risk {
-        Risk::Observe => RiskTier::Observe,
-        Risk::ObservePrivate => RiskTier::ObservePrivate,
-        Risk::Act => RiskTier::Act,
-        Risk::Confirm => RiskTier::Confirm,
-        Risk::Blocked => RiskTier::Blocked,
-    };
-    (tier, preview)
-}
-
 impl Agent {
     /// A call to the actions catalogue (`helix-actions`): the same grants, confirmation and audit as a shell command, with the tier
     /// taken from the catalogue (one setting can be riskier than another) and the call run here, in the desktop service.
@@ -837,8 +792,8 @@ impl Agent {
             return Ok(operation);
         }
         let rows = crate::configuration::setting_rows(&state);
-        let (tier, preview) = catalogue_tier(action, &params, &rows);
-        let known = helix_actions::find(action).is_some();
+        let manifests = crate::actions_run::manifests();
+        let (tier, preview, known) = crate::actions_run::tier(action, &params, &rows, &manifests);
         let Decision {
             verdict,
             tier,
@@ -941,6 +896,76 @@ impl Agent {
         use helix_actions::settings;
         let params: serde_json::Value =
             serde_json::from_str(params_text).unwrap_or_else(|_| json!({}));
+        if !action.starts_with("settings.") {
+            let by = helix_actions::Actor::agent(label);
+            let bus = self.state.lock().await.bus.clone();
+            let (outcome, changed) = if action.starts_with("models.") {
+                crate::actions_run::run_models(&self.state, bus.as_ref(), action, &params, &by)
+                    .await
+            } else {
+                let manifests = crate::actions_run::manifests();
+                match (
+                    helix_actions::manifest::find(&manifests, action),
+                    bus.as_ref(),
+                ) {
+                    (Some((provider, _)), Some(conn)) => {
+                        match crate::actions_run::invoke_provider(conn, provider, action, &params)
+                            .await
+                        {
+                            Ok(reply) => {
+                                let (done, undo) = helix_actions::manifest::reply_parts(&reply);
+                                let sentence =
+                                    done.unwrap_or_else(|| format!("{}: {action}", provider.title));
+                                let entry = self.state.lock().await.history.record_call(
+                                    std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .map_or(0, |d| d.as_secs()),
+                                    action,
+                                    &by,
+                                    &sentence,
+                                    undo,
+                                );
+                                let mut reply = reply;
+                                if let Some(object) = reply.as_object_mut() {
+                                    object.insert("history".into(), json!(entry));
+                                }
+                                (Ok(reply), true)
+                            }
+                            Err(why) => (Err(why), false),
+                        }
+                    }
+                    (None, _) => (Err(format!("unknown action {action}")), false),
+                    (_, None) => (Err("The desktop has no bus connection.".into()), false),
+                }
+            };
+            let ok = outcome.is_ok();
+            if ok && result_is_untrusted(tier) {
+                self.state.lock().await.taint.mark_untrusted(client);
+            }
+            if changed {
+                if let Some(conn) = &bus {
+                    AgentActivity::notify_changed(conn).await;
+                }
+            }
+            let trust = if ok && result_is_untrusted(tier) {
+                "untrusted"
+            } else {
+                "trusted"
+            };
+            let body = match outcome {
+                Ok(value) => value.to_string(),
+                Err(why) => why,
+            };
+            Self::completed(
+                emitter,
+                operation,
+                ok,
+                &action_result_json(trust, ok, &body),
+            )
+            .await
+            .ok();
+            return;
+        }
         let text = |key: &str| {
             params
                 .get(key)

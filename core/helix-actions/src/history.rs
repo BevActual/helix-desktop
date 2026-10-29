@@ -37,6 +37,9 @@ pub struct Entry {
     /// Set when the entry has been undone, with who did it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub undone_by: Option<Actor>,
+    /// For a provider's action: the call that undoes it (`{"action": "...", "params": {...}}`), as the provider said.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_call: Option<Value>,
 }
 
 /// What [`History::undo_plan`] says about an entry.
@@ -134,6 +137,43 @@ impl History {
             after,
             undo,
             undone_by: None,
+            undo_call: None,
+        });
+        if self.entries.len() > KEEP {
+            let extra = self.entries.len() - KEEP;
+            self.entries.drain(..extra);
+        }
+        self.save();
+        id
+    }
+
+    /// Records a provider's action that says how it is undone (`undo_call`), or that cannot be (`None`). Never merged with another.
+    pub fn record_call(
+        &mut self,
+        now: u64,
+        action: &str,
+        by: &Actor,
+        sentence: &str,
+        undo_call: Option<Value>,
+    ) -> u64 {
+        let id = self.next;
+        self.next += 1;
+        self.entries.push(Entry {
+            id,
+            at: now,
+            action: action.into(),
+            target: action.into(),
+            sentence: sentence.into(),
+            by: by.clone(),
+            before: Value::Null,
+            after: Value::Null,
+            undo: if undo_call.is_some() {
+                Undo::Restore
+            } else {
+                Undo::None
+            },
+            undone_by: None,
+            undo_call,
         });
         if self.entries.len() > KEEP {
             let extra = self.entries.len() - KEEP;
@@ -351,5 +391,26 @@ mod tests {
         );
         assert!(next > id);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_providers_action_keeps_how_to_undo_it() {
+        let mut history = History::in_memory();
+        let call = json!({"action": "notes.delete", "params": {"id": 3}});
+        let id = history.record_call(
+            100,
+            "notes.add",
+            &Actor::agent("Mobius"),
+            "Added a note",
+            Some(call.clone()),
+        );
+        let entry = history.get(id).unwrap();
+        assert_eq!(
+            (entry.undo, entry.undo_call.clone()),
+            (Undo::Restore, Some(call))
+        );
+        assert!(matches!(history.undo_plan(id), UndoPlan::Restore(_)));
+        let gone = history.record_call(101, "notes.send", &Actor::person(), "Sent a note", None);
+        assert!(matches!(history.undo_plan(gone), UndoPlan::Refused(_)));
     }
 }

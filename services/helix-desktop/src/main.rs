@@ -2,6 +2,7 @@
 //! Nested harness: `HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop`.
 
 mod accent_sync;
+mod actions_run;
 mod agent;
 mod agent_activity;
 mod agent_support;
