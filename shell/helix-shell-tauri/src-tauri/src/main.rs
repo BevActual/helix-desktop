@@ -128,6 +128,10 @@ struct ShellState {
     brightness: Option<helix_models::brightness::Brightness>,
     /// What is playing (from playerctl), for the live-status pill.
     media: Option<helix_shell_model::island::Media>,
+    /// An agent's change shown in the pill with Undo, until the instant given (`docs/design/actions.md`).
+    recent_change: Option<(helix_shell_model::island::RecentChange, std::time::Instant)>,
+    /// The newest history entry already considered, so one change is shown once.
+    seen_change: u64,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
     insert_target: Option<u64>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
@@ -1045,6 +1049,7 @@ async fn refresh_activity(app: &AppHandle) {
             }
         }
     }
+    island::note_recent_change(app).await;
     let view = next.view();
     // Tests read this line; it carries counts and the newest row's sanitized fields, nothing an agent wrote verbatim.
     let last = view.history.first().map_or(String::new(), |row| {
@@ -2093,6 +2098,7 @@ fn main() {
             calendar_view,
             report_glass,
             island::island_view,
+            island::island_undo,
             island::media_toggle,
             island::media_next,
             island::media_previous,
@@ -2214,6 +2220,8 @@ fn main() {
                 activity: Activity::default(),
                 notifications: helix_shell_model::notifications::Notifications::new(),
                 media: None,
+                recent_change: None,
+                seen_change: 0,
                 insert_target: None,
                 tray: helix_shell_model::tray::Tray::default(),
                 tray_menu: None,

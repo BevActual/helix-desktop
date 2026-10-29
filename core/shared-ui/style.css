@@ -2725,3 +2725,11 @@ body.chat.hx-modern [data-models-section="generation"] { --tile: #8e8e93; } body
 body.chat.hx-modern .set-nav-label { margin-left: 10px; }
 .monitor-widgets .big small.fraction { margin-left: 0; }
 body.chat.hx-modern .code-block pre code { background: transparent; box-shadow: none; padding: 0; border-radius: 0; }
+
+/* The island after an agent's change: a green check, the sentence, who did it, and an Undo that is always there (not only on hover). */
+#island.changed { background: color-mix(in srgb, var(--ok) 14%, var(--fill-1)); }
+#island.changed .isl-icon svg { color: var(--ok); }
+#island .isl-undo-wrap { max-width: none; opacity: 1; margin-left: 4px; }
+#island .isl-undo { height: 20px; padding: 0 10px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--accent) 85%, transparent); color: var(--on-accent);
+  font: 650 11.5px/20px var(--font); transition: filter 120ms var(--ease), transform 160ms cubic-bezier(.2, 1.15, .32, 1); }
+#island .isl-undo:hover { filter: brightness(1.1); } #island .isl-undo:active { transform: scale(.94); }

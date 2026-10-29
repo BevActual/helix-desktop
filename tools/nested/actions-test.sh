@@ -57,6 +57,29 @@ assert e['sentence'].startswith('Pure black dark surfaces:'), e['sentence']
 print('ok: history:', e['sentence'], 'by', e['by']['label'])" || fail "history: $H"
 ENTRY=$(echo "$H" | python3 -c "import sys, json; print(json.loads(sys.stdin.read())[0]['id'])")
 
+echo "--- 3b. the bar shows the agent's change, with Undo"
+source "$ROOT/tools/nested/ui-lib.sh"; LAYOUT=$SCRATCH/state/layout.json
+for _ in $(seq 1 40); do grep -q "ISLAND change $ENTRY" "$SCRATCH/program.log" && break; sleep 0.25; done
+grep -q "ISLAND change $ENTRY" "$SCRATCH/program.log" && echo "ok: the shell picked up the change" || fail "no island change: $(grep ISLAND "$SCRATCH/program.log" | tail -3)"
+for _ in $(seq 1 40); do grep -q "ISLAND Changed" "$SCRATCH/program.log" && break; sleep 0.25; done
+grep -q "ISLAND Changed" "$SCRATCH/program.log" && echo "ok: the pill says what changed" || fail "pill not shown"
+for _ in $(seq 1 40); do has_id island-undo && break; sleep 0.25; done
+python3 - "$LAYOUT" <<'PY' && echo "ok: Undo sits in the pill" || fail "no Undo button in the pill"
+import json, sys
+e = json.load(open(sys.argv[1]))["elements"]
+u, i = e["island-undo"], e["island"]
+assert i["x"] <= u["x"] and u["x"] + u["w"] <= i["x"] + i["w"] + 1, (u, i)
+PY
+sleep 3   # once the pill has settled (it slides in over the clock)
+niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.2; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/island-change.png"
+click_id island-undo
+for _ in $(seq 1 40); do grep -q "ISLAND undid $ENTRY" "$SCRATCH/program.log" && break; sleep 0.25; done
+grep -q "ISLAND undid $ENTRY" "$SCRATCH/program.log" && echo "ok: Undo in the bar was pressed" || fail "undo from the bar: $(grep ISLAND "$SCRATCH/program.log" | tail -3)"
+[ "$(value_of theme.pure_black_dark)" = "$BEFORE" ] && echo "ok: the value is back" || fail "not restored from the bar"
+# Change it again for the person's Undo in step 5.
+out=$(probe action settings.set "{\"setting\":\"theme.pure_black_dark\",\"value\":$WANT}")
+ENTRY=$(config ActionHistory "(uint32 1,)" "(s)" | python3 -c "import sys, json; print(json.loads(sys.stdin.read())[0]['id'])")
+
 echo "--- 4. what an agent may not do"
 out=$(probe action settings.set '{"setting":"hooks.started","value":"touch /tmp/owned"}')
 echo "$out" | grep -q 'COMPLETED ok=False' && echo "$out" | grep -q 'blocked' && echo "ok: a setting that runs a program is refused" || fail "hook: $out"

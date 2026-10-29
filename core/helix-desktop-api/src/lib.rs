@@ -500,6 +500,19 @@ impl Desktop {
         ))
     }
 
+    /// `Configuration1.ActionHistory(limit)`: the one history of actions, newest first (`docs/design/actions.md`).
+    pub async fn action_history(&self, limit: u32) -> zbus::Result<serde_json::Value> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        let text: String = proxy.call("ActionHistory", &(limit,)).await?;
+        Ok(serde_json::from_str(&text).unwrap_or(serde_json::Value::Array(Vec::new())))
+    }
+
+    /// `Configuration1.UndoAction(entry)`: puts back what history entry `entry` changed; returns the sentence of what was undone.
+    pub async fn undo_action(&self, entry: u64) -> zbus::Result<String> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        proxy.call("UndoAction", &(entry,)).await
+    }
+
     /// `Configuration1.Update(id, value)` for a boolean, a string or a number (whole numbers as 64-bit integers). The service validates the id and the value again.
     pub async fn update_setting(&self, id: &str, value: &serde_json::Value) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Configuration).await?;

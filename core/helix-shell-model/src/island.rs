@@ -45,6 +45,8 @@ pub enum Kind {
     /// An agent working on its display has asked the person for help and is waiting.
     AgentHelp,
     Media,
+    /// An agent just changed something; the pill says what, in plain words, with Undo.
+    Changed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -146,6 +148,36 @@ pub fn with_agent_display(view: IslandView, windows: Option<usize>) -> IslandVie
         } else {
             format!("{count} windows")
         },
+    }
+}
+
+/// An agent's change the person may want to take back (`docs/design/actions.md`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecentChange {
+    /// The history entry Undo names.
+    pub entry: u64,
+    /// "Night Light: Off → On".
+    pub sentence: String,
+    /// Who did it: "Mobius", "Claude Code".
+    pub by: String,
+}
+
+/// Shows an agent's change for a moment, with Undo, over music, the agent desk and the agent display; what needs the person (an approval,
+/// the assistant mid-task, a request for help) still comes first.
+pub fn with_change(view: IslandView, change: Option<&RecentChange>) -> IslandView {
+    let Some(change) = change else {
+        return view;
+    };
+    if matches!(
+        view.kind,
+        Kind::Approval | Kind::Assistant | Kind::AgentHelp
+    ) {
+        return view;
+    }
+    IslandView {
+        kind: Kind::Changed,
+        text: sanitize_for_display(&change.sentence, 60),
+        detail: sanitize_for_display(&change.by, 30),
     }
 }
 
@@ -368,5 +400,35 @@ mod tests {
             m.title, "Title with a tab",
             "the third field is everything after the second tab, the tab shown as a space"
         );
+    }
+
+    #[test]
+    fn an_agents_change_shows_with_who_did_it_but_never_over_what_needs_the_person() {
+        let change = RecentChange {
+            entry: 7,
+            sentence: "Night Light: Off → On".into(),
+            by: "Mobius".into(),
+        };
+        let shown = with_change(IslandView::none(), Some(&change));
+        assert_eq!(
+            (shown.kind, shown.text.as_str(), shown.detail.as_str()),
+            (Kind::Changed, "Night Light: Off → On", "Mobius")
+        );
+        let music = IslandView {
+            kind: Kind::Media,
+            text: "Song".into(),
+            detail: "Artist".into(),
+        };
+        assert_eq!(
+            with_change(music.clone(), Some(&change)).kind,
+            Kind::Changed
+        );
+        assert_eq!(with_change(music.clone(), None), music);
+        let waiting = IslandView {
+            kind: Kind::Approval,
+            text: "Waiting for you".into(),
+            detail: String::new(),
+        };
+        assert_eq!(with_change(waiting.clone(), Some(&change)), waiting);
     }
 }

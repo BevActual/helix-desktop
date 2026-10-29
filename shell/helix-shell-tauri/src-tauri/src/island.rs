@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use helix_compositor::agent_desk::glance_from_niri;
 use helix_shell_model::island::{
-    choose, parse_media_line, with_agent_display, with_agent_help, IslandView,
+    choose, parse_media_line, with_agent_display, with_agent_help, with_change, IslandView,
+    RecentChange,
 };
 use tauri::{AppHandle, Emitter};
 
@@ -22,6 +23,11 @@ fn compute(app: &AppHandle) -> IslandView {
     let shell = state.lock().expect("shell state");
     let activity = shell.activity.view();
     let agent_desk = glance_from_niri(&shell.niri);
+    let change = shell
+        .recent_change
+        .as_ref()
+        .filter(|(_, until)| std::time::Instant::now() < *until)
+        .map(|(change, _)| change.clone());
     let view = choose(
         activity.pending.len(),
         activity.enabled,
@@ -31,6 +37,7 @@ fn compute(app: &AppHandle) -> IslandView {
     );
     drop(shell);
     let view = with_agent_display(view, crate::agent_display::window_count());
+    let view = with_change(view, change.as_ref());
     with_agent_help(view, crate::agent_display::help_reason().as_deref())
 }
 
@@ -48,6 +55,85 @@ pub fn publish(app: &AppHandle) {
 #[tauri::command]
 pub fn island_view(app: AppHandle) -> IslandView {
     compute(&app)
+}
+
+/// How long an agent's change stays in the pill.
+const CHANGE_SHOWN: Duration = Duration::from_secs(8);
+
+/// Reads the newest entry of the history of actions; an agent's change made just now (and not undone) goes into the pill with Undo for a
+/// few seconds. Called when Agent Surface activity changes, which the desktop signals after an agent's change.
+pub async fn note_recent_change(app: &AppHandle) {
+    let Some(desktop) = crate::REGISTERED.get() else {
+        return;
+    };
+    let Ok(history) = desktop.action_history(1).await else {
+        return;
+    };
+    let Some(entry) = history.as_array().and_then(|rows| rows.first()) else {
+        return;
+    };
+    let id = entry.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+    let by = entry.get("by");
+    let agent = by.and_then(|b| b.get("kind")).and_then(|k| k.as_str()) == Some("agent");
+    let undone = entry.get("undone_by").is_some_and(|u| !u.is_null());
+    let at = entry.get("at").and_then(|v| v.as_u64()).unwrap_or(0);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        if id == 0 || id <= shell.seen_change {
+            return;
+        }
+        shell.seen_change = id;
+        if !agent || undone || now.saturating_sub(at) > 10 {
+            return;
+        }
+        let change = RecentChange {
+            entry: id,
+            sentence: entry
+                .get("sentence")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            by: by
+                .and_then(|b| b.get("label"))
+                .and_then(|l| l.as_str())
+                .unwrap_or("An agent")
+                .to_string(),
+        };
+        eprintln!("ISLAND change {id}");
+        shell.recent_change = Some((change, std::time::Instant::now() + CHANGE_SHOWN));
+    }
+    publish(app);
+    // Leaves on its own once its time is up.
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(CHANGE_SHOWN + Duration::from_millis(100)).await;
+        publish(&app);
+    });
+}
+
+/// Undo on the pill: puts back what the agent changed, through the same history the person's Settings use.
+#[tauri::command]
+pub async fn island_undo(app: AppHandle) -> Result<String, String> {
+    let entry = {
+        let state = shell_state(&app);
+        let mut shell = state.lock().expect("shell state");
+        shell.recent_change.take().map(|(change, _)| change.entry)
+    };
+    publish(&app);
+    let entry = entry.ok_or("Nothing to undo.")?;
+    let desktop = crate::REGISTERED
+        .get()
+        .ok_or("this shell is not the registered desktop")?;
+    let done = desktop
+        .undo_action(entry)
+        .await
+        .map_err(|e| e.to_string())?;
+    eprintln!("ISLAND undid {entry}");
+    Ok(done)
 }
 
 /// Follows what is playing. If `playerctl` is missing the pill simply never shows music.

@@ -29,7 +29,8 @@ export function IslandBody({ register }: { register: (set: (view: IslandView) =>
     if (key !== last.current) { last.current = key; setSwap((n) => n + 1); }
   }, [view]);
   const media = view.kind === "media";
-  const icon = view.kind === "approval" ? "shield" : view.kind === "agentdesk" ? "grid" : view.kind === "agentdisplay" ? "eye" : view.kind === "agenthelp" ? "alert" : "sparkle";
+  const changed = view.kind === "changed";
+  const icon = changed ? "check" : view.kind === "approval" ? "shield" : view.kind === "agentdesk" ? "grid" : view.kind === "agentdisplay" ? "eye" : view.kind === "agenthelp" ? "alert" : "sparkle";
   const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
   return (
     <>
@@ -49,6 +50,11 @@ export function IslandBody({ register }: { register: (set: (view: IslandView) =>
           <button type="button" className="isl-btn" data-test="island-prev" title="Previous" aria-label="Previous" onClick={() => invoke("media_previous")}><Icon name="skip-back" /></button>
           <button type="button" className="isl-btn" data-test="island-toggle" title="Pause" aria-label="Pause" onClick={() => invoke("media_toggle")}><Icon name="pause" /></button>
           <button type="button" className="isl-btn" data-test="island-next" title="Next" aria-label="Next" onClick={() => invoke("media_next")}><Icon name="skip-forward" /></button>
+        </span>
+      ) : null}
+      {changed ? (
+        <span className="isl-controls isl-undo-wrap" onClick={stop}>
+          <button type="button" className="isl-undo" data-test="island-undo" onClick={() => invoke("island_undo")}>Undo</button>
         </span>
       ) : null}
       <button type="button" className="isl-time" data-test="island-time" title="Calendar" onClick={(event) => { stop(event); invoke("panel_open", { id: "today" }); }}>{clockText(now)}</button>

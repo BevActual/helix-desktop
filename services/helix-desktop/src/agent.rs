@@ -1011,6 +1011,8 @@ impl Agent {
         if changed {
             if let Some(conn) = &bus {
                 crate::configuration::Configuration::notify_changed(conn).await;
+                // The shell shows an agent's change in the bar with Undo; it reads the history when activity changes.
+                AgentActivity::notify_changed(conn).await;
             }
         }
         let trust = if ok && result_is_untrusted(tier) {
