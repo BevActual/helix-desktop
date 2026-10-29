@@ -157,6 +157,171 @@ export function Segmented<T extends string>({ value, options, onChange, test }: 
   );
 }
 
+/**
+ * A pop-up button, as on macOS: the current choice with a chevron, and a menu of the others that opens beneath it. Arrow keys move, Enter chooses,
+ * Escape and a click elsewhere close it. One choice is marked with a tick. An option can be disabled (greyed, with a reason as its title).
+ */
+export function Popup<T extends string>({ value, options, onChange, test, label, placeholder }: {
+  value: T;
+  options: { id: T; label: string; disabled?: boolean; title?: string }[];
+  onChange: (id: T) => void;
+  test?: string;
+  label: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const host = useRef<HTMLDivElement>(null);
+  const current = options.find((option) => option.id === value);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: MouseEvent) => {
+      if (!host.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", outside, true);
+    return () => window.removeEventListener("mousedown", outside, true);
+  }, [open]);
+  const choose = (option: { id: T; disabled?: boolean }) => {
+    if (option.disabled) return;
+    setOpen(false);
+    if (option.id !== value) onChange(option.id);
+  };
+  const move = (by: number) => {
+    const count = options.length;
+    for (let step = 1; step <= count; step++) {
+      const next = (active + by * step + count * step) % count;
+      if (!options[next].disabled) {
+        setActive(next);
+        return;
+      }
+    }
+  };
+  return (
+    <div className="hx-popup" ref={host}>
+      <button
+        type="button"
+        className="hx-popup-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        data-test={test}
+        onClick={() => { setActive(Math.max(0, options.findIndex((option) => option.id === value))); setOpen(!open); }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (!open) { setActive(Math.max(0, options.findIndex((option) => option.id === value))); setOpen(true); } else move(event.key === "ArrowDown" ? 1 : -1);
+          } else if (event.key === "Enter" && open) {
+            event.preventDefault();
+            choose(options[active]);
+          } else if (event.key === "Escape" && open) {
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}
+      >
+        <span className="hx-popup-value">{current ? current.label : placeholder ?? "Choose"}</span>
+        <Icon name="chevron-down" />
+      </button>
+      {open ? (
+        <div className="hx-popup-menu" role="menu" aria-label={label}>
+          {options.map((option, index) => (
+            <button
+              type="button"
+              key={option.id}
+              role="menuitemradio"
+              aria-checked={option.id === value}
+              disabled={option.disabled}
+              title={option.title}
+              className={`hx-popup-item${index === active ? " active" : ""}`}
+              data-test={test ? `${test}-${option.id}` : undefined}
+              onMouseEnter={() => setActive(index)}
+              onClick={() => choose(option)}
+            >
+              <span className="hx-popup-tick">{option.id === value ? "✓" : ""}</span>
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A ⋯ button that opens a short menu of actions (a context menu you can see). Destructive items are red and come last. */
+export function ActionMenu({ label, items, test }: {
+  label: string;
+  items: { id: string; label: string; destructive?: boolean; disabled?: boolean; onSelect: () => void }[];
+  test?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: MouseEvent) => {
+      if (!host.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", outside, true);
+    return () => window.removeEventListener("mousedown", outside, true);
+  }, [open]);
+  const run = (index: number) => {
+    const item = items[index];
+    if (!item || item.disabled) return;
+    setOpen(false);
+    item.onSelect();
+  };
+  return (
+    <div className="hx-popup hx-action-menu" ref={host} onClick={(event) => event.stopPropagation()}>
+      <button type="button" className="hx-more-button" aria-haspopup="menu" aria-expanded={open} aria-label={label} data-test={test}
+        onClick={() => { setActive(-1); setOpen(!open); }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (!open) { setOpen(true); setActive(0); return; }
+            const by = event.key === "ArrowDown" ? 1 : -1;
+            setActive((a) => (a + by + items.length) % items.length);
+          } else if (event.key === "Enter" && open && active >= 0) {
+            event.preventDefault();
+            run(active);
+          } else if (event.key === "Escape" && open) {
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}>
+        <Icon name="dots" />
+      </button>
+      {open ? (
+        <div className="hx-popup-menu" role="menu" aria-label={label}>
+          {items.map((item, index) => (
+            <button type="button" key={item.id} role="menuitem" disabled={item.disabled}
+              className={`hx-popup-item${index === active ? " active" : ""}${item.destructive ? " destructive" : ""}`}
+              data-test={test ? `${test}-${item.id}` : undefined}
+              onMouseEnter={() => setActive(index)} onClick={() => run(index)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Determinate progress as a ring around a stop square (App Store style); clicking it stops the work. No percent: it spins. */
+export function ProgressRing({ percent, label, onStop, test }: { percent: number | null; label: string; onStop?: () => void; test?: string }) {
+  const radius = 11;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <button type="button" className={`hx-ring${percent == null ? " indeterminate" : ""}`} data-test={test} aria-label={label}
+      onClick={(event) => { event.stopPropagation(); onStop?.(); }}>
+      <svg viewBox="0 0 28 28" width="28" height="28" fill="none" strokeWidth="2.5">
+        <circle className="track" cx="14" cy="14" r={radius} />
+        <circle className="arc" cx="14" cy="14" r={radius} strokeDasharray={circumference} strokeDashoffset={circumference * (1 - Math.max(0, Math.min(100, percent ?? 25)) / 100)} />
+      </svg>
+      {onStop ? <span className="stop" /> : null}
+    </button>
+  );
+}
+
 export function Switch({ checked, onChange, label, test }: { checked: boolean; onChange: (next: boolean) => void; label: string; test?: string }) {
   return <button className="hx-switch" role="switch" aria-checked={checked} aria-label={label} data-test={test} onClick={() => onChange(!checked)} />;
 }
@@ -193,10 +358,19 @@ export function EmptyState({ icon: name, children, action }: { icon: string; chi
   );
 }
 
-export function Meter({ percent }: { percent: number }) {
+export function Meter({ percent, live, label }: { percent: number; live?: boolean; label?: string }) {
+  const value = Math.max(0, Math.min(100, percent));
   return (
-    <div className="hx-meter" aria-hidden="true">
-      <i style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} />
+    <div
+      className={live ? "hx-meter live" : "hx-meter"}
+      role={live ? "meter" : undefined}
+      aria-hidden={live ? undefined : true}
+      aria-label={live ? label : undefined}
+      aria-valuemin={live ? 0 : undefined}
+      aria-valuemax={live ? 100 : undefined}
+      aria-valuenow={live ? Math.round(value) : undefined}
+    >
+      <i style={{ width: `${value}%` }} />
     </div>
   );
 }
@@ -204,17 +378,20 @@ export function Meter({ percent }: { percent: number }) {
 /** A modal sheet that drops from the titlebar, or a centred alert. Escape cancels; Enter does not confirm (the primary must be clicked). */
 export function Sheet({ title, children, actions, alert, onCancel, test }: { title: string; children?: ReactNode; actions: ReactNode; alert?: boolean; onCancel: () => void; test?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  // The latest onCancel, without re-running the effect: focusing the sheet again on every render would take the keyboard from a field being typed in.
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
   useEffect(() => {
     ref.current?.focus();
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onCancel();
+        cancel.current();
       }
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [onCancel]);
+  }, []);
   return (
     <div className="hx-scrim" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
       <div ref={ref} tabIndex={-1} role={alert ? "alertdialog" : "dialog"} aria-label={title} className={`hx-sheet${alert ? " hx-alert" : ""}`} data-test={test}>

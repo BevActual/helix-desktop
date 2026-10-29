@@ -12,6 +12,8 @@ let reactLauncher = null;   // set by shell-react.js when the React bundle is pr
 let reactToday = null;
 let reactControls = null;
 let reactQuickInsert = null;
+let reactWriting = null;
+let reactPointer = null;
 let reactMobius = null;
 let reactIsland = null;
 let reactTray = null;
@@ -25,14 +27,54 @@ function drawStatus() {
   slot("bt").style.display = statusState.bt ? "" : "none";
 }
 let clockTimer = null;
+// The person's clock choice (Settings, Date & time): "auto" follows the language, "12" and "24" are fixed.
+let clockFormat = "auto";
+const hour12 = () => (clockFormat === "12" ? true : clockFormat === "24" ? false : undefined);
+const clockTime = (when) => when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: hour12() });
+window.helixClockTime = clockTime;
+// The microphone and camera indicator: shown only while something is capturing, in the colours people know (orange for the microphone, green for a
+// camera), with the programs' names for whoever hovers or uses a screen reader. It cannot be hidden: it is the point of it.
+function drawPrivacy(view) {
+  const mic = (view.microphone || []).length > 0;
+  const cam = (view.camera || []).length > 0;
+  const box = $("privacy");
+  box.hidden = !(mic || cam);
+  slot("priv-mic").style.display = mic ? "" : "none";
+  slot("priv-cam").style.display = cam ? "" : "none";
+  const parts = [];
+  if (mic) parts.push("Microphone in use by " + view.microphone.join(", "));
+  if (cam) parts.push("Camera in use by " + view.camera.join(", "));
+  box.title = parts.join(" · ");
+  box.setAttribute("aria-label", box.title);
+  queueGlass(); queueInteractive(); queueReport();
+}
+invoke("privacy_view").then(drawPrivacy, () => undefined);
+listen("privacy-view", (event) => drawPrivacy(event.payload));
+
+// What the bar shows (Settings, Top bar): each hidden item is a class on the page, and the style sheet does the hiding.
+let clockSeconds = false;
+let secondsTimer = null;
+const barClockTime = (when) => when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: clockSeconds ? "2-digit" : undefined, hour12: hour12() });
+function applyBarPrefs(raw) {
+  let prefs = {};
+  try { prefs = JSON.parse(raw); } catch (error) { prefs = {}; }
+  for (const [key, on] of Object.entries(prefs)) document.documentElement.classList.toggle("bar-hide-" + key, !on);
+  showActiveWindow = prefs.window === true;
+  drawActiveWindow();
+  clockSeconds = prefs.seconds === true;
+  clearInterval(secondsTimer);
+  if (clockSeconds) secondsTimer = setInterval(tickClock, 1000);
+  tickClock();
+  queueReport();
+}
 function tickClock() {
   const now = new Date();
   if (!reactControls) {
-    $("qs-time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    $("qs-time").textContent = clockTime(now);
     $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   }
   document.querySelector("#clock .day").textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-  document.querySelector("#clock .time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  document.querySelector("#clock .time").textContent = barClockTime(now);
 }
 // Today panel: the month grid is built in Rust (leap years, week starts, week numbers); this draws it. Moving months re-asks with a delta.
 let calMonth = null;   // { year, month } being shown
@@ -164,7 +206,8 @@ listen("shell-mode", (event) => {
   if (panel === null && !dockPrefs.auto_hide) setDock(true);
   if (panel) document.body.dataset.panel = panel;
   else delete document.body.dataset.panel;
-  if (panel === "notifications") {
+  if (panel === "agent-display") startViewer(); else stopViewer();
+  if (panel === "today") {
     if (reactToday) reactToday.open();
     else {
       drawToday();
@@ -189,6 +232,10 @@ listen("shell-mode", (event) => {
     invoke("quick_view").then(drawQuick);
     invoke("brightness_view").then(drawBrightness);
     invoke("battery_view").then(drawBattery);
+  } else if (panel === "writing" && reactWriting) {
+    reactWriting.open();
+  } else if (panel === "point" && reactPointer) {
+    reactPointer.open();
   } else if (panel === "quick-insert" && reactQuickInsert) {
     reactQuickInsert.open();
   } else if (panel === "quick-insert") {
@@ -449,31 +496,176 @@ document.querySelectorAll(".qi-tab").forEach((tab) => tab.addEventListener("clic
 $("qi-forget").onclick = () => invoke("quick_insert_forget_clipboard").then(qiSearch);
 
 
+// The agent display viewer: a picture of the agent's own screen, refreshed a few times a second while the panel is open.
+let viewerOn = false;
+function drawViewerState(status) {
+  $("av-state").textContent = status.running ? (status.windows.length === 1 ? "1 window" : status.windows.length + " windows") : "Not running";
+  $("av-start").hidden = status.running;
+  $("av-stop").hidden = !status.running;
+  $("av-take").hidden = !status.running || taking;
+  $("av-back").hidden = !taking;
+  $("av-empty").textContent = status.running ? "Waiting for the first picture…" : "The agent screen is not running. It is an agent's own screen: nothing on it is your desktop.";
+  $("av-empty").hidden = status.running && !$("av-frame").hidden;
+  if (!status.running) $("av-frame").hidden = true;
+  queueReport();
+}
+async function viewerLoop() {
+  while (viewerOn) {
+    let running = false;
+    try {
+      const status = await invoke("agent_display_status");
+      running = status.running;
+      drawViewerState(status);
+      if (running) {
+        const picture = await invoke("agent_display_frame");
+        if (viewerOn) { $("av-frame").src = picture; $("av-frame").hidden = false; $("av-empty").hidden = true; queueReport(); }
+      }
+    } catch (error) { /* the display went away between the two questions */ }
+    await new Promise((resolve) => setTimeout(resolve, running ? 200 : 800));
+  }
+}
+// The agent asked for help: the request, and how to say it is done (or take over, do the step, and hand back).
+function drawHelp(reason) {
+  $("av-help").hidden = !reason;
+  $("av-help-text").textContent = reason ? "The agent needs your help: " + reason : "";
+  queueReport();
+}
+listen("agent-display-help", (event) => drawHelp(event.payload));
+$("av-done").onclick = () => invoke("agent_display_help_done");
+function startViewer() { if (viewerOn) return; viewerOn = true; invoke("agent_display_help").then(drawHelp, () => undefined); viewerLoop(); }
+function stopViewer() { viewerOn = false; if (taking) handBack(); }
+
+// Taking over: the person's mouse and keyboard over the picture go to the agent display. The agent is paused for as long as that lasts.
+let taking = false;
+let lastMove = 0;
+const sendInput = (command) => invoke("agent_display_input", { command }).catch(() => undefined);
+function displayPoint(event) {
+  const frame = $("av-frame");
+  const box = frame.getBoundingClientRect();
+  if (!frame.naturalWidth || box.width === 0) return null;
+  const x = (event.clientX - box.left) / box.width * frame.naturalWidth;
+  const y = (event.clientY - box.top) / box.height * frame.naturalHeight;
+  return x >= 0 && y >= 0 && x < frame.naturalWidth && y < frame.naturalHeight ? { x, y } : null;
+}
+const BUTTONS = ["left", "middle", "right"];
+const KEYS = { Enter: "Return", Tab: "Tab", Escape: "Escape", Backspace: "BackSpace", Delete: "Delete", Home: "Home", End: "End", PageUp: "Page_Up", PageDown: "Page_Down", ArrowLeft: "Left", ArrowRight: "Right", ArrowUp: "Up", ArrowDown: "Down", Insert: "Insert", " ": "space" };
+function takeoverKey(event) {
+  if (!taking) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  if (event.type !== "keydown" || ["Control", "Shift", "Alt", "Meta"].includes(event.key)) return;
+  const name = KEYS[event.key] || (/^F([1-9]|1[0-2])$/.test(event.key) ? event.key : (event.key.length === 1 ? event.key : null));
+  if (!name) return;
+  if (event.ctrlKey || event.altKey || event.metaKey) {
+    const keys = [];
+    if (event.ctrlKey) keys.push("Control_L"); if (event.altKey) keys.push("Alt_L"); if (event.metaKey) keys.push("Super_L"); if (event.shiftKey && name.length > 1) keys.push("Shift_L");
+    sendInput({ op: "combo", keys: [...keys, event.key.length === 1 ? event.key.toLowerCase() : name] });
+  } else if (event.key.length === 1) {
+    sendInput({ op: "text", text: event.key });
+  } else {
+    sendInput({ op: "key", name });
+  }
+}
+function takeOver() {
+  if (taking) return;
+  taking = true;
+  invoke("agent_display_control", { on: true });
+  document.body.classList.add("taking");
+  $("av-take").hidden = true; $("av-back").hidden = false;
+  $("av-foot").textContent = "You are in control of the agent screen. The agent is paused. Your mouse and keyboard go to it.";
+  window.addEventListener("keydown", takeoverKey, true); window.addEventListener("keyup", takeoverKey, true);
+  queueReport();
+}
+function handBack() {
+  if (!taking) return;
+  taking = false;
+  invoke("agent_display_control", { on: false });
+  document.body.classList.remove("taking");
+  $("av-take").hidden = false; $("av-back").hidden = true;
+  $("av-foot").textContent = "You are watching.";
+  window.removeEventListener("keydown", takeoverKey, true); window.removeEventListener("keyup", takeoverKey, true);
+  queueReport();
+}
+$("av-take").onclick = takeOver;
+$("av-back").onclick = handBack;
+$("av-frame").addEventListener("mousemove", (event) => {
+  if (!taking || Date.now() - lastMove < 40) return;
+  const point = displayPoint(event);
+  if (point) { lastMove = Date.now(); sendInput({ op: "move", ...point }); }
+});
+for (const type of ["mousedown", "mouseup"]) {
+  $("av-frame").addEventListener(type, (event) => {
+    if (!taking) return;
+    event.preventDefault();
+    const point = displayPoint(event);
+    if (!point) return;
+    sendInput({ op: "move", ...point });
+    sendInput({ op: "button", button: BUTTONS[event.button] || "left", down: type === "mousedown" });
+  });
+}
+$("av-frame").addEventListener("wheel", (event) => {
+  if (!taking) return;
+  event.preventDefault();
+  sendInput({ op: "scroll", dx: Math.max(-5, Math.min(5, Math.round(event.deltaX / 40))), dy: Math.max(-5, Math.min(5, Math.round(event.deltaY / 40))) });
+}, { passive: false });
+$("av-frame").addEventListener("contextmenu", (event) => { if (taking) event.preventDefault(); });
+$("av-frame").addEventListener("dragstart", (event) => event.preventDefault());
+$("av-start").onclick = () => invoke("agent_display_start").then(() => undefined, () => undefined);
+$("av-stop").onclick = () => invoke("agent_display_stop");
+listen("agent-display-status", (event) => { if (viewerOn) drawViewerState(event.payload); });
+
 // The live-status pill. Rust decides what (if anything) is going on; this draws it and sends the click back as the thing it stands for.
 let islandKind = "none";
+let islandLeaving = null;
 function drawIsland(view) {
-  islandKind = view.kind;
   const pill = $("island");
-  pill.hidden = view.kind === "none";
-  pill.className = "bar-btn " + view.kind;
-  if (view.kind === "none") { queueReport(); queueGlass(); return; }
+  const wasShown = !pill.hidden && islandKind !== "none";
+  islandKind = view.kind;
+  clearTimeout(islandLeaving);
+  if (view.kind === "none") {
+    document.body.classList.remove("island-on");
+    // It leaves with a short shrink rather than vanishing.
+    if (wasShown) {
+      pill.classList.add("leaving");
+      islandLeaving = setTimeout(() => { pill.hidden = true; pill.classList.remove("leaving"); queueReport(); queueGlass(); }, 220);
+    } else {
+      pill.hidden = true;
+    }
+    queueReport(); queueGlass();
+    return;
+  }
+  const entering = pill.hidden || pill.classList.contains("leaving");
+  pill.hidden = false;
+  // The kind changes the colour; the pill is not rebuilt, so a change of kind morphs instead of popping.
+  pill.className = "bar-btn " + view.kind + (entering ? "" : " settled");
   if (reactIsland) {
     reactIsland.set(view);
+    // The island carries the time, so it takes the clock's place.
+    document.body.classList.add("island-on");
   } else {
     swapIcon(slot("island-ico"), view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : view.kind === "agentdesk" ? "grid" : "sparkle");
     $("island-text").textContent = view.text;
     $("island-detail").textContent = view.detail;
   }
-  pill.title = view.detail ? view.text + " · " + view.detail : view.text;
+  // No native tooltip: the words are already on the pill.
+  pill.removeAttribute("title");
+  pill.setAttribute("aria-label", view.detail ? view.text + " · " + view.detail : view.text);
   queueReport();
   queueGlass();
+  // The pill's width changes with its words: measure again once it has settled.
+  setTimeout(() => { queueReport(); queueGlass(); }, 380);
 }
+// The transport opens and closes with a transition, which changes sizes without any change to the page: measure again when it ends.
+$("island").addEventListener("transitionend", () => { queueReport(); queueGlass(); });
+$("island").addEventListener("animationend", () => { queueReport(); });
 listen("island-view", (event) => drawIsland(event.payload));
 invoke("island_view").then(drawIsland);
-$("island").onclick = () => {
+$("island").onclick = (event) => {
+  // The transport buttons and the time have their own actions.
+  if (event.target.closest(".isl-controls, .isl-time")) return;
   if (islandKind === "approval") invoke("mobius_open", { mode: "agents" });
   else if (islandKind === "assistant") invoke("mobius_open", { mode: "act" });
   else if (islandKind === "agentdesk") invoke("agent_desk_focus");
+  else if (islandKind === "agentdisplay" || islandKind === "agenthelp") invoke("panel_open", { id: "agent-display" });
   else if (islandKind === "media") invoke("media_toggle");
 };
 
@@ -564,7 +756,7 @@ document.querySelectorAll("[data-mobius-mode]").forEach((btn) => {
 $("agent-stopall").onclick = () => invoke("activity_stop_all");
 $("agent-toggle").onclick = () => invoke("activity_set_enabled", { enabled: $("agent-toggle").textContent === "Turn on" });
 $("apps").onclick = () => invoke("panel_open", { id: "launcher" });
-$("clock").onclick = () => invoke("panel_open", { id: "notifications" });
+$("clock").onclick = () => invoke("panel_open", { id: "today" });
 $("controlbtn").onclick = () => invoke("panel_open", { id: "control-center" });
 
 (function buildTalkSuggestions() {
@@ -917,6 +1109,7 @@ $("tile-night").addEventListener("click", () => invoke("quick_set_night_light", 
 function drawQuick(view) {
   // The shell follows the system theme: the same setting the Dark theme tile changes.
   document.documentElement.dataset.theme = view.resolved_dark === false ? "light" : "dark";
+  document.documentElement.dataset.accent = view.accent || "blue";
   if (reactControls) { queueReport(); return; }
   const dark = view.dark !== null && view.dark !== undefined;
   $("tile-dark").style.display = dark ? "" : "none";
@@ -1104,7 +1297,7 @@ function drawWorkspaces(strip) {
     mark.className = "ws" + (ws.active ? " active" : "") + (ws.windows ? " has-windows" : "") + (ws.urgent ? " urgent" : "") + (ws.agent_desk ? " agent-desk" : "");
     pill.append(mark);
     pill.dataset.test = "ws-" + index;
-    pill.title = ws.agent_desk ? (ws.name || "Agent desk") : (ws.name ? ws.name : "Workspace " + ws.idx);
+    pill.title = ws.agent_desk ? (ws.name || "Agent workspace") : (ws.name ? ws.name : "Workspace " + ws.idx);
     pill.setAttribute("aria-label", pill.title);
     pill.onclick = () => invoke("workspace_focus", { id: ws.id });
     host.append(pill);
@@ -1113,6 +1306,25 @@ function drawWorkspaces(strip) {
   queueGlass();
 }
 listen("workspaces-view", (event) => drawWorkspaces(event.payload));
+
+// The active window's name, when the bar is set to show it (Settings → Top bar → Active window). Drawn as text, never markup.
+let activeWindow = { app: "", title: "" };
+let showActiveWindow = false;
+function drawActiveWindow() {
+  const host = $("bar-window");
+  const { app, title } = activeWindow;
+  host.hidden = !showActiveWindow || !(app || title);
+  if (host.hidden) { queueReport(); return; }
+  host.replaceChildren();
+  const strong = document.createElement("strong");
+  strong.textContent = app || title;
+  host.append(strong);
+  if (app && title && title.toLowerCase() !== app.toLowerCase()) host.append(document.createTextNode(" — " + title));
+  host.title = [app, title].filter(Boolean).join(" — ");
+  queueReport();
+}
+listen("active-window", (event) => { activeWindow = event.payload; drawActiveWindow(); });
+invoke("active_window_view").then((view) => { activeWindow = view; drawActiveWindow(); }, () => undefined);
 invoke("workspaces_view").then(drawWorkspaces);
 
 
@@ -1279,6 +1491,22 @@ function applyDockPrefs(prefs) {
   magnify(null);
   setDock(!prefs.auto_hide && !document.body.classList.contains("open"));
 }
+listen("clock-format", (event) => { clockFormat = event.payload; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
+invoke("bar_prefs").then(applyBarPrefs, () => undefined);
+listen("bar-prefs", (event) => applyBarPrefs(event.payload));
+
+// How round each part of the shell is and how clear its glass is (Settings → Appearance): Rust sends a script that sets a few numbers on the root element.
+function applyShape(vars) {
+  for (const [name, value] of Array.isArray(vars) ? vars : []) {
+    // Only the shell's own shape properties, and only numbers.
+    if (/^--(shape-[a-z]+|glass-t)$/.test(name) && /^[0-9]+(\.[0-9]+)?$/.test(value)) document.documentElement.style.setProperty(name, value);
+  }
+  queueGlass();
+  queueReport();
+}
+listen("shape-vars", (event) => applyShape(event.payload));
+invoke("shape_vars").then(applyShape, () => undefined);
+invoke("clock_format").then((format) => { clockFormat = format; tickClock(); window.dispatchEvent(new Event("helix-clock")); });
 listen("dock-prefs", (event) => applyDockPrefs(event.payload));
 invoke("dock_prefs").then(applyDockPrefs);
 function magnify(x) {
@@ -1362,10 +1590,11 @@ function reportInteractive() {
       rects.push({ ...layoutBox($("dock-edge")), radius: 0 });
     }
   }
-  const key = JSON.stringify(rects) + window.innerWidth + "x" + window.innerHeight;
+  const real_rects = rects.map(real);
+  const key = JSON.stringify(real_rects) + realWidth() + "x" + realHeight();
   if (key === lastInteractive) return;
   lastInteractive = key;
-  invoke("report_interactive", { elements: rects, width: window.innerWidth, height: window.innerHeight });
+  invoke("report_interactive", { elements: real_rects, width: realWidth(), height: realHeight() });
 }
 function queueInteractive() {
   if (interactiveQueued) return;
@@ -1379,7 +1608,13 @@ queueInteractive();
 // Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
-const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
+const GLASS_PANEL = { "agent-display": "agentview", "control-center": "controls", notifications: "notifs", today: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert", writing: "writing", point: "pointer" };
+// The interface scale (Settings, Accessibility). The page is zoomed by it, so everything the page measures is in zoomed pixels; the compositor and the
+// tests want real ones, so what is reported is multiplied by it.
+let uiScale = 1;
+const real = (box) => ({ ...box, x: box.x * uiScale, y: box.y * uiScale, w: box.w * uiScale, h: box.h * uiScale, radius: (box.radius || 0) * uiScale });
+const realWidth = () => Math.round(window.innerWidth * uiScale);
+const realHeight = () => Math.round(window.innerHeight * uiScale);
 function layoutBox(element) {
   let x = 0, y = 0;
   for (let node = element; node; node = node.offsetParent) { x += node.offsetLeft; y += node.offsetTop; }
@@ -1398,11 +1633,11 @@ function reportGlass() {
   if (open && GLASS_PANEL[open]) elements.push($(GLASS_PANEL[open]));
   document.querySelectorAll("#toasts .toast").forEach((toast) => elements.push(toast));
   if (open) elements.splice(0, elements.length, ...elements.filter((el) => !(el instanceof Element) || !el.classList.contains("toast"))); // toasts are hidden while a panel is open
-  const boxes = elements.map((el) => (el instanceof Element ? layoutBox(el) : el));
-  const key = JSON.stringify(boxes) + window.innerWidth + "x" + window.innerHeight;
+  const boxes = elements.map((el) => real(el instanceof Element ? layoutBox(el) : el));
+  const key = JSON.stringify(boxes) + realWidth() + "x" + realHeight();
   if (key === lastGlass) return;
   lastGlass = key;
-  invoke("report_glass", { elements: boxes, width: window.innerWidth, height: window.innerHeight });
+  invoke("report_glass", { elements: boxes, width: realWidth(), height: realHeight() });
 }
 function queueGlass() {
   if (glassQueued) return;
@@ -1413,7 +1648,9 @@ listen("blur-active", (event) => { document.documentElement.dataset.blur = event
 new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
 const glassResize = new ResizeObserver(queueGlass);
-["bar", "controls", "notifs", "launcher", "panel", "quickinsert", "toasts", "osd", "dock", "tray-menu", "island"].forEach((id) => glassResize.observe($(id)));
+["bar", "controls", "notifs", "launcher", "panel", "quickinsert", "writing", "pointer", "toasts", "osd", "dock", "tray-menu", "island"].forEach((id) => glassResize.observe($(id)));
+// The pointer's bubble moves to wherever the pointer is: its glass follows.
+new MutationObserver(queueGlass).observe($("pointer"), { attributes: true, attributeFilter: ["style"] });
 window.addEventListener("resize", queueGlass);
 queueGlass();
 
@@ -1437,11 +1674,13 @@ function sendReport() {
   document.querySelectorAll("[data-test]").forEach((element) => {
     const box = element.getBoundingClientRect();
     // A closed panel is laid out but invisible (visibility is inherited): it has no controls to click.
-    if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
+    if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x * uiScale, y: box.y * uiScale, w: box.width * uiScale, h: box.height * uiScale };
   });
-  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today", reactControls && "controls", reactQuickInsert && "quick-insert", reactMobius && "mobius", reactIsland && "island", reactOsd && "osd", reactTray && "tray", reactDock && "dock"].filter(Boolean), elements } });
+  invoke("report_layout", { report: { width: realWidth(), height: realHeight(), scale: uiScale, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today", reactControls && "controls", reactQuickInsert && "quick-insert", reactMobius && "mobius", reactIsland && "island", reactOsd && "osd", reactTray && "tray", reactDock && "dock"].filter(Boolean), elements } });
 }
 window.addEventListener("resize", () => queueReport());
+invoke("ui_scale").then((value) => { uiScale = value; queueGlass(); queueInteractive(); queueReport(); }, () => undefined);
+listen("ui-scale", (event) => { uiScale = event.payload; lastGlass = ""; lastInteractive = ""; queueGlass(); queueInteractive(); queueReport(300); });
 new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 
 invoke("quick_view").then(drawQuick);

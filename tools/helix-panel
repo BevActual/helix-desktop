@@ -1,6 +1,7 @@
 #!/bin/sh
 # What a niri key binding runs. Works under either shell: when the Tauri shell is the session shell it drives that
 # (panels over org.helix.Shell1, volume and brightness directly); otherwise it hands the same request to the native shell.
+#   helix-panel agent [claude|opencode|codex] [--profile ask|auto|open]
 #   helix-panel launcher | control-center | assistant | agents | notifications | quick-insert | settings | window-switcher
 #   helix-panel lock | lid-close | dnd | night-light | media-toggle | media-next | media-previous | screenshot | screenshot-screen
 #   helix-panel volume-up | volume-down | volume-mute | mic-mute | brightness-up | brightness-down
@@ -43,6 +44,9 @@ tauri() {
     || busctl --user status org.helix.Shell >/dev/null 2>&1
 }
 case "$cmd" in
+  agent)
+    # A terminal in the focused window's folder running the default agent (or the one named): Claude Code, OpenCode, Codex in a Helix profile.
+    exec helix-agents terminal "$@" ;;
   status)
     [ -z "$arg" ] || { echo "helix-panel: status takes no arguments" >&2; exit 2; }
     agent_socket_send status 30
@@ -65,14 +69,14 @@ if tauri; then
     screenshot) exec niri msg action screenshot ;;
     screenshot-screen) exec niri msg action screenshot-screen ;;
     lock|lid-close)
-      # swaylock speaks ext-session-lock-v1 (niri keeps the session locked even if the locker dies) and authenticates with PAM.
-      # The colours are the shared tokens (core/shared-ui/style.css: accent, danger, ok) so the lock matches the login card.
-      exec swaylock --daemonize --color 0e1028 --indicator-idle-visible --indicator-radius 70 --indicator-thickness 6 \
-        --inside-color 1e1e22dd --inside-clear-color 1e1e22dd --inside-ver-color 1e1e22dd --inside-wrong-color 1e1e22dd \
-        --ring-color ffffff24 --ring-clear-color ffffff24 --ring-ver-color 0a84ffff --ring-wrong-color ff453aff \
-        --key-hl-color 0a84ffff --bs-hl-color ff453aff --line-color 00000000 --separator-color 00000000 \
-        --text-color ffffffe6 --text-clear-color ffffffe6 --text-ver-color ffffffe6 --text-wrong-color ff453aff \
-        --font Inter ;;
+      # helix-lock is the Helix lock screen (ext-session-lock-v1: niri keeps the session locked even if the locker dies; PAM checks the password).
+      # Exit 1 means the session is already locked; exit 2, or no helix-lock at all, falls back to swaylock on a plain colour.
+      if command -v helix-lock >/dev/null 2>&1; then
+        helix-lock --daemonize
+        rc=$?
+        [ "$rc" -eq 2 ] || exit "$rc"
+      fi
+      exec swaylock --daemonize --color 0e1028 ;;
     settings) exec helix-settings ;;
     window-switcher) exec niri msg action focus-window-previous ;;
     volume-up) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustVolume i 5 && exit 0; exec wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;

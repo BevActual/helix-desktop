@@ -241,12 +241,17 @@ pub struct TrustedSurfacePart {
 pub struct Helix {
     /// Named workspace where agent-launched windows open without stealing focus.
     pub agent_desk_name: String,
+    /// The window `helix-summon` raises when it is already open (its `app-id`), and otherwise starts with `summon-command`.
+    pub summon_app_id: String,
+    pub summon_command: Vec<String>,
 }
 
 impl Default for Helix {
     fn default() -> Self {
         Self {
             agent_desk_name: String::from("Helix Agent"),
+            summon_app_id: String::from("org.helix.Mobius"),
+            summon_command: vec![String::from("helix-mobius")],
         }
     }
 }
@@ -255,12 +260,22 @@ impl Default for Helix {
 pub struct HelixPart {
     #[knuffel(child, unwrap(argument))]
     pub agent_desk_name: Option<String>,
+    #[knuffel(child, unwrap(argument))]
+    pub summon_app_id: Option<String>,
+    #[knuffel(child, unwrap(arguments))]
+    pub summon_command: Option<Vec<String>>,
 }
 
 impl MergeWith<HelixPart> for Helix {
     fn merge_with(&mut self, part: &HelixPart) {
         if let Some(name) = &part.agent_desk_name {
             self.agent_desk_name = name.clone();
+        }
+        if let Some(app_id) = &part.summon_app_id {
+            self.summon_app_id = app_id.clone();
+        }
+        if let Some(command) = part.summon_command.as_ref().filter(|c| !c.is_empty()) {
+            self.summon_command = command.clone();
         }
     }
 }

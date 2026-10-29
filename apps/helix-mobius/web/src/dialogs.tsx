@@ -34,7 +34,7 @@ export interface DialogHooks {
   closeMenu: () => void;
 }
 /** What the mode menu needs to know: the current mode and whether it can be changed now. */
-export interface ModeState { mode: "ask" | "tools" | "act"; folder: string; busy: boolean }
+export interface ModeState { mode: "ask" | "agent" | "plan" | "act" | "tools"; folder: string; busy: boolean }
 export interface DialogHandle {
   openRename: (title: string) => void;
   openProject: (current: string, suggestions: string[]) => void;
@@ -305,9 +305,10 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                 <>
                   <div className="hx-menu-label">Mode <span className="hx-menu-hint">Shift+Tab</span></div>
                   {([
-                    ["ask", "Ask", "Chat only. No tools."],
-                    ["tools", "Tools", "Search the web, read pages and run commands in a project folder. Each step asks first."],
-                    ["act", "Act", "Do it on the desktop. The next message goes to the desktop assistant, which asks before changing anything."],
+                    ["agent", "Agent", "Do the work. Search, edit the project, and run commands. Each step asks first, then continues."],
+                    ["ask", "Ask", "Answer only. No tools, no edits, no desktop changes."],
+                    ["plan", "Plan", "Write a plan you can edit. Nothing runs until you switch to Agent and build it."],
+                    ["act", "Desktop", "The next message goes to the desktop assistant, which asks before changing anything."],
                   ] as const).map(([id, title, sub]) => (
                     <button key={id} className={`hx-menu-item${modeState.mode === id ? " current" : ""}`} role="menuitemradio" aria-checked={modeState.mode === id} data-test={`menu-mode-${id}`} disabled={modeState.busy && id !== "act" && modeState.mode !== "act"}
                       onClick={() => { setMenu(null); window.dispatchEvent(new CustomEvent("mobius-set-mode", { detail: id })); }}>
@@ -537,7 +538,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         >
           <header className="sheet-head">
             <h3>Persona</h3>
-            <p className="sheet-note">A hub mind for talk. Desktop change still goes through Act and the bar Assistant.</p>
+            <p className="sheet-note">A hub mind for conversations. Changes to the desktop go through Helix's actions, which you can undo.</p>
           </header>
           <div className="sheet-scroll">
             <label className="sheet-field">Name
@@ -600,7 +601,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         <form className="sheet-body" onSubmit={(event) => { event.preventDefault(); applyRoute(custom.trim()); }}>
           <header className="sheet-head">
             <h3>Chat model</h3>
-            <p className="sheet-note">Local, LAN, or cloud for talk. Act stays on its own local model — remotes never run desktop tools.</p>
+            <p className="sheet-note">Local, your network, or cloud for conversations. Acting on the desktop stays on a model on this computer.</p>
           </header>
           <div className="sheet-scroll">
             <label className="sheet-field">Backend

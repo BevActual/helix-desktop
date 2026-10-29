@@ -1,0 +1,14 @@
+<!-- An app's actions, called by the Helix desktop (docs/design/actions.md, "Providers"). The app describes them in
+     $XDG_DATA_DIRS/helix/actions/<provider>.json (or $XDG_DATA_HOME for the person's own) and owns the bus name the manifest names.
+     The desktop checks every call (grants, confirmation in plain words, audit) before Invoke is called; the app only carries it out.
+     The reply is JSON. It may carry "done" (a sentence for the history and the bar) and "undo" ({"action": "<one of the app's actions>",
+     "params": {...}}) to make the change undoable. An error is a D-Bus error whose message is shown to the person. -->
+<node>
+<interface name="org.helix.ActionProvider1">
+ <method name="Invoke">
+  <arg name="action" type="s" direction="in"/>
+  <arg name="params" type="s" direction="in"/>
+  <arg name="reply" type="s" direction="out"/>
+ </method>
+</interface>
+</node>

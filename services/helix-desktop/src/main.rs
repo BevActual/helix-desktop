@@ -1,6 +1,8 @@
 //! Rust desktop authority for `org.helix.Desktop` (installed as `helix-desktop`, unit `helix-service.service`).
 //! Nested harness: `HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop`.
 
+mod accent_sync;
+mod actions_run;
 mod agent;
 mod agent_activity;
 mod agent_support;
@@ -24,6 +26,7 @@ mod desktop_operations;
 mod displays;
 mod displays_backend;
 mod displays_support;
+mod location;
 mod msg_ipc;
 mod network;
 mod network_backend;
@@ -130,6 +133,9 @@ async fn main() -> zbus::Result<()> {
         agents::start_system_agents(hub, backends.0, backends.1).await;
         backends
     };
+
+    tokio::spawn(location::run(Arc::clone(&state), connection.clone()));
+    tokio::spawn(accent_sync::run(Arc::clone(&state)));
 
     let rule = MatchRule::builder()
         .msg_type(MessageType::Signal)

@@ -84,19 +84,56 @@ pub fn choice_path(home: &str) -> PathBuf {
     PathBuf::from(config).join("helix/wallpaper.toml")
 }
 
-/// The text of a choice file that makes `source` the wallpaper on every output.
-pub fn choice_to_toml(source: &Source) -> String {
-    let path = match source {
+/// `color:#rrggbb` or a path, the form the choice file stores.
+pub fn source_text(source: &Source) -> String {
+    match source {
         Source::Color([r, g, b]) => format!("color:#{r:02x}{g:02x}{b:02x}"),
         Source::Image(path) => path.to_string_lossy().into_owned(),
-    };
+    }
+}
+
+/// A connector name Settings may write: the same shape the compositor uses for an output.
+pub fn monitor_name_ok(name: &str) -> bool {
+    let len = name.len();
+    (1..=64).contains(&len)
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+}
+
+/// The text of a choice file that makes `source` the wallpaper on every output.
+pub fn choice_to_toml(source: &Source) -> String {
     let mut default = toml::Table::new();
-    default.insert("path".into(), toml::Value::String(path));
+    default.insert("path".into(), toml::Value::String(source_text(source)));
     let mut wallpaper = toml::Table::new();
     wallpaper.insert("default".into(), toml::Value::Table(default));
     let mut root = toml::Table::new();
     root.insert("wallpaper".into(), toml::Value::Table(wallpaper));
     toml::to_string(&root).unwrap_or_default()
+}
+
+/// `existing` with `name` set to `source`. The default and every other display stay as they were.
+pub fn assign_monitor(existing: &str, name: &str, source: &Source) -> Result<String, &'static str> {
+    if !monitor_name_ok(name) {
+        return Err("unknown display");
+    }
+    let mut root: toml::Table = existing.parse().unwrap_or_default();
+    let wallpaper = child_table(&mut root, "wallpaper");
+    let monitors = child_table(wallpaper, "monitors");
+    let mut entry = toml::Table::new();
+    entry.insert("path".into(), toml::Value::String(source_text(source)));
+    monitors.insert(name.to_string(), toml::Value::Table(entry));
+    Ok(toml::to_string(&root).unwrap_or_default())
+}
+
+fn child_table<'a>(parent: &'a mut toml::Table, key: &str) -> &'a mut toml::Table {
+    if parent.get(key).and_then(toml::Value::as_table).is_none() {
+        parent.insert(key.into(), toml::Value::Table(toml::Table::new()));
+    }
+    parent
+        .get_mut(key)
+        .and_then(toml::Value::as_table_mut)
+        .expect("table")
 }
 
 impl Config {
@@ -190,6 +227,31 @@ mod tests {
             old.clone().overlay(Config::default()),
             old,
             "an empty choice changes nothing"
+        );
+    }
+
+    #[test]
+    fn a_display_keeps_its_own_picture_and_the_rest_stay() {
+        let all = choice_to_toml(&Source::Color([0, 0, 0]));
+        let text = assign_monitor(&all, "eDP-1", &Source::Color([0x1f, 0x4d, 0x3a])).unwrap();
+        let config = parse_config(&text, "/h");
+        assert_eq!(config.default, Some(Source::Color([0, 0, 0])));
+        assert_eq!(config.monitors["eDP-1"], Source::Color([0x1f, 0x4d, 0x3a]));
+        let again =
+            assign_monitor(&text, "HDMI-A-1", &Source::Image("/pics/a.jpg".into())).unwrap();
+        let config = parse_config(&again, "/h");
+        assert_eq!(config.monitors["eDP-1"], Source::Color([0x1f, 0x4d, 0x3a]));
+        assert_eq!(
+            config.monitors["HDMI-A-1"],
+            Source::Image("/pics/a.jpg".into())
+        );
+        assert_eq!(
+            assign_monitor(&all, "bad name", &Source::Color([0, 0, 0])),
+            Err("unknown display")
+        );
+        assert_eq!(
+            assign_monitor(&all, "", &Source::Color([0, 0, 0])),
+            Err("unknown display")
         );
     }
 

@@ -58,6 +58,8 @@ run desktop_audio_meter_integration 60 'have_bus && have_gio && have_pw && need 
   dbus-run-session -- python3 tests/desktop_audio_meter_integration.py "$DESKTOP" "$ROOT/tests/desktop_audio/pipewire.conf"
 run helix_desktop_config_smoke 120 'have_bus && have_gio && need "$DESKTOP"' -- \
   env HELIX_SERVICE_BIN="$DESKTOP" HELIX_ASSETS_DIR="$ROOT/assets" dbus-run-session -- tools/nested/helix-desktop-config-smoke.sh
+run helix_desktop_location_smoke 120 'have_bus && have_gio && need "$DESKTOP"' -- \
+  env HELIX_SERVICE_BIN="$DESKTOP" HELIX_ASSETS_DIR="$ROOT/assets" dbus-run-session -- tools/nested/helix-desktop-location-smoke.sh
 run helix_desktop_configuration_contract 180 'have_bus && have_gio && need "$DESKTOP"' -- \
   dbus-run-session -- tools/nested/helix-desktop-configuration-contract.sh
 run helix_agent_adapter_integration 120 'have_bus && have_agent_py && need "$DESKTOP"' -- \

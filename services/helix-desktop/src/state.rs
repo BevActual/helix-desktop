@@ -46,6 +46,8 @@ pub struct PendingConfirm {
     pub tainted: bool,
     pub label: String,
     pub deadline: Instant,
+    /// A catalogue action's parameters (JSON), kept here while the person decides; empty for a shell command.
+    pub params: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,6 +89,8 @@ pub struct State {
     /// Agent Surface kill switch (`AgentSurfaceActivity1.SetEnabled`).
     pub agent_enabled: bool,
     pub audit: AuditLog,
+    /// The one history of actions, the person's and agents' (`helix-actions`).
+    pub history: helix_actions::history::History,
     pub bus: Option<Connection>,
 }
 
@@ -144,6 +148,9 @@ impl State {
             desktop: None,
             agent_enabled: true,
             audit,
+            history: helix_actions::history::History::load(
+                &state_dir.join("actions").join("history.json"),
+            ),
             bus: None,
         }
     }

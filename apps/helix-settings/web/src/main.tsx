@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { invoke, type Change, type RowView } from "@helix/ui";
 import { RowsPage, type PageHandle, type PageSpec } from "./pages/RowsPage";
 import { AboutPage } from "./pages/AboutPage";
+import { DisplaysPage } from "./pages/DisplaysPage";
+import { UsersPage } from "./pages/UsersPage";
 import { AppearancePage } from "./pages/AppearancePage";
 import { KeyboardPage } from "./pages/KeyboardPage";
 import { WallpaperPage } from "./pages/WallpaperPage";
@@ -30,6 +32,13 @@ const report = (text: string) => {
 
 const serviceChange = (page: string) => (id: string, change: Change) => invoke<void>("setting_change", { page, id, change });
 
+const displays: PageSpec = {
+  load: () => invoke<RowView[]>("displays_rows"),
+  empty: "No displays reported.",
+  change: (id, change) => invoke<RowView[]>("displays_change", { id, change }),
+  note: "Resolution, scale, orientation, and arrangement apply now and are kept in Helix's display setup.",
+};
+
 const appearance: PageSpec = {
   change: serviceChange("appearance"),
   empty: "There is nothing to adjust here on this desktop.",
@@ -41,6 +50,23 @@ const specs: Record<string, PageSpec> = {
     load: () => invoke<RowView[]>("dock_rows"),
     change: (id, change) => invoke<RowView[]>("dock_change", { id, change }),
   },
+  multitask: {
+    load: () => invoke<RowView[]>("multitask_rows"),
+    change: (id, change) => invoke<RowView[]>("multitask_change", { id, change }),
+    empty: "Multitasking settings need the Helix compositor.",
+    note: "These apply at once and are remembered.",
+  },
+  startup: {
+    load: () => invoke<RowView[]>("startup_rows"),
+    change: (id, change) => invoke<RowView[]>("startup_change", { id, change }),
+    empty: "Nothing starts when you log in.",
+    note: "These start the next time you log in. Turning one off keeps it on the list, and a program from the system is never changed.",
+  },
+  topbar: {
+    load: () => invoke<RowView[]>("topbar_rows"),
+    change: (id, change) => invoke<RowView[]>("topbar_change", { id, change }),
+    note: "The control center and notification buttons always stay, so the bar can never lock you out of them.",
+  },
   notifications: {
     load: () => invoke<RowView[]>("notifications_rows"),
     change: (id, change) => invoke<RowView[]>("notifications_change", { id, change }),
@@ -49,10 +75,22 @@ const specs: Record<string, PageSpec> = {
     load: () => invoke<RowView[]>("power_rows"),
     change: (id, change) => invoke<RowView[]>("power_change", { id, change }),
   },
-  displays: {
-    load: () => invoke<RowView[]>("displays_rows"),
-    empty: "No displays reported.",
-    note: "Resolution, scale and arrangement are set in the compositor's configuration.",
+  defaults: {
+    load: () => invoke<RowView[]>("defaults_rows"),
+    change: (id, change) => invoke<RowView[]>("defaults_change", { id, change }),
+    empty: "No applications were found for these kinds of file.",
+    note: "Kept in ~/.config/mimeapps.list, where every program looks.",
+  },
+  pointer: {
+    load: () => invoke<RowView[]>("pointer_rows"),
+    change: (id, change) => invoke<RowView[]>("pointer_change", { id, change }),
+    empty: "Mouse and touchpad settings need the Helix compositor.",
+    note: "These apply at once and are remembered. A setting you never change here stays as your compositor config says.",
+  },
+  datetime: {
+    load: () => invoke<RowView[]>("datetime_rows"),
+    change: (id, change) => invoke<RowView[]>("datetime_change", { id, change }),
+    note: "The time zone and automatic time are the system's, so changing them asks for your password. Location is only used here, to work out sunrise and sunset.",
   },
   accessibility: { change: serviceChange("accessibility"), empty: "There is nothing to adjust here on this desktop." },
 };
@@ -69,12 +107,16 @@ const custom: Record<string, (props: { register: (handle: PageHandle) => void; o
       report={report}
     />
   ),
+  displays: ({ register, options }) => (
+    <DisplaysPage spec={displays} register={register} initialRows={options.initialRows} onRows={options.onRows} report={report} />
+  ),
   keyboard: ({ register }) => <KeyboardPage register={register} report={report} />,
   wallpaper: ({ register }) => <WallpaperPage register={register} report={report} />,
   network: ({ register }) => <NetworkPage register={register} />,
   bluetooth: ({ register }) => <BluetoothPage register={register} />,
   sound: ({ register }) => <SoundPage register={register} />,
   agents: ({ register }) => <AgentsPage register={register} />,
+  users: ({ register }) => <UsersPage register={register} report={report} />,
 };
 
 function mountPage(name: string, host: HTMLElement, options: MountOptions): Controller | null {

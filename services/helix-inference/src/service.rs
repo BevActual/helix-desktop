@@ -16,6 +16,7 @@ use zbus::{interface, Connection};
 use crate::backend::*;
 use crate::pictures;
 use crate::queue::{InferenceQueue, Limits};
+use crate::router;
 use crate::routing::RoutingTable;
 
 pub const BUS_NAME: &str = "org.helix.Inference";
@@ -62,6 +63,7 @@ pub struct Inner {
     owners: Owners,
     clients: Arc<Mutex<HashMap<String, String>>>,
     connection: Connection,
+    downloads: Arc<crate::downloads::Downloads>,
 }
 
 pub fn outcome_json(outcome: &Outcome) -> Json {
@@ -76,6 +78,15 @@ pub fn outcome_json(outcome: &Outcome) -> Json {
         "completion_tokens": outcome.completion_tokens,
         "language": outcome.language,
     });
+    if !outcome.model.is_empty() {
+        result["model"] = json!(outcome.model);
+    }
+    if let Some(cost) = outcome.cost_micro {
+        result["cost_micro"] = json!(cost);
+    }
+    if !outcome.route_reason.is_empty() {
+        result["route"] = json!({"backend": outcome.route_backend, "model": outcome.route_model, "reason": outcome.route_reason});
+    }
     if !outcome.image_png.is_empty() {
         result["image"] = json!({
             "png": outcome.image_png,
@@ -139,13 +150,44 @@ fn to_variant(value: &Json) -> Option<OwnedValue> {
     OwnedValue::try_from(wrapped).ok()
 }
 
+/// Whether the computer is saving power (the firmware's platform profile, else the power daemon's).
+fn power_saver_active() -> bool {
+    if let Ok(text) = std::fs::read_to_string("/sys/firmware/acpi/platform_profile") {
+        let profile = text.trim();
+        if profile == "low-power" || profile == "cool" {
+            return true;
+        }
+    }
+    if let Ok(output) = std::process::Command::new("powerprofilesctl")
+        .arg("get")
+        .output()
+    {
+        return String::from_utf8_lossy(&output.stdout).trim() == "power-saver";
+    }
+    false
+}
+
+/// What the local engine offers, for the routing decision.
+#[derive(Default)]
+struct Local {
+    models: Vec<ModelInfo>,
+    /// What it can hold at once (0 when not known).
+    context: u32,
+}
+
 fn parse_chat(
     args: &Map<String, Json>,
     client: &str,
     routing: &RoutingTable,
+    local: &Local,
     images: Vec<ImageInput>,
 ) -> Result<ChatRequest, InferenceError> {
-    const KNOWN: [&str; 7] = [
+    const KNOWN: [&str; 12] = [
+        "escalate",
+        "private",
+        "backend",
+        "route",
+        "remote_timeout",
         "messages",
         "model",
         "schema",
@@ -209,22 +251,33 @@ fn parse_chat(
             return Err(invalid("task must be act, chat, summarize, vision or code"));
         }
     }
-    if let Some(value) = args.get("model") {
-        let Some(text) = value.as_str() else {
-            return Err(invalid("model must be a string"));
-        };
-        request.model = text.to_string();
-    }
-    // Local model slots: when the client omits model, use the profile from inference-routing.toml.
-    if request.model.is_empty() {
-        if !routing.is_local(&task) {
-            return Err(invalid(format!(
-                "task \"{task}\" is routed to a non-local backend; the sandboxed engine only runs local GGUF \
-                 (use Mobius for LAN/cloud talk)"
-            )));
+    let requested_model = match args.get("model") {
+        None => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .ok_or_else(|| invalid("model must be a string"))?
+                .to_string(),
+        ),
+    };
+    let named_backend = match args.get("backend") {
+        None => None,
+        Some(value) => {
+            let id = value
+                .as_str()
+                .ok_or_else(|| invalid("backend must be a string"))?;
+            (!id.is_empty() && id != "local").then(|| id.to_string())
         }
-        request.model = routing.route(&task).model;
-    }
+    };
+    let flag = |name: &str| -> Result<bool, InferenceError> {
+        match args.get(name) {
+            None => Ok(false),
+            Some(v) => v
+                .as_bool()
+                .ok_or_else(|| invalid(format!("{name} must be true or false"))),
+        }
+    };
+    let (escalate, private) = (flag("escalate")?, flag("private")?);
     if let Some(value) = args.get("schema") {
         let Some(text) = value.as_str() else {
             return Err(invalid("schema must be a string of JSON"));
@@ -232,9 +285,6 @@ fn parse_chat(
         // Only the on-device Act slot may emit tool JSON (grammar). Refuse schemas on talk tasks.
         if task != "act" {
             return Err(invalid("schema is only allowed for task \"act\""));
-        }
-        if !routing.is_local(&task) {
-            return Err(invalid("schema requires a local act backend"));
         }
         request.json_schema = text.to_string();
     }
@@ -257,6 +307,86 @@ fn parse_chat(
         };
         request.temperature = number;
     }
+    // Which model answers, and why: the policy router (router.rs).
+    let estimated =
+        (request.messages.to_string().len() as u32 / 4).saturating_add(request.max_tokens);
+    let decision = router::decide(&router::Input {
+        task: &task,
+        requested_model: requested_model.as_deref(),
+        backend: named_backend.as_deref(),
+        escalate,
+        private,
+        has_images: !request.images.is_empty(),
+        estimated_tokens: estimated,
+        local_context: local.context,
+        local_models: &local.models,
+        routing,
+    })
+    .map_err(invalid)?;
+    request.backend = decision.backend;
+    request.model = decision.model;
+    request.route_reason = decision.reason;
+    if !request.backend.is_empty() {
+        // Off the computer: the person can keep that from happening while the battery is being saved.
+        if !routing.allow_remote_on_battery_saver && power_saver_active() {
+            return Err(invalid(
+                "Battery saver is on, so models on other computers and services are not used. Allow them in Settings, or use a model on this computer.",
+            ));
+        }
+        if let Some(value) = args.get("remote_timeout") {
+            let Some(seconds) = value.as_u64().or_else(|| value.as_f64().map(|f| f as u64)) else {
+                return Err(invalid("remote_timeout must be a number of seconds"));
+            };
+            request.timeout_secs = seconds.clamp(15, 600);
+        }
+        if let Some(value) = args.get("route") {
+            let Some(map) = value.as_object() else {
+                return Err(invalid("route must be a dictionary"));
+            };
+            let mut route = RemoteRoute::default();
+            for (key, v) in map {
+                match key.as_str() {
+                    "fallbacks" => {
+                        let list = v
+                            .as_array()
+                            .ok_or_else(|| invalid("fallbacks is a list of model ids"))?;
+                        if list.len() > 8 {
+                            return Err(invalid("at most 8 fallback models"));
+                        }
+                        for item in list {
+                            let id = item
+                                .as_str()
+                                .ok_or_else(|| invalid("fallbacks is a list of model ids"))?;
+                            if id.is_empty() || id.len() > 128 {
+                                return Err(invalid("a fallback model id is 1 to 128 characters"));
+                            }
+                            route.fallbacks.push(id.to_string());
+                        }
+                    }
+                    "prefer" => {
+                        let word = v
+                            .as_str()
+                            .ok_or_else(|| invalid("prefer is price or speed"))?;
+                        if !["", "price", "speed"].contains(&word) {
+                            return Err(invalid("prefer is price or speed"));
+                        }
+                        route.prefer = word.to_string();
+                    }
+                    "private_only" => {
+                        route.private_only = v
+                            .as_bool()
+                            .ok_or_else(|| invalid("private_only is true or false"))?
+                    }
+                    other => return Err(invalid(format!("unknown route option: {other}"))),
+                }
+            }
+            request.route = Some(route);
+        }
+    } else if args.contains_key("route") || args.contains_key("remote_timeout") {
+        return Err(invalid(
+            "route and remote_timeout are for models on other computers",
+        ));
+    }
     if let Some(value) = args.get("priority") {
         match value.as_str() {
             Some("background") => request.priority = Priority::Background,
@@ -268,6 +398,10 @@ fn parse_chat(
 }
 
 impl Inner {
+    pub fn set_remote(&self, remote: Arc<dyn RemoteChat>) {
+        self.queue.set_remote(remote);
+    }
+
     pub fn new(
         connection: Connection,
         config: Config,
@@ -392,6 +526,7 @@ impl Inner {
             owners,
             clients: Arc::new(Mutex::new(HashMap::new())),
             connection,
+            downloads: Arc::new(crate::downloads::Downloads::default()),
         }
     }
 
@@ -502,6 +637,66 @@ impl Service {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Asks a configured backend which models it offers, for the management app; the key stays here. JSON: `{ok, models, trust, error}`.
+    async fn probe(&self, backend: String) -> Result<String, InferenceError> {
+        if backend.is_empty() || backend.len() > 64 {
+            return Err(invalid("backend is a short id"));
+        }
+        let result = tokio::task::spawn_blocking(move || crate::remote::probe(&backend))
+            .await
+            .map_err(|e| InferenceError::Failed(e.to_string()))?;
+        Ok(result.to_string())
+    }
+
+    /// The GGUF files a Hugging Face repository offers (`owner/name`): JSON `[{path, size}]`.
+    async fn hub_files(&self, repo: String) -> Result<String, InferenceError> {
+        let files = tokio::task::spawn_blocking(move || crate::downloads::list(&repo))
+            .await
+            .map_err(|e| InferenceError::Failed(e.to_string()))?
+            .map_err(InferenceError::Failed)?;
+        Ok(Json::Array(
+            files
+                .iter()
+                .map(|f| json!({"path": f.path, "size": f.size}))
+                .collect(),
+        )
+        .to_string())
+    }
+
+    /// Starts fetching a model file (all of it, if it is split) and, if asked, its vision projector, into the models folder. The id to follow it by.
+    async fn download(
+        &self,
+        repo: String,
+        file: String,
+        projector: bool,
+    ) -> Result<u64, InferenceError> {
+        let dir = std::path::PathBuf::from(&self.0.config.model_dir);
+        let downloads = Arc::clone(&self.0.downloads);
+        tokio::task::spawn_blocking(move || {
+            let files = crate::downloads::list(&repo)?;
+            let items = crate::downloads::plan(&files, &file, projector)?;
+            downloads.start(&repo, items, &dir)
+        })
+        .await
+        .map_err(|e| InferenceError::Failed(e.to_string()))?
+        .map_err(InferenceError::Failed)
+    }
+
+    /// The downloads of this session, newest first: JSON `[{id, repo, title, total, done, state, message}]`.
+    async fn downloads(&self) -> String {
+        self.0.downloads.view().to_string()
+    }
+
+    /// Stops a download; what arrived is kept, so starting it again continues.
+    async fn cancel_download(&self, id: u64) -> bool {
+        self.0.downloads.cancel(id)
+    }
+
+    /// Frees the model now if nothing is running or waiting. True when it did.
+    async fn unload(&self) -> bool {
+        self.0.queue.unload_if_idle(Duration::ZERO)
     }
 
     async fn list_models(&self) -> Vec<OwnedValue> {
@@ -655,7 +850,14 @@ impl Service {
                 for bytes in &encoded_pictures {
                     decoded.push(pictures::decode_image_input(bytes).map_err(invalid)?);
                 }
-                let request = parse_chat(&options, &client, &routing, decoded)?;
+                let local = {
+                    let backend = self.0.queue.backend();
+                    Local {
+                        models: backend.models(),
+                        context: backend.snapshot()["contextTokens"].as_u64().unwrap_or(0) as u32,
+                    }
+                };
+                let request = parse_chat(&options, &client, &routing, &local, decoded)?;
                 self.0.register(request, &sender, &client)
             }
             other => Err(invalid(format!("unknown action: {other}"))),
@@ -718,4 +920,121 @@ impl Service {
 
     #[zbus(signal)]
     async fn changed(emitter: &zbus::object_server::SignalEmitter<'_>) -> zbus::Result<()>;
+}
+
+#[cfg(test)]
+mod routing_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn table() -> RoutingTable {
+        RoutingTable::parse(
+            "allow_remote_on_battery_saver = true\n[[backends]]\nid = \"lan\"\nkind = \"openai\"\nbase_url = \"http://studio:8080/v1\"\n\
+             [[backends]]\nid = \"odd\"\nkind = \"carrier-pigeon\"\n\
+             [profiles.chat]\nbackend = \"lan\"\nmodel = \"big\"\n\
+             [profiles.code]\nbackend = \"odd\"\nmodel = \"x\"\n\
+             [profiles.summarize]\nbackend = \"missing\"\n\
+             [profiles.act]\nbackend = \"lan\"\nmodel = \"big\"\n\
+             [profiles.vision]\nbackend = \"local\"\nmodel = \"small.gguf\"\n",
+        )
+    }
+
+    fn args(task: &str) -> Map<String, Json> {
+        let v = json!({"messages": [{"role": "user", "content": "hi"}], "task": task});
+        v.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn a_slot_the_person_routed_elsewhere_goes_there_and_nothing_else_does() {
+        let routing = table();
+        let request = parse_chat(&args("chat"), "c", &routing, &Local::default(), vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("lan", "big")
+        );
+        // A local slot stays on the engine.
+        let request =
+            parse_chat(&args("vision"), "c", &routing, &Local::default(), vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("", "small.gguf")
+        );
+        // Only a model on this computer may act for the desktop, wherever the slot is routed.
+        assert!(parse_chat(&args("act"), "c", &routing, &Local::default(), vec![]).is_err());
+        // A backend that is missing or of an unknown kind is an error, never a fall back to local.
+        assert!(parse_chat(&args("summarize"), "c", &routing, &Local::default(), vec![]).is_err());
+        assert!(parse_chat(&args("code"), "c", &routing, &Local::default(), vec![]).is_err());
+        // An output grammar never goes to another machine.
+        let mut with_schema = args("chat");
+        with_schema.insert("schema".into(), json!("{}"));
+        assert!(parse_chat(&with_schema, "c", &routing, &Local::default(), vec![]).is_err());
+    }
+
+    #[test]
+    fn a_caller_may_name_a_configured_backend_and_how_it_should_choose() {
+        let routing = table();
+        let mut named = args("chat");
+        named.insert("backend".into(), json!("lan"));
+        named.insert("model".into(), json!("mine"));
+        named.insert("remote_timeout".into(), json!(9999));
+        named.insert(
+            "route".into(),
+            json!({"fallbacks": ["x/y"], "prefer": "price", "private_only": true}),
+        );
+        let request = parse_chat(&named, "c", &routing, &Local::default(), vec![]).unwrap();
+        assert_eq!(
+            (request.backend.as_str(), request.model.as_str()),
+            ("lan", "mine")
+        );
+        assert_eq!(request.timeout_secs, 600, "clamped");
+        assert_eq!(request.route.unwrap().fallbacks, ["x/y"]);
+        // Not a backend the person configured, not for Act, nothing odd in the options.
+        let with = |key: &str, value: Json| {
+            let mut a = args("chat");
+            a.insert("backend".into(), json!("lan"));
+            a.insert(key.into(), value);
+            a
+        };
+        let mut unknown = args("chat");
+        unknown.insert("backend".into(), json!("nowhere"));
+        assert!(parse_chat(&unknown, "c", &routing, &Local::default(), vec![]).is_err());
+        let mut act = args("act");
+        act.insert("backend".into(), json!("lan"));
+        assert!(parse_chat(&act, "c", &routing, &Local::default(), vec![]).is_err());
+        assert!(parse_chat(
+            &with("route", json!({"prefer": "vibes"})),
+            "c",
+            &routing,
+            &Local::default(),
+            vec![]
+        )
+        .is_err());
+        assert!(parse_chat(
+            &with("route", json!({"colour": "red"})),
+            "c",
+            &routing,
+            &Local::default(),
+            vec![]
+        )
+        .is_err());
+        assert!(parse_chat(
+            &with("route", json!({"fallbacks": vec!["a"; 9]})),
+            "c",
+            &routing,
+            &Local::default(),
+            vec![]
+        )
+        .is_err());
+        // Options for another machine are an error on a local request.
+        let mut local = args("vision");
+        local.insert("route".into(), json!({}));
+        assert!(parse_chat(&local, "c", &routing, &Local::default(), vec![]).is_err());
+        // With battery saver on and not allowed, other machines are not used.
+        let strict = RoutingTable::parse("[[backends]]\nid = \"lan\"\nkind = \"openai\"\nbase_url = \"http://studio/v1\"\n[profiles.chat]\nbackend = \"lan\"\n");
+        let saving = std::fs::read_to_string("/sys/firmware/acpi/platform_profile")
+            .is_ok_and(|p| matches!(p.trim(), "low-power" | "cool"));
+        if saving {
+            assert!(parse_chat(&args("chat"), "c", &strict, &Local::default(), vec![]).is_err());
+        }
+    }
 }

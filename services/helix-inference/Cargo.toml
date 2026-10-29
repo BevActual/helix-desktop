@@ -25,6 +25,8 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "
 zbus = { workspace = true, features = ["tokio"] }
 futures-util = { workspace = true }
 libc = { workspace = true }
+ureq = { workspace = true }
+sha2 = "0.10"
 
 [lints]
 workspace = true

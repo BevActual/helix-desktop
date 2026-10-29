@@ -187,14 +187,31 @@ pub fn evaluate(
     command: &str,
     args: &[String],
 ) -> Decision {
-    let tier = policy.tier_for(command, args);
+    evaluate_tier(
+        policy.tier_for(command, args),
+        policy.knows(command),
+        grants,
+        taint,
+        client,
+    )
+}
+
+/// The same decision for a tier that comes from somewhere other than `msg-risk.toml` (the actions catalogue, `helix-actions`):
+/// blocked is refused, a missing grant is refused, confirm asks.
+pub fn evaluate_tier(
+    tier: Tier,
+    known: bool,
+    grants: &GrantStore,
+    taint: &TaintTracker,
+    client: &str,
+) -> Decision {
     let tainted = taint.tainted(client);
     if tier == Tier::Blocked {
         return Decision {
             verdict: Verdict::Deny,
             tier,
             tainted,
-            reason: if policy.knows(command) {
+            reason: if known {
                 "blocked for agent clients".into()
             } else {
                 "unknown command".into()

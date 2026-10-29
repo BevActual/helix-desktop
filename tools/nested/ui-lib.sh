@@ -12,22 +12,25 @@ reveal_id() {
 import json, sys
 try:
     d = json.load(open(sys.argv[1])); b = d["elements"][sys.argv[2]]
-    print(1 if b["y"] + b["h"] > d["height"] - 2 else 0)
+    # Below the fold (1), or scrolled up out of sight above the window's top (2).
+    print(1 if b["y"] + b["h"] > d["height"] - 2 else 2 if b["y"] < 0 else 0)
 except Exception:
     print(0)
 PY
 )
-    [ "$below" = 1 ] || return 0
+    [ "$below" = 1 ] || [ "$below" = 2 ] || return 0
     # Page Down scrolls the area that was last clicked: click an empty spot in the content first (a window reports positions inside itself).
-    "$PT" $(python3 - <<'PY'
+    # Going up, click the title bar instead (a spot 60 px down may be a slider by then): UI_REVEAL_UP.
+    "$PT" $(BELOW=$below python3 - <<'PY'
 import json, os
 ox, oy = (float(v) for v in os.environ.get("UI_ORIGIN", "0 0").split())
 w, h = (float(v) for v in os.environ.get("UI_SCREEN", "1280 720").split())
-rx, ry = (float(v) for v in os.environ.get("UI_REVEAL", "520 60").split())
+spot = os.environ.get("UI_REVEAL_UP", "520 26") if os.environ.get("BELOW") == "2" else os.environ.get("UI_REVEAL", "520 60")
+rx, ry = (float(v) for v in spot.split())
 print(f"{(ox + rx) / w:.4f} {(oy + ry) / h:.4f}")
 PY
 ) click
-    wtype -k Next; sleep 1.2   # the page reports its layout every 0.5 s
+    if [ "$below" = 1 ]; then wtype -k Next; else wtype -k Prior; fi; sleep 1.2   # the page reports its layout every 0.5 s
   done
 }
 click_id() {

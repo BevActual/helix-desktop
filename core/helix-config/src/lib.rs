@@ -1,6 +1,8 @@
 //! The settings catalog, ordered lists, shell preferences and config migration. Pure data and validation.
 
+pub mod bar_prefs;
 pub mod catalog;
+pub mod clock_prefs;
 pub mod color_spec;
 mod config_merge;
 mod config_settings_migrate;
@@ -17,6 +19,7 @@ pub mod ordered_lists;
 pub mod palette_names;
 pub mod settings;
 mod settings_defaults_generated;
+pub mod shape_prefs;
 
 // Modules that live in other crates but are named `crate::<module>` throughout this crate.
 pub use helix_base::display;

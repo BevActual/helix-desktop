@@ -42,7 +42,7 @@ Fedora + helix-niri are the sole shell target. Everything else is a helper or co
  (apps/)          (apps/)          (apps/)
 
 helix-assistant, helix-inference, helix-system-upgrade (services/)
-Session helpers: helix-wallpaper, helix-idle (services/)
+Session helpers: helix-wallpaper, helix-idle, helix-nightlight (services/)
 ```
 
 **One bus owner.** The user unit `helix-service.service` (name kept) runs `helix-desktop` on the session bus. Nested harnesses set `HELIX_SERVICE_BIN` to an explicit binary when they need a non-installed build.
@@ -59,7 +59,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `apps/` | Standalone Helix apps (Settings, …): Tauri host + React/TypeScript frontend (`frontend-stack.md`) | Claiming the Desktop bus |
 | `services/helix-desktop` | `org.helix.Desktop` authority | Compositor |
 | `services/helix-assistant`, `helix-inference`, `helix-system-upgrade` | Agent client, inference fabric, pkexec upgrade helper | Desktop bus name (assistant/inference use their own names) |
-| `services/helix-wallpaper`, `helix-idle` | Small session helpers | Desktop bus name |
+| `services/helix-wallpaper`, `helix-idle`, `helix-nightlight` | Small session helpers | Desktop bus name |
 | `greeter/` | Login only | Session shell surfaces |
 | `compositor/` | Display server (niri fork) | Shell chrome |
 | `services/helix-inference/native/` | Interim llama + whisper shims for Cargo bins | Session UI |
@@ -101,7 +101,7 @@ Rule: new binaries and tests land in Cargo. Dependency direction between crates 
 | `helix-desktop` | `org.helix.Desktop` owner | `services/helix-desktop` |
 | `helix-settings` etc. | Desktop clients | `apps/` |
 | **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-mobius/` |
-| `helix-wallpaper`, `helix-idle` | helpers | `services/` |
+| `helix-wallpaper`, `helix-idle`, `helix-nightlight` | helpers | `services/` |
 | `helix-assistant` | Agent Surface client; never in the shell | `services/helix-assistant` |
 | `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (+ `helix-transcribe` bin; llama glue under `native/`) |
 | `helix-system-upgrade` | polkit-gated `dnf` plan helper | `services/helix-system-upgrade` |

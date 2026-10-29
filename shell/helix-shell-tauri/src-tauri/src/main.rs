@@ -11,13 +11,17 @@
 
 mod act_feed;
 mod admin_auth;
+mod agent_display;
 mod agent_ipc;
+mod agent_sessions;
 mod apps;
 mod backlight;
 mod bar;
+mod bar_prefs;
 mod battery;
 mod blur;
 mod capture;
+mod clock;
 mod confirmer;
 mod control;
 mod desktop_action;
@@ -29,11 +33,16 @@ mod mobius_talk;
 mod niri_query;
 mod notify;
 mod panels_bridge;
+mod pointer;
 mod polkit_agent;
 mod polkit_helper;
+mod privacy;
 mod role;
+mod shape;
 mod strut;
 mod tray;
+mod ui_scale;
+mod writing;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -121,6 +130,15 @@ struct ShellState {
     brightness: Option<helix_models::brightness::Brightness>,
     /// What is playing (from playerctl), for the live-status pill.
     media: Option<helix_shell_model::island::Media>,
+    /// An agent's change shown in the pill with Undo, until the instant given (`docs/design/actions.md`).
+    recent_change: Option<(helix_shell_model::island::RecentChange, std::time::Instant)>,
+    /// The newest history entry already considered, so one change is shown once.
+    seen_change: u64,
+    /// Writing Tools: the selection it works on and its answer (`writing`).
+    writing: writing::Writing,
+    pointer: pointer::Pointer,
+    /// The screen edges stay lit until then after an agent changed something (`island::glow`).
+    glow_until: Option<std::time::Instant>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
     insert_target: Option<u64>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
@@ -131,6 +149,8 @@ struct ShellState {
     activity: Activity,
     /// The last settings list, for the dark-theme and night-light tiles.
     quick: Quick,
+    /// The same list as rows, for finding a setting by what it does from the launcher (`helix_actions::settings`).
+    setting_rows: Vec<serde_json::Value>,
     /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
     icons: std::collections::HashMap<String, String>,
     started: Instant,
@@ -347,11 +367,14 @@ fn apply_panel_plan(app: &AppHandle, plan: helix_shell_model::shell_surface::Pla
     match ShellRole::from_env() {
         ShellRole::Bar => layer::apply(app, BAR_PLAN),
         ShellRole::Panels => {
-            let plan = if plan.input == helix_shell_model::shell_surface::InputRegion::Whole {
-                plan
-            } else {
-                PANEL_CLOSED
-            };
+            let opening = plan.input == helix_shell_model::shell_surface::InputRegion::Whole;
+            let plan = if opening { plan } else { PANEL_CLOSED };
+            if opening {
+                // A panel opens on the screen that has the focus: the compositor moves the surface there (a no-op where it already is).
+                let _ = niri_query::request_line(
+                    r#"{"HelixMoveLayerToFocusedOutput":{"namespace":"helix-panels"}}"#,
+                );
+            }
             layer::apply(app, plan);
         }
         ShellRole::Monolith => layer::apply(app, plan),
@@ -359,6 +382,16 @@ fn apply_panel_plan(app: &AppHandle, plan: helix_shell_model::shell_surface::Pla
 }
 
 fn open_panel(app: &AppHandle, id: &str) {
+    // Writing Tools read the selection first, while the window that has it still has the keyboard (the panel would take it).
+    if id == "writing" && !writing::take_ready() {
+        writing::capture_then_open(app.clone());
+        return;
+    }
+    // The Magic Pointer takes the compositor's note of where the pointer was, and what is selected, before it opens.
+    if id == "point" && !pointer::take_ready() {
+        pointer::capture_then_open(app.clone());
+        return;
+    }
     // Agents is a Mobius door, not a second panel.
     if id == "agents" {
         open_mobius_panel(app, MobiusMode::Agents);
@@ -401,7 +434,7 @@ fn open_panel_local(app: &AppHandle, id: &str) {
         shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
-    if id == "quick-insert" {
+    if id == "quick-insert" || id == "writing" || id == "point" {
         shell.insert_target = shell.niri.focused_window().map(|w| w.id);
     }
     if id == "notifications" {
@@ -424,6 +457,13 @@ fn open_panel_local(app: &AppHandle, id: &str) {
     apply_panel_plan(app, plan);
     eprintln!("PANEL open");
     emit_view(app, &view);
+    // After the lock above is let go: Writing Tools takes it again to store what it will work on.
+    if id == "writing" {
+        writing::opened(app);
+    }
+    if id == "point" {
+        pointer::opened(app);
+    }
 }
 
 fn close_panel(app: &AppHandle) {
@@ -547,7 +587,53 @@ fn control(app: &AppHandle, command: &str) {
         "control-center" => open_panel(app, "control-center"),
         "agents" => open_panel(app, "agents"),
         "notifications" => open_panel(app, "notifications"),
+        "today" => open_panel(app, "today"),
+        // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): drive the agent display without the viewer.
+        "agent-display" => open_panel(app, "agent-display"),
+        "agent-display-start" => {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                if let Err(error) = agent_display::start(&app) {
+                    eprintln!("AGENT-DISPLAY start failed: {error}");
+                }
+            });
+        }
+        "agent-display-stop" => agent_display::stop(),
+        other if other.starts_with("agent-display-agent-input ") => {
+            let line = other["agent-display-agent-input ".len()..].to_string();
+            std::thread::spawn(move || match agent_display::agent_input(&line) {
+                Ok(()) => eprintln!("AGENT-DISPLAY agent input ok"),
+                Err(error) => eprintln!("AGENT-DISPLAY agent input failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-input ") => {
+            let line = other["agent-display-input ".len()..].to_string();
+            std::thread::spawn(move || match agent_display::input(&line) {
+                Ok(()) => eprintln!("AGENT-DISPLAY input ok"),
+                Err(error) => eprintln!("AGENT-DISPLAY input failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-frame ") => {
+            let path = other["agent-display-frame ".len()..].trim().to_string();
+            std::thread::spawn(move || match agent_display::frame() {
+                Ok(bytes) => {
+                    let _ = std::fs::write(&path, bytes);
+                    eprintln!("AGENT-DISPLAY frame written");
+                }
+                Err(error) => eprintln!("AGENT-DISPLAY frame failed: {error}"),
+            });
+        }
+        other if other.starts_with("agent-display-launch ") => {
+            let id = other["agent-display-launch ".len()..].trim().to_string();
+            std::thread::spawn(move || {
+                if let Err(error) = agent_display::launch(&id) {
+                    eprintln!("AGENT-DISPLAY launch failed: {error}");
+                }
+            });
+        }
         "quick-insert" => open_panel(app, "quick-insert"),
+        "writing" => open_panel(app, "writing"),
+        "point" => open_panel(app, "point"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
         "agent-stop-all" => {
@@ -991,6 +1077,7 @@ async fn refresh_activity(app: &AppHandle) {
             }
         }
     }
+    island::note_recent_change(app).await;
     let view = next.view();
     // Tests read this line; it carries counts and the newest row's sanitized fields, nothing an agent wrote verbatim.
     let last = view.history.first().map_or(String::new(), |row| {
@@ -1005,7 +1092,32 @@ async fn refresh_activity(app: &AppHandle) {
         view.grants.len(),
         view.history.len(),
     );
-    shell_state(app).lock().expect("shell state").activity = next;
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        // A new newest row that is an agent changing something lights the screen edges for a moment.
+        let newest = |view: &helix_agent::activity::ActivityView| {
+            view.history.first().map(|row| {
+                (
+                    row.time.clone(),
+                    row.tool.clone(),
+                    row.decision.clone(),
+                    row.tier.clone(),
+                )
+            })
+        };
+        let before = newest(&shell.activity.view());
+        if let Some((_, _, decision, tier)) =
+            newest(&view).filter(|row| Some(row) != before.as_ref())
+        {
+            if matches!(decision.as_str(), "allowed" | "confirmed")
+                && matches!(tier.as_str(), "act" | "confirm")
+            {
+                shell.glow_until = Some(std::time::Instant::now() + island::GLOW_AFTER_ACT);
+            }
+        }
+        shell.activity = next;
+    }
     let _ = app.emit("activity-view", view);
     island::publish(app);
 }
@@ -1103,12 +1215,19 @@ async fn refresh_quick(app: &AppHandle) {
         None => serde_json::Value::Null,
     };
     let mut quick = Quick::from_settings(&settings);
+    // Night light is the `helix-nightlight` service's own file, not a setting of the desktop service.
+    quick.use_night_light(Some(helix_nightlight_model::load().enabled));
     quick.set_resolved_dark(helix_desktop_api::theme_is_dark_json(
         &settings,
         helix_desktop_api::LocalTime::now(),
     ));
     let view = quick.view();
-    shell_state(app).lock().expect("shell state").quick = quick;
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        shell.quick = quick;
+        shell.setting_rows = settings.as_array().cloned().unwrap_or_default();
+    }
     let _ = app.emit("quick-view", view);
 }
 
@@ -1215,12 +1334,10 @@ async fn quick_set_dark(app: AppHandle, on: bool) -> Result<(), String> {
 
 #[tauri::command]
 async fn quick_set_night_light(app: AppHandle, on: bool) -> Result<(), String> {
-    let update = shell_state(&app)
-        .lock()
-        .expect("shell state")
-        .quick
-        .set_night_light(on);
-    send_setting(update).await
+    helix_nightlight_model::set_enabled(on)?;
+    eprintln!("QUICK night light {}", if on { "on" } else { "off" });
+    refresh_quick(&app).await;
+    Ok(())
 }
 
 /// What the on-screen indicator shows after a key press or a slider: one value, drawn for a moment.
@@ -1350,15 +1467,10 @@ async fn brightness_set(app: AppHandle, percent: f64) -> Result<(), String> {
         .map(|_| ())
 }
 
-/// Flips the Night Light setting from its current state (what a key binding wants).
+/// Flips Night Light from its current state (what a key binding wants).
 pub(crate) async fn toggle_night_light(app: &AppHandle) {
-    let update = {
-        let state = shell_state(app);
-        let shell = state.lock().expect("shell state");
-        let on = shell.quick.view().night_light.unwrap_or(false);
-        shell.quick.set_night_light(!on)
-    };
-    let _ = send_setting(update).await;
+    let on = helix_nightlight_model::load().enabled;
+    let _ = quick_set_night_light(app.clone(), !on).await;
 }
 
 pub(crate) async fn toggle_dark_theme(app: &AppHandle) {
@@ -1792,10 +1904,51 @@ fn mobius_act_from_talk(app: AppHandle, text: Option<String>) -> Result<(), Stri
         .map(|t| t.trim().to_string())
         .filter(|t| !t.is_empty())
         .or_else(|| mobius_talk::last_user_text(&app))
-        .ok_or_else(|| "Ask something first, then Act.".to_string())?;
+        .ok_or_else(|| "Ask something first.".to_string())?;
     open_mobius_panel(&app, MobiusMode::Act);
     submit_request(&app, &request);
     Ok(())
+}
+
+/// One place to ask: Helix decides whether `text` is something to do on the desktop (the assistant does it, in the panel's doing view)
+/// or a question (Mobius answers). Runs on the main thread, because opening the panel touches GTK.
+pub(crate) fn ask(app: &AppHandle, text: &str) -> Result<(), String> {
+    let text: String = text.trim().chars().take(MAX_QUERY_CHARS * 4).collect();
+    if text.is_empty() {
+        return Err("Write something to ask.".into());
+    }
+    if helix_shell_model::ask::wants_doing(&text) {
+        eprintln!("ASK do");
+        return mobius_act_from_talk(app.clone(), Some(text));
+    }
+    eprintln!("ASK answer");
+    let open = shell_state(app)
+        .lock()
+        .expect("shell state")
+        .surface
+        .open_panel_id()
+        == Some("assistant");
+    if open {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        shell.mobius_mode = MobiusMode::Talk;
+        emit_mode(app, &shell);
+    } else {
+        open_mobius_panel(app, MobiusMode::Talk);
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = mobius_talk::submit(app, text).await {
+            eprintln!("ASK answer failed: {error}");
+        }
+    });
+    Ok(())
+}
+
+/// The bar's one box: answers, or does, whichever was asked.
+#[tauri::command]
+fn mobius_ask(app: AppHandle, text: String) -> Result<(), String> {
+    ask(&app, &text)
 }
 
 #[tauri::command]
@@ -1895,6 +2048,35 @@ struct AppHit {
 }
 
 const LAUNCHER_ROWS: usize = 8;
+
+/// A Settings page id as the person sees it in Settings' sidebar.
+fn settings_page_title(page: &str) -> String {
+    let title = match page {
+        "appearance" => "Appearance",
+        "wallpaper" => "Wallpaper",
+        "accessibility" => "Accessibility",
+        "displays" => "Displays",
+        "network" => "Network",
+        "bluetooth" => "Bluetooth",
+        "sound" => "Sound",
+        "keyboard" => "Keyboard",
+        "multitask" => "Multitasking",
+        "pointer" => "Mouse & touchpad",
+        "startup" => "Startup apps",
+        "defaults" => "Default apps",
+        "datetime" => "Date & time",
+        "topbar" => "Top bar",
+        "dock" => "Dock",
+        "notifications" => "Notifications",
+        "power" => "Power & lock",
+        "users" => "Users",
+        "agents" => "Privacy & agents",
+        "about" => "About",
+        "" => return String::new(),
+        other => return format!("Settings · {other}"),
+    };
+    format!("Settings · {title}")
+}
 const MAX_QUERY_CHARS: usize = 100;
 
 /// The best matches for what was typed. Names are already display-safe; the page shows them as text.
@@ -1916,7 +2098,46 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
             icon: String::new(),
         });
     }
-    let app_slots = LAUNCHER_ROWS.saturating_sub(hits.len());
+    // Settings found by what they do (the actions catalogue's search), at most three.
+    if !query.trim().is_empty() && !helix_shell_model::desktop_actions::parse_act_query(&query).0 {
+        for found in helix_actions::settings::search(&shell.setting_rows, &query, None, 3) {
+            let id = found
+                .get("setting")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let row = shell
+                .setting_rows
+                .iter()
+                .find(|r| r.get("id").and_then(|v| v.as_str()) == Some(id));
+            let page = found
+                .get("page")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let value = row
+                .and_then(|r| r.get("value"))
+                .filter(|_| found.get("value").is_some());
+            let shown = match (row, value) {
+                (Some(row), Some(value)) => helix_actions::settings::shown(row, value),
+                _ => String::new(),
+            };
+            hits.push(AppHit {
+                id: format!("helix:setting:{id}"),
+                name: found
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(id)
+                    .to_string(),
+                generic: [settings_page_title(page), shown]
+                    .iter()
+                    .filter(|t| !t.is_empty())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" · "),
+                icon: String::new(),
+            });
+        }
+    }
+    let app_slots = LAUNCHER_ROWS.saturating_sub(hits.len() + 1);
     let found = if app_slots == 0 {
         Vec::new()
     } else {
@@ -1941,6 +2162,15 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
             icon,
         });
     }
+    // Anything typed can be asked of Mobius: the last row, and the first choice when nothing else matches.
+    if !query.trim().is_empty() && !helix_shell_model::desktop_actions::parse_act_query(&query).0 {
+        hits.push(AppHit {
+            id: "helix:ask".into(),
+            name: "Ask Mobius".into(),
+            generic: query.trim().chars().take(80).collect(),
+            icon: String::new(),
+        });
+    }
     eprintln!(
         "LAUNCHER results {} first {} icons {}",
         hits.len(),
@@ -1953,11 +2183,68 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
 /// Starts the application with this id and closes the launcher. The page can only name an application the scan found; it
 /// supplies no command, arguments or paths.
 #[tauri::command]
-fn launcher_launch(app: AppHandle, id: String) -> bool {
+fn launcher_launch(app: AppHandle, id: String, query: Option<String>) -> bool {
     let state = shell_state(&app);
     let shell = state.lock().expect("shell state");
     if shell.surface.open_panel_id() != Some("launcher") {
         return false;
+    }
+    if id == "helix:ask" {
+        let text: String = query
+            .unwrap_or_default()
+            .trim()
+            .chars()
+            .take(MAX_QUERY_CHARS)
+            .collect();
+        if text.is_empty() {
+            return false;
+        }
+        drop(shell);
+        eprintln!("LAUNCHER ask");
+        close_panel(&app);
+        // Answered or done, whichever was asked (on the main thread: opening the panel touches GTK).
+        if let Err(error) = ask(&app, &text) {
+            eprintln!("LAUNCHER ask failed: {error}");
+        }
+        return true;
+    }
+    if let Some(setting) = id.strip_prefix("helix:setting:") {
+        let row = shell
+            .setting_rows
+            .iter()
+            .find(|r| r.get("id").and_then(|v| v.as_str()) == Some(setting))
+            .cloned();
+        drop(shell);
+        let Some(row) = row else { return false };
+        close_panel(&app);
+        // A switch is flipped here (the person's own change, recorded with Undo); anything else opens its page in Settings.
+        if let Some(on) = row
+            .get("value")
+            .and_then(|v| v.as_bool())
+            .filter(|_| row.get("type").and_then(|t| t.as_str()) == Some("boolean"))
+        {
+            let id = setting.to_string();
+            eprintln!("LAUNCHER setting {id} -> {}", !on);
+            tauri::async_runtime::spawn(async move {
+                if let Some(desktop) = desktop().await {
+                    if let Err(error) = desktop
+                        .update_setting(&id, &serde_json::Value::Bool(!on))
+                        .await
+                    {
+                        eprintln!("LAUNCHER setting failed: {error}");
+                    }
+                }
+            });
+        } else {
+            let page = row
+                .get("page")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            eprintln!("LAUNCHER open settings {page}");
+            let _ = desktop_action::spawn_settings((!page.is_empty()).then_some(page.as_str()));
+        }
+        return true;
     }
     if id.starts_with("helix:desktop:") {
         let ok = desktop_action::run(&app, &id).is_ok();
@@ -2014,6 +2301,7 @@ fn main() {
             mobius_talk_clear,
             mobius_continue_full,
             mobius_act_from_talk,
+            mobius_ask,
             panel_outside,
             assistant_submit,
             assistant_confirm,
@@ -2038,10 +2326,25 @@ fn main() {
             network_forget,
             network_vpn,
             activity_view,
+            agent_sessions::agent_sessions,
+            agent_sessions::agent_session_stop,
             notify::notifications_view,
             calendar_view,
             report_glass,
             island::island_view,
+            writing::writing_view,
+            writing::writing_run,
+            writing::writing_replace,
+            writing::writing_copy,
+            pointer::pointer_view,
+            pointer::pointer_ask,
+            pointer::pointer_writing,
+            pointer::pointer_offer,
+            pointer::pointer_undo,
+            pointer::pointer_copy,
+            pointer::pointer_back,
+            notify::notification_summaries,
+            island::island_undo,
             island::media_toggle,
             island::media_next,
             island::media_previous,
@@ -2061,7 +2364,22 @@ fn main() {
             report_interactive,
             dock::dock_view,
             dock::dock_prefs,
+            clock::clock_format,
+            bar_prefs::bar_prefs,
+            shape::shape_vars,
+            ui_scale::ui_scale,
+            privacy::privacy_view,
+            agent_display::agent_display_status,
+            agent_display::agent_display_start,
+            agent_display::agent_display_stop,
+            agent_display::agent_display_launch,
+            agent_display::agent_display_input,
+            agent_display::agent_display_control,
+            agent_display::agent_display_help_done,
+            agent_display::agent_display_help,
+            agent_display::agent_display_frame,
             dock::workspaces_view,
+            dock::active_window_view,
             dock::workspace_focus,
             dock::agent_desk_focus,
             dock::dock_activate,
@@ -2148,6 +2466,11 @@ fn main() {
                 activity: Activity::default(),
                 notifications: helix_shell_model::notifications::Notifications::new(),
                 media: None,
+                recent_change: None,
+                seen_change: 0,
+                writing: writing::Writing::default(),
+                pointer: pointer::Pointer::default(),
+                glow_until: None,
                 insert_target: None,
                 tray: helix_shell_model::tray::Tray::default(),
                 tray_menu: None,
@@ -2161,6 +2484,7 @@ fn main() {
                     )),
                 ),
                 quick: Quick::default(),
+                setting_rows: Vec::new(),
                 icons: std::collections::HashMap::new(),
                 started,
                 last_phase: Phase::Idle,
@@ -2220,6 +2544,12 @@ fn main() {
                         })
                 });
             }
+            // Every surface that draws a time (the bar, the control center) hears about the clock choice.
+            clock::start(handle.clone());
+            bar_prefs::start(handle.clone());
+            shape::start(handle.clone());
+            ui_scale::start(handle.clone());
+            privacy::start(handle.clone());
             if role.is_bar_side() {
                 notify::serve(handle.clone());
                 tray::serve(handle.clone());

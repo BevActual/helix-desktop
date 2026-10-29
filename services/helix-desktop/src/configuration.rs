@@ -48,8 +48,97 @@ fn require_setting_access(state: &State, id: &str) -> fdo::Result<()> {
     Ok(())
 }
 
+/// The Settings rows as `GetSettings` returns them, as JSON: the catalogue the Settings actions search and change.
+pub(crate) fn setting_rows(state: &State) -> Vec<JsonValue> {
+    let include_desktop = state.desktop.is_some();
+    let display_names = display_output_names(state, include_desktop);
+    let gamma = gamma_available(state);
+    state
+        .config
+        .full_catalog(include_desktop, &display_names)
+        .into_iter()
+        .filter(|row| {
+            // Night Light rows exist only when the compositor offers gamma control.
+            gamma
+                || !row
+                    .get("id")
+                    .and_then(|id| id.as_str())
+                    .is_some_and(|id| id.starts_with("nightlight."))
+        })
+        .collect()
+}
+
+fn now_seconds() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Changes one setting (the person through Settings, or an agent through `settings.set`) and records it in the history of actions.
+/// Returns the history entry, which Undo names.
+pub(crate) fn apply_setting(
+    state: &mut State,
+    id: &str,
+    json: JsonValue,
+    by: &helix_actions::Actor,
+) -> Result<u64, String> {
+    if helix_config::ordered_lists::requires_update_ordered_list(id) {
+        return Err(helix_config::ordered_lists::update_ordered_list_message(id).into());
+    }
+    require_setting_access(state, id).map_err(|error| match error {
+        fdo::Error::InvalidArgs(message) => message,
+        other => other.to_string(),
+    })?;
+    state.config.force_reload();
+    let before = state.config.get(id);
+    state.config.set(id, json.clone())?;
+    let after = state.config.get(id);
+    if id == "audio.sound_volume" {
+        if let Some(volume) = json.as_f64() {
+            if let Some(sink) = state.audio.sinks().iter().find(|node| node.is_default) {
+                let sink_id = sink.id;
+                let _ = state.audio.set_volume(sink_id, volume);
+            }
+        }
+    }
+    let row = setting_rows(state)
+        .into_iter()
+        .find(|row| row.get("id").and_then(JsonValue::as_str) == Some(id))
+        .unwrap_or_else(|| serde_json::json!({ "id": id, "title": id }));
+    Ok(state.history.record(
+        now_seconds(),
+        helix_actions::settings::SET,
+        id,
+        by,
+        before,
+        after,
+        helix_actions::Undo::Restore,
+        |before, after| helix_actions::settings::sentence(&row, before, after),
+    ))
+}
+
+/// The history of actions as JSON, newest first.
+pub(crate) fn history_json(state: &State, limit: usize) -> String {
+    let entries: Vec<_> = state.history.recent(limit.clamp(1, 200));
+    serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into())
+}
+
 pub struct Configuration {
     pub state: Arc<Mutex<State>>,
+}
+
+impl Configuration {
+    /// Says the settings changed (an agent's `settings.set`, an undo), so the Settings app and the shell read them again.
+    pub async fn notify_changed(connection: &Connection) {
+        if let Ok(iface) = connection
+            .object_server()
+            .interface::<_, Configuration>(crate::agent_support::OBJECT_PATH)
+            .await
+        {
+            Self::changed(iface.signal_emitter()).await.ok();
+        }
+    }
 }
 
 fn value_from_zvariant(value: &Value<'_>) -> Option<serde_json::Value> {
@@ -250,23 +339,73 @@ impl Configuration {
 
     async fn get_settings(&self) -> Vec<OwnedValue> {
         let state = self.state.lock().await;
-        let include_desktop = state.desktop.is_some();
-        let display_names = display_output_names(&state, include_desktop);
-        let gamma = gamma_available(&state);
-        state
-            .config
-            .full_catalog(include_desktop, &display_names)
+        setting_rows(&state)
             .iter()
-            .filter(|row| {
-                // Night Light rows exist only when the compositor offers gamma control.
-                gamma
-                    || !row
-                        .get("id")
-                        .and_then(|id| id.as_str())
-                        .is_some_and(|id| id.starts_with("nightlight."))
-            })
             .filter_map(json_to_owned)
             .collect()
+    }
+
+    /// The history of actions (the person's and agents'), newest first, as JSON.
+    async fn action_history(&self, limit: u32) -> String {
+        let state = self.state.lock().await;
+        history_json(&state, limit as usize)
+    }
+
+    /// Runs an app's action (one its manifest describes) for the person at the computer, from a Helix surface they used (the Magic
+    /// Pointer): recorded in the history as theirs, with the app's own Undo. Blocked actions are refused; the surface asks before an
+    /// action marked "confirm". Returns the app's reply as JSON.
+    async fn run_app_action(
+        &self,
+        #[zbus(connection)] connection: &Connection,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        action: &str,
+        params: &str,
+    ) -> fdo::Result<String> {
+        let params: JsonValue = serde_json::from_str(params)
+            .map_err(|e| fdo::Error::InvalidArgs(format!("params: {e}")))?;
+        let manifests = crate::actions_run::manifests();
+        let (provider, found) = helix_actions::manifest::find(&manifests, action)
+            .ok_or_else(|| fdo::Error::InvalidArgs(format!("unknown action {action}")))?;
+        if found.risk == helix_actions::Risk::Blocked {
+            return Err(fdo::Error::AccessDenied(format!(
+                "{} cannot be run from here.",
+                found.title
+            )));
+        }
+        let reply = crate::actions_run::invoke_provider(connection, provider, action, &params)
+            .await
+            .map_err(fdo::Error::Failed)?;
+        let (done, undo) = helix_actions::manifest::reply_parts(&reply);
+        let sentence = done.unwrap_or_else(|| format!("{}: {}", provider.title, found.title));
+        let entry = self.state.lock().await.history.record_call(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs()),
+            action,
+            &helix_actions::Actor::person(),
+            &sentence,
+            undo,
+        );
+        Self::changed(&emitter).await.ok();
+        let mut reply = reply;
+        if let Some(object) = reply.as_object_mut() {
+            object.insert("history".into(), serde_json::json!(entry));
+            object.insert("sentence".into(), serde_json::json!(sentence));
+        }
+        Ok(reply.to_string())
+    }
+
+    /// Undoes one change from the history. Only the newest change of a thing can be undone.
+    async fn undo_action(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        entry: u64,
+    ) -> fdo::Result<String> {
+        let done = crate::actions_run::undo(&self.state, entry, &helix_actions::Actor::person())
+            .await
+            .map_err(fdo::Error::InvalidArgs)?;
+        Self::changed(&emitter).await.ok();
+        Ok(done)
     }
 
     async fn update(
@@ -277,25 +416,9 @@ impl Configuration {
     ) -> fdo::Result<()> {
         let json = value_from_zvariant(&value)
             .ok_or_else(|| fdo::Error::InvalidArgs("unsupported value type".into()))?;
-        if helix_config::ordered_lists::requires_update_ordered_list(id) {
-            let message = helix_config::ordered_lists::update_ordered_list_message(id);
-            return Err(fdo::Error::InvalidArgs(message.into()));
-        }
         let mut state = self.state.lock().await;
-        require_setting_access(&state, id)?;
-        state.config.force_reload();
-        state
-            .config
-            .set(id, json.clone())
+        apply_setting(&mut state, id, json, &helix_actions::Actor::person())
             .map_err(fdo::Error::InvalidArgs)?;
-        if id == "audio.sound_volume" {
-            if let Some(volume) = json.as_f64() {
-                if let Some(sink) = state.audio.sinks().iter().find(|node| node.is_default) {
-                    let sink_id = sink.id;
-                    let _ = state.audio.set_volume(sink_id, volume);
-                }
-            }
-        }
         drop(state);
         Self::changed(&emitter).await.ok();
         Ok(())

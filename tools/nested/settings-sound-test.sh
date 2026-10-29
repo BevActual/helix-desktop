@@ -41,4 +41,14 @@ ACTION mute {"id": 70, "value": false}
 ACTION default {"id": 71, "input": true}'
 [ "$(grep '^ACTION' "$AUDIO")" = "$EXPECTED" ] && echo "ok: exactly the expected audio actions, in order" || { fail "audio actions differ"; cat "$AUDIO"; }
 [ "$(grep -c '^REFUSED' "$AUDIO" 2>/dev/null)" = 0 ] && echo "ok: the service refused nothing" || fail "service refused something"
+echo "--- 5. testing the microphone opens the one in use, shows a level, and closes it on leaving the page"
+click_id sound-input-test; sleep 0.4
+for _ in $(seq 1 40); do grep -q "METER start 71" "$AUDIO" && break; sleep 0.1; done
+grep -q "METER start 71" "$AUDIO" && echo "ok: the meter started on the microphone in use" || { fail "meter did not start"; cat "$AUDIO"; }
+for _ in $(seq 1 40); do has_id sound-input-heard && break; sleep 0.15; done
+has_id sound-input-heard && echo "ok: the page shows it is hearing the microphone" || fail "no level on the page"
+shot settings-sound-meter
+click_id page-appearance; sleep 0.8
+grep -q "METER stop" "$AUDIO" && echo "ok: leaving the page closed the microphone" || { fail "meter did not stop"; cat "$AUDIO"; }
+[ "$(grep '^ACTION' "$AUDIO")" = "$EXPECTED" ] && echo "ok: the test sent no volume or mute changes" || fail "the meter changed the audio actions"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

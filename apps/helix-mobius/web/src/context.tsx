@@ -6,6 +6,7 @@ export interface ContextInfo {
   included_images: number; omitted_images: number;
   used_chars: number; budget_chars: number; truncated_chars: number;
   first_message: number | null;
+  model_context_tokens?: number;
 }
 interface Snapshot { id: string; brief: string; context: ContextInfo; streaming: boolean; temporary: boolean }
 export interface ContextHandle { open: (view: Snapshot) => void }
@@ -49,6 +50,7 @@ export function ChatContext({ register }: { register: (handle: ContextHandle) =>
         {info && <section className="context-history" aria-label="Recent history">
           <h4>Recent history</h4>
           <div className="context-stats"><div><strong>{info.included_messages}</strong><span>messages included</span></div><div><strong>{info.omitted_messages}</strong><span>earlier messages outside context</span></div></div>
+          <div className="context-ring-row" aria-hidden="true"><span className="context-ring context-ring-lg" style={{ "--context-fill": String(info.model_context_tokens ? Math.min(1, info.used_chars / (info.model_context_tokens * 4)) : Math.min(1, info.used_chars / info.budget_chars)) } as React.CSSProperties} /><span>{info.model_context_tokens ? `${Math.round(100 * info.used_chars / (info.model_context_tokens * 4))}% of model window (~${info.model_context_tokens.toLocaleString()} tokens)` : `${Math.round(100 * info.used_chars / info.budget_chars)}% of recent-history budget`}</span></div>
           <progress value={info.used_chars} max={info.budget_chars} aria-label="Recent history space used" />
           <p className="sheet-note">{info.used_chars.toLocaleString()} of {info.budget_chars.toLocaleString()} characters used for recent history.</p>
           {info.omitted_messages > 0 && <p className="context-notice" data-test="context-history-notice">Earlier messages stay saved in this chat, but are not currently included. Add the details you still need to the brief below.</p>}

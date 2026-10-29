@@ -26,4 +26,4 @@ export type { ItemView as NotificationItem } from "./bindings/ItemView";
 export type { MonthView } from "./bindings/MonthView";
 export type { Week as CalendarWeek } from "./bindings/Week";
 export type { Cell as CalendarCell } from "./bindings/Cell";
-export { AppFrame, Banner, Button, Chip, EmptyState, Group, hueOf, Icon, IconTile, Meter, SearchField, Segmented, Sheet, Sidebar, SidebarItem, SidebarLabel, Spinner, Switch as HxSwitch, Row as HxRow } from "./kit";
+export { ActionMenu, AppFrame, Banner, Button, Chip, EmptyState, Group, hueOf, Icon, IconTile, Meter, Popup, ProgressRing, SearchField, Segmented, Sheet, Sidebar, SidebarItem, SidebarLabel, Spinner, Switch as HxSwitch, Row as HxRow } from "./kit";

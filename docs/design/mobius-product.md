@@ -7,7 +7,7 @@ Priorities are based on current gaps in the code and everyday workflows. Each de
 | Task | Current path | Next useful improvement |
 |---|---|---|
 | Ask, explain, write, or work through code | Chat, persona/model selection, streamed answers, Stop, edit, regenerate, fork; **Tools mode** (`/tools`, welcome card, meta chip) for inline research and reviewed project commands | Deeper project-knowledge reuse across chats |
-| Continue a long task | Saved chats, projects, full-text search, Find, and a per-chat brief | Project material with visible sources and selective retrieval |
+| Continue a long task | Saved chats, projects, full-text search, Find, and a per-chat brief | While you type (Ask, local), **From your files** chips preview what knowledge would attach; replies still list passages under **From your files · n** |
 | Understand text files | Bounded attachments, excerpt cards, exact text preview | Extract readable PDF/document content and show page/source references |
 | Understand a picture | Local vision model and attached pictures | A deliberate screenshot-to-question flow |
 | Make a picture | Local SD-Turbo generation, size/seed, progress, Stop, save/copy/reuse | Reference-image editing and measured quality improvements |
@@ -31,7 +31,7 @@ When the shell recorded a pair, the note keeps those two display values, and Und
 
 ## Delivered: context and a chat brief
 
-The Context chip and `/context` expose the recent history selected by the same helper that builds the model request. The panel counts included/omitted messages and attached pictures, reports shortened message text, and states that adding a new prompt can change the selection. A boundary in the thread indicates where currently included history starts; older messages remain readable and saved.
+The Context chip and `/context` expose the recent history selected by the same helper that builds the model request. A ring on the chip and in the panel fills against the model window when `GetSnapshot.contextTokens` (local) or the OpenRouter catalog (cloud route) is known, otherwise against the recent-history character budget. The panel counts included/omitted messages and attached pictures, reports shortened message text, and states that adding a new prompt can change the selection. A boundary in the thread indicates where currently included history starts; older messages remain readable and saved.
 
 A user-maintained brief (at most 2000 Unicode characters) carries goals, decisions, and constraints separately from the recent-history allowance. It is appended to the composed system prompt for text chat, including a persona's custom prompt. It persists with the chat, is inherited by forks, and is included in Markdown exports of a conversation. Old saved chats load with an empty brief. A brief-only draft appears in the sidebar before its first message. Temporary briefs stay in memory. Brief edits are refused during an active reply and if the selected chat changed; a failed save restores the previous brief and reports the error.
 

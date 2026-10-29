@@ -74,4 +74,8 @@ c = json.load(open(glob.glob(sys.argv[1] + "/*.json")[0]))
 u = [m for m in c["messages"] if m["role"] == "user"][-1]
 assert "Describe this part" in u["text"] and u.get("images"), u
 PY
+read -r ax ay bx by < /tmp/claude-1000/img-drag
+"$PT" $ax $ay drag $bx $by; sleep 1.5
+wait_id img-region-blur 10 && click_id img-region-blur; sleep 2
+[ "$(steps)" = "Black and white|Rotate 90°|Brightness +20|Crop to 10×10|Blur area 3.0;5" ] && echo "ok: Blur area applied only inside the selection" || fail "region blur: $(steps)"
 [ "$FAILED" = 0 ] && echo "PASS: mobius image" || exit 1

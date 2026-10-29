@@ -33,8 +33,55 @@ probe send Chat "One" "x" 1 -1 >/dev/null
 probe send Chat2 "Two" "x" 1 -1 >/dev/null
 probe send Chat3 "Three" "x" 1 -1 >/dev/null
 wait_log 'toasts=1 items=4' 20 && echo "ok: one banner, all four in the list" || fail "wrong banner count: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+echo "--- 2b. do not disturb from the file hides an ordinary banner"
+echo '{"version":1,"toast_seconds":6,"max_toasts":3,"dnd":true}' > "$FILE"
+for _ in $(seq 1 20); do grep -q 'NOTIFICATIONS settings seconds=6 toasts=3 dnd=true' "$LOG" && break; sleep 0.25; done
+grep -q 'NOTIFICATIONS settings seconds=6 toasts=3 dnd=true' "$LOG" && echo "ok: do not disturb from the file" || fail "dnd not applied"
+probe send Quiet "hidden" "x" 1 -1 >/dev/null
+wait_log 'toasts=0 .*dnd=true' 20 && echo "ok: an ordinary banner stayed hidden" || fail "banner showed during do not disturb: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
 echo "--- 3. back to the defaults, and a damaged file means the defaults"
 echo 'not json' > "$FILE"
-for _ in $(seq 1 20); do grep -q 'NOTIFICATIONS settings seconds=6 toasts=3' "$LOG" && break; sleep 0.25; done
-grep -q 'NOTIFICATIONS settings seconds=6 toasts=3' "$LOG" && echo "ok: defaults again" || fail "damaged file did not give the defaults"
+for _ in $(seq 1 20); do grep -q 'NOTIFICATIONS settings seconds=6 toasts=3 dnd=false' "$LOG" && break; sleep 0.25; done
+grep -q 'NOTIFICATIONS settings seconds=6 toasts=3 dnd=false' "$LOG" && echo "ok: defaults again" || fail "damaged file did not give the defaults"
+echo "--- 4. quiet hours covering this hour hide an ordinary banner; an urgent one still shows"
+sleep 7
+HOUR=$(date +%-H)
+END=$(( (10#$HOUR + 1) % 24 ))
+printf '{"version":1,"toast_seconds":6,"max_toasts":3,"dnd":false,"quiet":true,"quiet_start":%s,"quiet_end":%s}\n' "$HOUR" "$END" > "$FILE"
+for _ in $(seq 1 20); do grep -q 'dnd=false quiet=true' "$LOG" && break; sleep 0.25; done
+grep -q 'dnd=false quiet=true' "$LOG" && echo "ok: quiet hours cover this hour" || fail "quiet hours not applied: $(grep 'NOTIFICATIONS settings' "$LOG" | tail -2)"
+ITEMS=$(grep 'NOTIFICATIONS view' "$LOG" | tail -1 | sed -n 's/.*items=\([0-9]*\).*/\1/p')
+probe send Day "hidden" "x" 1 -1 >/dev/null
+wait_log "toasts=0 items=$((ITEMS + 1))" 20 && echo "ok: an ordinary banner stayed hidden during quiet hours" || fail "banner showed during quiet hours: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+probe send Power "low" "x" 2 -1 >/dev/null
+wait_log "toasts=1 items=$((ITEMS + 2))" 20 && echo "ok: an urgent banner still shows" || fail "urgent banner hidden: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+echo "--- 5. a window that does not cover this hour leaves ordinary banners showing"
+sleep 7
+START=$(( (10#$HOUR + 2) % 24 ))
+END=$(( (10#$HOUR + 3) % 24 ))
+OUTSIDE=$(grep -c 'dnd=false quiet=false' "$LOG" || true)
+printf '{"version":1,"toast_seconds":6,"max_toasts":3,"dnd":false,"quiet":true,"quiet_start":%s,"quiet_end":%s}\n' "$START" "$END" > "$FILE"
+NOW=$OUTSIDE
+for _ in $(seq 1 20); do NOW=$(grep -c 'dnd=false quiet=false' "$LOG" || true); [ "$NOW" -gt "$OUTSIDE" ] && break; sleep 0.25; done
+[ "$NOW" -gt "$OUTSIDE" ] && echo "ok: quiet hours are outside this hour" || fail "quiet hours stayed on: $(grep 'NOTIFICATIONS settings' "$LOG" | tail -2)"
+probe send Outside "shown" "x" 1 -1 >/dev/null
+wait_log "toasts=2 items=$((ITEMS + 3))" 20 && echo "ok: an ordinary banner shows outside quiet hours" || fail "banner stayed hidden: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+echo "--- 6. per-application rules: Quiet is listed but never a banner, Off is not kept, an urgent one always shows"
+sleep 7
+printf '{"version":1,"toast_seconds":6,"max_toasts":3,"app_rules":{"chat":"quiet","spam":"off"}}\n' > "$FILE"
+sleep 2
+ITEMS=$(grep 'NOTIFICATIONS view' "$LOG" | tail -1 | sed -n 's/.*items=\([0-9]*\).*/\1/p')
+probe send Chat "quiet one" "x" 1 -1 >/dev/null
+wait_log "toasts=0 items=$((ITEMS + 1))" 20 && echo "ok: a Quiet application is listed with no banner" || fail "quiet app: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+probe send Spam "dropped" "x" 1 -1 >/dev/null
+sleep 2
+[ "$(grep 'NOTIFICATIONS view' "$LOG" | tail -1 | sed -n 's/.*items=\([0-9]*\).*/\1/p')" = "$((ITEMS + 1))" ] && echo "ok: an Off application is not kept" || fail "off app kept: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+probe send Spam "disk full" "x" 2 -1 >/dev/null
+wait_log "toasts=1 items=$((ITEMS + 2))" 20 && echo "ok: an urgent one from an Off application still shows" || fail "urgent spam: $(grep 'NOTIFICATIONS view' "$LOG" | tail -1)"
+APPS=$SCRATCH/config/helix/notification-apps.json
+python3 - "$APPS" <<'PY' && echo "ok: the applications seen are written for Settings" || fail "notification-apps.json: $(cat "$APPS" 2>&1)"
+import json, sys
+seen = [a.lower() for a in json.load(open(sys.argv[1]))]
+assert {"chat", "spam", "mail"} <= set(seen), seen
+PY
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

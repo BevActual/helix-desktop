@@ -29,6 +29,19 @@ fn read_dock_prefs() -> DockPrefs {
         .unwrap_or_default()
 }
 
+/// The space the dock keeps free at the person's interface scale.
+fn dock_zone() -> Option<i32> {
+    read_dock_prefs()
+        .reserved_height()
+        .map(|h| helix_shell_model::ui_scale::scaled(h, helix_shell_model::ui_scale::read()))
+}
+
+fn scale_stamp() -> Option<std::time::SystemTime> {
+    helix_shell_model::ui_scale::state_path()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .and_then(|m| m.modified().ok())
+}
+
 fn make_transparent(window: &gtk::Window) {
     window.set_decorated(false);
     window.set_accept_focus(false);
@@ -177,22 +190,24 @@ fn main() {
     });
 
     let dock = Rc::new(RefCell::new(DockStrut::new()));
-    dock.borrow_mut().apply(read_dock_prefs().reserved_height());
+    dock.borrow_mut().apply(dock_zone());
 
     // Poll dock prefs (stat); same cadence as the bar dock bridge.
     let dock_watch = dock.clone();
-    let mut seen = dock_prefs_path()
-        .and_then(|p| std::fs::metadata(p).ok())
-        .and_then(|m| m.modified().ok());
+    let stamp = || {
+        (
+            dock_prefs_path()
+                .and_then(|p| std::fs::metadata(p).ok())
+                .and_then(|m| m.modified().ok()),
+            scale_stamp(),
+        )
+    };
+    let mut seen = stamp();
     gtk::glib::timeout_add_local(Duration::from_secs(1), move || {
-        let now = dock_prefs_path()
-            .and_then(|p| std::fs::metadata(p).ok())
-            .and_then(|m| m.modified().ok());
+        let now = stamp();
         if now != seen {
             seen = now;
-            dock_watch
-                .borrow_mut()
-                .apply(read_dock_prefs().reserved_height());
+            dock_watch.borrow_mut().apply(dock_zone());
         }
         gtk::glib::ControlFlow::Continue
     });

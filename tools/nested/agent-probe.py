@@ -2,6 +2,7 @@
 """A stand-in agent for nested tests. Usage:
   agent-probe.py grant <tiers...>   Hello + RequestAccess; prints COMPLETED ok=<bool> result=<json>
   agent-probe.py act <tool> [arg...] Hello + Action; prints COMPLETED ok=<bool> result=<json>
+  agent-probe.py action <id> <json>  Hello + Action for a catalogue action (docs/design/actions.md) with its params as JSON
 Same executable path every time, so the service sees the same client and its grants persist between calls.
 Exit 0 whether or not the operation succeeded (the test reads the printed result); 2 on timeout."""
 import json
@@ -37,6 +38,9 @@ if verb == "grant":
     (operation,) = call("RequestAccess", GLib.Variant("(as)", (rest,)), "(t)")
 elif verb == "act":
     options = {"argv": GLib.Variant("as", rest[1:]), "literal": GLib.Variant("as", []), "reason": GLib.Variant("s", "nested test")}
+    (operation,) = call("Action", GLib.Variant("(sa{sv})", (rest[0], options)), "(t)")
+elif verb == "action":
+    options = {"params": GLib.Variant("s", rest[1] if len(rest) > 1 else "{}"), "reason": GLib.Variant("s", "nested test")}
     (operation,) = call("Action", GLib.Variant("(sa{sv})", (rest[0], options)), "(t)")
 else:
     sys.exit("unknown verb")

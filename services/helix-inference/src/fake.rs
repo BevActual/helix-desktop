@@ -12,6 +12,8 @@ pub struct FakeBackend {
     pub reply: String,
     pub chunk_chars: usize,
     pub per_chunk: Duration,
+    /// A models folder whose files are listed too (so downloads show up), though only `fake-model` answers.
+    pub folder: Option<std::path::PathBuf>,
     state: Mutex<FakeState>,
     progress: Mutex<Option<ProgressFn>>,
 }
@@ -27,6 +29,7 @@ impl FakeBackend {
             reply: reply.to_string(),
             chunk_chars: 3,
             per_chunk,
+            folder: None,
             state: Mutex::new(FakeState::default()),
             progress: Mutex::new(None),
         }
@@ -39,12 +42,21 @@ impl FakeBackend {
 
 impl Backend for FakeBackend {
     fn models(&self) -> Vec<ModelInfo> {
-        vec![ModelInfo {
+        let mut out = vec![ModelInfo {
             id: "fake-model".into(),
             bytes: 1,
             loaded: self.loaded() == "fake-model",
             vision: true,
-        }]
+        }];
+        if let Some(dir) = &self.folder {
+            out.extend(crate::models::list(dir).into_iter().map(|m| ModelInfo {
+                id: m.id,
+                bytes: m.bytes,
+                loaded: false,
+                vision: m.vision,
+            }));
+        }
+        out
     }
 
     fn load(&self, model: &str) -> Result<(), String> {
@@ -108,7 +120,11 @@ impl Backend for FakeBackend {
     }
 
     fn snapshot(&self) -> Value {
-        json!({"backend": "fake", "loaded": self.loaded()})
+        json!({
+            "backend": "fake",
+            "loaded": self.loaded(),
+            "contextTokens": 8192
+        })
     }
 }
 

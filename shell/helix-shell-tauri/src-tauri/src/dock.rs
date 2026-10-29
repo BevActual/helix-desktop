@@ -50,8 +50,13 @@ fn apply_reserve(app: &AppHandle, prefs: &helix_config::dock_prefs::DockPrefs) {
     if crate::strut::strut_unit_active() {
         return;
     }
-    let height = prefs.reserved_height();
+    let height = prefs.reserved_height().map(crate::ui_scale::scaled);
     let _ = app.run_on_main_thread(move || crate::layer::set_dock_strut(height));
+}
+
+/// Applies the dock's strip again (the interface scale changed its size).
+pub fn reapply_reserve(app: &AppHandle) {
+    apply_reserve(app, &prefs());
 }
 
 pub fn prefs() -> helix_config::dock_prefs::DockPrefs {
@@ -173,7 +178,7 @@ pub(crate) fn niri_action(action: &Value) -> Result<(), String> {
     }
 }
 
-fn focus_window(id: u64) -> Result<(), String> {
+pub(crate) fn focus_window(id: u64) -> Result<(), String> {
     let reply = request(&serde_json::json!({"Action": {"FocusWindow": {"id": id}}}).to_string())?;
     if reply.contains("\"Ok\"") {
         Ok(())
@@ -284,7 +289,62 @@ pub fn refresh(app: &AppHandle) {
     );
     let _ = app.emit("dock-view", view);
     publish_workspaces(app);
+    publish_active_window(app);
     crate::island::publish(app);
+}
+
+#[derive(Clone, Default, PartialEq, Eq, Serialize)]
+pub struct ActiveWindow {
+    app: String,
+    title: String,
+}
+
+/// The window that has the focus: the application's name (from its desktop entry, else the app id) and the window's title, for the bar.
+fn active_window(app: &AppHandle) -> ActiveWindow {
+    let state = shell_state(app);
+    let shell = state.lock().expect("shell state");
+    let Some(window) = shell.niri.windows().find(|w| w.focused) else {
+        return ActiveWindow::default();
+    };
+    let id = window.app_id.to_lowercase();
+    let name = shell
+        .dock_apps
+        .iter()
+        .find(|a| {
+            a.id.trim_end_matches(".desktop").to_lowercase() == id
+                || (!a.startup_wm_class.is_empty() && a.startup_wm_class.to_lowercase() == id)
+        })
+        .map(|a| a.name.clone())
+        .unwrap_or_else(|| window.app_id.clone());
+    let clean = |text: &str, max: usize| -> String {
+        text.chars()
+            .filter(|c| !c.is_control())
+            .take(max)
+            .collect::<String>()
+            .trim()
+            .to_string()
+    };
+    ActiveWindow {
+        app: clean(&name, 60),
+        title: clean(&window.title, 120),
+    }
+}
+
+#[tauri::command]
+pub fn active_window_view(app: AppHandle) -> ActiveWindow {
+    active_window(&app)
+}
+
+/// Tells the page which window has the focus, but only when it changed (the event stream is chatty).
+fn publish_active_window(app: &AppHandle) {
+    static LAST: std::sync::Mutex<Option<ActiveWindow>> = std::sync::Mutex::new(None);
+    let now = active_window(app);
+    let mut last = LAST.lock().expect("active window");
+    if last.as_ref() != Some(&now) {
+        eprintln!("ACTIVE-WINDOW app={:?} title={:?}", now.app, now.title);
+        *last = Some(now.clone());
+        let _ = app.emit("active-window", now);
+    }
 }
 
 /// Tells the page the workspace strip, but only when it differs from what it was last told (the event stream is chatty).

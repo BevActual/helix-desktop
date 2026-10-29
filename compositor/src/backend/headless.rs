@@ -42,6 +42,17 @@ impl Headless {
             && self.add_renderer().is_ok()
         {
             self.add_output(niri, 1, (1280, 720));
+            // A test of several displays asks for more: `HELIX_NESTED_EXTRA_OUTPUTS=1024x768,1920x1080`.
+            if let Some(extra) = std::env::var_os("HELIX_NESTED_EXTRA_OUTPUTS") {
+                for (n, spec) in (2u8..).zip(extra.to_string_lossy().split(',')) {
+                    let size = spec.split_once('x').and_then(|(w, h)| {
+                        Some((w.trim().parse::<u16>().ok()?, h.trim().parse::<u16>().ok()?))
+                    });
+                    if let Some(size) = size.filter(|(w, h)| *w >= 320 && *h >= 240) {
+                        self.add_output(niri, n, size);
+                    }
+                }
+            }
         }
     }
 

@@ -1,0 +1,21 @@
+[package]
+name = "helix-cli"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "`helix`: the actions catalogue, its history and Undo from a terminal or a script (docs/design/actions.md)."
+
+[[bin]]
+name = "helix"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
+zbus = { workspace = true }
+futures-util = { workspace = true }
+
+[lints]
+workspace = true

@@ -44,7 +44,7 @@ function FileSources({ files, index }: { files: FileRef[]; index: number }) {
     </section>
   );
 }
-interface ReplyStats { model: string; tokens: number; ms: number; files?: FileRef[]; cost_micro?: number | null }
+interface ReplyStats { model: string; tokens: number; ms: number; files?: FileRef[]; cost_micro?: number | null; route?: string }
 export interface Message { activities?: Activity[]; sources?: Source[]; role: string; text: string; blocks: Block[]; images?: string[]; stats?: ReplyStats | null; }
 /** What a reply cost, in a few words: the model, its tokens, and how fast they came. */
 /** What a cloud reply cost, in plain words: "about $0.0012", "free", or nothing when it was not reported. */
@@ -116,6 +116,8 @@ export interface ThreadHooks {
   send: (text: string) => void;
   /** Asks the shell to write this task's previous value back. */
   undo: (id: number) => void;
+  /** Opens a file from the project folder on the Code stage. */
+  openProjectFile?: (path: string) => void;
 }
 export interface ThreadHandle {
   /** The whole chat, drawn now (synchronously) so the page can scroll and find in it straight away. */
@@ -229,7 +231,7 @@ function Step({ activity, streaming, hooks }: { activity: Activity; streaming: b
           {activity.tool === "edit_file" ? <Diff text={activity.input} testId="tool-command" /> : <pre data-test="tool-command">{activity.input}</pre>}
           <p className="sheet-note">{activity.output}</p>
           <div className="tool-review">
-            <button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : activity.tool === "agent_permission" ? "Allow once" : "Allow lookup"}</button>
+            <button className="primary" data-test="tool-approve" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: true }).catch(hooks.report)}>{activity.tool === "terminal" ? "Run command" : activity.tool === "edit_file" ? "Apply edit" : activity.tool === "agent_permission" ? "Allow once" : activity.tool === "display_launch" ? "Open app" : activity.tool === "display_look" ? "Allow look" : "Allow lookup"}</button>
             <button data-test="tool-decline" disabled={!streaming} onClick={() => invoke("tools_review", { activityId: activity.id, approved: false }).catch(hooks.report)}>Skip</button>
           </div>
         </div>
@@ -287,26 +289,58 @@ function Timeline({ activities, streaming, live, hooks }: { activities: Activity
 
 interface FileChange { path: string; kind: string; diff: string; added: number; removed: number; reverted: boolean }
 
+function splitUnifiedHunks(diff: string): { head: string; hunks: string[] } {
+  const hunks: string[] = [];
+  let head: string[] = [];
+  let current: string[] = [];
+  for (const line of diff.replace(/\n$/, "").split("\n")) {
+    if (line.startsWith("@@")) {
+      if (current.length) hunks.push(current.join("\n"));
+      current = [line];
+    } else if (current.length) current.push(line);
+    else head.push(line);
+  }
+  if (current.length) hunks.push(current.join("\n"));
+  return { head: head.join("\n"), hunks };
+}
+
 /** Everything a Tools turn changed in the project folder, file by file with its diff, and a way to put each file back. */
 function ChangesCard({ activity, streaming, hooks }: { activity: { id: string; input: string; output: string }; streaming: boolean; hooks: ThreadHooks }) {
   let files: FileChange[] = [];
   try { files = JSON.parse(activity.input); } catch { /* shown as empty */ }
   return <section className="changes-card" data-test="changes-card" aria-label="Changes made to the project folder">
     <div className="changes-head"><strong>Changes</strong><span>{activity.output}</span></div>
-    {files.map((file, i) => <details key={file.path} className={file.reverted ? "reverted" : ""} data-test={`change-${i}`}>
-      <summary>
-        <span className={`change-kind ${file.kind}`}>{file.kind}</span>
-        <span className="change-path">{file.path}</span>
-        <span className="change-count">{file.reverted ? "reverted" : `+${file.added} −${file.removed}`}</span>
-        {!file.reverted && <button type="button" className="mini" data-test={`change-revert-${i}`} disabled={streaming}
-          onClick={(event) => { event.preventDefault(); invoke("tools_revert_change", { activityId: activity.id, index: i }).catch(hooks.report); }}>Revert</button>}
-      </summary>
-      <Diff text={file.diff} unified />
-    </details>)}
+    {files.map((file, i) => {
+      const parts = splitUnifiedHunks(file.diff);
+      const showHunks = !file.reverted && file.kind === "modified" && parts.hunks.length > 1;
+      return <details key={file.path} className={file.reverted ? "reverted" : ""} data-test={`change-${i}`}>
+        <summary>
+          <span className={`change-kind ${file.kind}`}>{file.kind}</span>
+          <span className="change-path">{file.path}</span>
+          <span className="change-count">{file.reverted ? "reverted" : `+${file.added} −${file.removed}`}</span>
+          {file.kind !== "deleted" && hooks.openProjectFile ? <button type="button" className="mini" data-test={`change-open-${i}`} disabled={streaming}
+            onClick={(event) => { event.preventDefault(); hooks.openProjectFile?.(file.path); }}>Open</button> : null}
+          {!file.reverted && <button type="button" className="mini" data-test={`change-revert-${i}`} disabled={streaming}
+            onClick={(event) => { event.preventDefault(); invoke("tools_revert_change", { activityId: activity.id, index: i }).catch(hooks.report); }}>Revert file</button>}
+        </summary>
+        {showHunks ? <>
+          {parts.head ? <Diff text={parts.head} unified /> : null}
+          {parts.hunks.map((hunk, hi) => <div key={hi} className="change-hunk" data-test={`change-hunk-${i}-${hi}`}>
+            <div className="change-hunk-head"><span className="stage-state">Change {hi + 1} of {parts.hunks.length}</span>
+              <button type="button" className="mini primary" data-test={`change-hunk-accept-${i}-${hi}`} disabled={streaming}
+                onClick={() => invoke("tools_accept_hunk", { activityId: activity.id, index: i, hunk: hi }).catch(hooks.report)}>Accept this hunk</button>
+              <button type="button" className="mini" data-test={`change-hunk-revert-${i}-${hi}`} disabled={streaming}
+                onClick={() => invoke("tools_revert_hunk", { activityId: activity.id, index: i, hunk: hi }).catch(hooks.report)}>Reject this hunk</button>
+            </div>
+            <Diff text={hunk} unified />
+          </div>)}
+        </> : <Diff text={file.diff} unified />}
+      </details>;
+    })}
   </section>;
 }
 
-export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, onStage, onEdits, onDocEdits, writing }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void; onStage?: (title: string, body: string) => void; onEdits?: (ops: Record<string, unknown>[]) => void; onDocEdits?: (ops: Record<string, unknown>[]) => void; writing?: boolean }) {
+export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, onStage, onEdits, onDocEdits, writing, thinking = "folded" }: { blocks: Block[]; needle: string; report: ThreadHooks["report"]; onSaveSnippet?: (body: string, defaultFilename: string) => void; live?: boolean; onSend?: (text: string) => void; onStage?: (title: string, body: string) => void; onEdits?: (ops: Record<string, unknown>[]) => void; onDocEdits?: (ops: Record<string, unknown>[]) => void; writing?: boolean; thinking?: "open" | "folded" | "hidden" }) {
   return (
     <>
       {blocks.map((block, index) => {
@@ -363,7 +397,8 @@ export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, on
             </div>;
           }
           case "thinking":
-            return <details key={index} className="thinking" data-test="thinking" open={!block.done}>
+            if (thinking === "hidden") return null;
+            return <details key={index} className="thinking" data-test="thinking" open={thinking === "open" || !block.done}>
               <summary>{block.done ? "Thought it through" : "Thinking…"}</summary>
               <p>{block.text}</p>
             </details>;
@@ -411,6 +446,20 @@ export function Blocks({ blocks, needle, report, onSaveSnippet, live, onSend, on
  * index of the message acted on. Find highlighting is done here, so nothing else touches these nodes. */
 interface ReplySaveState { body: string; defaultFilename: string; busy: boolean; error: string }
 
+function useReplyThinking(): "open" | "folded" | "hidden" {
+  const [mode, setMode] = useState<"open" | "folded" | "hidden">("folded");
+  useEffect(() => {
+    const apply = (value: string) => {
+      if (value === "open" || value === "folded" || value === "hidden") setMode(value);
+    };
+    invoke<{ thinking: string }>("reply_prefs").then((prefs) => apply(prefs.thinking), () => undefined);
+    const onPrefs = (event: Event) => apply(String((event as CustomEvent<{ thinking?: string }>).detail?.thinking ?? ""));
+    window.addEventListener("mobius-reply-prefs", onPrefs);
+    return () => window.removeEventListener("mobius-reply-prefs", onPrefs);
+  }, []);
+  return mode;
+}
+
 export function Thread({ register, hooks }: { register: (handle: ThreadHandle) => void; hooks: ThreadHooks }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const saveDialog = useRef<HTMLDialogElement>(null);
@@ -423,6 +472,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
   const [editing, setEditing] = useState<number | null>(null);
   const [needle, setNeedle] = useState("");
   const [progress, setProgress] = useState({ fraction: 0, stage: "Queued for local image generation" });
+  const thinking = useReplyThinking();
   useEffect(() => { const stop = listen<{ fraction: number; stage: string }>("image-progress", setProgress); return () => { stop.then((fn) => fn()); }; }, []);
 
   useEffect(() => {
@@ -499,7 +549,8 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               {editing === index ? <InlineEdit initial={message.text} onCancel={() => setEditing(null)} onSend={(text) => { setEditing(null); hooks.edited(index, text); }} /> : <div className="msg-body">{message.sources?.length ? <><p>{highlight(message.text.split("\n\n--- Online sources")[0], needle)}</p><details className="web-request-evidence"><summary>Question and source excerpts</summary><pre>{highlight(message.text, needle)}</pre></details></> : highlight(message.text, needle)}</div>}
               {editing !== index && <div className="msg-actions">
                   {!message.text.startsWith("/image ") && !message.sources?.length && !messages[index + 1]?.activities?.length && <button className="mini" data-test={`edit-${index}`} onClick={() => setEditing(index)}>Edit</button>}
-                  <button className="mini" data-test={`act-${index}`} title="Have Mobius change the desktop using this" onClick={() => hooks.act(message.text)}>Act</button>
+                  <button className="mini" data-test={`act-${index}`} title="Have Mobius change the desktop using this" onClick={() => hooks.act(message.text)}>Do it</button>
+                  <button className="mini" data-test={`task-${index}`} title="Give this to an agent as a task that runs on its own" onClick={() => window.dispatchEvent(new CustomEvent("mobius-run-as-task", { detail: { goal: message.text } }))}>Run as task</button>
                   <button className="mini" data-test={`quote-${index}`} title="Insert into the composer" onClick={() => hooks.quote(message.text)}>Quote</button>
                   {!streaming ? <button className="mini" data-test={`fork-user-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
                 </div>}
@@ -507,21 +558,21 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
           );
         }
         const blocks = last && live ? live : message.blocks;
+        const shown = thinking === "hidden" ? blocks.filter((block) => block.kind !== "thinking") : blocks;
         return (
           <Fragment key={index}>{boundary}<div className={`msg ${message.role}${last && streaming ? " live" : ""}`} data-test={`msg-${index}`}>
             <div className="msg-body">
               {message.images?.map((id) => <GeneratedPicture key={id} id={id} streaming={streaming} hooks={hooks} />)}
               {!!message.activities?.length && <Timeline activities={message.activities} streaming={streaming} live={last && streaming} hooks={hooks} />}
-              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} onStage={hooks.stage} onEdits={hooks.applyEdits} onDocEdits={hooks.applyDocEdits} writing={last && streaming} />
+              <Blocks blocks={blocks} needle={needle} report={hooks.report} onSaveSnippet={!streaming ? beginSave : undefined} live={last && !streaming} onSend={hooks.send} onStage={hooks.stage} onEdits={hooks.applyEdits} onDocEdits={hooks.applyDocEdits} writing={last && streaming} thinking={thinking} />
               {last && !streaming && message.stats ? <CompareBar index={index} current={{ text: message.text, model: message.stats.model, tokens: message.stats.tokens, ms: message.stats.ms }} streaming={streaming} report={hooks.report} /> : null}
               {!!message.sources?.length && <section className="answer-web-sources" data-test="answer-web-sources" aria-label="Online sources provided to the model"><strong>Online sources</strong>{message.sources.map((source, i) => <div key={`${i}:${source.url}`}><button type="button" className="web-citation" data-test={`answer-source-${index}-${i}`} title={source.url} onClick={() => invoke("web_open_source", { url: source.url }).catch(hooks.report)}>[{i + 1}] {source.title || source.url}</button><span>{source.kind === "page" ? "Page excerpt" : `Search snippet${source.provider ? ` · ${source.provider}` : ""}`} · retrieved {new Date(source.fetched * 1000).toLocaleDateString()}</span></div>)}</section>}
               {!streaming && message.stats?.files?.length ? <FileSources files={message.stats.files} index={index} /> : null}
               {last && streaming && messages[index - 1]?.text.startsWith("/image ") && !messages[index - 1]?.sources?.length && <div className="image-progress" data-test="image-generation-progress"><p>{progress.stage}</p><progress value={Number.isFinite(progress.fraction) ? Math.max(0, Math.min(1, progress.fraction)) : 0} max={1} /><p className="sheet-note">On this computer · use Stop to cancel</p></div>}
-              {!blocks.length && !message.activities?.some((activity) => activity.state === "waiting" || activity.state === "running") ? (
-                <span className="typing-dots" data-test="typing" aria-label="Thinking">
-                  <span className="dot" /><span className="dot" /><span className="dot" />
-                </span>
+              {!shown.length && !message.activities?.some((activity) => activity.state === "waiting" || activity.state === "running") ? (
+                <span className="typing-dots" data-test="typing" aria-label="Writing"><span className="dot" />Writing</span>
               ) : null}
+              {last && streaming && !!shown.length ? <span className="writing-caret" data-test="writing-caret" aria-hidden="true" /> : null}
             </div>
             <div className="msg-actions">
               <button className="mini" data-test={`copy-${index}`} onClick={() => invoke("chat_copy", { text: message.text })}>Copy</button>
@@ -529,13 +580,13 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
                 <button className="mini" data-test={`save-reply-${index}`} title="Preview and save this reply to a file" onClick={() => openSave(index)}>Save as file</button>
               ) : null}
               {!streaming && message.text.trim() ? (
-                <button className="mini" data-test={`act-assistant-${index}`} title="Have Mobius act from this reply" onClick={() => hooks.act(message.text)}>Act</button>
+                <button className="mini" data-test={`act-assistant-${index}`} title="Have Mobius act from this reply" onClick={() => hooks.act(message.text)}>Do it</button>
               ) : null}
               {!streaming ? <button className="mini" data-test={`fork-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
               {last && !streaming && !message.images?.length && !message.activities?.length ? (
                 <Regenerate disabled={streaming} report={hooks.report} />
               ) : null}
-              {!streaming && replyDetails(message.stats) ? <span className="msg-stats" data-test={`stats-${index}`}>{replyDetails(message.stats)}</span> : null}
+              {!streaming && replyDetails(message.stats) ? <span className="msg-stats" data-test={`stats-${index}`} title={message.stats?.route || undefined}>{replyDetails(message.stats)}</span> : null}
             </div>
           </div></Fragment>
         );

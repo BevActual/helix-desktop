@@ -152,7 +152,7 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
           </button>
         </div>
       </div>
-      <h4>Agent desk &amp; compositor</h4>
+      <h4>Agent workspace</h4>
       <div className="rows-card" data-test="compositor-card">
         <p className="setting-about note">
           Helix keeps compositor snippets in <code>helix-setup.kdl</code> (included from your niri <code>config.kdl</code>), separate from theme and layout includes Control Center writes. Agent-launched windows open on the named desk without switching your workspace.
@@ -162,7 +162,7 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
         ) : null}
         {compositor?.caps.agent_desk ? (
           <>
-            <label className="sheet-field" htmlFor="agent-desk-name">Agent desk workspace name</label>
+            <label className="sheet-field" htmlFor="agent-desk-name">Agent workspace name</label>
             <div className="setting-row">
               <input
                 id="agent-desk-name"
@@ -187,8 +187,8 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
             ) : null}
             <div className="setting-row">
               <div className="setting-text">
-                <div className="setting-title">Place agent app launches on the agent desk</div>
-                <div className="setting-about">When off, Act and app-launch open on your current workspace (legacy behaviour).</div>
+                <div className="setting-title">Open agents' apps in the agent workspace</div>
+                <div className="setting-about">When off, apps an agent opens appear on the workspace you are using.</div>
               </div>
               <input
                 type="checkbox"
@@ -209,7 +209,7 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
             ) : null}
             <div className="setting-row">
               <button type="button" data-test="agent-desk-focus" onClick={() => invoke("compositor_focus_agent_desk").catch((error) => setNote(String(error)))}>
-                Show agent desk
+                Show agent workspace
               </button>
               <button type="button" data-test="open-compositor-setup" onClick={() => invoke("compositor_open_config", { which: "setup" }).catch((error) => setNote(String(error)))}>
                 Open helix-setup.kdl
@@ -289,6 +289,7 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
       <div>
         {view?.clients.map((client, index) => <Client key={client.id} client={client} index={index} />)}
         {view && view.status === "connected" && view.clients.length === 0 ? <div className="empty">No application has been given access.</div> : null}
+        {view && view.status !== "connected" ? <div className="empty">Shown once Settings is connected to the desktop service.</div> : null}
       </div>
       <h4>Recent activity</h4>
       <div>

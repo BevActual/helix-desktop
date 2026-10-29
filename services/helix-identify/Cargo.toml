@@ -1,0 +1,17 @@
+[package]
+name = "helix-identify"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Flashes a number on each screen for a few seconds, so Settings can say which screen is which."
+
+[dependencies]
+smithay-client-toolkit = "0.21"
+wayland-client = { workspace = true }
+cairo-rs = { version = "0.21" }
+pango = { version = "0.21", features = ["v1_44"] }
+pangocairo = "0.21"
+
+[lints]
+workspace = true

@@ -81,3 +81,19 @@ actions and synthetic input are out of scope for v1.
 | `app_launch` | Launch an installed app by desktop id or name |
 | `window_close` | Close the focused window, or a window id |
 | `dnd_toggle` | Toggle Do not disturb; returns on or off |
+
+## Computer use: Helix's sandboxed computer for your agent
+
+Nine `computer_*` tools give any MCP agent (Hermes, Claude Code, Cursor, a ChatGPT desktop connector, anything that speaks MCP) a **screen of its own** to
+work on: `computer_launch`, `computer_screenshot` (returned as an image), `computer_click`, `computer_move`, `computer_scroll`, `computer_key`,
+`computer_type`, `computer_state` and `computer_ask_for_help`. They act on the **agent display** only (a separate headless compositor with its own session
+bus, home and runtime directory; see `docs/design/computer-use.md`), never on your desktop, your windows, your clipboard or your stored logins.
+
+* The person approves each application launch (confirm tier). Screenshots need the `observe-private` grant, input needs `act`.
+* The person can **watch** the display from the bar's island, **take over** with the mouse and keyboard (the agent is paused and its inputs are
+  refused), and **is asked for help** when the agent calls `computer_ask_for_help("sign in to the portal")`, which blocks until they press *Done, carry on*.
+* Agents must never type a password: they ask for help and the person types it.
+* Coordinates are pixels in the screenshot (1280 x 720, 0,0 at the top left). Inputs are limited to 12 a second.
+
+`.venv/bin/python -m unittest test_computer_tools` checks how each tool becomes a `display-*` command.
+

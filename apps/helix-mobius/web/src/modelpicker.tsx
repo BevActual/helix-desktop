@@ -59,7 +59,7 @@ export function ModelPicker({ local, titles, chatgpt, cloud, hidden, loading, on
         ))}
         {rows.length === 0 ? <li className="picker-empty" data-test="picker-empty">{needle ? "Nothing matches. A model id like vendor/model-name can be added." : "No models yet. Get one in the Library, or search OpenRouter above."}</li> : null}
       </ul>
-      <p className="set-hint">Turned-off models stay installed and can still be chosen in Settings. The picker is the model menu in a chat. <button type="button" className="set-link" data-test="picker-to-tasks" onClick={onTasks}>Which model does which job →</button></p>
+      <p className="set-hint">A model you turn off stays installed and can still do a task. This list is only the menu in the composer. <button type="button" className="set-link" data-test="picker-to-tasks" onClick={onTasks}>Which model does each task →</button></p>
     </div>
   );
 }

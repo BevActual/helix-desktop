@@ -92,6 +92,14 @@ pub fn emit(app: &AppHandle) {
 fn chat_args(
     messages: &[(String, String)],
 ) -> Result<HashMap<&'static str, Value<'static>>, String> {
+    chat_args_for(messages, "chat")
+}
+
+/// The same, for another task's model (Writing Tools use the small, quick Summaries model).
+pub(crate) fn chat_args_for(
+    messages: &[(String, String)],
+    task: &str,
+) -> Result<HashMap<&'static str, Value<'static>>, String> {
     let variant = Signature::try_from("v").map_err(|e| e.to_string())?;
     let (string, any) = (
         Signature::try_from("s").map_err(|e| e.to_string())?,
@@ -118,7 +126,7 @@ fn chat_args(
     let talk = inference_routing::load().talk.clamped();
     let mut args = HashMap::new();
     args.insert("messages", Value::Array(list));
-    args.insert("task", Value::from("chat".to_string()));
+    args.insert("task", Value::from(task.to_string()));
     args.insert("temperature", Value::F64(talk.temperature));
     args.insert("max_tokens", Value::U32(talk.max_tokens.min(512)));
     args.insert("priority", Value::from("interactive".to_string()));
@@ -129,7 +137,7 @@ static CONNECTION: tokio::sync::OnceCell<zbus::Connection> = tokio::sync::OnceCe
 
 /// One bus connection for every quick turn: the model service lets only the connection that started an operation cancel it, so Stop
 /// must not come from a new connection.
-async fn inference_proxy() -> Result<zbus::Proxy<'static>, String> {
+pub(crate) async fn inference_proxy() -> Result<zbus::Proxy<'static>, String> {
     let connection = CONNECTION
         .get_or_try_init(zbus::Connection::session)
         .await

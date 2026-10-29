@@ -2,6 +2,7 @@
 # Started by run.sh: a fake greetd on a private socket, then the real helix-greeter pointed at it.
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BIN=${HELIX_GREETER_BIN:-$(ls -t "$ROOT/target/fast/helix-greeter" "$ROOT/target/release/helix-greeter" 2>/dev/null | head -1)}
+export HELIX_GREETER_POWER_LOG="$XDG_STATE_HOME/power.log" HELIX_GREETER_REMEMBER="$XDG_STATE_HOME/last.json"
 export GREETD_SOCK="$XDG_STATE_HOME/greetd.sock"
 python3 "$ROOT/tools/nested/fake-greetd.py" "$GREETD_SOCK" "$XDG_STATE_HOME/greetd-log.jsonl" &
 echo $! > "$XDG_STATE_HOME/helix-service.pid"

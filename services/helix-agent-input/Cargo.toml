@@ -1,0 +1,21 @@
+[package]
+name = "helix-agent-input"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Moves the pointer, clicks, scrolls and types on the agent display (a headless compositor) through the virtual pointer and keyboard protocols. Commands arrive as JSON lines on stdin. A separate small process, started by the shell for one display and for nothing else."
+
+[dependencies]
+wayland-client = { workspace = true }
+wayland-protocols-wlr = { workspace = true, features = ["client"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+xkbcommon = "0.9"
+
+[lints]
+workspace = true

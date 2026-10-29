@@ -18,8 +18,20 @@ log_path = os.path.join(state_dir, "fake-network-actions.log")
 bt_log_path = os.path.join(state_dir, "fake-bluetooth-actions.log")
 settings_log_path = os.path.join(state_dir, "fake-settings-actions.log")
 audio_log_path = os.path.join(state_dir, "fake-audio-actions.log")
-settings = {"theme.mode": "dark", "nightlight.enabled": False, "theme.pure_black_dark": False, "accessibility.ui_scale": 1.0,
-            "location.custom_schedule": False, "location.sunset": "19:00", "location.sunrise": "07:00"}
+settings = {"theme.mode": "dark", "theme.accent": "blue", "nightlight.enabled": False, "theme.pure_black_dark": False, "accessibility.ui_scale": 1.0,
+            "location.custom_schedule": False, "location.sunset": "19:00", "location.sunrise": "07:00",
+            "location.latitude": 51.5, "location.longitude": -0.12, "location.auto_locate": False, "location.address": ""}
+# A test can start the desktop with a larger interface (HELIX_FAKE_UI_SCALE=2).
+if os.environ.get("HELIX_FAKE_UI_SCALE"):
+    settings["accessibility.ui_scale"] = float(os.environ["HELIX_FAKE_UI_SCALE"])
+# A test can start the desktop in the light look (HELIX_FAKE_THEME=light).
+if os.environ.get("HELIX_FAKE_THEME") in ("dark", "light"):
+    settings["theme.mode"] = os.environ["HELIX_FAKE_THEME"]
+# A test can start the desktop with its own day and night times (HELIX_FAKE_CUSTOM_SCHEDULE=1 HELIX_FAKE_SUNSET=HH:MM HELIX_FAKE_SUNRISE=HH:MM).
+if os.environ.get("HELIX_FAKE_CUSTOM_SCHEDULE") == "1":
+    settings["location.custom_schedule"] = True
+    settings["location.sunset"] = os.environ.get("HELIX_FAKE_SUNSET", settings["location.sunset"])
+    settings["location.sunrise"] = os.environ.get("HELIX_FAKE_SUNRISE", settings["location.sunrise"])
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
 
 world = {
@@ -182,6 +194,37 @@ def network_action(name, args, emit):
 
 next_operation = [100]
 connection = None
+meter = {"sender": None, "source": None, "timer": None, "step": 0}
+
+def meter_tick():
+    if connection is None or meter["sender"] is None:
+        meter["timer"] = None
+        return False
+    meter["step"] = (meter["step"] + 1) % 4
+    peak = 0.35 + 0.15 * meter["step"]
+    connection.emit_signal(meter["sender"], PATH, "org.helix.Desktop.Audio1", "InputLevel",
+                           GLib.Variant("(udb)", (int(meter["source"]), float(peak), True)))
+    return True
+
+def start_meter(sender, source):
+    source = int(source)
+    if source not in audio["sources"]:
+        raise Refused("Microphone is no longer available")
+    with open(audio_log_path, "a") as log:
+        log.write(f"METER start {source}\n")
+    meter["sender"] = sender
+    meter["source"] = source
+    if meter["timer"] is None:
+        meter["timer"] = GLib.timeout_add(200, meter_tick)
+
+def stop_meter():
+    with open(audio_log_path, "a") as log:
+        log.write("METER stop\n")
+    meter["sender"] = None
+    meter["source"] = None
+    if meter["timer"] is not None:
+        GLib.source_remove(meter["timer"])
+        meter["timer"] = None
 
 def emit_changed(interface):
     connection.emit_signal(None, PATH, interface, "Changed", None)
@@ -200,8 +243,13 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             entries = [entry(id="audio.sound_volume", type="number", value=0.5),
                        entry(id="theme.mode", title="Appearance", group="Colors", type="mode", value=settings["theme.mode"], options=["dark", "light", "auto"], **{"option-labels": ["Dark", "Light", "Automatic"]}),
                        entry(id="theme.pure_black_dark", title="Pure black in dark mode", group="Colors", description="Darker surfaces on OLED screens.", type="boolean", value=settings["theme.pure_black_dark"]),
+                       entry(id="theme.accent", title="Accent colour", group="Colors", type="string", value=settings["theme.accent"]),
                        entry(id="nightlight.enabled", title="Night Light", group="Night Light", type="boolean", value=settings["nightlight.enabled"]),
                        entry(id="accessibility.ui_scale", title="Interface scale", group="Presentation", type="number", value=float(settings["accessibility.ui_scale"])),
+                       entry(id="location.auto_locate", type="boolean", value=settings["location.auto_locate"]),
+                       entry(id="location.address", type="string", value=settings["location.address"]),
+                       entry(id="location.latitude", type="number", value=float(settings["location.latitude"])),
+                       entry(id="location.longitude", type="number", value=float(settings["location.longitude"])),
                        entry(id="location.custom_schedule", type="boolean", value=settings["location.custom_schedule"]),
                        entry(id="location.sunset", type="string", value=settings["location.sunset"]),
                        entry(id="location.sunrise", type="string", value=settings["location.sunrise"])]
@@ -210,7 +258,7 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             setting_id, value = params.unpack()
             if isinstance(value, GLib.Variant): value = value.unpack()
             with open(settings_log_path, "a") as log: log.write(f"UPDATE {setting_id} {json.dumps(value)}\n")
-            ok = (setting_id == "theme.mode" and value in ("dark", "light", "auto")) or (setting_id in ("nightlight.enabled", "theme.pure_black_dark") and isinstance(value, bool)) or (setting_id == "location.custom_schedule" and isinstance(value, bool)) or (setting_id in ("location.sunset", "location.sunrise") and isinstance(value, str)) or (setting_id == "accessibility.ui_scale" and isinstance(value, (int, float)) and not isinstance(value, bool))
+            ok = (setting_id == "theme.mode" and value in ("dark", "light", "auto")) or (setting_id == "theme.accent" and value in ("blue", "purple", "pink", "red", "orange", "yellow", "green", "graphite")) or (setting_id in ("nightlight.enabled", "theme.pure_black_dark") and isinstance(value, bool)) or (setting_id in ("location.custom_schedule", "location.auto_locate") and isinstance(value, bool)) or (setting_id in ("location.sunset", "location.sunrise") and isinstance(value, str)) or (setting_id in ("location.latitude", "location.longitude") and isinstance(value, (int, float)) and not isinstance(value, bool)) or (setting_id == "accessibility.ui_scale" and isinstance(value, (int, float)) and not isinstance(value, bool))
             if not ok:
                 with open(settings_log_path, "a") as log: log.write(f"REFUSED {setting_id} {json.dumps(value)}\n")
                 invocation.return_dbus_error("org.helix.Desktop.Error.InvalidArgument", "Setting could not be saved"); return
@@ -242,6 +290,16 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             next_operation[0] += 1
             invocation.return_value(GLib.Variant("(t)", (next_operation[0],)))
             GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Audio1"), False)[1])
+        elif method == "StartInputMeter" and short == "Audio1":
+            (source,) = params.unpack()
+            try:
+                start_meter(sender, source)
+            except Refused as error:
+                invocation.return_dbus_error("org.helix.Desktop.Error.Failed", str(error)); return
+            invocation.return_value(None)
+        elif method == "StopInputMeter" and short == "Audio1":
+            stop_meter()
+            invocation.return_value(None)
         elif method == "Reply" and short == "Bluetooth1":
             response, cancel = params.unpack()
             path = bt["pairing"]

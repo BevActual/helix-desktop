@@ -11,13 +11,22 @@
        max_tokens   any integer                          optional, clamped by the service
        temperature  d                                    optional, 0 = greedy
        priority     s                                    "interactive" (default) or "background"
-     Non-local backends (LAN/cloud) are not run inside the PrivateNetwork sandbox; Mobius or a network gateway
-     performs those turns. GetSnapshot.backends lists configured backends; GetSnapshot.profiles maps task → route.
+       backend      s                                    optional; a configured OpenAI-compatible backend id (never for act). Without it, the slot's route decides.
+       route        a{sv}                                optional, backends of OpenRouter only: fallbacks as, prefer s (price|speed), private_only b
+       remote_timeout  integer                           optional, seconds (15 to 600) for a backend on another computer
+     Slots routed to LAN or hosted OpenAI-compatible backends are answered by this service (remote.rs): streamed through Delta, the key kept here, only
+     https or a local-network address, never for act. Probe(backend) lists what a backend offers; Unload() frees the engine when idle. GetSnapshot.backends lists configured backends; GetSnapshot.profiles maps task → route.
      Delta(operation, text) streams to the requester only. Completed(operation, ok, result) ends it;
      Loading(operation, model, fraction) tells the requester how far a model swap has got (0..1) before its reply starts;
-     result JSON: {ok, text, error, cancelled, truncated, prompt_tokens, cached_prompt_tokens, completion_tokens, task, backend}. -->
+     result JSON: {ok, text, error, cancelled, truncated, prompt_tokens, cached_prompt_tokens, completion_tokens, task, backend, model (the one that answered), cost_micro}. -->
 <interface name="org.helix.Inference1">
  <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="Probe"><arg name="backend" type="s" direction="in"/><arg name="result" type="s" direction="out"/></method>
+ <method name="HubFiles"><arg name="repo" type="s" direction="in"/><arg name="files" type="s" direction="out"/></method>
+ <method name="Download"><arg name="repo" type="s" direction="in"/><arg name="file" type="s" direction="in"/><arg name="projector" type="b" direction="in"/><arg name="id" type="t" direction="out"/></method>
+ <method name="Downloads"><arg name="jobs" type="s" direction="out"/></method>
+ <method name="CancelDownload"><arg name="id" type="t" direction="in"/><arg type="b" direction="out"/></method>
+ <method name="Unload"><arg type="b" direction="out"/></method>
  <method name="ListModels"><arg type="av" direction="out"/></method>
  <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
  <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>

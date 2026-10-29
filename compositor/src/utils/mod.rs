@@ -607,6 +607,11 @@ pub fn cause_panic() {
     let _ = a - b;
 }
 
+/// Whether the nested test compositor should offer a pretend gamma table (see `HELIX_NESTED_GAMMA` where it is used).
+pub fn helix_nested_gamma() -> bool {
+    std::env::var_os("HELIX_NESTED_GAMMA").is_some_and(|v| v != "0" && !v.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

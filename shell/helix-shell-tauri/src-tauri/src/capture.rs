@@ -25,7 +25,7 @@ fn runtime_dir() -> Option<PathBuf> {
         .filter(|p| p.is_absolute())
 }
 
-fn capture_file() -> Result<PathBuf, String> {
+pub(crate) fn capture_file() -> Result<PathBuf, String> {
     let dir = runtime_dir().ok_or("no runtime directory")?;
     let name = format!(
         "helix-capture-{}.png",
@@ -97,7 +97,7 @@ fn shoot(action: Value, path: &Path) -> Result<(), String> {
     Err("the compositor did not write a screenshot".into())
 }
 
-fn shoot_window(id: u64, path: &Path) -> Result<(), String> {
+pub(crate) fn shoot_window(id: u64, path: &Path) -> Result<(), String> {
     let path_str = path.to_string_lossy().into_owned();
     shoot(
         json!({

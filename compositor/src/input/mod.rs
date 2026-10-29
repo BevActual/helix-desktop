@@ -171,7 +171,8 @@ impl State {
         use InputEvent::*;
         // Events from a client protocol (the virtual pointer) are not from a device; all the others are.
         self.niri.physical_input = std::any::TypeId::of::<I>()
-            != std::any::TypeId::of::<crate::protocols::virtual_pointer::VirtualPointerInputBackend>();
+            != std::any::TypeId::of::<crate::protocols::virtual_pointer::VirtualPointerInputBackend>(
+            );
         if self.niri.blocks_synthetic_input()
             && matches!(
                 event,
@@ -2410,6 +2411,12 @@ impl State {
             }
             Action::HelixFocusAgentDesk {} => {
                 self.helix_focus_agent_desk();
+            }
+            Action::HelixSummon => {
+                self.helix_summon();
+            }
+            Action::HelixShell(command) => {
+                self.helix_shell(command);
             }
             Action::LoadConfigFile(path) => {
                 if let Some(watcher) = &self.niri.config_file_watcher {
@@ -4908,6 +4915,7 @@ fn allowed_during_screenshot(action: &Action) -> bool {
             // Intended for binds such as volume up/down, lock the screen, etc.
             | Action::Spawn(_)
             | Action::SpawnSh(_)
+            | Action::HelixShell(_)
             // The screenshot UI can handle these.
             | Action::MoveColumnLeft
             | Action::MoveColumnLeftOrToMonitorLeft

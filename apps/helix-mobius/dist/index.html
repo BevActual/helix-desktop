@@ -1,5 +1,5 @@
 <!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
-<body class="chat">
+<body class="chat hx-modern">
 <div id="app" data-test="app">
   <aside id="side" data-test="side">
     <div id="titlebar" data-tauri-drag-region>
@@ -12,8 +12,10 @@
       <button type="button" id="mode-write" class="mode-row" data-test="mode-write" title="Write: a document beside the chat"><i data-icon="doc"></i><span>Write</span></button>
       <button type="button" id="mode-image" class="mode-row" data-test="mode-image" title="Image: edit a picture beside the chat"><i data-icon="image"></i><span>Image</span></button>
       <button type="button" id="mode-code" class="mode-row" data-test="mode-code" title="Code: your project beside the chat"><i data-icon="code"></i><span>Code</span></button>
+      <button type="button" id="mode-analyze" class="mode-row" data-test="mode-analyze" title="Analyze: inspect a Linux binary with REA and Ghidra. The program is not run."><i data-icon="eye"></i><span>Analyze</span></button>
       <button type="button" id="mode-projects" class="mode-row" data-test="mode-projects" title="Projects: instructions, folder, chats and documents together"><i data-icon="folder"></i><span>Projects</span></button>
       <button type="button" id="mode-scheduled" class="mode-row" data-test="mode-scheduled" title="Scheduled: prompts that run by themselves"><i data-icon="clock"></i><span>Scheduled</span></button>
+      <button type="button" id="mode-tasks" class="mode-row" data-test="mode-tasks" title="Agents: tasks that run on their own"><i data-icon="bolt"></i><span>Agents</span><span id="agents-badge" class="side-badge" data-test="agents-badge" hidden></span></button>
       <button type="button" id="mode-artifacts" class="mode-row" data-test="mode-artifacts" title="Artifacts: every document your chats made"><i data-icon="grid"></i><span>Artifacts</span></button>
     </nav>
     <div id="chat-list-host" style="display: contents">
@@ -37,7 +39,7 @@
         <button id="open-web" data-test="open-web" type="button"><i data-icon="search"></i><span>Pick online sources</span></button>
         <button id="open-create-image" data-test="open-create-image" type="button"><i data-icon="image"></i><span>Create image</span></button>
         <button id="open-analysis" data-test="open-analysis" type="button"><i data-icon="eye"></i><span>Analyze software</span></button>
-        <button id="open-assistant" data-test="open-assistant" type="button"><i data-icon="sparkle"></i><span>Act on the desktop</span></button>
+        <button id="open-assistant" data-test="open-assistant" type="button"><i data-icon="sparkle"></i><span>Do it on the desktop</span></button>
         <button id="open-agents" data-test="open-agents" type="button"><i data-icon="shield"></i><span>Agents</span></button>
         <button id="open-routing" data-test="open-routing" type="button"><i data-icon="settings"></i><span>Settings</span></button>
         <button id="open-settings-agents" data-test="open-settings-agents" type="button"><i data-icon="lock"></i><span>Privacy &amp; agents</span></button>
@@ -54,7 +56,7 @@
   <main id="main">
     <div id="chat-surface" data-test="chat-surface">
       <header data-tauri-drag-region>
-        <button id="side-toggle" class="side-toggle" data-test="side-toggle" type="button" title="Conversations" aria-label="Conversations" aria-controls="side" aria-expanded="false"><i data-icon="sidebar"></i></button>
+        <button id="side-toggle" class="side-toggle" data-test="side-toggle" type="button" title="Hide the sidebar" aria-label="Hide the sidebar" aria-controls="side" aria-expanded="true"><i data-icon="sidebar"></i></button>
         <button id="chat-title" class="chat-title" data-test="chat-title" type="button" title="Rename chat">New chat</button>
         <div class="header-actions">
           <button id="pin-chat" class="icon-btn" data-test="pin-chat" type="button" title="Pin chat" aria-label="Pin chat" hidden><i data-icon="pin"></i></button>
@@ -65,6 +67,7 @@
           <button id="route-chip" class="route-chip" data-test="route-chip" type="button" hidden title="Models and routing"></button>
         </div>
       </header>
+      <div id="view-tabs" class="view-tabs" data-test="view-tabs" role="tablist" aria-label="Open views" hidden></div>
       <div id="temp-banner" class="temp-banner" data-test="temp-banner" hidden>Temporary chat — this conversation will not be saved.</div>
       <div id="find-bar" class="find-bar" data-test="find-bar" hidden>
         <input id="find-input" data-test="find-input" type="search" placeholder="Find in chat" autocomplete="off">
@@ -83,45 +86,56 @@
         <div id="act-task-host" data-test="act-task-host"></div>
         <button id="side-chip" class="act-hint side-chip" data-test="side-chip" type="button" hidden></button>
         <button id="stage-chip" class="act-hint stage-chip" data-test="stage-chip" type="button" hidden title="Click to stop sending the document with your message"></button>
-        <button id="act-hint" class="act-hint" data-test="act-hint" type="button" hidden>Looks like a desktop action · Use Act</button>
-        <div id="composer-meta" class="composer-meta" data-test="composer-meta">
-          <button id="meta-persona" class="meta-chip" data-test="meta-persona" type="button" title="Persona" hidden></button>
-          <button id="meta-style" class="meta-chip" data-test="meta-style" type="button" title="Style for this chat" hidden></button>
-          <button id="meta-more" class="meta-chip" data-test="meta-more" type="button" title="Chat settings: persona, style, where it runs, context" aria-haspopup="menu">⋯</button>
-          <button id="meta-model" class="meta-chip" data-test="meta-model" type="button" title="Chat model">Model</button>
-          <button id="analysis-evidence" class="meta-chip" data-test="analysis-evidence" type="button" hidden>Local analysis · evidence</button>
-          <button id="meta-route" class="meta-chip" data-test="meta-route" type="button" title="Models and routing"></button>
-          <button id="meta-tools" class="meta-chip" data-test="meta-tools" type="button" title="Project folder for Tools mode" hidden>Tools · off</button>
-          <button id="meta-agent-desk" class="meta-chip" data-test="meta-agent-desk" type="button" title="Show the Helix agent desk" hidden>Agent desk</button>
-          <button id="meta-context" class="meta-chip" data-test="meta-context" type="button" title="Chat context and brief">Context</button>
-          <span id="loading-chip" class="queue-chip" data-test="loading-chip" hidden></span>
-        </div>
+        <button id="summon-chip" class="act-hint stage-chip" data-test="summon-chip" type="button" hidden title="Click to leave this out of your message"></button>
+        <button id="summon-selection-chip" class="act-hint stage-chip" data-test="summon-selection-chip" type="button" hidden title="Click to leave this out of your message"></button>
+        <button id="act-hint" class="act-hint" data-test="act-hint" type="button" hidden>Looks like a desktop action · Use Desktop</button>
+        <button type="button" id="needs-you" class="needs-you" data-test="needs-you" hidden>Mobius needs your review — show the chat</button>
+        <div id="dock-actions" class="dock-actions" data-test="dock-actions" hidden></div>
         <div id="queue-list" class="queue-list" data-test="queue-list" hidden></div>
         <div id="picture-strip" class="picture-strip" data-test="picture-strip" hidden></div>
+        <div id="knowledge-chips" class="knowledge-chips" data-test="knowledge-chips" hidden></div>
         <div id="attach-chips" class="attach-chips" data-test="attach-chips" hidden></div>
         <div id="slash-menu" class="slash-menu" data-test="slash-menu" hidden></div>
         <form id="composer" data-test="composer">
-          <button id="plus" type="button" data-test="plus" title="Add: files, pictures, an image, online sources" aria-label="Add to the message" aria-haspopup="menu"><i data-icon="plus"></i></button>
-          <button id="attach" type="button" hidden data-test="attach" title="Attach files" aria-label="Attach files"><i data-icon="paperclip"></i></button>
-          <button id="attach-picture" type="button" hidden data-test="attach-picture" title="Add a picture" aria-label="Add a picture"><i data-icon="image"></i></button>
-          <button id="dictate" type="button" data-test="dictate" title="Dictate" aria-label="Dictate" aria-pressed="false"><i data-icon="mic"></i></button>
           <textarea id="input" data-test="input" rows="1" placeholder="Ask anything — / for commands" autocomplete="off" spellcheck="true"></textarea>
-          <div class="composer-actions">
-            <button id="mode" class="mode-chip" type="button" data-test="mode" title="Mode: Ask, Tools or Act (Shift+Tab)" aria-haspopup="menu">Ask</button>
-            <button id="send" type="submit" data-test="send" title="Send" aria-label="Send" disabled><i data-icon="arrow-up"></i></button>
-            <button id="stop" type="button" data-test="stop" title="Stop" aria-label="Stop" hidden><i data-icon="stop"></i></button>
+          <div class="composer-bar">
+            <button id="plus" type="button" data-test="plus" title="Add: files, pictures, an image, online sources" aria-label="Add to the message" aria-haspopup="menu"><i data-icon="plus"></i></button>
+            <button id="attach" type="button" hidden data-test="attach" title="Attach files" aria-label="Attach files"><i data-icon="paperclip"></i></button>
+            <button id="attach-picture" type="button" hidden data-test="attach-picture" title="Add a picture" aria-label="Add a picture"><i data-icon="image"></i></button>
+            <button id="mode" class="mode-chip" type="button" data-test="mode" title="Mode: Agent, Ask, Plan, or Desktop (Shift+Tab)" aria-haspopup="menu">Ask</button>
+            <button id="plan-build" class="mode-chip mode-plan" type="button" data-test="plan-build" hidden title="Switch to Agent and carry out the plan">Build</button>
+            <div id="composer-meta" class="composer-meta" data-test="composer-meta">
+              <button id="meta-model" class="meta-chip" data-test="meta-model" type="button" title="Chat model">Model</button>
+              <button id="meta-tools" class="meta-chip" data-test="meta-tools" type="button" title="Project folder for Tools mode" hidden>Tools · off</button>
+              <button id="analysis-evidence" class="meta-chip" data-test="analysis-evidence" type="button" hidden>Local analysis · evidence</button>
+              <button id="meta-more" class="meta-chip" data-test="meta-more" type="button" title="Chat settings: persona, style, where it runs, context" aria-haspopup="menu" aria-label="Chat settings">⋯</button>
+              <button id="meta-persona" class="meta-chip" data-test="meta-persona" type="button" title="Persona" hidden></button>
+              <button id="meta-style" class="meta-chip" data-test="meta-style" type="button" title="Style for this chat" hidden></button>
+              <button id="meta-route" class="meta-chip" data-test="meta-route" type="button" title="Models and routing"></button>
+              <button id="meta-agent-desk" class="meta-chip" data-test="meta-agent-desk" type="button" title="Show the Helix agent desk" hidden>Agent workspace</button>
+              <button id="meta-context" class="meta-chip context-chip" data-test="meta-context" type="button" title="Chat context and brief"><span class="context-ring" data-test="context-ring" aria-hidden="true"></span><span class="context-label">Context</span></button>
+              <span id="loading-chip" class="queue-chip" data-test="loading-chip" hidden></span>
+              <button id="agent-status" class="queue-chip agent-status" data-test="agent-status" type="button" hidden></button>
+            </div>
+            <button id="dictate" type="button" data-test="dictate" title="Dictate" aria-label="Dictate" aria-pressed="false"><i data-icon="mic"></i></button>
+            <div class="composer-actions">
+              <button id="send" type="submit" data-test="send" title="Send" aria-label="Send" disabled><i data-icon="arrow-up"></i></button>
+              <button id="stop" type="button" data-test="stop" title="Stop" aria-label="Stop" hidden><i data-icon="stop"></i></button>
+            </div>
           </div>
         </form>
       </div>
       <div id="home-below" class="home-below-host"></div>
     </div>
 
+    <div id="agent-tasks-host" class="agents-host"></div>
+
     <section id="models-page" class="models-page" data-test="models-page" hidden>
       <header class="models-page-head" data-tauri-drag-region>
         <button id="models-back" class="icon-btn" data-test="models-back" type="button" title="Back to chat" aria-label="Back to chat"><i data-icon="chevron-left"></i></button>
         <div class="models-page-titles">
           <h2>Settings</h2>
-          <p>Where Talk, Act, and Code run — and how replies are generated.</p>
+          <p>Where conversations, desktop requests and code run, and how replies are made.</p>
         </div>
         <div class="models-page-actions">
           <button id="models-discard" type="button" data-test="models-discard">Discard</button>
@@ -141,13 +155,13 @@
           <section class="models-panel active" data-models-panel="overview" data-test="models-panel-overview">
             <div id="models-info-cards" class="models-info-cards" data-test="models-info-cards"></div>
             <h3 class="models-h3">Task map</h3>
-            <p class="models-lead">Each Helix task can use a different brain. Act is locked local so desktop tools never leave this machine.</p>
+            <p class="models-lead">Each task can use a different model. Acting on the desktop stays on this computer.</p>
             <div id="route-tasks" class="route-tasks" aria-label="Task destinations"></div>
           </section>
 
           <section class="models-panel" data-models-panel="local" data-test="models-panel-local" hidden>
             <h3 class="models-h3">Models on this computer</h3>
-            <p class="models-lead">GGUFs exposed by <code>org.helix.Inference</code>. Assign one to Chat, Act, or Code.</p>
+            <p class="models-lead">GGUFs exposed by <code>org.helix.Inference</code>. Assign one to Chat, Desktop or Code.</p>
             <div class="route-source-toolbar">
               <label class="route-search" for="route-model-search-local">
                 <i data-icon="search"></i>
@@ -176,7 +190,7 @@
 
           <section class="models-panel" data-models-panel="cloud" data-test="models-panel-cloud" hidden>
             <h3 class="models-h3">Cloud (OpenRouter)</h3>
-            <p class="models-lead">OpenAI-compatible cloud. API keys live in the Secret Service — never in transcripts or routing TOML. Remotes never get Act tools.</p>
+            <p class="models-lead">OpenAI-compatible cloud. API keys live in the Secret Service — never in transcripts or routing TOML. Remote models never act on the desktop.</p>
             <div class="models-form-card">
               <label class="sheet-field">API URL<input id="route-cloud-url" data-test="route-cloud-url" type="url" placeholder="https://openrouter.ai/api/v1"></label>
               <label class="sheet-field">API key<input id="route-cloud-key" data-test="route-cloud-key" type="password" autocomplete="off" placeholder="Paste to update; leave blank to keep"></label>
@@ -194,7 +208,7 @@
 
           <section class="models-panel" data-models-panel="generation" data-test="models-panel-generation" hidden>
             <h3 class="models-h3">Generation defaults</h3>
-            <p class="models-lead">Applied to Talk and Code turns (local Inference and remote). Act still uses the local tool slot.</p>
+            <p class="models-lead">Applied to conversations and code (on this computer and remote). Desktop requests use the local desktop model.</p>
             <div class="models-form-card">
               <label class="sheet-field">Temperature
                 <div class="models-slider-row">
@@ -216,7 +230,7 @@
             <div class="models-form-card">
               <label class="sheet-check"><input id="route-battery" data-test="route-battery" type="checkbox"><span>Allow remote models when battery saver is on</span></label>
               <div class="models-kv"><span>Config file</span><code id="route-config-path" data-test="route-config-path"></code></div>
-              <p class="models-lead">Profiles: chat, act, summarize, vision, code. Only Act is forced local.</p>
+              <p class="models-lead">Tasks: chat, desktop, summaries, pictures, code. Only Desktop always stays on this computer.</p>
               <button id="route-reset-defaults" type="button" data-test="route-reset-defaults">Reset generation defaults</button>
             </div>
           </section>
@@ -239,7 +253,7 @@
   <form method="dialog" id="model-form" class="sheet-body">
     <header class="sheet-head">
       <h3>Chat model</h3>
-      <p class="sheet-note">Local, LAN, or cloud for talk. Act stays on its own local model — remotes never run desktop tools.</p>
+      <p class="sheet-note">Local, your network, or cloud for conversations. Acting on the desktop stays on a model on this computer.</p>
     </header>
     <div class="sheet-scroll">
       <label class="sheet-field">Backend
@@ -315,7 +329,7 @@
   <form method="dialog" id="persona-form" class="sheet-body">
     <header class="sheet-head">
       <h3>Persona</h3>
-      <p class="sheet-note">A hub mind for talk. Desktop change still goes through Act and the bar Assistant.</p>
+      <p class="sheet-note">A hub mind for conversations. Changes to the desktop go through Helix's actions, which you can undo.</p>
     </header>
     <div class="sheet-scroll">
       <label class="sheet-field">Name<input id="persona-edit-name" data-test="persona-edit-name" type="text" maxlength="40" required></label>

@@ -1,0 +1,470 @@
+//! The picture: a blurred, dimmed wallpaper, the date and a large clock, the account's avatar and a glass password capsule, in the same grammar as the
+//! login screen. Drawn with Cairo and Pango into any cairo context, so a test can draw into a plain image and look at it.
+
+use std::path::Path;
+
+use cairo::{Context, Extend, Filter, Format, ImageSurface};
+use helix_wallpaper_model::{cover_crop, Source};
+
+/// The avatar's radius in logical pixels.
+pub const AVATAR_RADIUS: f64 = 38.0;
+
+/// A picture cropped to its centre square and scaled to `side` pixels, for the avatar.
+pub fn square_avatar(source: &ImageSurface, side: i32) -> Option<ImageSurface> {
+    let out = ImageSurface::create(Format::ARgb32, side, side).ok()?;
+    let c = Context::new(&out).ok()?;
+    let (w, h) = (f64::from(source.width()), f64::from(source.height()));
+    let edge = w.min(h);
+    let zoom = f64::from(side) / edge;
+    c.scale(zoom, zoom);
+    let _ = c.set_source_surface(source, -(w - edge) / 2.0, -(h - edge) / 2.0);
+    let _ = c.paint();
+    Some(out)
+}
+
+/// What the screen says right now.
+pub struct Frame<'a> {
+    pub time: &'a str,
+    pub date: &'a str,
+    pub name: &'a str,
+    pub initials: &'a str,
+    /// The account's picture, already cut to a square of `2 * AVATAR_RADIUS` logical pixels (or more); when there is none the initials are drawn.
+    pub avatar: Option<&'a ImageSurface>,
+    pub dots: usize,
+    pub message: &'a str,
+    /// The message is a complaint (drawn in red).
+    pub complaint: bool,
+    /// Sideways wobble of the field after a wrong password, in logical pixels.
+    pub shake: f64,
+    pub accent: [u8; 3],
+    pub checking: bool,
+    /// The battery, on a computer that has one.
+    pub battery: Option<crate::facts::Battery>,
+}
+
+const FONT: &str = "Inter";
+
+fn rgb(c: &Context, [r, g, b]: [u8; 3], alpha: f64) {
+    c.set_source_rgba(
+        f64::from(r) / 255.0,
+        f64::from(g) / 255.0,
+        f64::from(b) / 255.0,
+        alpha,
+    );
+}
+
+/// Draws `text` centred on `x`, its top at `y`, and returns its height.
+fn centred(c: &Context, text: &str, x: f64, y: f64, size: f64, weight: &str) -> f64 {
+    let layout = pangocairo::functions::create_layout(c);
+    let mut description = pango::FontDescription::from_string(&format!("{FONT} {weight}"));
+    description.set_absolute_size(size * f64::from(pango::SCALE));
+    layout.set_font_description(Some(&description));
+    layout.set_text(text);
+    let (width, height) = layout.pixel_size();
+    c.move_to(x - f64::from(width) / 2.0, y);
+    pangocairo::functions::show_layout(c, &layout);
+    f64::from(height)
+}
+
+fn rounded(c: &Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
+    let r = r.min(w / 2.0).min(h / 2.0);
+    c.new_sub_path();
+    c.arc(x + w - r, y + r, r, -std::f64::consts::FRAC_PI_2, 0.0);
+    c.arc(x + w - r, y + h - r, r, 0.0, std::f64::consts::FRAC_PI_2);
+    c.arc(
+        x + r,
+        y + h - r,
+        r,
+        std::f64::consts::FRAC_PI_2,
+        std::f64::consts::PI,
+    );
+    c.arc(
+        x + r,
+        y + r,
+        r,
+        std::f64::consts::PI,
+        3.0 * std::f64::consts::FRAC_PI_2,
+    );
+    c.close_path();
+}
+
+/// Everything on the screen except the background, in logical pixels on a `w` x `h` screen.
+pub fn draw(c: &Context, w: f64, h: f64, frame: &Frame) {
+    let cx = w / 2.0;
+    // The date, then a large bold clock, in the upper part; the person in the middle: the same order as the login screen (and a Mac's).
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.85);
+    let date_h = centred(c, frame.date, cx, h * 0.13, 20.0, "Semi-Bold");
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.97);
+    let time_top = h * 0.13 + date_h + 2.0;
+    let time_h = centred(
+        c,
+        frame.time,
+        cx,
+        time_top,
+        (h * 0.14).clamp(60.0, 132.0),
+        "Bold",
+    );
+
+    let card_w = 280.0;
+    let card_top = (h * 0.40).max(time_top + time_h + 50.0);
+    // The avatar: the account's picture in a circle, else the initials on the accent colour, lifted by a soft shadow and a lit ring.
+    let r = AVATAR_RADIUS;
+    let ay = card_top + r;
+    for (spread, alpha) in [(10.0, 0.05), (6.0, 0.07), (3.0, 0.09)] {
+        c.set_source_rgba(0.0, 0.0, 0.0, alpha);
+        c.arc(cx, ay + 4.0, r + spread, 0.0, std::f64::consts::TAU);
+        let _ = c.fill();
+    }
+    if let Some(picture) = frame.avatar {
+        let _ = c.save();
+        c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
+        c.clip();
+        let side = f64::from(picture.width().min(picture.height()));
+        let zoom = (2.0 * r) / side;
+        c.translate(cx - r, ay - r);
+        c.scale(zoom, zoom);
+        let _ = c.set_source_surface(picture, 0.0, 0.0);
+        let _ = c.paint();
+        let _ = c.restore();
+    } else {
+        let [ar, ag, ab] = frame.accent.map(|v| f64::from(v) / 255.0);
+        let shade = cairo::LinearGradient::new(cx - r, ay - r, cx + r * 0.4, ay + r);
+        shade.add_color_stop_rgb(0.0, ar * 0.88 + 0.12, ag * 0.88 + 0.12, ab * 0.88 + 0.12);
+        shade.add_color_stop_rgb(0.55, ar, ag, ab);
+        shade.add_color_stop_rgb(1.0, ar * 0.7, ag * 0.7, ab * 0.7);
+        let _ = c.set_source(&shade);
+        c.arc(cx, ay, r, 0.0, std::f64::consts::TAU);
+        let _ = c.fill();
+        c.set_source_rgba(1.0, 1.0, 1.0, 1.0);
+        let initials_size = 28.0;
+        centred(
+            c,
+            frame.initials,
+            cx,
+            ay - initials_size * 0.62,
+            initials_size,
+            "Bold",
+        );
+    }
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.3);
+    c.set_line_width(3.0);
+    // A fresh path: the initials leave the current point where their text ended, and an arc would otherwise join it with a line.
+    c.new_path();
+    c.arc(cx, ay, r + 1.5, 0.0, std::f64::consts::TAU);
+    let _ = c.stroke();
+    // The name.
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.96);
+    let name_h = centred(c, frame.name, cx, ay + r + 14.0, 21.0, "Bold");
+    // The field.
+    let fx = cx - card_w / 2.0 + frame.shake;
+    let fy = ay + r + 14.0 + name_h + 18.0;
+    let (fw, fh) = (card_w, 44.0);
+    // A capsule of glass: a light fill, a lit top edge, a hairline; red only when the password was wrong.
+    rounded(c, fx, fy, fw, fh, fh / 2.0);
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.16);
+    let _ = c.fill_preserve();
+    if frame.complaint {
+        c.set_source_rgba(1.0, 0.27, 0.23, 0.9);
+        c.set_line_width(1.5);
+    } else {
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.3);
+        c.set_line_width(1.0);
+    }
+    let _ = c.stroke();
+    let _ = c.save();
+    rounded(c, fx, fy, fw, fh, fh / 2.0);
+    c.clip();
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.22);
+    c.set_line_width(1.0);
+    c.move_to(fx + fh / 2.0, fy + 1.0);
+    c.line_to(fx + fw - fh / 2.0, fy + 1.0);
+    let _ = c.stroke();
+    let _ = c.restore();
+    if frame.dots == 0 && !frame.checking {
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.45);
+        centred(
+            c,
+            "Password",
+            cx + frame.shake,
+            fy + fh / 2.0 - 11.0,
+            16.0,
+            "Regular",
+        );
+    } else {
+        let gap = 18.0;
+        let shown = frame.dots.min(((fw - 48.0) / gap) as usize);
+        let total = shown as f64 * gap;
+        c.set_source_rgba(1.0, 1.0, 1.0, if frame.checking { 0.5 } else { 0.95 });
+        for i in 0..shown {
+            c.arc(
+                cx + frame.shake - total / 2.0 + gap * (i as f64 + 0.5),
+                fy + fh / 2.0,
+                5.0,
+                0.0,
+                std::f64::consts::TAU,
+            );
+            let _ = c.fill();
+        }
+    }
+    // The line under it.
+    if !frame.message.is_empty() {
+        if frame.complaint {
+            c.set_source_rgba(1.0, 0.45, 0.4, 1.0);
+        } else {
+            c.set_source_rgba(1.0, 1.0, 1.0, 0.7);
+        }
+        centred(c, frame.message, cx, fy + fh + 16.0, 14.0, "Regular");
+    }
+    if let Some(battery) = frame.battery {
+        // A small battery in the bottom right corner, with the number.
+        let text = if battery.charging {
+            format!("{}% · Charging", battery.percent)
+        } else {
+            format!("{}%", battery.percent)
+        };
+        let low = battery.percent <= 15 && !battery.charging;
+        let layout = pangocairo::functions::create_layout(c);
+        let mut description = pango::FontDescription::from_string(&format!("{FONT} Regular"));
+        description.set_absolute_size(13.0 * f64::from(pango::SCALE));
+        layout.set_font_description(Some(&description));
+        layout.set_text(&text);
+        let (text_w, _) = layout.pixel_size();
+        // Flush right: the number ends 28 px from the edge and the gauge sits before it.
+        let (bw, bh) = (22.0, 11.0);
+        let bx = w - 28.0 - f64::from(text_w) - 10.0 - bw - 3.5;
+        let by = h - 46.0;
+        c.set_line_width(1.2);
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.55);
+        rounded(c, bx, by, bw, bh, 2.5);
+        let _ = c.stroke();
+        c.rectangle(bx + bw + 1.5, by + 3.5, 2.0, bh - 7.0);
+        let _ = c.fill();
+        if low {
+            c.set_source_rgba(1.0, 0.27, 0.23, 0.95);
+        } else if battery.charging {
+            c.set_source_rgba(0.19, 0.82, 0.35, 0.95);
+        } else {
+            c.set_source_rgba(1.0, 1.0, 1.0, 0.85);
+        }
+        let fill = (bw - 3.0) * f64::from(battery.percent) / 100.0;
+        rounded(c, bx + 1.5, by + 1.5, fill.max(1.5), bh - 3.0, 1.5);
+        let _ = c.fill();
+        c.set_source_rgba(1.0, 1.0, 1.0, 0.6);
+        c.move_to(bx + bw + 10.0, by - 2.5);
+        pangocairo::functions::show_layout(c, &layout);
+    }
+    // A quiet note at the bottom, so the screen says what it is.
+    c.set_source_rgba(1.0, 1.0, 1.0, 0.38);
+    centred(c, "Locked", cx, h - 44.0, 13.0, "Regular");
+}
+
+/// Decodes a wallpaper small enough to blur cheaply: at most `max` pixels on a side.
+pub fn load_picture(path: &Path, max: u32) -> Option<ImageSurface> {
+    let image = image::open(path).ok()?.thumbnail(max, max).to_rgba8();
+    let (iw, ih) = image.dimensions();
+    let mut surface = ImageSurface::create(Format::ARgb32, iw as i32, ih as i32).ok()?;
+    let stride = surface.stride() as usize;
+    {
+        let mut data = surface.data().ok()?;
+        for (y, row) in image.rows().enumerate() {
+            for (x, pixel) in row.enumerate() {
+                let [r, g, b, a] = pixel.0;
+                let premultiply = |v: u8| ((u16::from(v) * u16::from(a) + 127) / 255) as u8;
+                let at = y * stride + x * 4;
+                // Cairo's ARgb32 is native-endian: bytes are B, G, R, A on a little-endian machine.
+                data[at] = premultiply(b);
+                data[at + 1] = premultiply(g);
+                data[at + 2] = premultiply(r);
+                data[at + 3] = a;
+            }
+        }
+    }
+    Some(surface)
+}
+
+/// The background for a `w` x `h` screen: the picture (or the colour) filling it, blurred by drawing it small and scaling it up, then dimmed.
+pub fn background(
+    source: &Source,
+    picture: Option<&ImageSurface>,
+    w: i32,
+    h: i32,
+) -> Option<ImageSurface> {
+    let out = ImageSurface::create(Format::ARgb32, w, h).ok()?;
+    let c = Context::new(&out).ok()?;
+    match (source, picture) {
+        (Source::Image(_), Some(image)) => {
+            let (iw, ih) = (image.width() as u32, image.height() as u32);
+            let (cx, cy, cw, ch) = cover_crop(iw, ih, w as u32, h as u32);
+            // The blur: the cropped picture onto something about a twentieth the size, and that scaled back up with smooth filtering.
+            let (sw, sh) = ((w / 24).max(8), (h / 24).max(8));
+            let small = ImageSurface::create(Format::ARgb32, sw, sh).ok()?;
+            {
+                let s = Context::new(&small).ok()?;
+                s.scale(f64::from(sw) / f64::from(cw), f64::from(sh) / f64::from(ch));
+                s.set_source_surface(image, -f64::from(cx), -f64::from(cy))
+                    .ok()?;
+                s.source().set_filter(Filter::Good);
+                s.source().set_extend(Extend::Pad);
+                s.paint().ok()?;
+            }
+            // Back up in two steps, each smoothed, so the blur has no visible blocks.
+            let (mw, mh) = ((w / 6).max(sw), (h / 6).max(sh));
+            let middle = ImageSurface::create(Format::ARgb32, mw, mh).ok()?;
+            {
+                let m = Context::new(&middle).ok()?;
+                m.scale(f64::from(mw) / f64::from(sw), f64::from(mh) / f64::from(sh));
+                m.set_source_surface(&small, 0.0, 0.0).ok()?;
+                m.source().set_filter(Filter::Bilinear);
+                m.source().set_extend(Extend::Pad);
+                m.paint().ok()?;
+            }
+            c.scale(f64::from(w) / f64::from(mw), f64::from(h) / f64::from(mh));
+            c.set_source_surface(&middle, 0.0, 0.0).ok()?;
+            c.source().set_filter(Filter::Bilinear);
+            c.source().set_extend(Extend::Pad);
+            c.paint().ok()?;
+            c.identity_matrix();
+            c.set_source_rgba(0.0, 0.0, 0.0, 0.42);
+            c.paint().ok()?;
+        }
+        (Source::Color([r, g, b]), _) => {
+            rgb(&c, [*r, *g, *b], 1.0);
+            c.paint().ok()?;
+            c.set_source_rgba(0.0, 0.0, 0.0, 0.25);
+            c.paint().ok()?;
+        }
+        _ => {
+            rgb(&c, [0x0e, 0x10, 0x28], 1.0);
+            c.paint().ok()?;
+        }
+    }
+    Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn frame(dots: usize, complaint: bool) -> Frame<'static> {
+        Frame {
+            time: "14:05",
+            date: "Wednesday, October 21",
+            name: "Ada Lovelace",
+            initials: "AL",
+            avatar: None,
+            dots,
+            message: if complaint {
+                "That is not right. Try again."
+            } else {
+                ""
+            },
+            complaint,
+            shake: 0.0,
+            accent: [0x0a, 0x84, 0xff],
+            checking: false,
+            battery: Some(crate::facts::Battery {
+                percent: 64,
+                charging: false,
+            }),
+        }
+    }
+
+    fn pixel(surface: &mut ImageSurface, x: i32, y: i32) -> (u8, u8, u8) {
+        let stride = surface.stride() as usize;
+        let data = surface.data().unwrap();
+        let at = y as usize * stride + x as usize * 4;
+        (data[at + 2], data[at + 1], data[at])
+    }
+
+    #[test]
+    fn the_account_picture_replaces_the_initials_inside_a_circle() {
+        // A wide solid green picture: cropped to its centre square and drawn in the avatar's circle.
+        let picture = ImageSurface::create(Format::ARgb32, 200, 120).unwrap();
+        {
+            let c = Context::new(&picture).unwrap();
+            c.set_source_rgb(0.0, 0.8, 0.0);
+            c.paint().unwrap();
+        }
+        let square = square_avatar(&picture, 152).unwrap();
+        assert_eq!((square.width(), square.height()), (152, 152));
+        let mut with = frame(0, false);
+        with.avatar = Some(&square);
+        let (cx, ay) = (400, (600.0f64 * 0.40 + AVATAR_RADIUS) as i32);
+        let mut shown = render(&with);
+        let (r, g, b) = pixel(&mut shown, cx, ay);
+        assert!(
+            g > 150 && r < 60 && b < 60,
+            "the picture is in the circle: {r},{g},{b}"
+        );
+        let (r, _, b) = pixel(&mut shown, cx + (AVATAR_RADIUS as i32) + 6, ay);
+        assert!(
+            r < 60 && b < 90,
+            "nothing of it outside the circle: {r},{b}"
+        );
+        let mut plain = render(&frame(0, false));
+        let (r, g, b) = pixel(&mut plain, cx - 30, ay);
+        assert!(
+            b > 150 && g > 100 && r < 60,
+            "without a picture the accent circle is drawn: {r},{g},{b}"
+        );
+    }
+
+    fn render(frame: &Frame) -> ImageSurface {
+        let out = background(&Source::Color([0x1c, 0x1c, 0x22]), None, 800, 600).unwrap();
+        let c = Context::new(&out).unwrap();
+        draw(&c, 800.0, 600.0, frame);
+        drop(c);
+        out.flush();
+        out
+    }
+
+    fn lit(surface: &mut ImageSurface, x0: usize, y0: usize, x1: usize, y1: usize) -> usize {
+        let stride = surface.stride() as usize;
+        let data = surface.data().unwrap();
+        let mut count = 0;
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let at = y * stride + x * 4;
+                if data[at] > 120 || data[at + 1] > 120 || data[at + 2] > 120 {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    #[test]
+    fn the_clock_and_the_dots_appear_where_they_belong() {
+        let mut empty = render(&frame(0, false));
+        let mut typed = render(&frame(6, false));
+        // The clock is drawn in the upper part, never in the lower.
+        assert!(
+            lit(&mut empty, 200, 60, 600, 200) > 400,
+            "the clock is on the screen"
+        );
+        assert_eq!(
+            lit(&mut empty, 0, 560, 100, 600),
+            0,
+            "nothing in the corner"
+        );
+        // Dots in the field make it brighter than the "Password" hint alone does not: compare the field's middle band.
+        let band = |s: &mut ImageSurface| lit(s, 330, 350, 470, 420);
+        assert_ne!(
+            band(&mut empty),
+            band(&mut typed),
+            "typing changes the field"
+        );
+    }
+
+    #[test]
+    fn a_complaint_is_red() {
+        let mut bad = render(&frame(0, true));
+        let stride = bad.stride() as usize;
+        let data = bad.data().unwrap();
+        let reddish = (0..stride * 600)
+            .step_by(4)
+            .filter(|&i| data[i + 2] > 200 && data[i + 1] < 140 && data[i] < 140)
+            .count();
+        assert!(reddish > 20, "the border or the message is red ({reddish})");
+    }
+}

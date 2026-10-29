@@ -53,13 +53,18 @@ pub fn openrouter_suggested_models() -> &'static [&'static str] {
     ]
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProfileRoute {
     /// Backend id from [`Routing::backends`], or `local` / `lan` shorthand.
     pub backend: String,
     /// Local GGUF filename or remote model id. Empty = service default.
     #[serde(default)]
     pub model: String,
+    /// Where "ask a stronger model" goes for this slot (and where a request too long for the local model goes): a backend id, empty for none.
+    #[serde(default)]
+    pub escalate_backend: String,
+    #[serde(default)]
+    pub escalate_model: String,
 }
 
 fn default_temperature() -> f64 {
@@ -128,6 +133,7 @@ impl Default for Routing {
             ProfileRoute {
                 backend: "local".into(),
                 model: String::new(),
+                ..Default::default()
             },
         );
         profiles.insert(
@@ -135,6 +141,7 @@ impl Default for Routing {
             ProfileRoute {
                 backend: "local".into(),
                 model: String::new(),
+                ..Default::default()
             },
         );
         profiles.insert(
@@ -142,6 +149,7 @@ impl Default for Routing {
             ProfileRoute {
                 backend: "local".into(),
                 model: String::new(),
+                ..Default::default()
             },
         );
         profiles.insert(
@@ -149,6 +157,7 @@ impl Default for Routing {
             ProfileRoute {
                 backend: "local".into(),
                 model: String::new(),
+                ..Default::default()
             },
         );
         profiles.insert(
@@ -156,6 +165,7 @@ impl Default for Routing {
             ProfileRoute {
                 backend: "local".into(),
                 model: String::new(),
+                ..Default::default()
             },
         );
         Self {
@@ -189,6 +199,7 @@ impl Routing {
             .unwrap_or_else(|| ProfileRoute {
                 backend: "local".into(),
                 model: String::new(),
+                ..Default::default()
             })
     }
 
@@ -444,6 +455,7 @@ mod tests {
             ProfileRoute {
                 backend: "ollama".into(),
                 model: "codellama".into(),
+                ..Default::default()
             },
         );
         r.talk.temperature = 0.4;

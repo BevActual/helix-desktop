@@ -782,7 +782,14 @@ impl Bridge {
                     crate::agent::activity(&app, g, &card_id, "terminal", &line, "running", &text);
                 }
             };
-            let result = terminal::run(&folder, &line, kill_receiver, progress).await;
+            let result = terminal::run(
+                &folder,
+                &helix_task::Policy::careful(),
+                &line,
+                kill_receiver,
+                progress,
+            )
+            .await;
             let (code, state, text) = match result {
                 Ok(o) => (
                     o.code,

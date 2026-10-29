@@ -83,7 +83,9 @@ grep -q 'beta-green.png' "$CHOICE" 2>/dev/null && echo "ok: the second picture w
 [ "$(stat -c %a "$CHOICE" 2>/dev/null)" = 600 ] && echo "ok: the file is owner only" || fail "file mode is $(stat -c %a "$CHOICE" 2>/dev/null)"
 click_id wp-swatch-3; sleep 1
 grep -q 'color:#1f4d3a' "$CHOICE" 2>/dev/null && echo "ok: a colour was chosen" || fail "choice is: $(cat "$CHOICE" 2>/dev/null)"
-click_id page-agents; sleep 0.8
+# Privacy & agents is below the fold of this window's sidebar (the pointer harness cannot scroll): from Power & lock, Tab passes Users and reaches it.
+open_agents() { click_id page-power; sleep 0.5; wtype -k Tab -k Tab -k Return; }
+open_agents; sleep 0.8
 for _ in $(seq 1 20); do has_id agent-0 && has_id agent-1 && break; sleep 0.25; done
 has_id agent-0 && has_id agent-1 && echo "ok: two applications listed" || fail "the applications are not on the page"
 
@@ -93,7 +95,7 @@ wtype "/"; sleep 0.3; wtype "contrast"; sleep 0.8
 has_id set-accessibility.high_contrast && echo "ok: the search found a setting on another page" || fail "search found nothing for contrast"
 wtype -k Escape; sleep 0.6
 has_id set-accessibility.high_contrast && fail "Escape did not leave the search" || echo "ok: Escape went back to the page"
-click_id page-agents; sleep 0.6
+open_agents; sleep 0.6
 
 echo "--- 1d3. a number can be typed (and an out-of-range one is not sent); the lock time goes to the file helix-idle reads"
 IDLE=$SCRATCH/config/helix/idle.toml
@@ -105,7 +107,7 @@ wtype "10"; wtype -k Return; sleep 1.2
 grep -q 'lock_after_seconds = 600' "$IDLE" 2>/dev/null && echo "ok: 10 minutes was written" || fail "idle.toml: $(cat "$IDLE" 2>&1)"
 click_id set-lock_minutes-number; wtype "999"; wtype -k Return; sleep 1
 grep -q 'lock_after_seconds = 600' "$IDLE" 2>/dev/null && echo "ok: 999 is above the range and was not written" || fail "idle.toml after 999: $(cat "$IDLE" 2>&1)"
-click_id page-agents; sleep 0.6
+open_agents; sleep 0.6
 
 echo "--- 1e. the approvals switch writes the choice the shell reads (off by default)"
 APPROVALS=$SCRATCH/config/helix/approvals.json

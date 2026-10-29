@@ -53,7 +53,8 @@ function Talk({ active }: { active: boolean }) {
   const send = (message: string) => {
     setText("");
     setError("");
-    invoke("mobius_talk", { text: message }).catch((e) => setError(String(e)));
+    // One box: Helix answers or does, whichever was asked.
+    invoke("mobius_ask", { text: message }).catch((e) => setError(String(e)));
   };
   const status = view?.phase === "thinking" ? "Thinking…" : view?.phase === "failed" ? view.error || "Something went wrong." : error;
   const fail = (e: unknown) => setError(String(e));
@@ -99,7 +100,7 @@ function Talk({ active }: { active: boolean }) {
       <div className="mobius-talk-actions">
         <button id="talk-stop" data-test="talk-stop" type="button" hidden={!busy} onClick={() => invoke("mobius_talk_cancel").then(read)}>Stop</button>
         <button id="talk-clear" data-test="talk-clear" type="button" hidden={busy || !hasHistory} onClick={() => invoke("mobius_talk_clear").then(read)}>Clear</button>
-        <button id="talk-act" data-test="talk-act" type="button" title="Act on the last question" hidden={busy || !history.some((line) => line.role === "user")} onClick={() => invoke("mobius_act_from_talk", { text: null }).catch(fail)}>Act</button>
+        <button id="talk-act" data-test="talk-act" type="button" title="Do this on the desktop instead" hidden={busy || !history.some((line) => line.role === "user")} onClick={() => invoke("mobius_act_from_talk", { text: null }).catch(fail)}>Do it</button>
         <button id="talk-open-full" data-test="talk-open-full" type="button" onClick={() => invoke(hasHistory ? "mobius_continue_full" : "open_mobius").catch(fail)}>
           {hasHistory ? "Continue in Mobius" : "Open full Mobius"}
         </button>
@@ -181,8 +182,19 @@ function Act({ active, resetKey }: { active: boolean; resetKey: number }) {
   );
 }
 
+interface AgentSession { session: string; agent: string; title: string; profile: string; project: string; boxed: boolean; minutes: number; pid: number }
+
 function Agents({ active, resetKey }: { active: boolean; resetKey: number }) {
   const [view, setView] = useState<ActivityView | null>(null);
+  const [sessions, setSessions] = useState<AgentSession[]>([]);
+  const readSessions = useCallback(() => invoke<AgentSession[]>("agent_sessions").then(setSessions, () => undefined), []);
+  // Coding agents started with helix-agents change as they start and end: look while the pane is open.
+  useEffect(() => {
+    if (!active) return;
+    readSessions();
+    const timer = setInterval(readSessions, 3000);
+    return () => clearInterval(timer);
+  }, [active, resetKey, readSessions]);
   const read = useCallback(() => invoke<ActivityView>("activity_view").then(setView, () => undefined), []);
   useEffect(() => {
     const stop = listen<ActivityView>("activity-view", setView);
@@ -204,6 +216,15 @@ function Agents({ active, resetKey }: { active: boolean; resetKey: number }) {
         <button id="agent-toggle" data-test="agent-toggle" disabled={!v.available} onClick={() => invoke("activity_set_enabled", { enabled: !v.enabled })}>{v.enabled ? "Turn off" : "Turn on"}</button>
       </div>
       <div id="agent-state">{state}</div>
+      <h4>Running now</h4>
+      <div id="agent-sessions" data-test="agent-sessions">
+        {sessions.map((row) => (
+          <Row key={row.session} what={`${row.title} · ${row.profile}${row.boxed ? " · in the box" : " · no box"}`} sub={`${row.project} · ${row.minutes < 1 ? "just started" : `${row.minutes} min`}`}>
+            <button data-test={`session-stop-${row.agent}`} onClick={() => invoke("agent_session_stop", { session: row.session }).then(readSessions, readSessions)}>Stop</button>
+          </Row>
+        ))}
+        {sessions.length ? null : <Row what="No coding agent is running." sub="Start one with the agent key, or helix-claude, helix-opencode, helix-codex." />}
+      </div>
       <h4>Waiting for you</h4>
       <div id="agent-pending">
         {v.pending.map((row, index) => (
@@ -238,7 +259,7 @@ function Agents({ active, resetKey }: { active: boolean; resetKey: number }) {
   );
 }
 
-/** The Mobius dropdown: Talk, Act and Agents. Rust owns the conversation, the pending request and the audit; this draws views and sends
+/** The Mobius dropdown: one place to ask (answering and doing) and Agents. Rust owns the conversation, the pending request and the audit; this draws views and sends
  * back the same commands (a typed request, the one confirm, the operation or grant id it was given). */
 export function Mobius({ register }: { register: (handle: MobiusHandle) => void }) {
   const [mode, setMode] = useState<MobiusMode>("talk");
@@ -251,9 +272,9 @@ export function Mobius({ register }: { register: (handle: MobiusHandle) => void 
       },
     });
   }, [register]);
+  // One box to ask: answering and doing are the same tab (the doing view opens by itself when a request is something to do).
   const tabs: [MobiusMode, string, string][] = [
-    ["talk", "Talk", "Talk"],
-    ["act", "Act", "Act on the desktop"],
+    ["talk", "Ask", "Ask Mobius: it answers, or does it"],
     ["agents", "Agents", "Agent activity"],
   ];
   return (
@@ -266,11 +287,11 @@ export function Mobius({ register }: { register: (handle: MobiusHandle) => void 
             <button
               key={value}
               type="button"
-              className={`ai-rail-btn${value === mode ? " active" : ""}`}
+              className={`ai-rail-btn${value === (mode === "act" ? "talk" : mode) ? " active" : ""}`}
               data-test={`mobius-${value}`}
               data-mobius-mode={value}
               title={title}
-              aria-current={value === mode ? "page" : undefined}
+              aria-current={value === (mode === "act" ? "talk" : mode) ? "page" : undefined}
               onClick={() => invoke("mobius_set_mode", { mode: value })}
             >
               {label}

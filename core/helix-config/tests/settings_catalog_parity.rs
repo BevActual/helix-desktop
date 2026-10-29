@@ -9,6 +9,9 @@ use std::collections::BTreeMap;
 /// `PRODUCT_DEFAULTS` in tools/gen-rust-settings-defaults.py.
 const PRODUCT_DEFAULTS: &[&str] = &["shell.polkit_agent"];
 
+/// Settings that exist only in Helix (the C++ shell had no such thing), so the frozen golden cannot list them.
+const HELIX_ONLY: &[&str] = &["theme.accent"];
+
 fn rows(v: &[Value]) -> BTreeMap<String, Value> {
     v.iter()
         .filter_map(|r| Some((r.get("id")?.as_str()?.to_string(), r.clone())))
@@ -84,7 +87,10 @@ fn pristine_catalog_matches_golden() {
             problems.push(format!("{id}.value: rust={gv} cpp={wv}"));
         }
     }
-    for id in got.keys().filter(|id| !want.contains_key(*id)) {
+    for id in got
+        .keys()
+        .filter(|id| !want.contains_key(*id) && !HELIX_ONLY.contains(&id.as_str()))
+    {
         problems.push(format!("extra in Rust: {id}"));
     }
     let _ = std::fs::remove_dir_all(&dir);

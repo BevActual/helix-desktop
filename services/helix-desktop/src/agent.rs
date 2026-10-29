@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use helix_agent::audit_log::AuditRecord;
 use helix_agent::grant_store::evaluate;
+use helix_agent::grant_store::evaluate_tier;
 use helix_agent::grant_store::result_is_untrusted;
 use helix_agent::grant_store::Decision;
 use helix_agent::grant_store::Verdict;
@@ -209,7 +210,7 @@ impl Agent {
     async fn list_tools(&self) -> Vec<OwnedValue> {
         let state = self.state.lock().await;
         let supported = shell_ipc::shell_supported_tools();
-        state
+        let mut tools: Vec<OwnedValue> = state
             .risk
             .commands()
             .into_iter()
@@ -221,7 +222,31 @@ impl Agent {
                     ("tier", owned_str(tier.name())),
                 ]))
             })
-            .collect()
+            .collect();
+        // The actions catalogue (`helix-actions`): named `provider.verb`, called with a `params` JSON object.
+        let manifests = crate::actions_run::manifests();
+        tools.extend(
+            helix_actions::catalogue_with(&manifests)
+                .into_iter()
+                .map(|action| {
+                    dict_entry(HashMap::from([
+                        ("name", owned_str(&action.id)),
+                        ("tier", owned_str(action.risk.name())),
+                        ("title", owned_str(&action.title)),
+                        ("summary", owned_str(&action.summary)),
+                        ("params", owned_str(&action.params.to_string())),
+                    ]))
+                }),
+        );
+        tools
+    }
+
+    /// The actions catalogue as JSON: id, title, summary, params (JSON Schema), risk and undo for each action.
+    async fn list_actions(&self) -> String {
+        serde_json::to_string(&helix_actions::catalogue_with(
+            &crate::actions_run::manifests(),
+        ))
+        .unwrap_or_else(|_| "[]".into())
     }
 
     async fn request_access(
@@ -282,6 +307,7 @@ impl Agent {
             tainted: state.taint.tainted(&peer.client),
             label,
             deadline: State::confirmation_deadline(),
+            params: String::new(),
         };
         state.pending.insert(operation, pending.clone());
         let bus = state.bus.clone();
@@ -304,6 +330,11 @@ impl Agent {
     ) -> fdo::Result<u64> {
         let sender = sender_name(&header)?;
         let peer = resolve_peer(connection, &sender).await?;
+        if helix_actions::is_action(action) {
+            return self
+                .catalogue_action(&emitter, &sender, &peer.client, action, &args)
+                .await;
+        }
         let (argv, literal, reason) = action_args(&args);
         let all_args = combined_args(&argv, &literal);
 
@@ -348,6 +379,7 @@ impl Agent {
                         .map(|session| session.label.clone())
                         .unwrap_or_default(),
                     deadline: State::confirmation_deadline(),
+                    params: String::new(),
                 };
                 audit_and_notify(
                     &mut state,
@@ -380,6 +412,7 @@ impl Agent {
                     tainted,
                     label,
                     deadline: State::confirmation_deadline(),
+                    params: String::new(),
                 };
                 let decision = if tier == RiskTier::Confirm {
                     "confirmed"
@@ -410,6 +443,7 @@ impl Agent {
                             .map(|session| session.label.clone())
                             .unwrap_or_default(),
                         deadline: State::confirmation_deadline(),
+                        params: String::new(),
                     };
                     audit_and_notify(
                         &mut state,
@@ -441,6 +475,7 @@ impl Agent {
                     tainted,
                     label,
                     deadline: State::confirmation_deadline(),
+                    params: String::new(),
                 };
                 state.pending.insert(operation, pending.clone());
                 let bus = state.bus.clone();
@@ -583,9 +618,20 @@ impl Agent {
                 let tool = pending.tool.clone();
                 let argv = pending.argv.clone();
                 let literal = pending.literal.clone();
+                let params = pending.params.clone();
+                let label = pending.label.clone();
                 drop(state);
-                self.run_shell_action(&emitter, operation, tier, &client, &tool, &argv, &literal)
+                if helix_actions::is_action(&tool) {
+                    self.run_catalogue_action(
+                        &emitter, operation, tier, &client, &label, &tool, &params,
+                    )
+                    .await;
+                } else {
+                    self.run_shell_action(
+                        &emitter, operation, tier, &client, &tool, &argv, &literal,
+                    )
                     .await?;
+                }
             }
         }
         Ok(())
@@ -717,6 +763,302 @@ impl Agent {
 }
 
 impl Agent {
+    /// A call to the actions catalogue (`helix-actions`): the same grants, confirmation and audit as a shell command, with the tier
+    /// taken from the catalogue (one setting can be riskier than another) and the call run here, in the desktop service.
+    async fn catalogue_action(
+        &self,
+        emitter: &SignalEmitter<'_>,
+        sender: &str,
+        client: &str,
+        action: &str,
+        args: &HashMap<String, OwnedValue>,
+    ) -> fdo::Result<u64> {
+        let params_text = args.get("params").map(string_field).unwrap_or_default();
+        let reason = args.get("reason").map(string_field).unwrap_or_default();
+        let params: serde_json::Value =
+            serde_json::from_str(&params_text).unwrap_or_else(|_| json!({}));
+        let mut state = self.state.lock().await;
+        let operation = state.alloc_operation();
+        if !state.agent_enabled {
+            drop(state);
+            Self::completed(
+                emitter,
+                operation,
+                false,
+                &denial_json("agent access is turned off"),
+            )
+            .await
+            .ok();
+            return Ok(operation);
+        }
+        let rows = crate::configuration::setting_rows(&state);
+        let manifests = crate::actions_run::manifests();
+        let (tier, preview, known) = crate::actions_run::tier(action, &params, &rows, &manifests);
+        let Decision {
+            verdict,
+            tier,
+            tainted,
+            reason: deny_reason,
+        } = evaluate_tier(tier, known, &state.grants, &state.taint, client);
+        // Said for a person (a script, the command line) as much as for an agent: why, and where it can be changed instead.
+        let deny_reason = if tier == RiskTier::Blocked && known {
+            "Scripts and agents may not change this: it can run a program or open the computer without a password. Change it in Settings.".to_string()
+        } else {
+            deny_reason
+        };
+        let label = state
+            .clients
+            .get(client)
+            .map(|session| session.label.clone())
+            .unwrap_or_default();
+        let pending = PendingConfirm {
+            sender: sender.to_string(),
+            client: client.to_string(),
+            kind: ConfirmKind::Action,
+            tool: action.to_string(),
+            // The confirmation shows the change in plain words, not the JSON.
+            argv: vec![preview],
+            literal: Vec::new(),
+            reason,
+            tiers: vec![tier.name().into()],
+            tainted,
+            label: label.clone(),
+            deadline: State::confirmation_deadline(),
+            params: params_text,
+        };
+        match verdict {
+            Verdict::Deny => {
+                audit_and_notify(
+                    &mut state,
+                    audit_record(&pending, tier, "denied", &deny_reason),
+                )
+                .await;
+                drop(state);
+                Self::completed(emitter, operation, false, &denial_json(&deny_reason))
+                    .await
+                    .ok();
+            }
+            Verdict::Allow => {
+                audit_and_notify(&mut state, audit_record(&pending, tier, "allowed", "")).await;
+                drop(state);
+                self.run_catalogue_action(
+                    emitter,
+                    operation,
+                    tier,
+                    client,
+                    &label,
+                    action,
+                    &pending.params,
+                )
+                .await;
+            }
+            Verdict::NeedsConfirmation => {
+                if state.confirmer.is_none() {
+                    audit_and_notify(
+                        &mut state,
+                        audit_record(&pending, tier, "denied", "no confirmer"),
+                    )
+                    .await;
+                    drop(state);
+                    let result = denial_json(
+                        "this action needs confirmation and no confirmation dialog is available",
+                    );
+                    Self::completed(emitter, operation, false, &result)
+                        .await
+                        .ok();
+                    return Ok(operation);
+                }
+                state.pending.insert(operation, pending.clone());
+                let bus = state.bus.clone();
+                let desktop = state.desktop.clone();
+                drop(state);
+                if let Some(conn) = &bus {
+                    emit_activity_pending_changed(conn, desktop.as_deref()).await;
+                }
+                Self::emit_confirmation(emitter, operation, &pending).await?;
+            }
+        }
+        Ok(operation)
+    }
+
+    /// Runs an allowed (or confirmed) catalogue call and reports it with `Completed`.
+    #[allow(clippy::too_many_arguments)]
+    async fn run_catalogue_action(
+        &self,
+        emitter: &SignalEmitter<'_>,
+        operation: u64,
+        tier: RiskTier,
+        client: &str,
+        label: &str,
+        action: &str,
+        params_text: &str,
+    ) {
+        use helix_actions::settings;
+        let params: serde_json::Value =
+            serde_json::from_str(params_text).unwrap_or_else(|_| json!({}));
+        if !action.starts_with("settings.") {
+            let by = helix_actions::Actor::agent(label);
+            let bus = self.state.lock().await.bus.clone();
+            let (outcome, changed) = if action.starts_with("models.") {
+                crate::actions_run::run_models(&self.state, bus.as_ref(), action, &params, &by)
+                    .await
+            } else {
+                let manifests = crate::actions_run::manifests();
+                match (
+                    helix_actions::manifest::find(&manifests, action),
+                    bus.as_ref(),
+                ) {
+                    (Some((provider, _)), Some(conn)) => {
+                        match crate::actions_run::invoke_provider(conn, provider, action, &params)
+                            .await
+                        {
+                            Ok(reply) => {
+                                let (done, undo) = helix_actions::manifest::reply_parts(&reply);
+                                let sentence =
+                                    done.unwrap_or_else(|| format!("{}: {action}", provider.title));
+                                let entry = self.state.lock().await.history.record_call(
+                                    std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .map_or(0, |d| d.as_secs()),
+                                    action,
+                                    &by,
+                                    &sentence,
+                                    undo,
+                                );
+                                let mut reply = reply;
+                                if let Some(object) = reply.as_object_mut() {
+                                    object.insert("history".into(), json!(entry));
+                                }
+                                (Ok(reply), true)
+                            }
+                            Err(why) => (Err(why), false),
+                        }
+                    }
+                    (None, _) => (Err(format!("unknown action {action}")), false),
+                    (_, None) => (Err("The desktop has no bus connection.".into()), false),
+                }
+            };
+            let ok = outcome.is_ok();
+            if ok && result_is_untrusted(tier) {
+                self.state.lock().await.taint.mark_untrusted(client);
+            }
+            if changed {
+                if let Some(conn) = &bus {
+                    AgentActivity::notify_changed(conn).await;
+                }
+            }
+            let trust = if ok && result_is_untrusted(tier) {
+                "untrusted"
+            } else {
+                "trusted"
+            };
+            let body = match outcome {
+                Ok(value) => value.to_string(),
+                Err(why) => why,
+            };
+            Self::completed(
+                emitter,
+                operation,
+                ok,
+                &action_result_json(trust, ok, &body),
+            )
+            .await
+            .ok();
+            return;
+        }
+        let text = |key: &str| {
+            params
+                .get(key)
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        };
+        let mut state = self.state.lock().await;
+        let rows = crate::configuration::setting_rows(&state);
+        let row = rows.iter().find(|row| {
+            row.get("id").and_then(serde_json::Value::as_str) == Some(text("setting").as_str())
+        });
+        let mut changed = false;
+        let outcome: Result<serde_json::Value, String> = match action {
+            settings::FIND => {
+                let page = text("page");
+                let found = settings::search(
+                    &rows,
+                    &text("query"),
+                    (!page.is_empty()).then_some(page.as_str()),
+                    8,
+                );
+                Ok(json!({ "settings": found }))
+            }
+            settings::GET => match row {
+                Some(row) => {
+                    let mut out = settings::summary(row);
+                    out["value"] = row.get("value").cloned().unwrap_or(serde_json::Value::Null);
+                    Ok(out)
+                }
+                None => Err(format!(
+                    "There is no setting \"{}\"; use settings.find.",
+                    text("setting")
+                )),
+            },
+            settings::SET => match row {
+                Some(row) => match settings::validate(
+                    row,
+                    params.get("value").unwrap_or(&serde_json::Value::Null),
+                ) {
+                    Ok(value) => {
+                        let id = text("setting");
+                        crate::configuration::apply_setting(
+                            &mut state,
+                            &id,
+                            value,
+                            &helix_actions::Actor::agent(label),
+                        )
+                        .map(|entry| {
+                            changed = true;
+                            let sentence = state
+                                .history
+                                .get(entry)
+                                .map(|e| e.sentence.clone())
+                                .unwrap_or_default();
+                            json!({ "done": sentence, "undo": entry })
+                        })
+                    }
+                    Err(why) => Err(why),
+                },
+                None => Err(format!(
+                    "There is no setting \"{}\"; use settings.find.",
+                    text("setting")
+                )),
+            },
+            other => Err(format!("unknown action {other}")),
+        };
+        let ok = outcome.is_ok();
+        if ok && result_is_untrusted(tier) {
+            state.taint.mark_untrusted(client);
+        }
+        let bus = state.bus.clone();
+        drop(state);
+        if changed {
+            if let Some(conn) = &bus {
+                crate::configuration::Configuration::notify_changed(conn).await;
+                // The shell shows an agent's change in the bar with Undo; it reads the history when activity changes.
+                AgentActivity::notify_changed(conn).await;
+            }
+        }
+        let trust = if ok && result_is_untrusted(tier) {
+            "untrusted"
+        } else {
+            "trusted"
+        };
+        let body = match outcome {
+            Ok(value) => value.to_string(),
+            Err(why) => why,
+        };
+        let result = action_result_json(trust, ok, &body);
+        Self::completed(emitter, operation, ok, &result).await.ok();
+    }
+
     #[allow(clippy::too_many_arguments)]
     async fn run_shell_action(
         &self,

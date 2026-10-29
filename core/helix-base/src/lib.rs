@@ -16,7 +16,11 @@ pub const PANELS: &[&str] = &[
     "control-center",
     "agents",
     "notifications",
+    "today",
+    "agent-display",
     "quick-insert",
+    "writing",
+    "point",
 ];
 
 /// One window as the agent may hear of it: no title (a title is the program's own text), and an application name only the desktop entry or the

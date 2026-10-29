@@ -62,6 +62,7 @@ struct Shared {
     on_loading: Mutex<Option<LoadingFn>>,
     on_progress: Mutex<Option<ProgressFn>>,
     transcriber: Mutex<Option<Arc<dyn Transcriber>>>,
+    remote: Mutex<Option<Arc<dyn RemoteChat>>>,
     image_generator: Mutex<Option<Arc<dyn ImageGenerator>>>,
     state: Mutex<State>,
     wake: Condvar,
@@ -93,6 +94,7 @@ impl InferenceQueue {
             on_loading: Mutex::new(None),
             on_progress: Mutex::new(None),
             transcriber: Mutex::new(None),
+            remote: Mutex::new(None),
             image_generator: Mutex::new(None),
             state: Mutex::new(State {
                 waiting: VecDeque::new(),
@@ -133,6 +135,10 @@ impl InferenceQueue {
 
     pub fn on_progress(&self, callback: ProgressFn) {
         *lock(&self.shared.on_progress) = Some(callback);
+    }
+
+    pub fn set_remote(&self, remote: Arc<dyn RemoteChat>) {
+        *lock(&self.shared.remote) = Some(remote);
     }
 
     pub fn set_transcriber(&self, transcriber: Arc<dyn Transcriber>) {
@@ -373,6 +379,23 @@ fn run(shared: &Arc<Shared>) {
                     ..Outcome::default()
                 },
             };
+        } else if !request.backend.is_empty() && request.backend != "local" {
+            // Routed to another machine or a hosted service: no model is loaded here.
+            let remote = lock(&shared.remote).clone();
+            outcome = match remote {
+                Some(remote) => {
+                    let delta = Arc::clone(&shared.on_delta);
+                    remote.chat(
+                        &request,
+                        &mut |piece: &str| delta(operation, piece),
+                        &cancelled,
+                    )
+                }
+                None => Outcome {
+                    error: "remote models are not available".into(),
+                    ..Outcome::default()
+                },
+            };
         } else {
             let loaded = if request.model.is_empty() {
                 Ok(())
@@ -408,6 +431,13 @@ fn run(shared: &Arc<Shared>) {
             state.last_activity = Instant::now();
             was
         };
+        outcome.route_backend = if request.backend.is_empty() {
+            "local".into()
+        } else {
+            request.backend.clone()
+        };
+        outcome.route_model = request.model.clone();
+        outcome.route_reason = request.route_reason.clone();
         if was_cancelled && !outcome.ok {
             outcome.cancelled = true;
             if outcome.error.is_empty() {

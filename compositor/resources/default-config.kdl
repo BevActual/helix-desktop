@@ -365,7 +365,7 @@ binds {
     // Suggested binds for running programs: terminal, app launcher, screen locker.
     Mod+T hotkey-overlay-title="Open a Terminal: alacritty" { spawn "alacritty"; }
     Mod+D hotkey-overlay-title="Run an Application: fuzzel" { spawn "fuzzel"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen: swaylock" { spawn "swaylock"; }
+    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "helix-lock --daemonize; case $? in 2|127) swaylock --daemonize --color 0e1028;; esac"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
@@ -607,6 +607,13 @@ binds {
     // a matching layout switch hotkey configured in xkb options above.
     // Having both at once on the same hotkey will break the switching,
     // since it will switch twice upon pressing the hotkey (once by xkb, once by niri).
+    // Helix: note which window has the keyboard, then raise Mobius (or start it). Mobius shows what you were using as a chip you can remove.
+    // Mod+Shift+A     { helix-summon; }
+
+    // Helix: the Magic Pointer. Point at anything and press it: a bubble beside the pointer says what it is, copies the text in it,
+    // answers a question about it, opens Writing Tools on the selection, and offers the actions apps add.
+    Mod+Slash hotkey-overlay-title="Magic Pointer: what's under the pointer" { helix-shell "point"; }
+
     // Mod+Space       { switch-layout "next"; }
     // Mod+Shift+Space { switch-layout "prev"; }
 

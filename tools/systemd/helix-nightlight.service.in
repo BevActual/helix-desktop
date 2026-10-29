@@ -1,0 +1,13 @@
+[Unit]
+Description=Helix night light (warm screen in the evening)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@NIGHTLIGHT_BIN@
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

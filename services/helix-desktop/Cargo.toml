@@ -15,6 +15,7 @@ name = "helix-fake-bluez"
 path = "src/bin/helix-fake-bluez.rs"
 
 [dependencies]
+helix-actions = { workspace = true }
 helix-agent = { workspace = true }
 helix-config = { workspace = true }
 helix-config-export = { workspace = true }

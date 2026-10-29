@@ -15,17 +15,31 @@ pub struct Bind {
     pub chord: String,
     pub title: String,
     pub command: String,
-    /// The file the bind came from (its name only).
+    /// The file the bind came from (its name only), or `config` / `helix` when the compositor reported it.
     pub source: String,
+    /// The action as a config writes it, when the compositor could say (so the bind can be moved).
+    pub kdl: Option<String>,
+    /// Set in Settings, over what the config says.
+    pub overridden: bool,
+    /// Turned off in Settings.
+    pub off: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ShortcutRow {
+    /// The chord as a config writes it, for changing it.
+    pub chord: String,
     pub keys: Vec<String>,
     pub title: String,
     pub conflict: bool,
     pub source: String,
+    /// The action as a config writes it, when it can be moved to another chord.
+    pub movable: bool,
+    /// Set in Settings, over what the config says (it can be given back).
+    pub overridden: bool,
+    /// Turned off in Settings (it can be given back).
+    pub off: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -133,12 +147,40 @@ pub fn parse(text: &str, source: &str) -> Vec<Bind> {
             title: sanitize_for_display(&title, 80),
             command: sanitize_for_display(&command, 200),
             source: sanitize_for_display(source, 60),
+            kdl: None,
+            overridden: false,
+            off: false,
         });
         if binds.len() >= MAX_BINDS {
             break;
         }
     }
     binds
+}
+
+/// The binds the compositor reports, as the list `view` groups.
+pub fn from_compositor(binds: &[crate::compositor_ipc::CompositorBind]) -> Vec<Bind> {
+    binds
+        .iter()
+        .take(MAX_BINDS * 2)
+        .map(|b| Bind {
+            chord: sanitize_for_display(&b.chord, 64),
+            title: sanitize_for_display(b.title.as_deref().unwrap_or(""), 80),
+            command: sanitize_for_display(
+                &match b.action.as_str() {
+                    "spawn" | "spawn-sh" => b.detail.clone(),
+                    // The shell's own actions group with the panels, and are named the way a panel is.
+                    "helix-shell" => format!("helix-panel {}", b.detail),
+                    other => other.to_string(),
+                },
+                200,
+            ),
+            source: sanitize_for_display(&b.source, 60),
+            kdl: b.action_kdl.clone(),
+            overridden: b.source == "helix",
+            off: b.action == "none",
+        })
+        .collect()
 }
 
 /// A chord as keys a person recognises: `Mod+Shift+Comma` → `Super`, `Shift`, `,`.
@@ -220,8 +262,16 @@ pub fn view(binds: &[Bind]) -> Vec<ShortcutGroup> {
     for bind in binds {
         let name = group_of(bind);
         let row = ShortcutRow {
+            chord: bind.chord.clone(),
+            movable: bind.kdl.is_some() && !bind.off,
+            overridden: bind.overridden,
+            off: bind.off,
             keys: keys_of(&bind.chord),
-            title: title_of(bind),
+            title: if bind.off {
+                "Turned off".into()
+            } else {
+                title_of(bind)
+            },
             conflict: seen.get(&identity(&bind.chord)).copied().unwrap_or(0) > 1,
             source: bind.source.clone(),
         };
@@ -386,5 +436,50 @@ binds {
         for t in [&b.title, &b.command, &b.source] {
             assert!(!t.contains('\u{202e}') && !t.contains('\u{7}'), "{t:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod live_tests {
+    use super::*;
+    use crate::compositor_ipc::CompositorBind;
+
+    fn bind(chord: &str, action: &str, detail: &str, source: &str) -> CompositorBind {
+        CompositorBind {
+            chord: chord.into(),
+            action: action.into(),
+            detail: detail.into(),
+            title: None,
+            source: source.into(),
+            action_kdl: Some(action.into()),
+            properties: Default::default(),
+        }
+    }
+
+    #[test]
+    fn what_the_compositor_reports_is_grouped_and_marked() {
+        let reported = [
+            bind("Mod+D", "helix-shell", "launcher", "helix"),
+            bind("Mod+H", "focus-column-left", "", "config"),
+            bind("XF86AudioMute", "spawn", "wpctl set-mute", "config"),
+            CompositorBind {
+                chord: "Mod+Q".into(),
+                action: "none".into(),
+                source: "helix".into(),
+                ..CompositorBind::default()
+            },
+        ];
+        let groups = view(&from_compositor(&reported));
+        let names: Vec<&str> = groups.iter().map(|g| g.name).collect();
+        assert_eq!(names, ["Helix", "Windows and apps", "Media keys"]);
+        assert_eq!(groups[0].rows[0].title, "Launcher");
+        assert!(groups[0].rows[0].overridden && groups[0].rows[0].movable);
+        assert_eq!(groups[1].rows[0].title, "Focus column left");
+        assert!(!groups[1].rows[0].overridden);
+        let off = groups[1].rows.iter().find(|r| r.off).unwrap();
+        assert_eq!(
+            (off.title.as_str(), off.movable, off.chord.as_str()),
+            ("Turned off", false, "Mod+Q")
+        );
     }
 }

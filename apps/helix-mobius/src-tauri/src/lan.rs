@@ -1,5 +1,7 @@
 //! OpenAI-compatible chat for LAN/cloud talk from Mobius.
-//! Remote replies are plain text only — never Agent Surface tools (see inference-fabric.md).
+//! A remote reply is text. The one exception is the planning step of a tools task: it may be offered the task's own tool list (`tools`), and a function
+//! call it makes is turned back into the same JSON the task loop reads from text, so every call still passes the loop's checks, the policy and the person.
+//! Remote models are never given Agent Surface itself.
 
 use serde_json::{json, Value};
 
@@ -168,6 +170,40 @@ pub async fn chat_completions_routed(
     options: RemoteOptions,
     route: Option<&OpenRouterRoute>,
 ) -> Result<Reply, String> {
+    chat_completions_inner(base_url, model, messages, api_key, options, route, None).await
+}
+
+/// A planning step with the task's tools offered natively. A function call comes back as the JSON object the task loop reads from text.
+pub async fn chat_completions_with_tools(
+    base_url: &str,
+    model: &str,
+    messages: &[(&str, String)],
+    api_key: Option<&str>,
+    options: RemoteOptions,
+    tools: &Value,
+) -> Result<String, String> {
+    chat_completions_inner(
+        base_url,
+        model,
+        messages,
+        api_key,
+        options,
+        None,
+        Some(tools),
+    )
+    .await
+    .map(|reply| reply.text)
+}
+
+async fn chat_completions_inner(
+    base_url: &str,
+    model: &str,
+    messages: &[(&str, String)],
+    api_key: Option<&str>,
+    options: RemoteOptions,
+    route: Option<&OpenRouterRoute>,
+    tools: Option<&Value>,
+) -> Result<Reply, String> {
     let base = base_url.trim().trim_end_matches('/');
     if base.is_empty() {
         return Err("Remote backend has no URL.".into());
@@ -187,7 +223,11 @@ pub async fn chat_completions_routed(
         0.6
     };
     let max_tokens = options.max_tokens.clamp(64, 8192);
-    let body = request_body(model, messages, temperature, max_tokens, route);
+    let mut body = request_body(model, messages, temperature, max_tokens, route);
+    if let Some(tools) = tools {
+        body["tools"] = tools.clone();
+        body["tool_choice"] = json!("auto");
+    }
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(
             options.timeout_secs.clamp(15, 600),
@@ -224,7 +264,52 @@ pub async fn chat_completions_routed(
         .json()
         .await
         .map_err(|e| format!("Remote reply was not JSON: {e}"))?;
+    if tools.is_some() {
+        if let Some(call) = function_call_as_json(&value) {
+            return Ok(Reply {
+                text: call,
+                model: model.to_string(),
+                cost_micro: None,
+                completion_tokens: None,
+            });
+        }
+    }
     parse_reply(&value, model)
+}
+
+/// The first function call of a reply as the JSON object the task loop reads (`{"tool":"terminal","command":"ls"}`): the function's name becomes `tool`
+/// and its arguments (an object, as text) the other fields. A call whose arguments are not an object, or that tries to set `tool` itself, is not one.
+pub fn function_call_as_json(value: &Value) -> Option<String> {
+    let call = value
+        .get("choices")?
+        .as_array()?
+        .first()?
+        .get("message")?
+        .get("tool_calls")?
+        .as_array()?
+        .first()?
+        .get("function")?;
+    let name = call.get("name")?.as_str()?;
+    if name.is_empty()
+        || name.len() > 40
+        || !name.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+    {
+        return None;
+    }
+    let raw = call.get("arguments").map_or("{}".to_string(), |a| {
+        a.as_str().map_or_else(|| a.to_string(), str::to_string)
+    });
+    let mut args: Value = if raw.trim().is_empty() {
+        json!({})
+    } else {
+        serde_json::from_str(&raw).ok()?
+    };
+    let object = args.as_object_mut()?;
+    if object.contains_key("tool") {
+        return None;
+    }
+    object.insert("tool".into(), json!(name));
+    Some(args.to_string())
 }
 
 /// GET `{base}/models` (OpenAI-compatible). Caps at 80 ids for the picker.
@@ -282,9 +367,9 @@ fn extract_text(value: &Value) -> Result<String, String> {
         .first()
         .and_then(|c| c.get("message"))
         .ok_or_else(|| "Remote reply had no message.".to_string())?;
-    // Ignore any tool_calls field — remote brains never get Agent Surface.
+    // A function call is only read where the caller offered tools (see `function_call_as_json`); anywhere else it is ignored.
     if message.get("tool_calls").is_some() {
-        eprintln!("MOBIUS ignored tool_calls from remote reply (Act-slot isolation)");
+        eprintln!("MOBIUS ignored tool_calls from remote reply (no tools were offered)");
     }
     let content = message
         .get("content")
@@ -319,6 +404,108 @@ fn extract_model_ids(value: &Value) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A one-request HTTP server: returns what the client sent (the body) and answers with `reply`.
+    async fn serve_once(reply: Value) -> (String, tokio::task::JoinHandle<String>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}/v1", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut data = Vec::new();
+            let mut chunk = [0u8; 4096];
+            loop {
+                let n = socket.read(&mut chunk).await.unwrap();
+                data.extend_from_slice(&chunk[..n]);
+                let text = String::from_utf8_lossy(&data).to_string();
+                if let Some(split) = text.find("\r\n\r\n") {
+                    let length = text[..split]
+                        .to_lowercase()
+                        .split("content-length:")
+                        .nth(1)
+                        .and_then(|l| l.lines().next())
+                        .and_then(|l| l.trim().parse::<usize>().ok())
+                        .unwrap_or(0);
+                    if data.len() >= split + 4 + length {
+                        break;
+                    }
+                }
+                if n == 0 {
+                    break;
+                }
+            }
+            let body = reply.to_string();
+            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+            socket.write_all(response.as_bytes()).await.unwrap();
+            String::from_utf8_lossy(&data).to_string()
+        });
+        (base, task)
+    }
+
+    #[tokio::test]
+    async fn a_planning_call_offers_the_tools_and_reads_a_function_call_back() {
+        let reply = json!({"choices": [{"message": {"content": null, "tool_calls": [{"function": {"name": "web_search", "arguments": "{\"query\":\"rust docs\"}"}}]}}]});
+        let (base, server) = serve_once(reply).await;
+        let tools = json!([{"type": "function", "function": {"name": "web_search", "parameters": {"type": "object"}}}]);
+        let text = chat_completions_with_tools(
+            &base,
+            "m",
+            &[("user", "find docs".to_string())],
+            None,
+            RemoteOptions::default(),
+            &tools,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&text).unwrap(),
+            json!({"tool": "web_search", "query": "rust docs"})
+        );
+        let sent = server.await.unwrap();
+        assert!(
+            sent.contains("\"tools\"") && sent.contains("\"tool_choice\":\"auto\""),
+            "the tools were offered: {sent}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_plain_call_never_offers_tools_and_ignores_a_function_call() {
+        let reply = json!({"choices": [{"message": {"content": "hello", "tool_calls": [{"function": {"name": "terminal", "arguments": "{}"}}]}}]});
+        let (base, server) = serve_once(reply).await;
+        let text = chat_completions(
+            &base,
+            "m",
+            &[("user", "hi".to_string())],
+            None,
+            RemoteOptions::default(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(text, "hello");
+        assert!(!server.await.unwrap().contains("\"tools\""));
+    }
+
+    #[test]
+    fn a_function_call_becomes_the_json_the_task_loop_reads() {
+        let reply = json!({"choices": [{"message": {"content": null, "tool_calls": [{"function": {"name": "terminal", "arguments": "{\"command\":\"ls -la\"}"}}]}}]});
+        let text = function_call_as_json(&reply).unwrap();
+        let back: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(back, json!({"tool": "terminal", "command": "ls -la"}));
+        let none = json!({"choices": [{"message": {"content": "hi", "tool_calls": [{"function": {"name": "finish", "arguments": ""}}]}}]});
+        assert_eq!(
+            serde_json::from_str::<Value>(&function_call_as_json(&none).unwrap()).unwrap(),
+            json!({"tool": "finish"})
+        );
+        for bad in [
+            json!({"choices": [{"message": {"content": "just text"}}]}),
+            json!({"choices": [{"message": {"tool_calls": [{"function": {"name": "terminal", "arguments": "not json"}}]}}]}),
+            json!({"choices": [{"message": {"tool_calls": [{"function": {"name": "terminal", "arguments": "[1]"}}]}}]}),
+            json!({"choices": [{"message": {"tool_calls": [{"function": {"name": "Terminal; rm", "arguments": "{}"}}]}}]}),
+            json!({"choices": [{"message": {"tool_calls": [{"function": {"name": "terminal", "arguments": "{\"tool\":\"finish\"}"}}]}}]}),
+        ] {
+            assert!(function_call_as_json(&bad).is_none(), "{bad}");
+        }
+    }
 
     fn msgs() -> Vec<(&'static str, String)> {
         vec![("user", "hi".to_string())]

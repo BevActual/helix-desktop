@@ -688,6 +688,48 @@ mod tests {
     }
 
     #[test]
+    fn parse_helix_summon() {
+        let none = do_parse("");
+        assert_eq!(none.helix.summon_app_id, "org.helix.Mobius");
+        assert_eq!(none.helix.summon_command, ["helix-mobius"]);
+
+        let parsed = do_parse(
+            r#"
+            helix {
+                summon-app-id "org.example.Assistant"
+                summon-command "assistant" "--summon"
+            }
+            binds {
+                Mod+Shift+Space { helix-summon; }
+            }
+            "#,
+        );
+        assert_eq!(parsed.helix.summon_app_id, "org.example.Assistant");
+        assert_eq!(parsed.helix.summon_command, ["assistant", "--summon"]);
+        assert!(parsed
+            .binds
+            .0
+            .iter()
+            .any(|bind| matches!(bind.action, Action::HelixSummon)));
+    }
+
+    #[test]
+    fn parse_helix_shell_bind() {
+        let parsed = do_parse(
+            r#"
+            binds {
+                Mod+D { helix-shell "launcher"; }
+            }
+            "#,
+        );
+        assert!(parsed
+            .binds
+            .0
+            .iter()
+            .any(|bind| matches!(&bind.action, Action::HelixShell(c) if c == "launcher")));
+    }
+
+    #[test]
     fn parse_on_xdg_activate() {
         let parsed = do_parse(
             r#"
@@ -1581,6 +1623,10 @@ mod tests {
             },
             helix: Helix {
                 agent_desk_name: "Helix Agent",
+                summon_app_id: "org.helix.Mobius",
+                summon_command: [
+                    "helix-mobius",
+                ],
             },
             config_notification: ConfigNotification {
                 disable_failed: false,

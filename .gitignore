@@ -32,6 +32,7 @@ result-*
 /third_party/llama.cpp-*.tar.gz
 /third_party/.llama-build/
 /third_party/llama-install/
+/third_party/llama-vulkan-install/
 /third_party/whisper.cpp-*/
 /third_party/whisper.cpp-*.tar.gz
 /third_party/whisper-install/

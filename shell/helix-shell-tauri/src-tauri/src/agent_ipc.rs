@@ -340,7 +340,63 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             crate::bar::toggle(app)?;
             noted_text(app, SettingKey::Bar, "Bar", before, bar_text())
         }
+        // Computer use: all of these act on the agent display and nothing else. The blocking ones run off the async threads.
+        Command::DisplayLaunch(query) => {
+            let app = app.clone();
+            let id = tokio::task::spawn_blocking(move || {
+                crate::agent_display::agent_launch(&app, &query)
+            })
+            .await
+            .map_err(|_| "the display did not answer".to_string())??;
+            eprintln!("AGENT-IPC display launched {id}");
+            ok()
+        }
+        Command::DisplayScreenshot => {
+            tokio::task::spawn_blocking(crate::agent_display::agent_screenshot)
+                .await
+                .map_err(|_| "the display did not answer".to_string())?
+        }
+        Command::DisplayClick { x, y, button } => {
+            display_input(move || crate::agent_display::agent_click(x, y, &button)).await
+        }
+        Command::DisplayMove { x, y } => {
+            display_input(move || crate::agent_display::agent_move(x, y)).await
+        }
+        Command::DisplayScroll { dx, dy } => {
+            display_input(move || crate::agent_display::agent_scroll(dx, dy)).await
+        }
+        Command::DisplayKey(key) => {
+            display_input(move || crate::agent_display::agent_key(&key)).await
+        }
+        Command::DisplayType(text) => {
+            display_input(move || crate::agent_display::agent_type(&text)).await
+        }
+        Command::DisplayState => {
+            let status = crate::agent_display::status();
+            let state = serde_json::json!({
+                "running": status.running,
+                "windows": status.windows.iter().map(|w| serde_json::json!({"app_id": w.app_id, "title": w.title})).collect::<Vec<_>>(),
+                "help": crate::agent_display::help_reason(),
+                "person_in_control": crate::agent_display::person_controlling(),
+                "size": [1280, 720],
+            });
+            Ok(format!("{state}\n"))
+        }
+        Command::DisplayHelp(reason) => {
+            crate::agent_display::request_help(app, &reason);
+            ok()
+        }
     }
+}
+
+/// Runs one input command for the agent off the async threads, answering `ok` or the reason it was refused.
+async fn display_input(
+    work: impl FnOnce() -> Result<(), String> + Send + 'static,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|_| "the display did not answer".to_string())??;
+    Ok("ok\n".to_string())
 }
 
 fn changes() -> std::sync::MutexGuard<'static, ChangeLedger> {
@@ -701,6 +757,9 @@ fn describe(command: &Command) -> String {
     match command {
         Command::ClipboardCopy(text) => format!("ClipboardCopy({} chars)", text.chars().count()),
         Command::AppLaunch(query) => format!("AppLaunch({query})"),
+        // What an agent types or asks is its own text: the log says how much, never what.
+        Command::DisplayType(text) => format!("DisplayType({} chars)", text.chars().count()),
+        Command::DisplayHelp(reason) => format!("DisplayHelp({} chars)", reason.chars().count()),
         other => format!("{other:?}"),
     }
 }

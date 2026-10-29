@@ -18,12 +18,30 @@ pub struct ImageInput {
     pub rgb: Vec<u8>,
 }
 
+/// How OpenRouter should choose among its models and providers for one request (ignored by every other backend).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RemoteRoute {
+    /// Models to try, in order, when the first fails.
+    pub fallbacks: Vec<String>,
+    /// `price` or `speed`; empty lets the provider balance.
+    pub prefer: String,
+    /// Only providers that promise not to keep or train on the prompt.
+    pub private_only: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct ChatRequest {
     /// Verified identity of the caller, for limits and logging.
     pub client: String,
     /// Empty = the backend's default.
     pub model: String,
+    /// Which configured backend answers (`inference-routing.toml`); empty or `local` is the on-device engine.
+    pub backend: String,
+    /// For a remote backend: provider and model choice (OpenRouter), and how long to wait (0 = the service's default).
+    pub route: Option<RemoteRoute>,
+    /// The routing decision's sentence (see router.rs).
+    pub route_reason: String,
+    pub timeout_secs: u64,
     /// `[{role, content}, ...]`; content is a string or a list of `{"type":"text","text":..}` / `{"type":"image","index":N}`.
     pub messages: Value,
     pub images: Vec<ImageInput>,
@@ -50,6 +68,10 @@ impl Default for ChatRequest {
         Self {
             client: String::new(),
             model: String::new(),
+            backend: String::new(),
+            route: None,
+            route_reason: String::new(),
+            timeout_secs: 0,
             messages: Value::Null,
             images: Vec::new(),
             generate_image: false,
@@ -83,6 +105,14 @@ pub struct Outcome {
     /// Of those, how many were already in the model's memory from the previous request.
     pub cached_prompt_tokens: u32,
     pub completion_tokens: u32,
+    /// The model that really answered (a fallback, perhaps), when it said.
+    pub model: String,
+    /// What it cost, in millionths of a dollar, when the provider said.
+    pub cost_micro: Option<u64>,
+    /// Where the request went and why (set by the queue from the routing decision).
+    pub route_backend: String,
+    pub route_model: String,
+    pub route_reason: String,
     /// Transcription: the language that was spoken.
     pub language: String,
     /// Bounded base64 PNG; no worker-chosen file path crosses the bus.
@@ -122,6 +152,17 @@ pub trait Backend: Send + Sync {
     fn snapshot(&self) -> Value;
     /// Told how far loading a model has got (0..1) while `load` runs, on the worker thread.
     fn set_progress(&self, _progress: ProgressFn) {}
+}
+
+/// Talk, summarise, vision and code answered by a model on another machine or a hosted service: only what the person routed there.
+pub trait RemoteChat: Send + Sync {
+    /// Must return promptly once `cancelled()` is true.
+    fn chat(
+        &self,
+        request: &ChatRequest,
+        on_delta: &mut dyn FnMut(&str),
+        cancelled: &dyn Fn() -> bool,
+    ) -> Outcome;
 }
 
 pub trait Transcriber: Send + Sync {

@@ -45,8 +45,11 @@ echo "--- 3. stop a reply"
 click_id new-chat; sleep 0.8
 HELIX=1
 click_id input; wtype "Tell me a long story"; wtype -k Return
-for _ in $(seq 1 12); do has_id stop && break; sleep 0.2; done
-if has_id stop; then click_id stop; echo "ok: stop pressed"; else fail "no stop button"; shot chat-nostop; tail -4 "$LOG" | cut -c1-140; fi
+for _ in $(seq 1 40); do has_id stop && break; sleep 0.25; done
+if has_id stop; then
+  has_id agent-status && echo "ok: the composer shows what Mobius is doing" || fail "no agent status"
+  click_id stop; echo "ok: stop pressed"
+else fail "no stop button"; shot chat-nostop; tail -4 "$LOG" | cut -c1-140; fi
 sleep 1.5
 grep -c "MOBIUS turn ended" "$LOG" | sed 's/^/turns ended so far: /'
 echo "--- 4. delete"

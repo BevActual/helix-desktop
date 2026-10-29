@@ -15,6 +15,7 @@ import { Stage, type StageHandle, type StageHooks } from "./workpanel";
 import { ImageStage, type ImageHandle, type ImageHooks } from "./imagestage";
 import { Projects, type ProjectsHandle, type ProjectsHooks } from "./projects";
 import { Scheduled, type ScheduledHandle } from "./scheduled";
+import { AgentTasks, type AgentTasksHandle } from "./agenttasks";
 import { Palette, type PaletteHandle, type PaletteHooks } from "./palette";
 import { Memory, type MemoryHandle } from "./memory";
 import { CreateImage, type CreateImageHandle } from "./create-image";
@@ -58,7 +59,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   codeStage: (host: HTMLElement, hooks: CodeHooks) => {
     const run = handled<CodeHandle>(host, (register) => <CodeStage register={register} hooks={hooks} />);
-    return { open: () => run((h) => h.open()), refresh: () => run((h) => h.refresh()), update: () => run((h) => h.update()), close: () => run((h) => h.close()) };
+    return { open: () => run((h) => h.open()), refresh: () => run((h) => h.refresh()), update: () => run((h) => h.update()), close: () => run((h) => h.close()), show: (path: string, line?: number) => run((h) => h.show(path, line)) };
   },
   stage: (host: HTMLElement, hooks: StageHooks) => {
     const run = handled<StageHandle>(host, (register) => <Stage register={register} hooks={hooks} />);
@@ -79,6 +80,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   scheduled: (host: HTMLElement, onOpenChat: (id: string) => void) => {
     const run = handled<ScheduledHandle>(host, (register) => <Scheduled register={register} onOpenChat={onOpenChat} />);
     return { open: () => run((h) => h.open()) };
+  },
+  agentTasks: (host: HTMLElement, visible: (shown: boolean) => void, onOpenChat: (id: string) => void) => {
+    const run = handled<AgentTasksHandle>(host, (register) => <AgentTasks register={register} visible={visible} onOpenChat={onOpenChat} />);
+    return { open: (prefill?: { goal?: string; folder?: string; policy?: string }) => run((h) => h.open(prefill)), close: () => run((h) => h.close()) };
   },
   memory: (host: HTMLElement) => {
     const run = handled<MemoryHandle>(host, (register) => <Memory register={register} />);
@@ -122,7 +127,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   },
   chats: (host: HTMLElement, hooks: ChatListHooks) => {
     const run = handled<ChatListHandle>(host, (register) => <ChatList register={register} hooks={hooks} />);
-    return { set: (items: ChatItem[], currentId: string) => run((h) => h.set(items, currentId)) };
+    return { set: (items: ChatItem[], currentId: string, live?: { streaming?: boolean; waiting?: boolean }) => run((h) => h.set(items, currentId, live)) };
   },
   models: (host: HTMLElement, hooks: SettingsHooks) => {
     const run = handled<SettingsHandle>(host, (register) => <SettingsPage register={register} hooks={hooks} />);

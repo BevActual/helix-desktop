@@ -128,7 +128,7 @@ export function CloudModels({ view, loading, hasKey, profiles, now, onRefresh, o
         <input data-test="cloud-add-id" type="text" spellCheck={false} placeholder="vendor/model-name" value={custom} onChange={(e) => setCustom(e.target.value)} />
         <button type="button" disabled={!customOk} data-test="cloud-add" onClick={() => { onPin(custom.trim(), true); setCustom(""); }}>Add to my menu</button>
       </div>
-      <p className="set-hint">Chats with a cloud model leave this computer, and Act never uses one. The list comes from openrouter.ai without your key.</p>
+      <p className="set-hint">Chats with a cloud model leave this computer; acting on the desktop stays here. The list comes from openrouter.ai without your key.</p>
     </>
   );
 }

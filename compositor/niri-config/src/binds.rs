@@ -392,6 +392,10 @@ pub enum Action {
     },
     #[knuffel(skip)]
     HelixFocusAgentDesk {},
+    /// Remember which window has the keyboard, then raise Mobius (or start it): `helix-summon`.
+    HelixSummon,
+    /// Ask the Helix shell to do something (open the launcher, lock, change the volume): `helix-shell "launcher"`.
+    HelixShell(#[knuffel(argument)] String),
     #[knuffel(skip)]
     MruAdvance {
         direction: MruDirection,
@@ -743,8 +747,12 @@ impl From<niri_ipc::Action> for Action {
                 show_pointer,
                 path,
             },
-            niri_ipc::Action::HelixPlaceOnAgentDesk { count } => Self::HelixPlaceOnAgentDesk { count },
+            niri_ipc::Action::HelixPlaceOnAgentDesk { count } => {
+                Self::HelixPlaceOnAgentDesk { count }
+            }
             niri_ipc::Action::HelixFocusAgentDesk {} => Self::HelixFocusAgentDesk {},
+            niri_ipc::Action::HelixSummon {} => Self::HelixSummon,
+            niri_ipc::Action::HelixShell { command } => Self::HelixShell(command),
         }
     }
 }
@@ -943,12 +951,15 @@ where
             }
             match Action::decode_node(child, ctx) {
                 Ok(action) => {
-                    if !matches!(action, Action::Spawn(_) | Action::SpawnSh(_)) {
+                    if !matches!(
+                        action,
+                        Action::Spawn(_) | Action::SpawnSh(_) | Action::HelixShell(_)
+                    ) {
                         if let Some(node) = allow_when_locked_node {
                             ctx.emit_error(DecodeError::unexpected(
                                 node,
                                 "property",
-                                "allow-when-locked can only be set on spawn binds",
+                                "allow-when-locked can only be set on spawn and helix-shell binds",
                             ));
                         }
                     }

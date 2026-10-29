@@ -65,6 +65,7 @@ BuildRequires:  pkgconfig(wayland-server)
 BuildRequires:  pkgconfig(systemd)
 BuildRequires:  pkgconfig(pangocairo)
 BuildRequires:  pkgconfig(cairo-gobject)
+BuildRequires:  pam-devel
 
 # The compositor is the one Helix needs, and the shell's approval dialog is only protected by it.
 Recommends:     helix-niri = %{version}-%{release}
@@ -154,6 +155,8 @@ rm -f %{buildroot}%{_bindir}/helix-transcribe %{buildroot}%{_bindir}/helix-image
 
 # The user preset for the session units.
 install -Dm644 packaging/90-helix.preset %{buildroot}%{_prefix}/lib/systemd/user-preset/90-helix.preset
+install -Dm644 packaging/90-helix-geoclue.conf %{buildroot}%{_sysconfdir}/geoclue/conf.d/90-helix.conf
+install -Dm644 packaging/helix-lock.pam %{buildroot}%{_sysconfdir}/pam.d/helix-lock
 
 # The compositor, laid out the way the distribution's own niri package does.
 NIRI="%{?helix_target}%{!?helix_target:target}/%{helix_profile}/niri"
@@ -189,18 +192,20 @@ command = "%{_bindir}/helix-greeter-session"
 user = "greetd"
 TOML
 
+install -D -m 0644 packaging/50-helix-greeter-power.rules %{buildroot}%{_datadir}/polkit-1/rules.d/50-helix-greeter-power.rules
+
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %if %{with check}
 cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-agent -p helix-config -p helix-config-export -p helix-models \
-  -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model -p helix-wallpaper-model
+  -p helix-compositor -p helix-shell-model -p helix-chat -p helix-software-model -p helix-monitor-model -p helix-wallpaper-model -p helix-nightlight-model
 %endif
 
 %post
-%systemd_user_post helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service
+%systemd_user_post helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service helix-nightlight.service
 
 %preun
-%systemd_user_preun helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service
+%systemd_user_preun helix-shell-strut.service helix-shell-bar.service helix-wallpaper.service helix-idle.service helix-nightlight.service
 
 %files
 %license LICENSE
@@ -214,10 +219,17 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-shell-strut
 %{_bindir}/helix-wallpaper
 %{_bindir}/helix-idle
+%{_bindir}/helix-lock
+%{_bindir}/helix-agent-input
+%{_bindir}/helix-identify
+%config(noreplace) %{_sysconfdir}/pam.d/helix-lock
+%{_bindir}/helix-nightlight
 %{_bindir}/helix-settings
 %{_bindir}/helix-mobius
 %{_bindir}/helix-software
 %{_bindir}/helix-system-monitor
+%{_bindir}/helix-models
+%{_bindir}/helix
 %{_bindir}/helix-greeter-apply-appearance
 %{_libexecdir}/helix-system-upgrade
 %{_userunitdir}/helix-service.service
@@ -227,8 +239,10 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_userunitdir}/helix-shell-bar.service
 %{_userunitdir}/helix-shell-panels.service
 %{_userunitdir}/helix-idle.service
+%{_userunitdir}/helix-nightlight.service
 %{_userunitdir}/helix-wallpaper.service
 %{_prefix}/lib/systemd/user-preset/90-helix.preset
+%config(noreplace) %{_sysconfdir}/geoclue/conf.d/90-helix.conf
 %{_datadir}/dbus-1/services/org.helix.Desktop.service
 %{_datadir}/dbus-1/services/org.helix.Inference.service
 %{_datadir}/polkit-1/actions/org.helix.Shell.upgrade.policy
@@ -236,6 +250,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_datadir}/icons/hicolor/scalable/apps/helix.svg
 %{_datadir}/icons/hicolor/scalable/apps/org.helix.Shell.svg
 %{_datadir}/icons/hicolor/scalable/apps/org.helix.SystemMonitor.svg
+%{_datadir}/icons/hicolor/scalable/apps/org.helix.Models.svg
 %dir %{_datadir}/helix
 %{_datadir}/helix/msg-risk.toml
 %{_datadir}/helix/tool-hints.toml
@@ -266,6 +281,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-greeter
 %{_bindir}/helix-greeter-session
 %{_datadir}/helix-greeter
+%{_datadir}/polkit-1/rules.d/50-helix-greeter-power.rules
 
 %changelog
 * Fri Oct 16 2026 Andrew Bevington <andrewlancebevington@gmail.com> - 0.1.0-1
