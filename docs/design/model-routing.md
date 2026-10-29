@@ -74,6 +74,18 @@ A routing eval set from Helix itself: Talk turns, summaries, code questions, age
 quality, cost and latency against the single best model (`tools/bench/mobius-bench.py` and the nested agent tests are the starting harness). A router
 ships on by default only if it wins there.
 
+## Status
+
+* 2026-10-29: steps 1 and 2 of the order below are built. `services/helix-inference/src/router.rs` is the policy router: hard rules first (Act only on this
+  computer; private content, meaning any picture or anything the caller passes as `private`, never leaves this computer, and a slot routed elsewhere is
+  quietly kept local with the sentence saying so; a named backend or model is honoured; "ask a stronger model" uses the slot's stronger-model choice;
+  a request too long for the local engine goes to that choice if the person set one and the content may leave), then the person's route for the slot.
+  Every decision carries a sentence, returned in the `Completed` result as `route {backend, model, reason}`, shown in Mobius as a tooltip on the reply
+  details, and written in the audit line. Each slot can have a stronger-model backend and model (`escalate_backend`, `escalate_model` in
+  `inference-routing.toml`), set in Helix Models → Routing ("When it is not enough"); Mobius's redo menu has "A stronger model". Nothing is asked of a
+  model to route and there is nothing to calibrate. 8 router tests.
+* Next: the routing log and price table (Activity page), agent-loop signals, protocol clients.
+
 ## Order of work
 
 1. Policy router with reasons and a routing log; reason chip in Mobius. (small, no new dependencies)
