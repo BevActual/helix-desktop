@@ -668,27 +668,11 @@ mod tests {
             }
             "##,
         );
-        assert_eq!(
-            parsed.trusted_surface.namespace.as_deref(),
-            Some("helix-tauri-confirmer")
-        );
-        assert_eq!(
-            parsed.trusted_surface.exes,
-            [
-                "/usr/local/bin/helix-shell-tauri",
-                "/usr/bin/helix-shell-tauri"
-            ]
-        );
+        assert_eq!(parsed.trusted_surface.namespace.as_deref(), Some("helix-tauri-confirmer"));
+        assert_eq!(parsed.trusted_surface.exes, ["/usr/local/bin/helix-shell-tauri", "/usr/bin/helix-shell-tauri"]);
         assert!(parsed.trusted_surface.allow_virtual_input);
-        assert_eq!(
-            parsed.trusted_surface.rim_color,
-            Color::from_array_unpremul([0., 1., 0., 1.])
-        );
-        assert_eq!(
-            none.trusted_surface.rim_color,
-            Color::from_array_unpremul([1., 0.62, 0.04, 1.]),
-            "orange unless chosen"
-        );
+        assert_eq!(parsed.trusted_surface.rim_color, Color::from_array_unpremul([0., 1., 0., 1.]));
+        assert_eq!(none.trusted_surface.rim_color, Color::from_array_unpremul([1., 0.62, 0.04, 1.]), "orange unless chosen");
 
         // A second part (an included file) adds executables and does not drop the first.
         let mut config = parsed;
@@ -699,10 +683,7 @@ mod tests {
             allow_virtual_input: Some(crate::utils::Flag(false)),
         });
         assert_eq!(config.trusted_surface.exes.len(), 3, "no duplicates");
-        assert_eq!(
-            config.trusted_surface.namespace.as_deref(),
-            Some("helix-tauri-confirmer")
-        );
+        assert_eq!(config.trusted_surface.namespace.as_deref(), Some("helix-tauri-confirmer"));
         assert!(!config.trusted_surface.allow_virtual_input);
     }
 

@@ -7,11 +7,7 @@ use tauri::{AppHandle, Emitter};
 
 /// The numbers a page is given: (custom property, value) pairs.
 fn vars(shape: &shape_prefs::Shape) -> Vec<(String, String)> {
-    shape
-        .css_vars("shell")
-        .into_iter()
-        .map(|(k, v)| (k.to_string(), v))
-        .collect()
+    shape.css_vars("shell").into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
 #[tauri::command]

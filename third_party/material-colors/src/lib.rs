@@ -32,10 +32,8 @@ compile_error!("\"quantize\" feature requires \"alloc\" feature");
 #[cfg(all(feature = "std", feature = "libm"))]
 compile_error!("features \"std\" and \"libm\" cannot be enabled simultaneously");
 
-#[cfg(feature = "alloc")]
-extern crate alloc;
-#[cfg(feature = "std")]
-extern crate std;
+#[cfg(feature = "alloc")] extern crate alloc;
+#[cfg(feature = "std")] extern crate std;
 
 #[cfg(feature = "quantize")]
 pub(crate) type IndexMap<K, V> = indexmap::IndexMap<K, V, core::hash::BuildHasherDefault<ahash::AHasher>>;
@@ -47,14 +45,11 @@ pub mod dislike;
 pub mod dynamic_color;
 pub mod error;
 pub mod hct;
-#[cfg(feature = "quantize")]
-pub mod image;
+#[cfg(feature = "quantize")] pub mod image;
 pub mod palette;
-#[cfg(feature = "quantize")]
-pub mod quantize;
+#[cfg(feature = "quantize")] pub mod quantize;
 pub mod scheme;
-#[cfg(feature = "quantize")]
-pub mod score;
+#[cfg(feature = "quantize")] pub mod score;
 pub mod temperature;
 pub mod theme;
 pub mod utils;
