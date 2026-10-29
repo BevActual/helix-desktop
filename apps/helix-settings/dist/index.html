@@ -1,5 +1,5 @@
 <!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
-<body class="settings">
+<body class="settings hx-modern">
 <div id="app" data-test="app">
   <aside id="side">
     <div id="titlebar" data-tauri-drag-region>
@@ -12,6 +12,7 @@
   </aside>
   <main id="content" data-test="content">
     <header data-tauri-drag-region><h2 id="page-title">Appearance</h2><button id="refresh" data-test="refresh" title="Read again">Refresh</button></header>
+    <div id="page-hero" data-test="page-hero"></div>
     <!-- pages made of rows of service settings are created by settings.js from PAGES -->
     <section id="page-search" class="settings-page" hidden><div id="search-rows"></div></section>
     <section id="page-agents" class="settings-page" hidden>

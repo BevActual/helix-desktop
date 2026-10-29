@@ -41,6 +41,36 @@ const PAGES = [
   { name: "about", title: "About", icon: "sparkle", rows: false },
 ];
 const TITLES = Object.fromEntries(PAGES.map((page) => [page.name, page.title]));
+// Each page's tile colour in the sidebar, the way System Settings colours its icons (grey for the plainer system pages).
+const GREY = "#8e8e93";
+// One line under each page's name in its header card.
+const ABOUT = {
+  appearance: "Dark or light, the accent colour, corners, glass and how the desktop moves.",
+  wallpaper: "The picture behind your windows, on every screen or one at a time.",
+  accessibility: "Make the screen easier to see and the computer easier to use.",
+  displays: "Arrange screens, choose their resolution, scale and Night Light.",
+  network: "Wi-Fi, wired connections and VPNs.",
+  bluetooth: "Pair and connect headphones, keyboards, mice and other devices.",
+  sound: "Speakers, headphones and microphones, and how loud they are.",
+  keyboard: "Typing, layouts and every keyboard shortcut.",
+  multitask: "Workspaces, window snapping and how windows open.",
+  pointer: "Pointer speed, scrolling, tapping and gestures.",
+  startup: "Apps that open when you log in.",
+  defaults: "Which app opens web pages, mail, pictures, music and files.",
+  datetime: "The time, date, time zone and calendar.",
+  topbar: "What the top bar shows and in what order.",
+  dock: "Size, position and what lives in the dock.",
+  notifications: "Which apps may notify you, and Do Not Disturb.",
+  power: "Sleep, the lock screen, battery and power saving.",
+  users: "Accounts on this computer, passwords and who can change settings.",
+  agents: "What assistants and agents may see and do, and what they did.",
+  about: "This computer, its name, its hardware and its software.",
+};
+const TINTS = {
+  appearance: "#1c1c1e", wallpaper: "#32ade6", accessibility: "#0a84ff", displays: "#0a84ff", network: "#0a84ff", bluetooth: "#0a84ff",
+  sound: "#ff2d55", keyboard: GREY, multitask: "#1c1c1e", pointer: GREY, startup: GREY, defaults: GREY, datetime: GREY, topbar: GREY,
+  dock: "#1c1c1e", notifications: "#ff3b30", power: "#1c1c1e", users: GREY, agents: "#0a84ff", about: GREY,
+};
 function buildPages() {
   const nav = $("pages");
   const content = $("content");
@@ -50,7 +80,10 @@ function buildPages() {
     const link = el("button", "page-link");
     link.dataset.page = page.name;
     link.dataset.test = "page-" + page.name;
-    link.append(icon(page.icon), el("span", "", page.title));
+    const tile = el("span", "page-tile");
+    tile.style.setProperty("--tile", TINTS[page.name] || GREY);
+    tile.append(icon(page.icon));
+    link.append(tile, el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
     if (page.name === "network" || page.name === "bluetooth" || page.name === "sound" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "topbar" || page.name === "multitask" || page.name === "startup" || page.name === "notifications" || page.name === "power" || page.name === "displays" || page.name === "datetime" || page.name === "users" || page.name === "pointer" || page.name === "defaults") {
@@ -107,6 +140,17 @@ function showPage(name) {
   document.querySelectorAll(".settings-page").forEach((node) => { node.hidden = node.id !== "page-" + name; });
   document.querySelectorAll(".page-link").forEach((node) => node.classList.toggle("current", node.dataset.page === name));
   $("page-title").textContent = TITLES[name];
+  const page = PAGES.find((p) => p.name === name);
+  const hero = $("page-hero");
+  if (hero && page) {
+    const tile = el("span", "page-tile large");
+    tile.style.setProperty("--tile", TINTS[name] || GREY);
+    tile.append(icon(page.icon));
+    const text = el("div", "page-hero-text");
+    text.append(el("div", "page-hero-title", page.title), el("div", "page-hero-about", ABOUT[name] || ""));
+    hero.style.setProperty("--hero-tint", TINTS[name] || GREY);
+    hero.replaceChildren(tile, text);
+  }
   $("refresh").style.display = name === "agents" ? "" : "none";
   if (showReactPage(name)) {
     // drawn by React

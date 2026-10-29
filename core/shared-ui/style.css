@@ -2468,3 +2468,54 @@ body.hx-modern .hx-banner { border-radius: 12px; }
 .hx-hero-card .hx-get-hero { margin-top: 14px; height: 30px; padding: 0 20px; border: 0; border-radius: 15px; background: #fff; color: #111; font: 700 13px/30px inherit; font-family: inherit; }
 .hx-hero-card .hx-get-hero:active { transform: scale(.97); }
 .hx-hero-card .meta { margin-top: 6px; font-size: 12px; opacity: .8; display: flex; gap: 10px; align-items: center; }
+
+/* Settings in the modern look: the same floating glass sidebar, coloured page tiles, tinted selection, capsules and softer cards. */
+.page-tile { flex: none; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; color: #fff; background: var(--tile, #8e8e93);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 65%); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.14); }
+.page-tile svg { width: 15px; height: 15px; }
+:root[data-theme="light"] .page-tile[style*="#1c1c1e"] { box-shadow: none; }
+body.settings.hx-modern #app { grid-template-columns: clamp(200px, 30vw, 236px) 1fr; background: var(--content, var(--glass-solid)); }
+body.settings.hx-modern #side { margin: 8px 0 8px 8px; padding: 0 8px 10px; border-radius: 18px; min-height: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02) 40%), var(--sidebar-solid);
+  box-shadow: inset 0 0 0 .5px rgba(255,255,255,.12), inset 0 1px 0 rgba(255,255,255,.08), 0 10px 30px rgba(0,0,0,.28); }
+:root[data-theme="light"] body.settings.hx-modern #side { background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.4)), var(--sidebar-solid);
+  box-shadow: inset 0 0 0 .5px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.08); }
+body.settings.hx-modern #titlebar { height: 44px; padding-left: 4px; }
+body.settings.hx-modern #search { margin: 0 2px 8px; border-radius: 999px; padding: 7px 14px; background: var(--fill-1); box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.settings.hx-modern .page-link { padding: 5px 8px; gap: 10px; border-radius: 10px; }
+body.settings.hx-modern .page-link:hover { background: var(--fill-1); }
+body.settings.hx-modern .page-link.current { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--label); }
+body.settings.hx-modern #content { padding: 0 32px 40px; }
+body.settings.hx-modern header { height: 72px; padding-top: 16px; }
+body.settings.hx-modern h2 { font: 700 30px/36px var(--font-display); letter-spacing: -.03em; }
+body.settings.hx-modern .settings-page h4 { font-weight: 600; margin-left: 16px; }
+body.settings.hx-modern .rows-card { border-radius: 14px; background: var(--group, var(--fill-1)); box-shadow: inset 0 0 0 .5px var(--hairline), 0 1px 2px rgba(0,0,0,.12); }
+body.settings.hx-modern .segments { border-radius: 999px; padding: 3px; }
+body.settings.hx-modern .segment { border-radius: 999px; padding: 4px 16px; }
+body.settings.hx-modern .segment.current { box-shadow: 0 1px 3px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.08); }
+body.settings.hx-modern .setting-row button:not(.switch):not(.segment):not(.swatch):not(.wp-tile):not(.hx-popup-button):not(.hx-more-button):not(.hx-ring),
+body.settings.hx-modern .section-tools button, body.settings.hx-modern #refresh { border-radius: 999px; padding-left: 14px; padding-right: 14px; }
+body.settings.hx-modern select { border-radius: 999px; padding-left: 14px; }
+body.settings.hx-modern .swatch { width: 30px; height: 30px; }
+body.settings.hx-modern .wp-tile { border-radius: 14px; }
+/* Settings, pushed: the page name goes small into the toolbar and each page opens with a header card (large tile, name, one line). */
+#page-hero { display: none; }
+body.settings.hx-modern header { height: 52px; padding-top: 0; position: sticky; top: 0; z-index: 3; margin: 0 -32px; padding: 0 32px;
+  background: color-mix(in srgb, var(--content) 72%, transparent); backdrop-filter: blur(24px) saturate(1.8); }
+body.settings.hx-modern h2 { font: 650 15px/20px var(--font-display); letter-spacing: -.01em; }
+body.settings.hx-modern #page-hero { display: flex; align-items: center; gap: 16px; padding: 18px 20px; margin: 4px 0 6px; border-radius: 20px;
+  background: radial-gradient(130% 160% at 0% 0%, color-mix(in srgb, var(--hero-tint, var(--accent)) 26%, transparent), transparent 62%), var(--group, var(--fill-1));
+  box-shadow: inset 0 0 0 .5px var(--hairline), 0 1px 2px rgba(0,0,0,.12); }
+body.settings.hx-modern #content:has(#page-search:not([hidden])) #page-hero { display: none; }
+.page-tile.large { width: 52px; height: 52px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0,0,0,.28), inset 0 0 0 .5px rgba(255,255,255,.18); }
+.page-tile.large svg { width: 28px; height: 28px; }
+.page-hero-title { font: 700 22px/26px var(--font-display); letter-spacing: -.025em; }
+.page-hero-about { color: var(--label-2); font-size: 13px; line-height: 18px; margin-top: 3px; }
+/* The window's close control is the red dot, as in every other Helix app. */
+body.settings.hx-modern #titlebar .win-btn { width: 14px; height: 14px; background: #ff5f57; color: transparent; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.25); margin-left: 6px; }
+body.settings.hx-modern #titlebar .win-btn:hover { color: rgba(0,0,0,.55); } body.settings.hx-modern #titlebar .win-btn svg { width: 9px; height: 9px; }
+/* List rows lead with a rounded tile around their icon; the active one is filled with the accent. */
+body.settings.hx-modern .list-row .row-lead svg { width: 30px; height: 30px; padding: 7px; border-radius: 8px; background: var(--fill-2); color: var(--label); box-sizing: border-box; }
+body.settings.hx-modern .list-row.active .row-lead svg { background: var(--accent); color: #fff; }
+body.settings.hx-modern .list-row + .list-row { border-top: .5px solid var(--hairline); }
+body.settings.hx-modern #content { scroll-padding-top: 64px; }
