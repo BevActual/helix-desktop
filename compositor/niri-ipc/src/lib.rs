@@ -142,12 +142,18 @@ pub enum Request {
     HelixSetInput(HelixInput),
     /// Helix: move the layer surfaces with this namespace to the output that has the focus (a panel opens on the screen the person is working on).
     /// Nothing moves if one has the keyboard grabbed (an open panel) or is already there.
-    HelixMoveLayerToFocusedOutput { namespace: String },
+    HelixMoveLayerToFocusedOutput {
+        /// The layer-shell namespace of the surfaces to move.
+        namespace: String,
+    },
     /// Helix: how things look in effect now (the overrides Settings made, over `config.kdl`).
     HelixLook,
     /// Helix: change how things look: animations, the gap between windows, the cursor size and the colour of the focus ring. Only the `Some` fields change; they
     /// take effect at once, are remembered, and are applied again whenever the configuration is loaded.
     HelixSetLook(HelixLook),
+    /// Helix: light the edges of every screen while an agent is acting (or put the light out). Drawn by the compositor, below trusted
+    /// surfaces and above everything else, so no application can fake it or hide it.
+    HelixSetGlow(bool),
     /// Helix: the window that had the keyboard when `helix-summon` was last used, once. Empty when it was never used, was a minute ago or
     /// more, or was already taken.
     HelixSummonContext,
@@ -493,6 +499,9 @@ pub struct HelixCapabilities {
     /// Whether the `helix-shell "<command>"` bind action is available.
     #[serde(default)]
     pub shell_action: bool,
+    /// Whether `HelixSetGlow` (the light at the screen edges while an agent acts) is available.
+    #[serde(default)]
+    pub agent_glow: bool,
 }
 
 /// State of the Helix agent desk workspace.

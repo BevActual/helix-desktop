@@ -65,4 +65,12 @@ agents in their boxes; local-first privacy; the compositor as part of the produc
 5. **Knowing your things.** A local personal index, opted into source by source, so requests can name things the way people do.
 6. **The model in every app.** Typed generation from the gateway for any Helix app (summaries, rewrite, extract), local by default.
 
+## Status
+
+* 2026-10-29: **Actions v1** (Settings: find, read, change; one history with who did it; Undo) in the desktop service, the MCP server and
+  Mobius's tool loop. **Presence, first parts:** the bar's island shows an agent's change in plain words with Undo, and the compositor lights
+  the screen edges while an agent acts (`HelixSetGlow`, `compositor/src/helix/glow.rs`: pink, blue, purple and orange light fading inward,
+  under trusted surfaces, still rather than animated). Nested: `tools/nested/ui-suite.sh actions`, `mobius-actions`.
+* Next: one invocation for asking (the entry points become ways to open it), the focused app's current thing, then more providers.
+
 The roadmap's other sections (foundations, Settings pages, apps) continue, but new work there is built as actions from the start.

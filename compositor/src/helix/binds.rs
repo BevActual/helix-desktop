@@ -17,7 +17,7 @@ use crate::niri::State;
 const MAX_OVERRIDES: usize = 200;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
-struct Overrides {
+pub struct Overrides {
     binds: Vec<Entry>,
 }
 
@@ -412,7 +412,7 @@ fn changed(
     change: &HelixBindsChange,
 ) -> Result<Overrides, String> {
     let mut next = stored.clone();
-    let mut touch = |chord: &str,
+    let touch = |chord: &str,
                      action: Option<String>,
                      properties: Option<HelixBindProperties>,
                      next: &mut Overrides|

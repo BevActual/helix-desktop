@@ -17,6 +17,50 @@ use tauri::{AppHandle, Emitter};
 use crate::{phase_name, shell_state};
 
 static LAST: Mutex<Option<IslandView>> = Mutex::new(None);
+static LAST_GLOW: Mutex<bool> = Mutex::new(false);
+
+/// How long the screen edges stay lit after an agent changed something.
+pub const GLOW_AFTER_ACT: Duration = Duration::from_secs(4);
+
+/// Whether the screen edges should be lit: the assistant is thinking or acting, or an agent changed something a moment ago.
+fn glow(app: &AppHandle) -> (bool, Option<std::time::Instant>) {
+    let state = shell_state(app);
+    let shell = state.lock().expect("shell state");
+    let working = matches!(
+        phase_name(shell.session.view().phase),
+        "thinking" | "acting"
+    );
+    let until = shell
+        .glow_until
+        .filter(|until| std::time::Instant::now() < *until);
+    (working || until.is_some(), until)
+}
+
+/// Tells the compositor when the light should change, and puts it out again when its time is up.
+fn publish_glow(app: &AppHandle) {
+    let (on, until) = glow(app);
+    {
+        let mut last = LAST_GLOW.lock().expect("glow");
+        if *last != on {
+            *last = on;
+            eprintln!("GLOW {}", if on { "on" } else { "off" });
+            std::thread::spawn(move || {
+                let _ = helix_compositor::compositor_ipc::set_agent_glow(on);
+            });
+        }
+    }
+    if let Some(until) = until {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(
+                until.saturating_duration_since(std::time::Instant::now())
+                    + Duration::from_millis(50),
+            )
+            .await;
+            publish_glow(&app);
+        });
+    }
+}
 
 fn compute(app: &AppHandle) -> IslandView {
     let state = shell_state(app);
@@ -41,8 +85,9 @@ fn compute(app: &AppHandle) -> IslandView {
     with_agent_help(view, crate::agent_display::help_reason().as_deref())
 }
 
-/// Recomputes the pill and tells the page if it changed.
+/// Recomputes the pill (and the light at the screen edges) and tells the page if it changed.
 pub fn publish(app: &AppHandle) {
+    publish_glow(app);
     let view = compute(app);
     let mut last = LAST.lock().expect("island");
     if last.as_ref() != Some(&view) {

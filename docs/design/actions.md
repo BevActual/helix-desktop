@@ -52,4 +52,6 @@ Mobius's environments (Write, Image and Code operations already have per-stage o
 * Mobius's tool loop: `settings_find` and `settings_set` in Tools mode and in tasks (`apps/helix-mobius/src-tauri/src/agent.rs`). Reading is
   free; a change asks the person in Mobius unless the task's policy always allows that setting (`allow_settings` in `helix-task`), and the
   desktop's own rules apply on top. Nested: `tools/nested/ui-suite.sh mobius-actions`.
+* The bar: an agent's change appears in the island in plain words with Undo (for eight seconds; never over something that needs the
+  person), and the screen edges are lit by the compositor while an agent acts (`HelixSetGlow`).
 * The presence (next): asking anywhere runs actions; its results offer Undo from the history.

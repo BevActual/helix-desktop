@@ -132,6 +132,8 @@ struct ShellState {
     recent_change: Option<(helix_shell_model::island::RecentChange, std::time::Instant)>,
     /// The newest history entry already considered, so one change is shown once.
     seen_change: u64,
+    /// The screen edges stay lit until then after an agent changed something (`island::glow`).
+    glow_until: Option<std::time::Instant>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
     insert_target: Option<u64>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
@@ -1064,7 +1066,32 @@ async fn refresh_activity(app: &AppHandle) {
         view.grants.len(),
         view.history.len(),
     );
-    shell_state(app).lock().expect("shell state").activity = next;
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        // A new newest row that is an agent changing something lights the screen edges for a moment.
+        let newest = |view: &helix_agent::activity::ActivityView| {
+            view.history.first().map(|row| {
+                (
+                    row.time.clone(),
+                    row.tool.clone(),
+                    row.decision.clone(),
+                    row.tier.clone(),
+                )
+            })
+        };
+        let before = newest(&shell.activity.view());
+        if let Some((_, _, decision, tier)) =
+            newest(&view).filter(|row| Some(row) != before.as_ref())
+        {
+            if matches!(decision.as_str(), "allowed" | "confirmed")
+                && matches!(tier.as_str(), "act" | "confirm")
+            {
+                shell.glow_until = Some(std::time::Instant::now() + island::GLOW_AFTER_ACT);
+            }
+        }
+        shell.activity = next;
+    }
     let _ = app.emit("activity-view", view);
     island::publish(app);
 }
@@ -2222,6 +2249,7 @@ fn main() {
                 media: None,
                 recent_change: None,
                 seen_change: 0,
+                glow_until: None,
                 insert_target: None,
                 tray: helix_shell_model::tray::Tray::default(),
                 tray_menu: None,

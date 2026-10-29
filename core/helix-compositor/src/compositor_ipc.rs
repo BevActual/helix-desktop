@@ -276,6 +276,12 @@ pub fn set_look_settings(change: &LookSettings) -> Result<(), String> {
     request_result(&line).map(|_| ())
 }
 
+/// Lights the screen edges while an agent acts, or puts the light out (`HelixSetGlow`; drawn by the compositor so no app can fake it).
+pub fn set_agent_glow(on: bool) -> Result<(), String> {
+    let line = serde_json::json!({ "HelixSetGlow": on }).to_string();
+    request_result(&line).map(|_| ())
+}
+
 /// The window that had the keyboard when the person last pressed the summon key, once (the compositor forgets it as it hands it over, and after
 /// a minute). `None` when there is none.
 pub fn take_summon_context() -> Option<SummonContext> {

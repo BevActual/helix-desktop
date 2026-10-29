@@ -45,6 +45,23 @@ AFTER=$(value_of theme.pure_black_dark)
 out=$(probe action settings.set '{"setting":"theme.pure_black_dark","value":"purple"}')
 echo "$out" | grep -q 'COMPLETED ok=False' && echo "$out" | grep -qi 'on or off' && echo "ok: a value it does not accept is refused in words" || fail "bad value: $out"
 
+echo "--- 2b. the screen edges light while the agent acts"
+edge() {  # prints "top-r top-g top-b left-r left-g left-b" of a fresh screenshot
+  niri msg action screenshot-screen >/dev/null 2>&1; sleep 1
+  python3 - "$(ls -t "$SCRATCH"/shots/*.png | head -1)" <<'PY'
+import sys
+from PIL import Image
+img = Image.open(sys.argv[1]).convert("RGB")
+w, h = img.size
+print(*img.getpixel((w // 2, 1)), *img.getpixel((1, h // 2)))
+PY
+}
+for _ in $(seq 1 20); do grep -q "^GLOW on" "$SCRATCH/program.log" && break; sleep 0.2; done
+grep -q "^GLOW on" "$SCRATCH/program.log" && echo "ok: the shell lit the edges" || fail "no glow: $(grep GLOW "$SCRATCH/program.log")"
+read -r tr tg tb lr lg lb <<<"$(edge)"
+cp "$(ls -t "$SCRATCH"/shots/*.png | head -1)" "$SCRATCH/glow.png"
+[ $((tr - tg)) -gt 40 ] && [ $((lr - lb)) -gt 40 ] && echo "ok: the top edge glows pink ($tr,$tg,$tb) and the left orange ($lr,$lg,$lb)" || fail "edges not lit: top $tr,$tg,$tb left $lr,$lg,$lb"
+
 echo "--- 3. the history says who"
 H=$(config ActionHistory "(uint32 10,)" "(s)")
 echo "$H" | python3 -c "
@@ -76,6 +93,12 @@ click_id island-undo
 for _ in $(seq 1 40); do grep -q "ISLAND undid $ENTRY" "$SCRATCH/program.log" && break; sleep 0.25; done
 grep -q "ISLAND undid $ENTRY" "$SCRATCH/program.log" && echo "ok: Undo in the bar was pressed" || fail "undo from the bar: $(grep ISLAND "$SCRATCH/program.log" | tail -3)"
 [ "$(value_of theme.pure_black_dark)" = "$BEFORE" ] && echo "ok: the value is back" || fail "not restored from the bar"
+echo "--- 3c. the light goes out once the agents are done"
+for _ in $(seq 1 40); do grep -q "^GLOW off" "$SCRATCH/program.log" && break; sleep 0.25; done
+grep -q "^GLOW off" "$SCRATCH/program.log" && echo "ok: the light went out once the agent was done" || fail "glow stayed on"
+sleep 0.5
+read -r tr tg tb lr lg lb <<<"$(edge)"
+[ $((tr - tg)) -lt 20 ] && [ $((lr - lb)) -lt 20 ] && echo "ok: the edges are dark again" || fail "edges still lit: top $tr,$tg,$tb left $lr,$lg,$lb"
 # Change it again for the person's Undo in step 5.
 out=$(probe action settings.set "{\"setting\":\"theme.pure_black_dark\",\"value\":$WANT}")
 ENTRY=$(config ActionHistory "(uint32 1,)" "(s)" | python3 -c "import sys, json; print(json.loads(sys.stdin.read())[0]['id'])")

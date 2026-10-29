@@ -475,6 +475,7 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             look_settings: true,
             shell_action: true,
             bind_settings: true,
+            agent_glow: true,
         }),
         Request::HelixSaveDisplayProfile
         | Request::HelixApplyDisplayProfile
@@ -543,6 +544,11 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             rx.recv()
                 .await
                 .map_err(|_| String::from("look settings change failed"))??;
+            Response::Handled
+        }
+        Request::HelixSetGlow(on) => {
+            ctx.event_loop
+                .insert_idle(move |state| state.helix_set_glow(on));
             Response::Handled
         }
         Request::HelixBinds => {
