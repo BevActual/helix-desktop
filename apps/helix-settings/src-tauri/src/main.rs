@@ -1032,7 +1032,8 @@ fn shortcut_move(chord: String, to: String, replace: bool) -> Result<(), String>
     } else {
         (vec![chord], vec![])
     };
-    set_binds(&[(to, action)], &unbind, &reset)?;
+    // How it behaves (repeat, working while locked, its title) moves with it.
+    set_binds(&[(to, action, from.properties.clone())], &unbind, &reset)?;
     eprintln!("SETTINGS shortcut moved");
     Ok(())
 }

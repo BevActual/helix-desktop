@@ -223,7 +223,7 @@ export function Popup<T extends string>({ value, options, onChange, test, label,
         <Icon name="chevron-down" />
       </button>
       {open ? (
-        <div className="hx-menu" role="menu" aria-label={label}>
+        <div className="hx-popup-menu" role="menu" aria-label={label}>
           {options.map((option, index) => (
             <button
               type="button"
@@ -232,12 +232,12 @@ export function Popup<T extends string>({ value, options, onChange, test, label,
               aria-checked={option.id === value}
               disabled={option.disabled}
               title={option.title}
-              className={`hx-menu-item${index === active ? " active" : ""}`}
+              className={`hx-popup-item${index === active ? " active" : ""}`}
               data-test={test ? `${test}-${option.id}` : undefined}
               onMouseEnter={() => setActive(index)}
               onClick={() => choose(option)}
             >
-              <span className="hx-menu-tick">{option.id === value ? "✓" : ""}</span>
+              <span className="hx-popup-tick">{option.id === value ? "✓" : ""}</span>
               {option.label}
             </button>
           ))}

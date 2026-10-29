@@ -91,6 +91,9 @@ struct SlotView {
     model: String,
     /// Only a model on this computer may act for the desktop.
     local_only: bool,
+    /// Where "ask a stronger model" goes for this slot (empty for nowhere).
+    escalate_backend: String,
+    escalate_model: String,
 }
 
 #[derive(Serialize)]
@@ -165,6 +168,8 @@ fn view_of(routing: &inference_routing::Routing) -> (Vec<BackendView>, Vec<SlotV
                 },
                 model: route.model,
                 local_only: *slot == "act",
+                escalate_backend: route.escalate_backend,
+                escalate_model: route.escalate_model,
             }
         })
         .collect();
@@ -235,13 +240,43 @@ fn slot_set(slot: String, backend: String, model: String) -> Result<(), String> 
     if slot == "act" && found.kind != BackendKind::Local {
         return Err("Acting for the desktop only runs on a model on this computer.".into());
     }
-    routing.profiles.insert(
-        slot,
-        ProfileRoute {
-            backend,
-            model: model.trim().to_string(),
-        },
-    );
+    // Only the backend and model change; the slot's stronger-model choice stays.
+    let mut route = routing.route(&slot);
+    route.backend = backend;
+    route.model = model.trim().to_string();
+    routing.profiles.insert(slot, route);
+    inference_routing::save(&routing)
+}
+
+/// Where "ask a stronger model" goes for a slot, and where a request too long for the local model goes. Never for Act; the backend must be set up
+/// and not this computer (an empty backend turns it off).
+#[tauri::command]
+fn slot_escalate(slot: String, backend: String, model: String) -> Result<(), String> {
+    if !SLOTS.contains(&slot.as_str()) || slot == "act" {
+        return Err("A stronger model can be set for Talk, Summarise, Pictures and Code.".into());
+    }
+    if model.len() > 200 || model.chars().any(char::is_control) {
+        return Err("That model name is not valid.".into());
+    }
+    let mut routing = inference_routing::load();
+    if !backend.is_empty() {
+        let found = routing
+            .backends
+            .iter()
+            .find(|b| b.id == backend)
+            .ok_or("That backend is not set up.")?;
+        if found.kind == BackendKind::Local {
+            return Err("A stronger model is on another computer or a service; this computer already answers.".into());
+        }
+    }
+    let mut route = routing.route(&slot);
+    route.escalate_model = if backend.is_empty() {
+        String::new()
+    } else {
+        model.trim().to_string()
+    };
+    route.escalate_backend = backend;
+    routing.profiles.insert(slot, route);
     inference_routing::save(&routing)
 }
 
@@ -568,6 +603,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             models_view,
             slot_set,
+            slot_escalate,
             backend_save,
             backend_remove,
             backend_probe,
@@ -715,6 +751,24 @@ mod tests {
         assert!(slot_set("act".into(), "studio".into(), "m".into()).is_err());
         assert!(slot_set("chat".into(), "nowhere".into(), "m".into()).is_err());
         assert!(slot_set("poetry".into(), "local".into(), "m".into()).is_err());
+        // A stronger model: not for Act, not this computer, only a backend that is set up; changing the slot's own route keeps it.
+        assert!(slot_escalate("act".into(), "studio".into(), "m".into()).is_err());
+        assert!(slot_escalate("chat".into(), "local".into(), "m".into()).is_err());
+        assert!(slot_escalate("chat".into(), "nowhere".into(), "m".into()).is_err());
+        slot_escalate("chat".into(), "studio".into(), "huge".into()).unwrap();
+        slot_set("chat".into(), "local".into(), "small.gguf".into()).unwrap();
+        let kept = inference_routing::load().route("chat");
+        assert_eq!(
+            (
+                kept.escalate_backend.as_str(),
+                kept.escalate_model.as_str(),
+                kept.model.as_str()
+            ),
+            ("studio", "huge", "small.gguf")
+        );
+        slot_escalate("chat".into(), String::new(), "ignored".into()).unwrap();
+        assert_eq!(inference_routing::load().route("chat").escalate_model, "");
+        slot_set("chat".into(), "studio".into(), "big-model".into()).unwrap();
         slot_set("chat".into(), "studio".into(), "big-model".into()).unwrap();
         assert_eq!(inference_routing::load().route("chat").model, "big-model");
         // A backend in use cannot be removed; once free it goes, with its key.

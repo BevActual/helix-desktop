@@ -53,6 +53,13 @@ wtype -k Escape; sleep 0.5
 # A model offered by the backend (found by the service when it was tested), then a name typed in the sheet.
 click_id slot-model:chat; sleep 0.6; wait_id slot-model:chat-big-model 10 && click_id slot-model:chat-big-model; sleep 1.5
 grep -A3 '^\[profiles.chat\]' "$ROUTING" | grep -q 'model = "big-model"' && echo "ok: a model the backend offers was chosen from its menu" || fail "model not saved: $(grep -A3 'profiles.chat' "$ROUTING")"
+# A stronger model for Talk: "When it is not enough" → Studio, then its model from the backend's own list.
+click_id escalate-backend:chat; sleep 0.6; wait_id escalate-backend:chat-studio 10 && click_id escalate-backend:chat-studio; sleep 1.5
+grep -A4 '^\[profiles.chat\]' "$ROUTING" | grep -q 'escalate_backend = "studio"' && echo "ok: Talk has a stronger model to ask for" || fail "no escalation: $(grep -A5 'profiles.chat' "$ROUTING")"
+wait_id escalate-model:chat 10 && click_id escalate-model:chat; sleep 0.6; wait_id escalate-model:chat-small-model 10 && click_id escalate-model:chat-small-model; sleep 1.5
+grep -A5 '^\[profiles.chat\]' "$ROUTING" | grep -q 'escalate_model = "small-model"' && echo "ok: with the model chosen from the backend's list" || fail "no escalate model"
+grep -A5 '^\[profiles.chat\]' "$ROUTING" | grep -q 'model = "big-model"' && echo "ok: Talk's own model is untouched" || fail "talk model lost"
+! has_id escalate:act && echo "ok: Act has no stronger-model choice" || fail "act offers one"
 # The Safety group is below the fold of this window; the keyboard scrolls (the pointer harness cannot).
 for _ in 1 2 3; do wtype -k End; sleep 0.5; done
 click_id battery-remote; sleep 1.2

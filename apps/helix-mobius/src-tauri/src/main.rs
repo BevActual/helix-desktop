@@ -715,6 +715,7 @@ fn follow_signals(app: AppHandle) {
                                             state.turn_model = answered.to_string();
                                         }
                                         state.chat.pending_cost = value["cost_micro"].as_u64();
+                                        state.chat.pending_route = value["route"]["reason"].as_str().unwrap_or("").to_string();
                                     }
                                 }
                                 state.chat.complete(operation, ok, &result)
@@ -1039,6 +1040,7 @@ pub(crate) fn apply_chat_route(
         helix_config::inference_routing::ProfileRoute {
             backend: "local".into(),
             model: String::new(),
+            ..Default::default()
         }
     });
     entry.backend = if backend.is_empty() {
@@ -2200,6 +2202,7 @@ async fn chat_regenerate(
     app: AppHandle,
     backend: Option<String>,
     model: Option<String>,
+    stronger: Option<bool>,
 ) -> Result<(), String> {
     if shared(&app)
         .lock()
@@ -2234,6 +2237,28 @@ async fn chat_regenerate(
     let store = personas::load();
     let persona = store.active_persona().clone();
     let prompt = active_prompt(&app, &persona);
+    // "Ask a stronger model": the one the person set for this slot in Helix Models → Routing, for this reply only.
+    let (backend, model) = if stronger == Some(true) {
+        let slot = if persona.task.is_empty() {
+            "chat"
+        } else {
+            persona.task.as_str()
+        };
+        let route = inference_routing::load().route(slot);
+        if route.escalate_backend.is_empty() {
+            return Err(
+                "No stronger model is set for this. Choose one in Helix Models → Routing.".into(),
+            );
+        }
+        let model = if route.escalate_model.trim().is_empty() {
+            "default".to_string()
+        } else {
+            route.escalate_model
+        };
+        (Some(route.escalate_backend), Some(model))
+    } else {
+        (backend, model)
+    };
     // Another model for this reply only: validated like a chat's own choice, kept for the one turn that is about to start.
     let once = match model.filter(|m| !m.trim().is_empty()) {
         Some(model) => {
@@ -2613,6 +2638,7 @@ fn chat_current_route(app: AppHandle) -> ChatRouteView {
                 own_backend
             },
             model: own_model,
+            ..Default::default()
         }
     };
     let label = routing

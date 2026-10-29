@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use niri_config::{Action, Bind, Config, Key, Modifiers, Trigger};
-use niri_ipc::{HelixBind, HelixBindsChange};
+use niri_ipc::{HelixBind, HelixBindProperties, HelixBindsChange};
 use serde::{Deserialize, Serialize};
 use smithay::input::keyboard::xkb::keysym_get_name;
 
@@ -26,6 +26,9 @@ struct Overrides {
 struct Entry {
     chord: String,
     action: Option<String>,
+    /// How it behaves besides what it does; the usual defaults when absent.
+    #[serde(default)]
+    properties: Option<HelixBindProperties>,
 }
 
 fn file() -> PathBuf {
@@ -116,14 +119,43 @@ fn action_text_ok(action: &str) -> bool {
         && !action.contains("/*")
 }
 
-fn parse_bind(chord: &str, action: &str) -> Result<Bind, String> {
+/// The properties as a config writes them, after the chord. A title is plain text: no quotes, backslashes or line breaks.
+fn property_text(p: &HelixBindProperties) -> Result<String, String> {
+    let mut out = String::new();
+    if !p.repeat {
+        out.push_str(" repeat=false");
+    }
+    if p.allow_when_locked {
+        out.push_str(" allow-when-locked=true");
+    }
+    if !p.allow_inhibiting {
+        out.push_str(" allow-inhibiting=false");
+    }
+    if let Some(ms) = p.cooldown_ms {
+        out.push_str(&format!(" cooldown-ms={}", ms.min(60_000)));
+    }
+    if let Some(title) = &p.title {
+        if title.len() > 100
+            || title
+                .chars()
+                .any(|c| c.is_control() || c == '"' || c == '\\')
+        {
+            return Err("a title is plain text up to 100 characters".into());
+        }
+        out.push_str(&format!(" hotkey-overlay-title=\"{title}\""));
+    }
+    Ok(out)
+}
+
+fn parse_bind(chord: &str, action: &str, properties: &HelixBindProperties) -> Result<Bind, String> {
     let key = key_of(chord)?;
     if !action_text_ok(action) {
         return Err("an action is one thing to do, like focus-column-left".into());
     }
     let text = format!(
-        "binds {{\n{} {{ {}; }}\n}}\n",
+        "binds {{\n{}{} {{ {}; }}\n}}\n",
         chord_of(&key),
+        property_text(properties)?,
         action.trim()
     );
     let config =
@@ -290,7 +322,9 @@ fn written(action: &Action) -> Option<String> {
 }
 
 fn verified(text: &str, action: &Action) -> bool {
-    action_text_ok(text) && parse_bind("F24", text).is_ok_and(|bind| bind.action == *action)
+    action_text_ok(text)
+        && parse_bind("F24", text, &HelixBindProperties::default())
+            .is_ok_and(|bind| bind.action == *action)
 }
 
 /// Puts the overrides over a configuration that was just loaded.
@@ -300,7 +334,11 @@ pub fn overlay(config: &mut Config, overrides: &Overrides) {
             continue;
         };
         let bind = match &entry.action {
-            Some(action) => match parse_bind(&entry.chord, action) {
+            Some(action) => match parse_bind(
+                &entry.chord,
+                action,
+                &entry.properties.clone().unwrap_or_default(),
+            ) {
                 Ok(bind) => Some(bind),
                 Err(err) => {
                     warn!("ignoring the saved bind {}: {err}", entry.chord);
@@ -340,6 +378,7 @@ fn report(config: &Config, overrides: &Overrides) -> Vec<HelixBind> {
                 action_kdl: mine
                     .and_then(|e| e.action.clone())
                     .or_else(|| written(&bind.action)),
+                properties: properties_of(bind),
             }
         })
         .collect();
@@ -354,6 +393,18 @@ fn report(config: &Config, overrides: &Overrides) -> Vec<HelixBind> {
     out
 }
 
+fn properties_of(bind: &Bind) -> HelixBindProperties {
+    HelixBindProperties {
+        repeat: bind.repeat,
+        allow_when_locked: bind.allow_when_locked,
+        allow_inhibiting: bind.allow_inhibiting,
+        cooldown_ms: bind
+            .cooldown
+            .map(|d| d.as_millis().min(u128::from(u32::MAX)) as u32),
+        title: bind.hotkey_overlay_title.clone().flatten(),
+    }
+}
+
 /// Refuses what cannot be applied, and works out the new overrides (without storing anything).
 fn changed(
     config: &Config,
@@ -361,30 +412,43 @@ fn changed(
     change: &HelixBindsChange,
 ) -> Result<Overrides, String> {
     let mut next = stored.clone();
-    let mut touch =
-        |chord: &str, action: Option<String>, next: &mut Overrides| -> Result<(), String> {
-            let key = key_of(chord)?;
-            // The base the person sees under this chord is the config's, unless an override already replaced it; either way it must not be a protected one.
-            if config
-                .binds
-                .0
-                .iter()
-                .any(|b| b.key == key && protected(&b.action))
-            {
-                return Err(format!("{chord} is kept so you can always get back"));
-            }
-            let chord = chord_of(&key);
-            next.binds
-                .retain(|e| key_of(&e.chord).map_or(true, |k| k != key));
-            next.binds.push(Entry { chord, action });
-            Ok(())
-        };
+    let mut touch = |chord: &str,
+                     action: Option<String>,
+                     properties: Option<HelixBindProperties>,
+                     next: &mut Overrides|
+     -> Result<(), String> {
+        let key = key_of(chord)?;
+        // The base the person sees under this chord is the config's, unless an override already replaced it; either way it must not be a protected one.
+        if config
+            .binds
+            .0
+            .iter()
+            .any(|b| b.key == key && protected(&b.action))
+        {
+            return Err(format!("{chord} is kept so you can always get back"));
+        }
+        let chord = chord_of(&key);
+        next.binds
+            .retain(|e| key_of(&e.chord).map_or(true, |k| k != key));
+        next.binds.push(Entry {
+            chord,
+            action,
+            properties,
+        });
+        Ok(())
+    };
     for set in &change.set {
-        parse_bind(&set.chord, &set.action)?;
-        touch(&set.chord, Some(set.action.trim().to_string()), &mut next)?;
+        let properties = set.properties.clone().unwrap_or_default();
+        parse_bind(&set.chord, &set.action, &properties)?;
+        touch(
+            &set.chord,
+            Some(set.action.trim().to_string()),
+            set.properties.clone(),
+            &mut next,
+        )?;
     }
     for chord in &change.unbind {
-        touch(chord, None, &mut next)?;
+        touch(chord, None, None, &mut next)?;
     }
     for chord in &change.reset {
         let key = key_of(chord)?;
@@ -467,6 +531,7 @@ mod tests {
             set: vec![niri_ipc::HelixBindSet {
                 chord: "mod+d".into(),
                 action: "helix-shell \"launcher\"".into(),
+                properties: None,
             }],
             unbind: vec!["Mod+Q".into()],
             reset: vec![],
@@ -515,6 +580,7 @@ mod tests {
                     set: vec![niri_ipc::HelixBindSet {
                         chord: chord.into(),
                         action: action.into(),
+                        properties: None,
                     }],
                     ..Default::default()
                 },
@@ -589,5 +655,61 @@ mod tests {
             .collect();
         eprintln!("{movable} of {} movable; not: {missing:?}", shown.len());
         assert!(movable * 10 >= shown.len() * 9, "{missing:?}");
+    }
+
+    #[test]
+    fn how_a_bind_behaves_is_kept_when_it_is_set_and_reported() {
+        let mut loaded = config("binds {\n}");
+        let properties = HelixBindProperties {
+            repeat: false,
+            allow_when_locked: true,
+            allow_inhibiting: false,
+            cooldown_ms: Some(250),
+            title: Some("Louder".into()),
+        };
+        let change = HelixBindsChange {
+            set: vec![niri_ipc::HelixBindSet {
+                chord: "XF86AudioRaiseVolume".into(),
+                action: "helix-shell \"volume-up\"".into(),
+                properties: Some(properties.clone()),
+            }],
+            ..Default::default()
+        };
+        let next = changed(&loaded, &Overrides::default(), &change).unwrap();
+        overlay(&mut loaded, &next);
+        assert!(loaded.binds.0[0].allow_when_locked && !loaded.binds.0[0].repeat);
+        let shown = report(&loaded, &next);
+        assert_eq!(shown[0].properties, properties);
+        // What is not said is the usual: repeat on, locked off.
+        let plain = HelixBindsChange {
+            set: vec![niri_ipc::HelixBindSet {
+                chord: "Mod+F2".into(),
+                action: "close-window".into(),
+                properties: None,
+            }],
+            ..Default::default()
+        };
+        let next = changed(&loaded, &Overrides::default(), &plain).unwrap();
+        let mut fresh = config("binds {\n}");
+        overlay(&mut fresh, &next);
+        assert!(fresh.binds.0[0].repeat && !fresh.binds.0[0].allow_when_locked);
+        // A title cannot carry a quote or a line break into the config text.
+        for bad in ["a\"b", "a\nb", "a\\b"] {
+            let nasty = HelixBindsChange {
+                set: vec![niri_ipc::HelixBindSet {
+                    chord: "Mod+F3".into(),
+                    action: "close-window".into(),
+                    properties: Some(HelixBindProperties {
+                        title: Some(bad.into()),
+                        ..HelixBindProperties::default()
+                    }),
+                }],
+                ..Default::default()
+            };
+            assert!(
+                changed(&loaded, &Overrides::default(), &nasty).is_err(),
+                "{bad:?}"
+            );
+        }
     }
 }

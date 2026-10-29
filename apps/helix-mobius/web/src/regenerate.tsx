@@ -32,6 +32,10 @@ export function Regenerate({ disabled, report }: { disabled: boolean; report: (e
     <button className="mini" data-test="regenerate" disabled={disabled} onClick={() => invoke("chat_regenerate").catch(report)}>Regenerate</button>
     <button className="mini regen-more" data-test="regenerate-more" aria-label="Regenerate with another model" aria-haspopup="menu" aria-expanded={open} title="Regenerate with another model" disabled={disabled} onClick={() => setOpen(!open)}>▾</button>
     {open && <div className="hx-menu regen-menu" role="menu" data-test="regen-menu">
+      <button type="button" role="menuitem" className="hx-menu-item" data-test="regen-stronger" onClick={() => { setOpen(false); invoke("chat_regenerate", { stronger: true }).catch(report); }}>
+        <span className="mi-text"><span className="mi-title">A stronger model</span><span className="mi-sub">The one you chose for this in Helix Models · may leave this computer</span></span>
+      </button>
+      <div className="hx-menu-sep" />
       <div className="hx-menu-label">Redo this reply with…</div>
       {local.map((c) => <button key={c.file} type="button" role="menuitem" className="hx-menu-item" data-test={`regen-model-${c.file}`} onClick={() => redo("local", c.file)}>
         <span className="mi-text"><span className="mi-title">{c.title}</span><span className="mi-sub">{[c.bytes ? `${(c.bytes / 1e9).toFixed(1)} GB` : "", c.vision ? "sees pictures" : "", c.loaded ? "ready now" : "loads first", c.speed ? `${Math.round(c.speed)} tok/s here` : ""].filter(Boolean).join(" · ")}</span></span>

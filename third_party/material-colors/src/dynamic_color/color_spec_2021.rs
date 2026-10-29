@@ -625,15 +625,19 @@ pub(super) fn secondary_palette(variant: Variant, source: Hct) -> Option<TonalPa
         Variant::Neutral => hue_chroma(hue, 8.0),
         Variant::Rainbow | Variant::TonalSpot => hue_chroma(hue, 16.0),
         Variant::Expressive => hue_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 21.0, 51.0, 121.0, 151.0, 191.0, 271.0, 321.0, 360.0], &[
-                45.0, 95.0, 45.0, 20.0, 45.0, 90.0, 45.0, 45.0, 45.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 21.0, 51.0, 121.0, 151.0, 191.0, 271.0, 321.0, 360.0],
+                &[45.0, 95.0, 45.0, 20.0, 45.0, 90.0, 45.0, 45.0, 45.0],
+            ),
             24.0,
         ),
         Variant::Vibrant => hue_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 41.0, 61.0, 101.0, 131.0, 181.0, 251.0, 301.0, 360.0], &[
-                18.0, 15.0, 10.0, 12.0, 15.0, 18.0, 15.0, 12.0, 12.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 41.0, 61.0, 101.0, 131.0, 181.0, 251.0, 301.0, 360.0],
+                &[18.0, 15.0, 10.0, 12.0, 15.0, 18.0, 15.0, 12.0, 12.0],
+            ),
             24.0,
         ),
         Variant::Cmf => return None,
@@ -651,15 +655,19 @@ pub(super) fn tertiary_palette(variant: Variant, source: Hct) -> Option<TonalPal
         Variant::Neutral => hue_chroma(hue, 16.0),
         Variant::Rainbow | Variant::TonalSpot => hue_chroma(sanitize_degrees(hue + 60.0), 24.0),
         Variant::Expressive => hue_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 21.0, 51.0, 121.0, 151.0, 191.0, 271.0, 321.0, 360.0], &[
-                120.0, 120.0, 20.0, 45.0, 20.0, 15.0, 20.0, 120.0, 120.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 21.0, 51.0, 121.0, 151.0, 191.0, 271.0, 321.0, 360.0],
+                &[120.0, 120.0, 20.0, 45.0, 20.0, 15.0, 20.0, 120.0, 120.0],
+            ),
             32.0,
         ),
         Variant::Vibrant => hue_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 41.0, 61.0, 101.0, 131.0, 181.0, 251.0, 301.0, 360.0], &[
-                35.0, 30.0, 20.0, 25.0, 30.0, 35.0, 30.0, 25.0, 25.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 41.0, 61.0, 101.0, 131.0, 181.0, 251.0, 301.0, 360.0],
+                &[35.0, 30.0, 20.0, 25.0, 30.0, 35.0, 30.0, 25.0, 25.0],
+            ),
             32.0,
         ),
         Variant::Cmf => return None,

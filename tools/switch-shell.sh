@@ -111,6 +111,9 @@ write_units_and_links() {
   link_app helix-system-monitor org.helix.SystemMonitor.desktop
   link_app helix-mobius org.helix.Mobius.desktop || true
   link_app helix-models org.helix.Models.desktop || true
+  # The agent launcher, and its short names (helix-claude, helix-opencode, helix-codex, ha).
+  link_app helix-agents "" || true
+  [ -x "$HOME/.local/bin/helix-agents" ] && "$HOME/.local/bin/helix-agents" install-links >/dev/null 2>&1 || true
   # The lock screen and the agent display's input helper are looked up by name on PATH.
   link_app helix-lock "" || true
   link_app helix-agent-input "" || true

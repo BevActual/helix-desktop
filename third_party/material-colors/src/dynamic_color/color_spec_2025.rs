@@ -748,11 +748,14 @@ pub(super) fn primary_palette(variant: Variant, source: Hct, is_dark: bool, plat
     let phone = platform == Platform::Phone;
 
     Some(match variant {
-        Variant::Neutral => TonalPalette::from_hue_and_chroma(hue, match (phone, Hct::is_blue(hue)) {
-            (true, false) => 8.0,
-            (false, true) => 16.0,
-            _ => 12.0,
-        }),
+        Variant::Neutral => TonalPalette::from_hue_and_chroma(
+            hue,
+            match (phone, Hct::is_blue(hue)) {
+                (true, false) => 8.0,
+                (false, true) => 16.0,
+                _ => 12.0,
+            },
+        ),
         Variant::TonalSpot => TonalPalette::from_hue_and_chroma(hue, if phone && is_dark { 26.0 } else { 32.0 }),
         Variant::Expressive => TonalPalette::from_hue_and_chroma(
             hue,
@@ -774,16 +777,21 @@ pub(super) fn secondary_palette(variant: Variant, source: Hct, is_dark: bool, pl
     let phone = platform == Platform::Phone;
 
     Some(match variant {
-        Variant::Neutral => TonalPalette::from_hue_and_chroma(hue, match (phone, Hct::is_blue(hue)) {
-            (true, false) => 4.0,
-            (false, true) => 10.0,
-            _ => 6.0,
-        }),
+        Variant::Neutral => TonalPalette::from_hue_and_chroma(
+            hue,
+            match (phone, Hct::is_blue(hue)) {
+                (true, false) => 4.0,
+                (false, true) => 10.0,
+                _ => 6.0,
+            },
+        ),
         Variant::TonalSpot => TonalPalette::from_hue_and_chroma(hue, 16.0),
         Variant::Expressive => TonalPalette::from_hue_and_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 105.0, 140.0, 204.0, 253.0, 278.0, 300.0, 333.0, 360.0], &[
-                -160.0, 155.0, -100.0, 96.0, -96.0, -156.0, -165.0, -160.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 105.0, 140.0, 204.0, 253.0, 278.0, 300.0, 333.0, 360.0],
+                &[-160.0, 155.0, -100.0, 96.0, -96.0, -156.0, -165.0, -160.0],
+            ),
             if phone && is_dark { 16.0 } else { 24.0 },
         ),
         // Same rotation table as the vibrant neutral hue.
@@ -798,9 +806,11 @@ pub(super) fn tertiary_palette(variant: Variant, source: Hct, platform: Platform
 
     Some(match variant {
         Variant::Neutral => TonalPalette::from_hue_and_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 38.0, 105.0, 161.0, 204.0, 278.0, 333.0, 360.0], &[
-                -32.0, 26.0, 10.0, -39.0, 24.0, -15.0, -32.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 38.0, 105.0, 161.0, 204.0, 278.0, 333.0, 360.0],
+                &[-32.0, 26.0, 10.0, -39.0, 24.0, -15.0, -32.0],
+            ),
             if phone { 20.0 } else { 36.0 },
         ),
         Variant::TonalSpot => TonalPalette::from_hue_and_chroma(
@@ -808,15 +818,19 @@ pub(super) fn tertiary_palette(variant: Variant, source: Hct, platform: Platform
             if phone { 28.0 } else { 32.0 },
         ),
         Variant::Expressive => TonalPalette::from_hue_and_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 105.0, 140.0, 204.0, 253.0, 278.0, 300.0, 333.0, 360.0], &[
-                -165.0, 160.0, -105.0, 101.0, -101.0, -160.0, -170.0, -165.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 105.0, 140.0, 204.0, 253.0, 278.0, 300.0, 333.0, 360.0],
+                &[-165.0, 160.0, -105.0, 101.0, -101.0, -160.0, -170.0, -165.0],
+            ),
             48.0,
         ),
         Variant::Vibrant => TonalPalette::from_hue_and_chroma(
-            DynamicScheme::get_rotated_hue(hue, &[0.0, 38.0, 71.0, 105.0, 140.0, 161.0, 253.0, 333.0, 360.0], &[
-                -72.0, 35.0, 24.0, -24.0, 62.0, 50.0, 62.0, -72.0,
-            ]),
+            DynamicScheme::get_rotated_hue(
+                hue,
+                &[0.0, 38.0, 71.0, 105.0, 140.0, 161.0, 253.0, 333.0, 360.0],
+                &[-72.0, 35.0, 24.0, -24.0, 62.0, 50.0, 62.0, -72.0],
+            ),
             56.0,
         ),
         _ => return color_spec_2021::tertiary_palette(variant, source),
@@ -898,9 +912,11 @@ pub(super) fn neutral_variant_palette(variant: Variant, source: Hct, is_dark: bo
 
 pub(super) fn error_palette(variant: Variant, source: Hct, platform: Platform) -> Option<TonalPalette> {
     // Absolute hue from a lookup (piecewise), not a rotation.
-    let error_hue = DynamicScheme::get_piecewise_value(source.get_hue(), &[0.0, 3.0, 13.0, 23.0, 33.0, 43.0, 153.0, 273.0, 360.0], &[
-        12.0, 22.0, 32.0, 12.0, 22.0, 32.0, 22.0, 12.0,
-    ]);
+    let error_hue = DynamicScheme::get_piecewise_value(
+        source.get_hue(),
+        &[0.0, 3.0, 13.0, 23.0, 33.0, 43.0, 153.0, 273.0, 360.0],
+        &[12.0, 22.0, 32.0, 12.0, 22.0, 32.0, 22.0, 12.0],
+    );
 
     let phone = platform == Platform::Phone;
 

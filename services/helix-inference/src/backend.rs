@@ -39,6 +39,8 @@ pub struct ChatRequest {
     pub backend: String,
     /// For a remote backend: provider and model choice (OpenRouter), and how long to wait (0 = the service's default).
     pub route: Option<RemoteRoute>,
+    /// The routing decision's sentence (see router.rs).
+    pub route_reason: String,
     pub timeout_secs: u64,
     /// `[{role, content}, ...]`; content is a string or a list of `{"type":"text","text":..}` / `{"type":"image","index":N}`.
     pub messages: Value,
@@ -68,6 +70,7 @@ impl Default for ChatRequest {
             model: String::new(),
             backend: String::new(),
             route: None,
+            route_reason: String::new(),
             timeout_secs: 0,
             messages: Value::Null,
             images: Vec::new(),
@@ -106,6 +109,10 @@ pub struct Outcome {
     pub model: String,
     /// What it cost, in millionths of a dollar, when the provider said.
     pub cost_micro: Option<u64>,
+    /// Where the request went and why (set by the queue from the routing decision).
+    pub route_backend: String,
+    pub route_model: String,
+    pub route_reason: String,
     /// Transcription: the language that was spoken.
     pub language: String,
     /// Bounded base64 PNG; no worker-chosen file path crosses the bus.

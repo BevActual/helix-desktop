@@ -6,7 +6,7 @@ type Page = "overview" | "backends" | "models" | "routing";
 type Trust = "this" | "lan" | "cloud";
 
 interface BackendView { id: string; label: string; kind: "local" | "openai"; base_url: string; trust: Trust; has_key: boolean }
-interface SlotView { slot: string; backend: string; model: string; local_only: boolean }
+interface SlotView { slot: string; backend: string; model: string; local_only: boolean; escalate_backend: string; escalate_model: string }
 interface Device { name: string; description: string; gpu: boolean; memory_free: number; memory_total: number }
 interface ModelView { id: string; bytes: number; loaded: boolean; vision: boolean }
 interface Snapshot {
@@ -194,7 +194,7 @@ function Models({ view, onDelete }: { view: View; onDelete: (m: ModelView) => vo
 
 const OTHER = "\u0000other";
 
-function Routing({ view, probes, onSlot, onCustom, onBattery }: { view: View; probes: Record<string, Probe>; onSlot: (slot: string, backend: string, model: string) => void; onCustom: (slot: string, backend: string, model: string) => void; onBattery: (allow: boolean) => void }) {
+function Routing({ view, probes, onSlot, onEscalate, onCustom, onBattery }: { view: View; probes: Record<string, Probe>; onSlot: (slot: string, backend: string, model: string) => void; onEscalate: (slot: string, backend: string, model: string) => void; onCustom: (slot: string, backend: string, model: string, escalate: boolean) => void; onBattery: (allow: boolean) => void }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }} data-test="routing">
       <Group>
@@ -217,8 +217,25 @@ function Routing({ view, probes, onSlot, onCustom, onBattery }: { view: View; pr
                     ...(slot.model && !(local ? view.models.map((m) => m.id) : choices).includes(slot.model) ? [{ id: slot.model, label: `${shortName(slot.model)}${local ? " (not installed)" : ""}` }] : []),
                     ...(local ? [] : [{ id: OTHER, label: "Other…" }]),
                   ]}
-                  onChange={(id) => (id === OTHER ? onCustom(slot.slot, slot.backend, slot.model) : onSlot(slot.slot, slot.backend, id))} />
+                  onChange={(id) => (id === OTHER ? onCustom(slot.slot, slot.backend, slot.model, false) : onSlot(slot.slot, slot.backend, id))} />
               </div>
+              {slot.local_only ? null : (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }} data-test={`escalate:${slot.slot}`}>
+                  <span className="setting-about">When it is not enough</span>
+                  <Popup label={`${info?.title ?? slot.slot}: stronger model backend`} test={`escalate-backend:${slot.slot}`} value={slot.escalate_backend}
+                    options={[{ id: "", label: "Nothing" }, ...view.backends.filter((b) => b.kind !== "local").map((b) => ({ id: b.id, label: b.label }))]}
+                    onChange={(id) => onEscalate(slot.slot, id, "")} />
+                  {slot.escalate_backend ? (
+                    <Popup label={`${info?.title ?? slot.slot}: stronger model`} test={`escalate-model:${slot.slot}`} value={slot.escalate_model} placeholder="Choose a model"
+                      options={[
+                        ...(probes[slot.escalate_backend]?.models ?? []).map((m) => ({ id: m, label: m })),
+                        ...(slot.escalate_model && !(probes[slot.escalate_backend]?.models ?? []).includes(slot.escalate_model) ? [{ id: slot.escalate_model, label: slot.escalate_model }] : []),
+                        { id: OTHER, label: "Other…" },
+                      ]}
+                      onChange={(id) => (id === OTHER ? onCustom(slot.slot, slot.escalate_backend, slot.escalate_model, true) : onEscalate(slot.slot, slot.escalate_backend, id))} />
+                  ) : null}
+                </div>
+              )}
             </HxRow>
           );
         })}
@@ -244,7 +261,7 @@ function Models_() {
   const [probing, setProbing] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftError, setDraftError] = useState("");
-  const [custom, setCustom] = useState<{ slot: string; backend: string; value: string } | null>(null);
+  const [custom, setCustom] = useState<{ slot: string; backend: string; value: string; escalate: boolean } | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; body: string; action: string; run: () => Promise<unknown>; test: string } | null>(null);
 
   const refresh = useCallback(() => {
@@ -289,9 +306,9 @@ function Models_() {
       body = <Models view={view} onDelete={(m) => setConfirm({ title: `Delete ${shortName(m.id)}?`, body: `${bytes(m.bytes)} are removed from this computer. You can get the model again later.`, action: "Delete", test: "confirm-delete", run: () => invoke("model_delete", { id: m.id }) })} />;
     }
     if (page === "routing") {
-      body = <Routing view={view} probes={probes} onSlot={(slot, backend, model) => run(invoke("slot_set", { slot, backend, model }))} onCustom={(slot, backend, model) => setCustom({ slot, backend, value: model })} onBattery={(allow) => run(invoke("battery_remote", { allow }))} />;
+      body = <Routing view={view} probes={probes} onSlot={(slot, backend, model) => run(invoke("slot_set", { slot, backend, model }))} onEscalate={(slot, backend, model) => run(invoke("slot_escalate", { slot, backend, model }))} onCustom={(slot, backend, model, escalate) => setCustom({ slot, backend, value: model, escalate })} onBattery={(allow) => run(invoke("battery_remote", { allow }))} />;
       // The models a backend offers are fetched once, so the model field can suggest them.
-      view.slots.forEach((s) => { if (s.backend !== "local" && !probes[s.backend] && probing !== s.backend) setTimeout(() => probe(s.backend), 0); });
+      view.slots.forEach((s) => { for (const id of [s.backend, s.escalate_backend]) { if (id && id !== "local" && !probes[id] && probing !== id) setTimeout(() => probe(id), 0); } });
     }
   }
 
@@ -309,7 +326,7 @@ function Models_() {
       {draft ? <BackendSheet draft={draft} setDraft={setDraft} onSave={saveDraft} onCancel={() => setDraft(null)} error={draftError} /> : null}
       {custom ? (
         <Sheet title="Model name" test="custom-sheet" onCancel={() => setCustom(null)}
-          actions={<><Button data-test="custom-cancel" onClick={() => setCustom(null)}>Cancel</Button><Button kind="primary" data-test="custom-save" onClick={() => { const c = custom; setCustom(null); run(invoke("slot_set", { slot: c.slot, backend: c.backend, model: c.value })); }}>Use</Button></>}>
+          actions={<><Button data-test="custom-cancel" onClick={() => setCustom(null)}>Cancel</Button><Button kind="primary" data-test="custom-save" onClick={() => { const c = custom; setCustom(null); run(invoke(c.escalate ? "slot_escalate" : "slot_set", { slot: c.slot, backend: c.backend, model: c.value })); }}>Use</Button></>}>
           <input className="text-input" data-test="custom-model" autoFocus value={custom.value} placeholder="Model name" autoComplete="off" style={{ width: "100%" }}
             onChange={(e) => setCustom({ ...custom, value: e.target.value })} />
           <div className="setting-about">The name the backend knows the model by, such as big-model or vendor/model-name.</div>

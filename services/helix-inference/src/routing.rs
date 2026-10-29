@@ -18,6 +18,9 @@ pub struct BackendInfo {
 pub struct ProfileRoute {
     pub backend: String,
     pub model: String,
+    /// Where "ask a stronger model" goes for this slot, and a request too long for the local model; empty for none.
+    pub escalate_backend: String,
+    pub escalate_model: String,
 }
 
 impl Default for ProfileRoute {
@@ -25,6 +28,8 @@ impl Default for ProfileRoute {
         Self {
             backend: "local".into(),
             model: String::new(),
+            escalate_backend: String::new(),
+            escalate_model: String::new(),
         }
     }
 }
@@ -130,6 +135,8 @@ impl RoutingTable {
                 match key {
                     "backend" => route.backend = value,
                     "model" => route.model = value,
+                    "escalate_backend" => route.escalate_backend = value,
+                    "escalate_model" => route.escalate_model = value,
                     _ => {}
                 }
             } else if backend_open {

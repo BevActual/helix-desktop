@@ -431,6 +431,13 @@ fn run(shared: &Arc<Shared>) {
             state.last_activity = Instant::now();
             was
         };
+        outcome.route_backend = if request.backend.is_empty() {
+            "local".into()
+        } else {
+            request.backend.clone()
+        };
+        outcome.route_model = request.model.clone();
+        outcome.route_reason = request.route_reason.clone();
         if was_cancelled && !outcome.ok {
             outcome.cancelled = true;
             if outcome.error.is_empty() {

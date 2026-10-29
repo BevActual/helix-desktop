@@ -44,7 +44,7 @@ function FileSources({ files, index }: { files: FileRef[]; index: number }) {
     </section>
   );
 }
-interface ReplyStats { model: string; tokens: number; ms: number; files?: FileRef[]; cost_micro?: number | null }
+interface ReplyStats { model: string; tokens: number; ms: number; files?: FileRef[]; cost_micro?: number | null; route?: string }
 export interface Message { activities?: Activity[]; sources?: Source[]; role: string; text: string; blocks: Block[]; images?: string[]; stats?: ReplyStats | null; }
 /** What a reply cost, in a few words: the model, its tokens, and how fast they came. */
 /** What a cloud reply cost, in plain words: "about $0.0012", "free", or nothing when it was not reported. */
@@ -586,7 +586,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               {last && !streaming && !message.images?.length && !message.activities?.length ? (
                 <Regenerate disabled={streaming} report={hooks.report} />
               ) : null}
-              {!streaming && replyDetails(message.stats) ? <span className="msg-stats" data-test={`stats-${index}`}>{replyDetails(message.stats)}</span> : null}
+              {!streaming && replyDetails(message.stats) ? <span className="msg-stats" data-test={`stats-${index}`} title={message.stats?.route || undefined}>{replyDetails(message.stats)}</span> : null}
             </div>
           </div></Fragment>
         );

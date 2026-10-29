@@ -195,6 +195,37 @@ pub fn set_input_settings(change: &InputSettings) -> Result<(), String> {
     request_result(&line).map(|_| ())
 }
 
+/// How a bind behaves besides what it does (`HelixBindProperties`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BindProperties {
+    #[serde(default = "yes")]
+    pub repeat: bool,
+    #[serde(default)]
+    pub allow_when_locked: bool,
+    #[serde(default = "yes")]
+    pub allow_inhibiting: bool,
+    #[serde(default)]
+    pub cooldown_ms: Option<u32>,
+    #[serde(default)]
+    pub title: Option<String>,
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl Default for BindProperties {
+    fn default() -> Self {
+        Self {
+            repeat: true,
+            allow_when_locked: false,
+            allow_inhibiting: true,
+            cooldown_ms: None,
+            title: None,
+        }
+    }
+}
+
 /// One key bind in effect (`HelixBind`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompositorBind {
@@ -207,6 +238,8 @@ pub struct CompositorBind {
     pub source: String,
     /// The action as a config writes it, when that can be worked out exactly.
     pub action_kdl: Option<String>,
+    #[serde(default)]
+    pub properties: BindProperties,
 }
 
 /// Every key bind in effect (`None` when the compositor cannot say, as stock niri cannot).
@@ -217,13 +250,13 @@ pub fn binds() -> Option<Vec<CompositorBind>> {
 
 /// Sets chords to actions, turns chords off, and gives chords back to the config; all at once, remembered by the compositor.
 pub fn set_binds(
-    set: &[(String, String)],
+    set: &[(String, String, BindProperties)],
     unbind: &[String],
     reset: &[String],
 ) -> Result<(), String> {
     let set: Vec<_> = set
         .iter()
-        .map(|(chord, action)| serde_json::json!({"chord": chord, "action": action}))
+        .map(|(chord, action, properties)| serde_json::json!({"chord": chord, "action": action, "properties": properties}))
         .collect();
     let line =
         serde_json::json!({ "HelixSetBinds": {"set": set, "unbind": unbind, "reset": reset} })

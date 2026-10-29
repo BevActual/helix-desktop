@@ -16,6 +16,7 @@ use zbus::{interface, Connection};
 use crate::backend::*;
 use crate::pictures;
 use crate::queue::{InferenceQueue, Limits};
+use crate::router;
 use crate::routing::RoutingTable;
 
 pub const BUS_NAME: &str = "org.helix.Inference";
@@ -81,6 +82,9 @@ pub fn outcome_json(outcome: &Outcome) -> Json {
     }
     if let Some(cost) = outcome.cost_micro {
         result["cost_micro"] = json!(cost);
+    }
+    if !outcome.route_reason.is_empty() {
+        result["route"] = json!({"backend": outcome.route_backend, "model": outcome.route_model, "reason": outcome.route_reason});
     }
     if !outcome.image_png.is_empty() {
         result["image"] = json!({
@@ -162,13 +166,24 @@ fn power_saver_active() -> bool {
     false
 }
 
+/// What the local engine offers, for the routing decision.
+#[derive(Default)]
+struct Local {
+    models: Vec<ModelInfo>,
+    /// What it can hold at once (0 when not known).
+    context: u32,
+}
+
 fn parse_chat(
     args: &Map<String, Json>,
     client: &str,
     routing: &RoutingTable,
+    local: &Local,
     images: Vec<ImageInput>,
 ) -> Result<ChatRequest, InferenceError> {
-    const KNOWN: [&str; 10] = [
+    const KNOWN: [&str; 12] = [
+        "escalate",
+        "private",
         "backend",
         "route",
         "remote_timeout",
@@ -235,67 +250,33 @@ fn parse_chat(
             return Err(invalid("task must be act, chat, summarize, vision or code"));
         }
     }
-    if let Some(value) = args.get("model") {
-        let Some(text) = value.as_str() else {
-            return Err(invalid("model must be a string"));
-        };
-        request.model = text.to_string();
-    }
-    // Local model slots: when the client omits model, use the profile from inference-routing.toml.
-    // A caller may name the backend itself (Mobius does, for a persona's own model): it must be one the person configured, and never for Act.
-    let explicit = match args.get("backend") {
+    let requested_model = match args.get("model") {
+        None => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .ok_or_else(|| invalid("model must be a string"))?
+                .to_string(),
+        ),
+    };
+    let named_backend = match args.get("backend") {
         None => None,
         Some(value) => {
-            let Some(id) = value.as_str() else {
-                return Err(invalid("backend must be a string"));
-            };
+            let id = value
+                .as_str()
+                .ok_or_else(|| invalid("backend must be a string"))?;
             (!id.is_empty() && id != "local").then(|| id.to_string())
         }
     };
-    if let Some(id) = &explicit {
-        if task == "act" {
-            return Err(invalid("the act task only runs on a local model"));
+    let flag = |name: &str| -> Result<bool, InferenceError> {
+        match args.get(name) {
+            None => Ok(false),
+            Some(v) => v
+                .as_bool()
+                .ok_or_else(|| invalid(format!("{name} must be true or false"))),
         }
-        let backend = routing
-            .backend(id)
-            .ok_or_else(|| invalid(format!("no such backend: {id}")))?;
-        if backend.kind != "openai" {
-            return Err(invalid(format!(
-                "backend {} is of a kind this service does not speak",
-                backend.id
-            )));
-        }
-        request.backend = backend.id.clone();
-        if request.model.is_empty() {
-            request.model = "default".into();
-        }
-    }
-    if explicit.is_none() && request.model.is_empty() {
-        let route = routing.route(&task);
-        if routing.is_local(&task) {
-            request.model = route.model;
-        } else {
-            // The person routed this slot to another machine or a hosted service: that is the explicit choice. The Act slot is the exception: only a
-            // model on this computer may emit tools for the desktop.
-            if task == "act" {
-                return Err(invalid("the act task only runs on a local model"));
-            }
-            let Some(backend) = routing.backend(&route.backend) else {
-                return Err(invalid(format!(
-                    "task \"{task}\" is routed to a backend that is not configured: {}",
-                    route.backend
-                )));
-            };
-            if backend.kind != "openai" {
-                return Err(invalid(format!(
-                    "backend {} is of a kind this service does not speak",
-                    backend.id
-                )));
-            }
-            request.backend = backend.id.clone();
-            request.model = route.model;
-        }
-    }
+    };
+    let (escalate, private) = (flag("escalate")?, flag("private")?);
     if let Some(value) = args.get("schema") {
         let Some(text) = value.as_str() else {
             return Err(invalid("schema must be a string of JSON"));
@@ -303,9 +284,6 @@ fn parse_chat(
         // Only the on-device Act slot may emit tool JSON (grammar). Refuse schemas on talk tasks.
         if task != "act" {
             return Err(invalid("schema is only allowed for task \"act\""));
-        }
-        if !request.backend.is_empty() {
-            return Err(invalid("schema requires a local act backend"));
         }
         request.json_schema = text.to_string();
     }
@@ -328,6 +306,25 @@ fn parse_chat(
         };
         request.temperature = number;
     }
+    // Which model answers, and why: the policy router (router.rs).
+    let estimated =
+        (request.messages.to_string().len() as u32 / 4).saturating_add(request.max_tokens);
+    let decision = router::decide(&router::Input {
+        task: &task,
+        requested_model: requested_model.as_deref(),
+        backend: named_backend.as_deref(),
+        escalate,
+        private,
+        has_images: !request.images.is_empty(),
+        estimated_tokens: estimated,
+        local_context: local.context,
+        local_models: &local.models,
+        routing,
+    })
+    .map_err(invalid)?;
+    request.backend = decision.backend;
+    request.model = decision.model;
+    request.route_reason = decision.reason;
     if !request.backend.is_empty() {
         // Off the computer: the person can keep that from happening while the battery is being saved.
         if !routing.allow_remote_on_battery_saver && power_saver_active() {
@@ -807,7 +804,14 @@ impl Service {
                 for bytes in &encoded_pictures {
                     decoded.push(pictures::decode_image_input(bytes).map_err(invalid)?);
                 }
-                let request = parse_chat(&options, &client, &routing, decoded)?;
+                let local = {
+                    let backend = self.0.queue.backend();
+                    Local {
+                        models: backend.models(),
+                        context: backend.snapshot()["contextTokens"].as_u64().unwrap_or(0) as u32,
+                    }
+                };
+                let request = parse_chat(&options, &client, &routing, &local, decoded)?;
                 self.0.register(request, &sender, &client)
             }
             other => Err(invalid(format!("unknown action: {other}"))),
@@ -897,26 +901,27 @@ mod routing_tests {
     #[test]
     fn a_slot_the_person_routed_elsewhere_goes_there_and_nothing_else_does() {
         let routing = table();
-        let request = parse_chat(&args("chat"), "c", &routing, vec![]).unwrap();
+        let request = parse_chat(&args("chat"), "c", &routing, &Local::default(), vec![]).unwrap();
         assert_eq!(
             (request.backend.as_str(), request.model.as_str()),
             ("lan", "big")
         );
         // A local slot stays on the engine.
-        let request = parse_chat(&args("vision"), "c", &routing, vec![]).unwrap();
+        let request =
+            parse_chat(&args("vision"), "c", &routing, &Local::default(), vec![]).unwrap();
         assert_eq!(
             (request.backend.as_str(), request.model.as_str()),
             ("", "small.gguf")
         );
         // Only a model on this computer may act for the desktop, wherever the slot is routed.
-        assert!(parse_chat(&args("act"), "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&args("act"), "c", &routing, &Local::default(), vec![]).is_err());
         // A backend that is missing or of an unknown kind is an error, never a fall back to local.
-        assert!(parse_chat(&args("summarize"), "c", &routing, vec![]).is_err());
-        assert!(parse_chat(&args("code"), "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&args("summarize"), "c", &routing, &Local::default(), vec![]).is_err());
+        assert!(parse_chat(&args("code"), "c", &routing, &Local::default(), vec![]).is_err());
         // An output grammar never goes to another machine.
         let mut with_schema = args("chat");
         with_schema.insert("schema".into(), json!("{}"));
-        assert!(parse_chat(&with_schema, "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&with_schema, "c", &routing, &Local::default(), vec![]).is_err());
     }
 
     #[test]
@@ -930,7 +935,7 @@ mod routing_tests {
             "route".into(),
             json!({"fallbacks": ["x/y"], "prefer": "price", "private_only": true}),
         );
-        let request = parse_chat(&named, "c", &routing, vec![]).unwrap();
+        let request = parse_chat(&named, "c", &routing, &Local::default(), vec![]).unwrap();
         assert_eq!(
             (request.backend.as_str(), request.model.as_str()),
             ("lan", "mine")
@@ -946,14 +951,15 @@ mod routing_tests {
         };
         let mut unknown = args("chat");
         unknown.insert("backend".into(), json!("nowhere"));
-        assert!(parse_chat(&unknown, "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&unknown, "c", &routing, &Local::default(), vec![]).is_err());
         let mut act = args("act");
         act.insert("backend".into(), json!("lan"));
-        assert!(parse_chat(&act, "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&act, "c", &routing, &Local::default(), vec![]).is_err());
         assert!(parse_chat(
             &with("route", json!({"prefer": "vibes"})),
             "c",
             &routing,
+            &Local::default(),
             vec![]
         )
         .is_err());
@@ -961,6 +967,7 @@ mod routing_tests {
             &with("route", json!({"colour": "red"})),
             "c",
             &routing,
+            &Local::default(),
             vec![]
         )
         .is_err());
@@ -968,19 +975,20 @@ mod routing_tests {
             &with("route", json!({"fallbacks": vec!["a"; 9]})),
             "c",
             &routing,
+            &Local::default(),
             vec![]
         )
         .is_err());
         // Options for another machine are an error on a local request.
         let mut local = args("vision");
         local.insert("route".into(), json!({}));
-        assert!(parse_chat(&local, "c", &routing, vec![]).is_err());
+        assert!(parse_chat(&local, "c", &routing, &Local::default(), vec![]).is_err());
         // With battery saver on and not allowed, other machines are not used.
         let strict = RoutingTable::parse("[[backends]]\nid = \"lan\"\nkind = \"openai\"\nbase_url = \"http://studio/v1\"\n[profiles.chat]\nbackend = \"lan\"\n");
         let saving = std::fs::read_to_string("/sys/firmware/acpi/platform_profile")
             .is_ok_and(|p| matches!(p.trim(), "low-power" | "cool"));
         if saving {
-            assert!(parse_chat(&args("chat"), "c", &strict, vec![]).is_err());
+            assert!(parse_chat(&args("chat"), "c", &strict, &Local::default(), vec![]).is_err());
         }
     }
 }

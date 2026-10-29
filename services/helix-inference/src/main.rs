@@ -11,6 +11,7 @@ mod models;
 mod pictures;
 mod queue;
 mod remote;
+mod router;
 mod routing;
 mod sandbox;
 mod server;

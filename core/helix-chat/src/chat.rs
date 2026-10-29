@@ -146,6 +146,8 @@ pub struct ReplyStats {
     /// What a cloud provider charged for this reply, in millionths of a dollar, when it said (0 is a free model). `None` for a model on this
     /// computer or a provider that did not report it.
     pub cost_micro: Option<u64>,
+    /// Where the request went and why, in one sentence from the model service's router (empty when it did not say).
+    pub route: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -865,6 +867,10 @@ impl Conversation {
                         })
                         .unwrap_or_default(),
                     cost_micro: v.get("cost_micro").and_then(Value::as_u64),
+                    route: sanitize_for_display(
+                        v.get("route").and_then(Value::as_str).unwrap_or(""),
+                        200,
+                    ),
                 })
                 .filter(|_| role == Role::Assistant);
             messages.push(Message {
@@ -1055,6 +1061,8 @@ pub struct Chat {
     pub pending_files: Vec<FileRef>,
     /// What the cloud charged for the turn now running, written onto the reply when it ends.
     pub pending_cost: Option<u64>,
+    /// The routing reason of the reply in progress (taken by `note_reply`).
+    pub pending_route: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1136,6 +1144,7 @@ impl Chat {
             last_tokens: 0,
             pending_files: Vec::new(),
             pending_cost: None,
+            pending_route: String::new(),
         }
     }
 
@@ -1154,6 +1163,7 @@ impl Chat {
                 ms,
                 files: std::mem::take(&mut self.pending_files),
                 cost_micro: self.pending_cost.take(),
+                route: std::mem::take(&mut self.pending_route),
             });
         }
     }

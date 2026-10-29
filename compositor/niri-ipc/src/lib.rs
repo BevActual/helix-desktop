@@ -218,6 +218,43 @@ pub enum Response {
     HelixBinds(Vec<HelixBind>),
 }
 
+/// How a bind behaves besides what it does (`repeat=false`, `allow-when-locked=true` in a config).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixBindProperties {
+    /// Whether holding the key repeats it.
+    #[serde(default = "helix_true")]
+    pub repeat: bool,
+    /// Whether it works while the session is locked (volume and brightness keys).
+    #[serde(default)]
+    pub allow_when_locked: bool,
+    /// Whether an application that asked to keep its shortcuts may take it away.
+    #[serde(default = "helix_true")]
+    pub allow_inhibiting: bool,
+    /// The shortest time between two uses, in milliseconds.
+    #[serde(default)]
+    pub cooldown_ms: Option<u32>,
+    /// The title the shortcuts overlay shows.
+    #[serde(default)]
+    pub title: Option<String>,
+}
+
+fn helix_true() -> bool {
+    true
+}
+
+impl Default for HelixBindProperties {
+    fn default() -> Self {
+        Self {
+            repeat: true,
+            allow_when_locked: false,
+            allow_inhibiting: true,
+            cooldown_ms: None,
+            title: None,
+        }
+    }
+}
+
 /// One key bind in effect.
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -234,6 +271,9 @@ pub struct HelixBind {
     pub source: String,
     /// The action as a config writes it, when that can be worked out exactly (so it can be put on another chord): always for an override.
     pub action_kdl: Option<String>,
+    /// How it behaves besides what it does.
+    #[serde(default)]
+    pub properties: HelixBindProperties,
 }
 
 /// What `HelixSetBinds` changes.
@@ -259,6 +299,9 @@ pub struct HelixBindSet {
     pub chord: String,
     /// The action as a config writes it.
     pub action: String,
+    /// How it behaves besides what it does; the usual defaults when left out.
+    #[serde(default)]
+    pub properties: Option<HelixBindProperties>,
 }
 
 /// The look settings a person is likely to want to change. In a reply every field is `Some`; in a request only the `Some` ones change.

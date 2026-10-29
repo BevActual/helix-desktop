@@ -1,6 +1,7 @@
 #!/bin/sh
 # What a niri key binding runs. Works under either shell: when the Tauri shell is the session shell it drives that
 # (panels over org.helix.Shell1, volume and brightness directly); otherwise it hands the same request to the native shell.
+#   helix-panel agent [claude|opencode|codex] [--profile ask|auto|open]
 #   helix-panel launcher | control-center | assistant | agents | notifications | quick-insert | settings | window-switcher
 #   helix-panel lock | lid-close | dnd | night-light | media-toggle | media-next | media-previous | screenshot | screenshot-screen
 #   helix-panel volume-up | volume-down | volume-mute | mic-mute | brightness-up | brightness-down
@@ -43,6 +44,9 @@ tauri() {
     || busctl --user status org.helix.Shell >/dev/null 2>&1
 }
 case "$cmd" in
+  agent)
+    # A terminal in the focused window's folder running the default agent (or the one named): Claude Code, OpenCode, Codex in a Helix profile.
+    exec helix-agents terminal "$@" ;;
   status)
     [ -z "$arg" ] || { echo "helix-panel: status takes no arguments" >&2; exit 2; }
     agent_socket_send status 30
