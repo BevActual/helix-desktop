@@ -67,6 +67,9 @@ pub struct Policy {
     pub protect: Vec<String>,
     /// Paths inside the folder commands cannot see at all (`.env`).
     pub hide: Vec<String>,
+    /// Settings (catalogue ids such as `theme.mode`, or "*") the task may change without asking. The desktop still refuses or asks for
+    /// the ones it guards (`docs/design/actions.md`).
+    pub allow_settings: Vec<String>,
 }
 
 impl Default for Policy {
@@ -96,6 +99,7 @@ impl Policy {
             read_only: vec![],
             protect: vec![],
             hide: vec![],
+            allow_settings: vec![],
         }
     }
 
@@ -161,6 +165,12 @@ impl Policy {
                     self.apps.push(app.trim().to_string());
                 }
                 Some(format!("Open {} without asking", app.trim()))
+            }
+            Action::Setting { id, change: true } => {
+                if !self.allow_settings.contains(id) && self.allow_settings.len() < 200 {
+                    self.allow_settings.push(id.clone());
+                }
+                Some(format!("Change {id} without asking"))
             }
             Action::Tool { server, tool } => {
                 let rule = format!("{server}/{tool}");
@@ -246,6 +256,14 @@ impl Policy {
                 }
             }
             Action::Skill => Verdict::Allow,
+            Action::Setting { change: false, .. } => Verdict::Allow,
+            Action::Setting { id, change: true } => {
+                if self.allow_settings.iter().any(|s| s == "*" || s == id) {
+                    Verdict::Allow
+                } else {
+                    Verdict::Ask(format!("Change the setting {id}"))
+                }
+            }
             Action::Tool { server, tool } => {
                 if self
                     .allow_tools
@@ -348,6 +366,11 @@ pub enum Action {
     Tool {
         server: String,
         tool: String,
+    },
+    /// Find or read a setting (`change: false`), or change one, through the actions catalogue.
+    Setting {
+        id: String,
+        change: bool,
     },
 }
 
@@ -610,5 +633,32 @@ mod tests {
         let p: Policy = serde_json::from_str(r#"{"folder":"/p"}"#).unwrap();
         assert!(!p.auto_edits && p.allow_commands.is_empty());
         assert_eq!(p.web, WebAccess::Ask);
+    }
+
+    #[test]
+    fn reading_a_setting_is_free_changing_one_asks_until_always_allowed() {
+        let mut p = Policy::careful();
+        let read = Action::Setting {
+            id: "theme.mode".into(),
+            change: false,
+        };
+        let change = Action::Setting {
+            id: "theme.mode".into(),
+            change: true,
+        };
+        assert_eq!(p.decide(&read, &LOCAL), Verdict::Allow);
+        assert!(
+            matches!(p.decide(&change, &LOCAL), Verdict::Ask(why) if why.contains("theme.mode"))
+        );
+        assert_eq!(
+            p.allow(&change).as_deref(),
+            Some("Change theme.mode without asking")
+        );
+        assert_eq!(p.decide(&change, &LOCAL), Verdict::Allow);
+        let other = Action::Setting {
+            id: "dock.icon_size".into(),
+            change: true,
+        };
+        assert!(matches!(p.decide(&other, &LOCAL), Verdict::Ask(_)));
     }
 }

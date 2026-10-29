@@ -774,6 +774,13 @@ async fn work(
                     }
                 }
             }
+            Request::SettingsFind { .. } | Request::SettingsSet { .. } => {
+                tokio::select! {
+                    biased;
+                    _ = cancel.changed() => return Err("Task stopped.".into()),
+                    result = super::settings_step(&mut display, &request) => result,
+                }
+            }
             Request::SkillRead { name } => crate::skills::read(name)
                 .map(|s| format!("{}\n\n{}", s.description, s.body))
                 .ok_or_else(|| format!("There is no skill called {name}.")),

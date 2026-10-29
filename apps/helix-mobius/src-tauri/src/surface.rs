@@ -141,6 +141,52 @@ impl Surface {
     }
 }
 
+impl Surface {
+    /// Runs one catalogue action (`settings.find`, …; `docs/design/actions.md`) with its parameters as one JSON object. When the desktop says
+    /// this call needs a stricter grant (a private setting, or one the person confirms), asks for it once and tries again.
+    pub async fn run_action(
+        &mut self,
+        action: &str,
+        params: &serde_json::Value,
+        tier: &str,
+    ) -> Result<Reply, String> {
+        self.ensure(tier).await?;
+        let mut outcome = self.call_action(action, params).await;
+        for needed in ["observe-private", "confirm"] {
+            if matches!(&outcome, Err(why) if why.contains(&format!("no {needed} grant"))) {
+                self.ensure(needed).await?;
+                outcome = self.call_action(action, params).await;
+            }
+        }
+        outcome
+    }
+
+    async fn call_action(
+        &mut self,
+        action: &str,
+        params: &serde_json::Value,
+    ) -> Result<Reply, String> {
+        let mut options: HashMap<&str, Value<'_>> = HashMap::new();
+        options.insert("params", Value::from(params.to_string()));
+        options.insert("reason", Value::from("Mobius".to_string()));
+        let (operation,): (u64,) = self
+            .proxy
+            .call("Action", &(action, options))
+            .await
+            .map_err(|e| e.to_string())?;
+        let (ok, body) = self.wait(operation, 75).await?;
+        let value: serde_json::Value = serde_json::from_str(&body)
+            .unwrap_or_else(|_| serde_json::json!({"trust":"untrusted","content":body}));
+        let field = |key: &str| value.get(key).and_then(|v| v.as_str()).map(str::to_string);
+        if !ok {
+            return Err(field("error").unwrap_or_else(|| "The action failed.".into()));
+        }
+        Ok(Reply {
+            text: field("content").unwrap_or_default(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
