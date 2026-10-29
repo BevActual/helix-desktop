@@ -2946,6 +2946,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "futures-util",
+ "serde_json",
+ "tokio",
+ "zbus",
+]
+
+[[package]]
 name = "helix-compositor"
 version = "0.1.0"
 dependencies = [

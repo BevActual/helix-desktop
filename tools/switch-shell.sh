@@ -111,6 +111,8 @@ write_units_and_links() {
   link_app helix-system-monitor org.helix.SystemMonitor.desktop
   link_app helix-mobius org.helix.Mobius.desktop || true
   link_app helix-models org.helix.Models.desktop || true
+  # `helix`: Helix's actions, their history and Undo from a terminal or a script.
+  link_app helix "" || true
   # The agent launcher, and its short names (helix-claude, helix-opencode, helix-codex, ha).
   link_app helix-agents "" || true
   [ -x "$HOME/.local/bin/helix-agents" ] && "$HOME/.local/bin/helix-agents" install-links >/dev/null 2>&1 || true

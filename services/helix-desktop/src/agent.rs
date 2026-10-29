@@ -845,6 +845,12 @@ impl Agent {
             tainted,
             reason: deny_reason,
         } = evaluate_tier(tier, known, &state.grants, &state.taint, client);
+        // Said for a person (a script, the command line) as much as for an agent: why, and where it can be changed instead.
+        let deny_reason = if tier == RiskTier::Blocked && known {
+            "Scripts and agents may not change this: it can run a program or open the computer without a password. Change it in Settings.".to_string()
+        } else {
+            deny_reason
+        };
         let label = state
             .clients
             .get(client)

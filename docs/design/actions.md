@@ -47,6 +47,12 @@ Mobius's environments (Write, Image and Code operations already have per-stage o
 
 ## Who uses it
 
+* The `helix` command line (`core/helix-cli`; open by design: everything clickable is scriptable):
+  `helix actions`, `helix find night light`, `helix get theme.mode`, `helix set theme.mode dark` (says what changed and how to undo it),
+  `helix do <action> key=value …`, `helix history [-n N]`, `helix undo <entry>`, and `--json` on all of them. Changes go through Agent
+  Surface as "helix command line" (the person allows it once, so an agent with a shell cannot quietly borrow it); history and undo are the
+  person's own Configuration1 calls. A refusal says why in plain words. Nested: `tools/nested/ui-suite.sh cli`.
+
 * MCP clients through `tools/helix-agent`: `settings_find`, `settings_get`, `settings_set` (allowlist entries of the same names). The tool asks
   once for a stricter grant when the service needs one.
 * Mobius's tool loop: `settings_find` and `settings_set` in Tools mode and in tasks (`apps/helix-mobius/src-tauri/src/agent.rs`). Reading is

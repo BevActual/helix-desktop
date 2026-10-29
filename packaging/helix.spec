@@ -229,6 +229,7 @@ cargo test --profile %{helix_profile} --locked --offline -p helix-base -p helix-
 %{_bindir}/helix-software
 %{_bindir}/helix-system-monitor
 %{_bindir}/helix-models
+%{_bindir}/helix
 %{_bindir}/helix-greeter-apply-appearance
 %{_libexecdir}/helix-system-upgrade
 %{_userunitdir}/helix-service.service

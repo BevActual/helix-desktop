@@ -7,7 +7,7 @@ machines share: **actions**. Everything below follows from that, and it is what 
 own decisions (one set of tools for people and machines in `mobius-workspaces.md`, real work in `agents.md`, watch-and-help computer use
 in `computer-use.md`, local-first models in `helix-models.md`) have in common.
 
-## Three pillars
+## Four pillars
 
 ### 1. One catalogue of actions, for people and machines
 
@@ -32,6 +32,24 @@ Local first, with the model gateway deciding where each request goes and saying 
 by the trusted surface; everything else runs and offers Undo; every action is in the audit trail; snapshots let a whole task be taken
 back. Because of this, Helix can offer more autonomy than other systems (profiles that act without asking, time-boxed runs, bots working
 together) instead of less.
+
+### 4. Open by design
+
+Apple keeps things safe by restriction; Helix keeps them safe by making everything visible, reversible and boxed, so it can say yes
+where Apple says no. **Power is moved behind a layer, never removed.**
+
+* The action catalogue is a public interface: any app, script or plugin can publish actions and call them (D-Bus, MCP, the `helix`
+  command line). Not only "approved" apps.
+* Everything you can click, you can script: `helix do settings.set theme.mode dark`, `helix history`, `helix undo 42`.
+* Any model, any agent: local, your other machines, any provider; Claude Code, Codex, OpenCode and Hermes-style agents are first class.
+* Autonomy up to fully hands-off, chosen by the person, time-boxed, with snapshots and Undo.
+* Your data in plain files you own: history, Mobius's memory, skills, automations, routing. No account, no telemetry.
+* Extensible surfaces (launcher providers, Control Centre modules, island activities, text actions) on the same kit, so they look native.
+* Open protocols between devices (an OpenAI-compatible endpoint, Matrix or Signal), and a compositor that is part of the product.
+
+The discipline that keeps it clean: power never leaks into the everyday path (defaults, the Setup Assistant and the three daily moments
+stay simple), one Developer Mode switch reveals the plumbing, and every power feature still uses the same grammar (sheets, plain words,
+Undo).
 
 And it looks and moves like modern Apple built it (`modern-apple-direction.md`).
 

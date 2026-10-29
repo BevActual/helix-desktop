@@ -105,7 +105,7 @@ ENTRY=$(config ActionHistory "(uint32 1,)" "(s)" | python3 -c "import sys, json;
 
 echo "--- 4. what an agent may not do"
 out=$(probe action settings.set '{"setting":"hooks.started","value":"touch /tmp/owned"}')
-echo "$out" | grep -q 'COMPLETED ok=False' && echo "$out" | grep -q 'blocked' && echo "ok: a setting that runs a program is refused" || fail "hook: $out"
+echo "$out" | grep -q 'COMPLETED ok=False' && echo "$out" | grep -q 'may not change this' && echo "ok: a setting that runs a program is refused" || fail "hook: $out"
 out=$(probe action settings.set '{"setting":"lockscreen.enabled","value":false}')
 echo "$out" | grep -q 'COMPLETED ok=False' && echo "$out" | grep -q 'no confirm grant' && echo "ok: the lock screen needs the person (no confirm grant)" || fail "lock: $out"
 out=$(probe action settings.nonsense '{}')

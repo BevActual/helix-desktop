@@ -50,8 +50,8 @@ OUT=${CARGO_TARGET_DIR:-$ROOT/target}/$PROFILE
 D=$DESTDIR
 
 # The session half: binaries (package -> binary), and the systemd user units made from tools/systemd/*.in.
-SESSION_PKGS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-lock helix-identify helix-agent-input helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor helix-models-app"
-SESSION_BINS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-lock helix-identify helix-agent-input helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor helix-models"
+SESSION_PKGS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-lock helix-identify helix-agent-input helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor helix-models-app helix-cli"
+SESSION_BINS="helix-shell-tauri helix-shell-strut helix-wallpaper helix-idle helix-lock helix-identify helix-agent-input helix-nightlight helix-greeter helix-settings helix-mobius helix-software helix-system-monitor helix-models helix"
 SESSION_UNITS="helix-shell-strut helix-shell-bar helix-shell-panels helix-idle helix-nightlight helix-wallpaper"
 
 if [ "$UNINSTALL" = 1 ]; then

@@ -11,6 +11,7 @@ members = [
     "core/helix-models",
     "core/helix-task",
     "core/helix-actions",
+    "core/helix-cli",
     "core/helix-monitor-model",
     "core/helix-shell-model",
     "core/helix-software-model",
