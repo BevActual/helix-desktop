@@ -1,0 +1,68 @@
+# Helix's north star (2026-10-29)
+
+**Say what you want. Helix does it with you, shows you what it is doing, and lets you take it back.**
+
+Helix stops being "a desktop with an AI hub and an agent API" and becomes an operating system built around one idea that people and
+machines share: **actions**. Everything below follows from that, and it is what Apple's approach to agents (`apple-agent.md`) and Helix's
+own decisions (one set of tools for people and machines in `mobius-workspaces.md`, real work in `agents.md`, watch-and-help computer use
+in `computer-use.md`, local-first models in `helix-models.md`) have in common.
+
+## Three pillars
+
+### 1. One catalogue of actions, for people and machines
+
+Every Helix app, service and Mobius environment publishes what it can do as **actions**: a verb, typed parameters, the things it acts on
+(a page, a model, a file, a document, a picture, a task), a risk class, and how to undo it. The person's buttons and an agent's tool
+calls are the same actions, recorded in the same history, attributed (`by: you | Mobius | Claude Code | a bot`), undone the same way.
+
+* Settings rows, Models slots, Software installs, the shell's panels, Write's edits, Image's operations and Code's edits are actions.
+* Agents of any kind (Mobius's own loop, bring-your-own agents over ACP and MCP, bots) see the catalogue as their tools.
+* Driving the screen (the agent display) is how an agent reaches the long tail that has no actions yet, never the first choice.
+
+### 2. One presence, drawn by the system
+
+There is one way to ask, from anywhere: a key, the bar, voice. It knows what "this" is (the focused app reports its current thing) and
+answers in place: a result inline, a sheet to confirm, a task that keeps going. While anything acts, the compositor draws a glow at the
+edge of the screen that no app can fake or hide, and the work sits in the bar's island with progress, "needs you" and Stop. Mobius, the
+app, is where long work lives (the environments: Write, Image, Code, Agents), not the front door.
+
+### 3. Trust you can see
+
+Local first, with the model gateway deciding where each request goes and saying why. Consequential actions are confirmed in plain words
+by the trusted surface; everything else runs and offers Undo; every action is in the audit trail; snapshots let a whole task be taken
+back. Because of this, Helix can offer more autonomy than other systems (profiles that act without asking, time-boxed runs, bots working
+together) instead of less.
+
+And it looks and moves like modern Apple built it (`modern-apple-direction.md`).
+
+## What changes
+
+| Today | Becomes |
+|---|---|
+| Agent Surface tier 2: a fixed allowlist of shell commands | The action catalogue (`org.helix.Actions1` on D-Bus, mirrored as MCP tools); tiers become risk classes on actions |
+| Several entry points: bar Assistant, Caps Lock act, Mobius key, agent key | One presence; the others become ways to open it |
+| Mobius as the place you go to talk | Mobius as the workspace for long work; asking happens anywhere |
+| Per-stage operation lists in Mobius (Image `Op`) | The general mechanism, used by every app |
+| "Act" as a desktop-settings mode | Gone as a concept: desktop settings are just actions in the catalogue |
+| Undo per feature | One history and Undo across apps, plus task snapshots |
+| An agent's progress inside Mobius | The island and the glow, system-wide |
+
+## Kept, not changed
+
+The model gateway and Helix Models; the trusted surface and approvals; the agent display and the watch-and-help handoff; bring-your-own
+agents in their boxes; local-first privacy; the compositor as part of the product.
+
+## Milestones
+
+1. **Actions v1.** The catalogue type and service (`core/helix-actions`: action, parameters as JSON Schema, entity, risk, undo), published
+   by Settings, Models and the shell; the MCP server and Mobius's tool loop read it. One history file with attribution and Undo.
+2. **The presence.** One invocation; the focused app's current entity; inline answers and confirm sheets; the compositor's edge glow; the
+   island as the home of running work.
+3. **Everything is an action.** Software, Files-level operations, Mobius Write/Image/Code operations, notifications; a bridge for other
+   apps (`.desktop` actions, MPRIS, portals).
+4. **Long work.** Tasks and bots on the catalogue, snapshots and time-boxed autonomy, automations you can see and edit (from
+   "every morning…").
+5. **Knowing your things.** A local personal index, opted into source by source, so requests can name things the way people do.
+6. **The model in every app.** Typed generation from the gateway for any Helix app (summaries, rewrite, extract), local by default.
+
+The roadmap's other sections (foundations, Settings pages, apps) continue, but new work there is built as actions from the start.

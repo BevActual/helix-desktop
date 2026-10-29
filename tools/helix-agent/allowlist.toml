@@ -38,6 +38,11 @@ app_launch = true
 window_close = true
 dnd_toggle = true
 
+# The actions catalogue (docs/design/actions.md): settings by what they do, recorded and undoable.
+settings_find = true
+settings_get = true
+settings_set = true
+
 # Computer use on the agent display (docs/design/computer-use.md): a separate screen for the agent's own programs.
 computer_launch = true
 computer_screenshot = true

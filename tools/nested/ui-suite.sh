@@ -58,6 +58,7 @@ pick helix-lock    && run helix-lock helix-lock-test.sh idle-program.sh
 pick nightlight    && run nightlight nightlight-test.sh nightlight-nested.sh HELIX_NESTED_GAMMA=1
 pick nightlight-sun && run nightlight-sun nightlight-sun-test.sh nightlight-sun-nested.sh HELIX_NESTED_GAMMA=1
 pick island         && run island island-test.sh tauri-shell.sh
+pick actions        && run actions actions-test.sh tauri-shell.sh "HELIX_NESTED_ASSISTANT=$(command -v python3)" "HELIX_NESTED_ASSISTANT_SCRIPT=$ROOT/tools/nested/agent-probe.py" "HELIX_NESTED_ASSISTANT_TIERS=observe act"
 pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }; include \"$ROOT/tools/nested/fixtures/niri-binds.kdl\""
 pick settings-net   && run settings-net settings-net-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-sound && run settings-sound settings-sound-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

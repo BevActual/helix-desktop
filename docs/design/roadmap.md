@@ -6,6 +6,12 @@ lands, delete the row and update the doc that owns the behaviour. Structure and 
 
 **Size:** S is under a day, M is a few days, L is a week or more. **Needs** is what must exist first.
 
+## Direction (2026-10-29)
+
+`north-star.md` sets the direction everything below serves: one catalogue of **actions** shared by people and machines, one **presence**
+drawn by the system, and **trust you can see** (local first, plain-word confirmation, Undo, audit). Its milestones come first; new work in
+the sections below is built as actions from the start. How Apple would approach this: `apple-agent.md`; the look: `modern-apple-direction.md`.
+
 ## Where the project stands
 
 The C++ → Rust cutover is finished (`cpp-to-rust.md`). Helix is a Tauri/Rust Fedora desktop on a niri fork. The bet

@@ -2869,6 +2869,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-actions"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "helix-agent"
 version = "0.1.0"
 dependencies = [
@@ -2975,6 +2983,7 @@ name = "helix-desktop"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "helix-actions",
  "helix-agent",
  "helix-config",
  "helix-config-export",

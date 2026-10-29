@@ -191,6 +191,18 @@ class AgentClient:
         return ok, str(text), result.get("trust", "trusted")
 
 
+    def run_action(self, action: str, params: dict, timeout: float = 30.0) -> tuple[bool, str, str]:
+        """A catalogue action (`settings.find`, …): parameters as one JSON object. Returns (ok, text, trust)."""
+        options = {"params": GLib.Variant("s", json.dumps(params)), "reason": GLib.Variant("s", f"{self.label}: {action}")}
+        try:
+            (operation,) = self._call("Action", GLib.Variant("(sa{sv})", (action, options)), "(t)")
+        except GLib.Error as error:
+            raise AgentError(error.message)
+        ok, result = self._wait(operation, max(timeout, 75.0))
+        text = result.get("content", result.get("error", "")) if ok else result.get("error", "failed")
+        return ok, str(text), result.get("trust", "trusted")
+
+
 _agent: AgentClient | None = None
 _agent_checked = False
 _agent_lock = threading.Lock()
@@ -530,6 +542,53 @@ def dnd_toggle() -> str:
     if toggled.startswith("error"):
         return toggled
     return helix_msg("notification-dnd-status")
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------
+# Actions (docs/design/actions.md): the catalogue the person's own Settings use. Find a setting by what it does, then read or change it.
+# Every change is recorded in Helix's history with your name on it and can be undone; some settings ask the person first, and a few
+# (anything that runs a program, or unlocks the computer) are never an agent's to change.
+# ---------------------------------------------------------------------------------------------------------------------------------
+
+
+def _catalogue(action: str, params: dict, tier: str) -> str:
+    agent = _backend()
+    if agent is None:
+        return "error: actions need the Helix desktop service (Agent Surface)"
+    try:
+        agent.ensure_access(tier)
+        ok, text, _trust = agent.run_action(action, params)
+        # The service decides the real tier per setting; ask once for a stricter one when it says so, then try again.
+        for needed in ("observe-private", "confirm"):
+            if not ok and f"no {needed} grant" in text:
+                agent.ensure_access(needed)
+                ok, text, _trust = agent.run_action(action, params)
+    except AgentError as error:
+        return f"error: {error}"
+    return text if ok else f"error: {text}"
+
+
+@mcp.tool()
+def settings_find(query: str, page: str = "") -> str:
+    """Find Helix settings by what they do ("dark mode", "dock icon size", "night light"). Returns JSON: each match's setting id, title,
+    page, current value, the values it accepts, and whether you may change it (act, confirm: the person is asked, blocked: never)."""
+    _guard("settings_find")
+    return _catalogue("settings.find", {"query": query, **({"page": page} if page else {})}, "observe")
+
+
+@mcp.tool()
+def settings_get(setting: str) -> str:
+    """The current value of one setting, by the id settings_find returned."""
+    _guard("settings_get")
+    return _catalogue("settings.get", {"setting": setting}, "observe")
+
+
+@mcp.tool()
+def settings_set(setting: str, value: str | int | float | bool) -> str:
+    """Change one setting (id from settings_find) to a value it accepts. Returns what changed ("Night Light: Off → On") and the history
+    entry, which the person can undo."""
+    _guard("settings_set")
+    return _catalogue("settings.set", {"setting": setting, "value": value}, "act")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
