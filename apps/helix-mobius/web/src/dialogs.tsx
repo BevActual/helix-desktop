@@ -538,7 +538,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         >
           <header className="sheet-head">
             <h3>Persona</h3>
-            <p className="sheet-note">A hub mind for talk. Desktop change still goes through Act and the bar Assistant.</p>
+            <p className="sheet-note">A hub mind for conversations. Changes to the desktop go through Helix's actions, which you can undo.</p>
           </header>
           <div className="sheet-scroll">
             <label className="sheet-field">Name
@@ -601,7 +601,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         <form className="sheet-body" onSubmit={(event) => { event.preventDefault(); applyRoute(custom.trim()); }}>
           <header className="sheet-head">
             <h3>Chat model</h3>
-            <p className="sheet-note">Local, LAN, or cloud for talk. Act stays on its own local model — remotes never run desktop tools.</p>
+            <p className="sheet-note">Local, your network, or cloud for conversations. Acting on the desktop stays on a model on this computer.</p>
           </header>
           <div className="sheet-scroll">
             <label className="sheet-field">Backend

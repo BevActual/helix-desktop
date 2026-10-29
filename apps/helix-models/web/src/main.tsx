@@ -40,7 +40,7 @@ const PAGES: { id: Page; title: string; icon: string }[] = [
   { id: "routing", title: "Routing", icon: "grid" },
 ];
 const SLOTS: Record<string, { title: string; about: string; icon: string; hue: number }> = {
-  act: { title: "Act", about: "Changes the desktop for you. Only ever runs on this computer.", icon: "bolt", hue: 28 },
+  act: { title: "Desktop", about: "Changes settings and apps when you ask. Only ever runs on this computer.", icon: "bolt", hue: 28 },
   chat: { title: "Talk", about: "Conversations in Mobius and the bar.", icon: "chat", hue: 212 },
   summarize: { title: "Summarise", about: "Short summaries and titles.", icon: "doc", hue: 268 },
   vision: { title: "Pictures", about: "Reading images and screenshots.", icon: "image", hue: 150 },

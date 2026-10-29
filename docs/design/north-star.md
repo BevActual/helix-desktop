@@ -93,7 +93,13 @@ agents in their boxes; local-first privacy; the compositor as part of the produc
   catalogue's search): Enter flips a switch setting there (the person's change, recorded with Undo) or opens the setting's page; anything
   typed can be asked of Mobius (the last row, the only one when nothing matches), which opens Mobius in the bar with the words. The
   "act …" prefix still lists desktop actions. Nested: `tools/nested/ui-suite.sh presence`.
-* Next: Mobius in the bar answers and acts with the same catalogue (Talk gets the settings actions), the bar's ✦ and Caps Lock "Ask"
-  open the same place, the focused app's current thing, then more providers (Models, Software).
+* 2026-10-29 (later): **Actions from any app** (manifests + `org.helix.ActionProvider1`, undo calls kept in the history) and **Models**
+  as built-in actions; `helix`, the command line.
+* 2026-10-29 (later): **Concept pass.** "Act" is no longer a mode: the bar has one box, "Ask", and Helix decides whether a request is
+  something to do on the desktop or a question (`helix_shell_model::ask`: a request that starts with a verb of doing, after a polite
+  opening, is done; "Do it" turns an answer into doing); the launcher's Ask row uses the same decision. People see "Desktop" for the task
+  that acts on the desktop, "Agent workspace" (was agent desk) and "Agent screen" (was agent display); stale texts ("settings still use
+  Act", "Act never uses a cloud model") are gone.
+* Next: intelligence in place (text actions on any selection, on the fast local model), then the Magic Pointer on top of it.
 
 The roadmap's other sections (foundations, Settings pages, apps) continue, but new work there is built as actions from the start.

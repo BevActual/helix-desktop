@@ -60,9 +60,21 @@ wait_for "PANEL open" 3 20 && echo "ok: Mobius opened in the bar" || fail "Mobiu
 grep -q "panicked" "$LOG" && fail "the shell panicked: $(grep -A1 panicked "$LOG" | head -2)" || echo "ok: nothing panicked"
 sleep 1; shot presence-asked
 
+grep -q "^ASK answer" "$LOG" && echo "ok: a question is answered (not done)" || fail "the question was not routed to answering: $(grep '^ASK' "$LOG")"
+
 echo "--- 3. act still lists desktop actions"
-echo launcher >> "$CONTROL"; sleep 1; wtype "act dark"; sleep 1.2
+echo escape >> "$CONTROL"; sleep 1
+n=$(grep -c "PANEL open" "$LOG"); echo launcher >> "$CONTROL"; wait_for "PANEL open" $((n + 1)) 20; sleep 0.8; wtype "act dark"; sleep 1.2;
 rows | grep -q "first helix:desktop:" && echo "ok: act lists desktop actions" || fail "act: $(rows)"
 rows | grep -q "helix:ask" && fail "Ask Mobius should not be offered in act mode" || true
 echo escape >> "$CONTROL"
+echo "--- 2b. a request to do something is done, from the same box"
+echo escape >> "$CONTROL"; sleep 1
+echo launcher >> "$CONTROL"; sleep 1; wtype "please lower the volume a little"; sleep 1.2
+rows | grep -q "first helix:ask" && wtype -k Return
+for _ in $(seq 1 20); do grep -q "^ASK do" "$LOG" && break; sleep 0.25; done
+grep -q "^ASK do" "$LOG" && echo "ok: \"please lower the volume a little\" went to doing" || fail "not routed to doing: $(grep '^ASK' "$LOG")"
+grep -q "panicked" "$LOG" && fail "the shell panicked" || true
+# (Doing starts the desktop assistant, which asks the person for access in a dialog that holds the keyboard: so this comes last.)
+
 [ "$FAILED" = 0 ] && echo "PASS: presence" || exit 1

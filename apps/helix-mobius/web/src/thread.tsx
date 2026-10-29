@@ -549,7 +549,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
               {editing === index ? <InlineEdit initial={message.text} onCancel={() => setEditing(null)} onSend={(text) => { setEditing(null); hooks.edited(index, text); }} /> : <div className="msg-body">{message.sources?.length ? <><p>{highlight(message.text.split("\n\n--- Online sources")[0], needle)}</p><details className="web-request-evidence"><summary>Question and source excerpts</summary><pre>{highlight(message.text, needle)}</pre></details></> : highlight(message.text, needle)}</div>}
               {editing !== index && <div className="msg-actions">
                   {!message.text.startsWith("/image ") && !message.sources?.length && !messages[index + 1]?.activities?.length && <button className="mini" data-test={`edit-${index}`} onClick={() => setEditing(index)}>Edit</button>}
-                  <button className="mini" data-test={`act-${index}`} title="Have Mobius change the desktop using this" onClick={() => hooks.act(message.text)}>Act</button>
+                  <button className="mini" data-test={`act-${index}`} title="Have Mobius change the desktop using this" onClick={() => hooks.act(message.text)}>Do it</button>
                   <button className="mini" data-test={`task-${index}`} title="Give this to an agent as a task that runs on its own" onClick={() => window.dispatchEvent(new CustomEvent("mobius-run-as-task", { detail: { goal: message.text } }))}>Run as task</button>
                   <button className="mini" data-test={`quote-${index}`} title="Insert into the composer" onClick={() => hooks.quote(message.text)}>Quote</button>
                   {!streaming ? <button className="mini" data-test={`fork-user-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
@@ -580,7 +580,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
                 <button className="mini" data-test={`save-reply-${index}`} title="Preview and save this reply to a file" onClick={() => openSave(index)}>Save as file</button>
               ) : null}
               {!streaming && message.text.trim() ? (
-                <button className="mini" data-test={`act-assistant-${index}`} title="Have Mobius act from this reply" onClick={() => hooks.act(message.text)}>Act</button>
+                <button className="mini" data-test={`act-assistant-${index}`} title="Have Mobius act from this reply" onClick={() => hooks.act(message.text)}>Do it</button>
               ) : null}
               {!streaming ? <button className="mini" data-test={`fork-${index}`} title="Continue from here in a new chat" onClick={() => hooks.fork(index)}>Fork</button> : null}
               {last && !streaming && !message.images?.length && !message.activities?.length ? (

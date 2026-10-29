@@ -1,5 +1,6 @@
 //! State machines the shell draws: bar and panel surfaces, dock, tray, launcher, notifications, island.
 
+pub mod ask;
 pub mod bar_surface;
 pub mod bar_visibility;
 pub mod calendar;

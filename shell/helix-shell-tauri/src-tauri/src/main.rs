@@ -1880,10 +1880,51 @@ fn mobius_act_from_talk(app: AppHandle, text: Option<String>) -> Result<(), Stri
         .map(|t| t.trim().to_string())
         .filter(|t| !t.is_empty())
         .or_else(|| mobius_talk::last_user_text(&app))
-        .ok_or_else(|| "Ask something first, then Act.".to_string())?;
+        .ok_or_else(|| "Ask something first.".to_string())?;
     open_mobius_panel(&app, MobiusMode::Act);
     submit_request(&app, &request);
     Ok(())
+}
+
+/// One place to ask: Helix decides whether `text` is something to do on the desktop (the assistant does it, in the panel's doing view)
+/// or a question (Mobius answers). Runs on the main thread, because opening the panel touches GTK.
+pub(crate) fn ask(app: &AppHandle, text: &str) -> Result<(), String> {
+    let text: String = text.trim().chars().take(MAX_QUERY_CHARS * 4).collect();
+    if text.is_empty() {
+        return Err("Write something to ask.".into());
+    }
+    if helix_shell_model::ask::wants_doing(&text) {
+        eprintln!("ASK do");
+        return mobius_act_from_talk(app.clone(), Some(text));
+    }
+    eprintln!("ASK answer");
+    let open = shell_state(app)
+        .lock()
+        .expect("shell state")
+        .surface
+        .open_panel_id()
+        == Some("assistant");
+    if open {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        shell.mobius_mode = MobiusMode::Talk;
+        emit_mode(app, &shell);
+    } else {
+        open_mobius_panel(app, MobiusMode::Talk);
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = mobius_talk::submit(app, text).await {
+            eprintln!("ASK answer failed: {error}");
+        }
+    });
+    Ok(())
+}
+
+/// The bar's one box: answers, or does, whichever was asked.
+#[tauri::command]
+fn mobius_ask(app: AppHandle, text: String) -> Result<(), String> {
+    ask(&app, &text)
 }
 
 #[tauri::command]
@@ -2137,13 +2178,10 @@ fn launcher_launch(app: AppHandle, id: String, query: Option<String>) -> bool {
         drop(shell);
         eprintln!("LAUNCHER ask");
         close_panel(&app);
-        // Opened here, on the main thread (GTK's layer shell may not be touched from a worker); the words follow from a task.
-        open_mobius_panel(&app, MobiusMode::Talk);
-        tauri::async_runtime::spawn(async move {
-            if let Err(error) = mobius_talk::submit(app, text).await {
-                eprintln!("LAUNCHER ask failed: {error}");
-            }
-        });
+        // Answered or done, whichever was asked (on the main thread: opening the panel touches GTK).
+        if let Err(error) = ask(&app, &text) {
+            eprintln!("LAUNCHER ask failed: {error}");
+        }
         return true;
     }
     if let Some(setting) = id.strip_prefix("helix:setting:") {
@@ -2239,6 +2277,7 @@ fn main() {
             mobius_talk_clear,
             mobius_continue_full,
             mobius_act_from_talk,
+            mobius_ask,
             panel_outside,
             assistant_submit,
             assistant_confirm,

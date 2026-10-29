@@ -39,7 +39,7 @@
         <button id="open-web" data-test="open-web" type="button"><i data-icon="search"></i><span>Pick online sources</span></button>
         <button id="open-create-image" data-test="open-create-image" type="button"><i data-icon="image"></i><span>Create image</span></button>
         <button id="open-analysis" data-test="open-analysis" type="button"><i data-icon="eye"></i><span>Analyze software</span></button>
-        <button id="open-assistant" data-test="open-assistant" type="button"><i data-icon="sparkle"></i><span>Act on the desktop</span></button>
+        <button id="open-assistant" data-test="open-assistant" type="button"><i data-icon="sparkle"></i><span>Do it on the desktop</span></button>
         <button id="open-agents" data-test="open-agents" type="button"><i data-icon="shield"></i><span>Agents</span></button>
         <button id="open-routing" data-test="open-routing" type="button"><i data-icon="settings"></i><span>Settings</span></button>
         <button id="open-settings-agents" data-test="open-settings-agents" type="button"><i data-icon="lock"></i><span>Privacy &amp; agents</span></button>
@@ -112,7 +112,7 @@
               <button id="meta-persona" class="meta-chip" data-test="meta-persona" type="button" title="Persona" hidden></button>
               <button id="meta-style" class="meta-chip" data-test="meta-style" type="button" title="Style for this chat" hidden></button>
               <button id="meta-route" class="meta-chip" data-test="meta-route" type="button" title="Models and routing"></button>
-              <button id="meta-agent-desk" class="meta-chip" data-test="meta-agent-desk" type="button" title="Show the Helix agent desk" hidden>Agent desk</button>
+              <button id="meta-agent-desk" class="meta-chip" data-test="meta-agent-desk" type="button" title="Show the Helix agent desk" hidden>Agent workspace</button>
               <button id="meta-context" class="meta-chip context-chip" data-test="meta-context" type="button" title="Chat context and brief"><span class="context-ring" data-test="context-ring" aria-hidden="true"></span><span class="context-label">Context</span></button>
               <span id="loading-chip" class="queue-chip" data-test="loading-chip" hidden></span>
               <button id="agent-status" class="queue-chip agent-status" data-test="agent-status" type="button" hidden></button>
@@ -135,7 +135,7 @@
         <button id="models-back" class="icon-btn" data-test="models-back" type="button" title="Back to chat" aria-label="Back to chat"><i data-icon="chevron-left"></i></button>
         <div class="models-page-titles">
           <h2>Settings</h2>
-          <p>Where Talk, Act, and Code run — and how replies are generated.</p>
+          <p>Where conversations, desktop requests and code run, and how replies are made.</p>
         </div>
         <div class="models-page-actions">
           <button id="models-discard" type="button" data-test="models-discard">Discard</button>
@@ -155,13 +155,13 @@
           <section class="models-panel active" data-models-panel="overview" data-test="models-panel-overview">
             <div id="models-info-cards" class="models-info-cards" data-test="models-info-cards"></div>
             <h3 class="models-h3">Task map</h3>
-            <p class="models-lead">Each Helix task can use a different brain. Act is locked local so desktop tools never leave this machine.</p>
+            <p class="models-lead">Each task can use a different model. Acting on the desktop stays on this computer.</p>
             <div id="route-tasks" class="route-tasks" aria-label="Task destinations"></div>
           </section>
 
           <section class="models-panel" data-models-panel="local" data-test="models-panel-local" hidden>
             <h3 class="models-h3">Models on this computer</h3>
-            <p class="models-lead">GGUFs exposed by <code>org.helix.Inference</code>. Assign one to Chat, Act, or Code.</p>
+            <p class="models-lead">GGUFs exposed by <code>org.helix.Inference</code>. Assign one to Chat, Desktop or Code.</p>
             <div class="route-source-toolbar">
               <label class="route-search" for="route-model-search-local">
                 <i data-icon="search"></i>
@@ -190,7 +190,7 @@
 
           <section class="models-panel" data-models-panel="cloud" data-test="models-panel-cloud" hidden>
             <h3 class="models-h3">Cloud (OpenRouter)</h3>
-            <p class="models-lead">OpenAI-compatible cloud. API keys live in the Secret Service — never in transcripts or routing TOML. Remotes never get Act tools.</p>
+            <p class="models-lead">OpenAI-compatible cloud. API keys live in the Secret Service — never in transcripts or routing TOML. Remote models never act on the desktop.</p>
             <div class="models-form-card">
               <label class="sheet-field">API URL<input id="route-cloud-url" data-test="route-cloud-url" type="url" placeholder="https://openrouter.ai/api/v1"></label>
               <label class="sheet-field">API key<input id="route-cloud-key" data-test="route-cloud-key" type="password" autocomplete="off" placeholder="Paste to update; leave blank to keep"></label>
@@ -208,7 +208,7 @@
 
           <section class="models-panel" data-models-panel="generation" data-test="models-panel-generation" hidden>
             <h3 class="models-h3">Generation defaults</h3>
-            <p class="models-lead">Applied to Talk and Code turns (local Inference and remote). Act still uses the local tool slot.</p>
+            <p class="models-lead">Applied to conversations and code (on this computer and remote). Desktop requests use the local desktop model.</p>
             <div class="models-form-card">
               <label class="sheet-field">Temperature
                 <div class="models-slider-row">
@@ -230,7 +230,7 @@
             <div class="models-form-card">
               <label class="sheet-check"><input id="route-battery" data-test="route-battery" type="checkbox"><span>Allow remote models when battery saver is on</span></label>
               <div class="models-kv"><span>Config file</span><code id="route-config-path" data-test="route-config-path"></code></div>
-              <p class="models-lead">Profiles: chat, act, summarize, vision, code. Only Act is forced local.</p>
+              <p class="models-lead">Tasks: chat, desktop, summaries, pictures, code. Only Desktop always stays on this computer.</p>
               <button id="route-reset-defaults" type="button" data-test="route-reset-defaults">Reset generation defaults</button>
             </div>
           </section>
@@ -253,7 +253,7 @@
   <form method="dialog" id="model-form" class="sheet-body">
     <header class="sheet-head">
       <h3>Chat model</h3>
-      <p class="sheet-note">Local, LAN, or cloud for talk. Act stays on its own local model — remotes never run desktop tools.</p>
+      <p class="sheet-note">Local, your network, or cloud for conversations. Acting on the desktop stays on a model on this computer.</p>
     </header>
     <div class="sheet-scroll">
       <label class="sheet-field">Backend
@@ -329,7 +329,7 @@
   <form method="dialog" id="persona-form" class="sheet-body">
     <header class="sheet-head">
       <h3>Persona</h3>
-      <p class="sheet-note">A hub mind for talk. Desktop change still goes through Act and the bar Assistant.</p>
+      <p class="sheet-note">A hub mind for conversations. Changes to the desktop go through Helix's actions, which you can undo.</p>
     </header>
     <div class="sheet-scroll">
       <label class="sheet-field">Name<input id="persona-edit-name" data-test="persona-edit-name" type="text" maxlength="40" required></label>

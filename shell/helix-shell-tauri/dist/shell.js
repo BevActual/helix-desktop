@@ -498,7 +498,7 @@ function drawViewerState(status) {
   $("av-stop").hidden = !status.running;
   $("av-take").hidden = !status.running || taking;
   $("av-back").hidden = !taking;
-  $("av-empty").textContent = status.running ? "Waiting for the first picture…" : "The agent display is not running. It is the agent's own screen: nothing on it is your desktop.";
+  $("av-empty").textContent = status.running ? "Waiting for the first picture…" : "The agent screen is not running. It is an agent's own screen: nothing on it is your desktop.";
   $("av-empty").hidden = status.running && !$("av-frame").hidden;
   if (!status.running) $("av-frame").hidden = true;
   queueReport();
@@ -565,7 +565,7 @@ function takeOver() {
   invoke("agent_display_control", { on: true });
   document.body.classList.add("taking");
   $("av-take").hidden = true; $("av-back").hidden = false;
-  $("av-foot").textContent = "You are in control of the agent display. The agent is paused. Your mouse and keyboard go to it.";
+  $("av-foot").textContent = "You are in control of the agent screen. The agent is paused. Your mouse and keyboard go to it.";
   window.addEventListener("keydown", takeoverKey, true); window.addEventListener("keyup", takeoverKey, true);
   queueReport();
 }
@@ -1291,7 +1291,7 @@ function drawWorkspaces(strip) {
     mark.className = "ws" + (ws.active ? " active" : "") + (ws.windows ? " has-windows" : "") + (ws.urgent ? " urgent" : "") + (ws.agent_desk ? " agent-desk" : "");
     pill.append(mark);
     pill.dataset.test = "ws-" + index;
-    pill.title = ws.agent_desk ? (ws.name || "Agent desk") : (ws.name ? ws.name : "Workspace " + ws.idx);
+    pill.title = ws.agent_desk ? (ws.name || "Agent workspace") : (ws.name ? ws.name : "Workspace " + ws.idx);
     pill.setAttribute("aria-label", pill.title);
     pill.onclick = () => invoke("workspace_focus", { id: ws.id });
     host.append(pill);

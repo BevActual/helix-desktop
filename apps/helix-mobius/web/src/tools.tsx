@@ -83,12 +83,12 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
         <ul>{CRAFTS[view?.craft || ""].tools.map(([name, about]) => <li key={name}><strong>{name}</strong><span>{about}</span></li>)}</ul>
       </section>}
       <details className="tools-desk">
-        <summary>Agent desk</summary>
-        <p className="sheet-note">With Tools on, a task can also open apps and click and type on the agent display, which you can watch and take over from the bar. It reads the screen with a model on this computer; only that description goes to the chat model. Desktop settings changes still use Act. With agent-desk placement on, the first approved command also opens a terminal there.</p>
+        <summary>Agent workspace</summary>
+        <p className="sheet-note">With Tools on, a task can also change settings (each change can be undone) and open apps and click and type on the agent screen, which you can watch and take over from the bar. It reads the screen with a model on this computer; only that description goes to the chat model. With agent-workspace placement on, the first approved command also opens a terminal there.</p>
         <div className="sheet-actions">
-          <button type="button" data-test="tools-show-desk" disabled={busy} onClick={() => invoke("agent_desk_focus").catch((reason) => setError(String(reason)))}>Show agent desk</button>
-          <button type="button" data-test="tools-open-desk-terminal" disabled={busy || !folder} onClick={() => invoke("tools_open_desk_terminal").catch((reason) => setError(String(reason)))}>Open folder on agent desk</button>
-          <button type="button" data-test="tools-agent-settings" disabled={busy} onClick={() => invoke("open_settings_agents").catch((reason) => setError(String(reason)))}>Agent desk settings</button>
+          <button type="button" data-test="tools-show-desk" disabled={busy} onClick={() => invoke("agent_desk_focus").catch((reason) => setError(String(reason)))}>Show agent workspace</button>
+          <button type="button" data-test="tools-open-desk-terminal" disabled={busy || !folder} onClick={() => invoke("tools_open_desk_terminal").catch((reason) => setError(String(reason)))}>Open folder in agent workspace</button>
+          <button type="button" data-test="tools-agent-settings" disabled={busy} onClick={() => invoke("open_settings_agents").catch((reason) => setError(String(reason)))}>Agent workspace settings</button>
         </div>
       </details>
       {view?.streaming && <p role="status">Stop or finish the current task before changing its tools.</p>}

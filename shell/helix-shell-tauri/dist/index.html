@@ -105,9 +105,9 @@
 <div id="toasts"></div>
 <div id="osd"><i data-icon="volume" data-slot="osd-ico"></i><div id="osd-bar"><div id="osd-fill"></div></div><span id="osd-val"></span><span id="osd-text"></span></div>
 <div id="agentview" class="panel glass" data-test="agentview">
-  <div id="av-head"><h3>Agent display</h3><span id="av-state" data-test="av-state"></span><span class="av-spacer"></span><button id="av-take" data-test="av-take" hidden>Take over</button><button id="av-back" data-test="av-back" hidden>Hand back</button><button id="av-start" data-test="av-start" hidden>Start</button><button id="av-stop" data-test="av-stop" hidden>Stop</button></div>
+  <div id="av-head"><h3>Agent screen</h3><span id="av-state" data-test="av-state"></span><span class="av-spacer"></span><button id="av-take" data-test="av-take" hidden>Take over</button><button id="av-back" data-test="av-back" hidden>Hand back</button><button id="av-start" data-test="av-start" hidden>Start</button><button id="av-stop" data-test="av-stop" hidden>Stop</button></div>
   <div id="av-help" data-test="av-help" role="alert" hidden><span id="av-help-text" data-test="av-help-text"></span><button id="av-done" data-test="av-done">Done, carry on</button></div>
-  <div id="av-stage"><img id="av-frame" data-test="av-frame" alt="What the agent sees" hidden><div id="av-empty" data-test="av-empty">The agent display is not running. It is the agent's own screen: nothing on it is your desktop.</div></div>
+  <div id="av-stage"><img id="av-frame" data-test="av-frame" alt="What the agent sees" hidden><div id="av-empty" data-test="av-empty">The agent screen is not running. It is an agent's own screen: nothing on it is your desktop.</div></div>
   <div id="av-foot" data-test="av-foot">You are watching.</div>
 </div>
 <div id="notifs" class="panel glass">
@@ -141,8 +141,7 @@
     <i data-icon="sparkle"></i>
     <h3>Mobius</h3>
     <nav class="ai-rail" aria-label="Mobius">
-      <button type="button" class="ai-rail-btn" data-test="mobius-talk" data-mobius-mode="talk" title="Talk">Talk</button>
-      <button type="button" class="ai-rail-btn" data-test="mobius-act" data-mobius-mode="act" title="Act on the desktop">Act</button>
+      <button type="button" class="ai-rail-btn" data-test="mobius-talk" data-mobius-mode="talk" title="Ask Mobius: it answers, or does it">Ask</button>
       <button type="button" class="ai-rail-btn" data-test="mobius-agents" data-mobius-mode="agents" title="Agent activity">Agents</button>
     </nav>
   </div>
@@ -162,7 +161,7 @@
     <div class="mobius-talk-actions">
       <button id="talk-stop" data-test="talk-stop" type="button" hidden>Stop</button>
       <button id="talk-clear" data-test="talk-clear" type="button" hidden>Clear</button>
-      <button id="talk-act" data-test="talk-act" type="button" hidden title="Act on the last question">Act</button>
+      <button id="talk-act" data-test="talk-act" type="button" hidden title="Do this on the desktop instead">Do it</button>
       <button id="talk-open-full" data-test="talk-open-full" type="button">Continue in Mobius</button>
     </div>
   </div>

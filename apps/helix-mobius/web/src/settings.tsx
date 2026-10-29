@@ -45,7 +45,7 @@ const JOBS: JobInfo[] = [
   { id: "image", title: "Create an image", note: "A new picture from a description" },
   { id: "summarize", title: "Summaries", note: "Names a chat and shortens a long one. A small, quick model is best", task: "summarize" },
   { id: "speech", title: "Dictation", note: "The microphone in the composer" },
-  { id: "act", title: "Act", note: "Changes the desktop. Always runs on this computer", task: "act", local: true },
+  { id: "act", title: "Desktop", note: "Changes settings and apps when you ask. Always runs on this computer", task: "act", local: true },
   { id: "embedding", title: "Meaning search", note: "Suggests a mode from what you type, and searches your notes and files" },
 ];
 const JOB_GROUPS: { title: string; lead: string; ids: Job[] }[] = [
@@ -107,7 +107,7 @@ export interface SettingsHooks {
 export interface SettingsHandle { open: (section?: string) => void; }
 
 const FIT_WORD: Record<string, string> = { gpu: "Fits your graphics card", tight: "Tight on your graphics card", cpu: "Runs on the processor (slower)", no: "Too big for this computer" };
-const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation", embedding: "Meaning search", reasoning: "Thinks first" };
+const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Desktop", speech: "Speech", image: "Image generation", embedding: "Meaning search", reasoning: "Thinks first" };
 
 function size(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
@@ -574,7 +574,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
 
   const assign = (task: Task, backend: string, model: string) => {
     if (task === "act" && backend !== "local") {
-      report("Act must stay on this computer.");
+      report("Acting on the desktop stays on this computer.");
       return;
     }
     const place = task === "act" ? "local" : backend;
@@ -713,7 +713,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
 
           <section className="models-panel active set-panel" data-test="models-panel-cloud" hidden={section !== "cloud"}>
             <h3 className="models-h3">Cloud models</h3>
-            <p className="models-lead">Hosted models. Add one to the menu, or assign it to a task. A chat on one of these leaves this computer, and Act never uses one.</p>
+            <p className="models-lead">Hosted models. Add one to the menu, or assign it to a task. A chat on one of these leaves this computer; acting on the desktop stays here.</p>
             <CloudModels view={cloudView} loading={cloudBusy} hasKey={hasKey} profiles={draft.profiles} now={Math.floor(Date.now() / 1000)}
               onRefresh={refreshCloud} onPin={pinCloud} onAssign={assign} onProviders={() => show("providers")} />
           </section>
@@ -728,7 +728,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
 
           <section className="models-panel active set-panel" data-test="models-panel-providers" hidden={section !== "providers"}>
             <h3 className="models-h3">Connections</h3>
-            <p className="models-lead">A task runs on this computer unless you connect somewhere else. Act always stays here.</p>
+            <p className="models-lead">A task runs on this computer unless you connect somewhere else. Acting on the desktop always stays here.</p>
             <h3 className="models-h3 set-gap">ChatGPT plan</h3>
             <p className="models-lead">Use the plan you already pay for. This is OpenAI's own sign-in for apps that run on your computer, and it is what Helix uses because it is open source.</p>
             <ChatGPTPlan status={chatgpt} onStatus={chatgptChanged} report={report} />
@@ -744,7 +744,7 @@ export function SettingsPage({ register, hooks }: { register: (handle: SettingsH
               </div>
             </div>
             <h3 className="models-h3 set-gap">Cloud (OpenRouter)</h3>
-            <p className="models-lead">Hundreds of hosted models through one key. The key lives in the Secret Service, never in transcripts or the routing file. Chats on a cloud model leave this computer, and Act never uses one.</p>
+            <p className="models-lead">Hundreds of hosted models through one key. The key lives in the Secret Service, never in transcripts or the routing file. Chats on a cloud model leave this computer; acting on the desktop stays here.</p>
             <div className="models-form-card">
               <label className="sheet-field key-line"><span>API key</span>
                 <input id="route-cloud-key" data-test="route-cloud-key" type="password" autoComplete="off" placeholder="Enter API key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />

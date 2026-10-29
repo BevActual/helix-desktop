@@ -111,9 +111,9 @@ pub fn choose(
     }
     if let Some(desk) = agent_desk.filter(|d| d.windows > 0) {
         let text = if desk.windows == 1 {
-            "1 window on agent desk".into()
+            "1 window in the agent workspace".into()
         } else {
-            format!("{} windows on agent desk", desk.windows)
+            format!("{} windows in the agent workspace", desk.windows)
         };
         return IslandView {
             kind: Kind::AgentDesk,
@@ -142,7 +142,7 @@ pub fn with_agent_display(view: IslandView, windows: Option<usize>) -> IslandVie
     }
     IslandView {
         kind: Kind::AgentDisplay,
-        text: "Agent display".into(),
+        text: "Agent screen".into(),
         detail: if count == 1 {
             "1 window".into()
         } else {
@@ -247,7 +247,7 @@ mod tests {
         let shown = with_agent_display(music.clone(), Some(2));
         assert_eq!(
             (shown.kind, shown.text.as_str(), shown.detail.as_str()),
-            (Kind::AgentDisplay, "Agent display", "2 windows")
+            (Kind::AgentDisplay, "Agent screen", "2 windows")
         );
         assert_eq!(
             with_agent_display(IslandView::none(), Some(1)).detail,

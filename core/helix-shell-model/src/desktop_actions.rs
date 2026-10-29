@@ -13,8 +13,8 @@ pub struct DesktopAction {
 const ACTIONS: &[DesktopAction] = &[
     DesktopAction {
         id: "helix:desktop:agent-desk",
-        name: "Show agent desk",
-        detail: "Jump to the Helix agent workspace",
+        name: "Show agent workspace",
+        detail: "Where agents' windows open on your desktop",
         keywords: &["agent", "desk", "mobius", "tools"],
     },
     DesktopAction {
@@ -38,7 +38,7 @@ const ACTIONS: &[DesktopAction] = &[
     DesktopAction {
         id: "helix:desktop:assistant",
         name: "Ask Mobius",
-        detail: "Desktop assistant (Act)",
+        detail: "It answers, or does it on the desktop",
         keywords: &["mobius", "assistant", "act", "ai"],
     },
     DesktopAction {
