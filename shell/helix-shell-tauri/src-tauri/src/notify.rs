@@ -4,9 +4,11 @@
 //! to that application as `ActionInvoked`, nothing more.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
+use helix_shell_model::notification_summary as summary;
 use helix_shell_model::notifications::{Event, Incoming, NotificationsView, RequestError, Urgency};
 use tauri::{AppHandle, Emitter};
 use zbus::zvariant::OwnedValue;
@@ -138,6 +140,137 @@ fn publish(app: &AppHandle) {
         view.dnd
     );
     let _ = app.emit("notifications-view", view);
+    let shade_open = matches!(
+        shell_state(app)
+            .lock()
+            .expect("shell state")
+            .surface
+            .open_panel_id(),
+        Some("notifications" | "today")
+    );
+    if shade_open {
+        refresh_summaries(app);
+    }
+}
+
+/// Summaries of the shade's stacks, by application: what they were written from (`notification_summary::key`) and the line.
+static SUMMARIES: Mutex<Vec<SummaryView>> = Mutex::new(Vec::new());
+static SUMMARIES_ON: AtomicBool = AtomicBool::new(true);
+static SUMMARIZING: AtomicBool = AtomicBool::new(false);
+static AGAIN: AtomicBool = AtomicBool::new(false);
+
+#[derive(Clone, serde::Serialize)]
+pub struct SummaryView {
+    app: String,
+    key: String,
+    text: String,
+}
+
+fn emit_summaries(app: &AppHandle) {
+    let all = SUMMARIES.lock().expect("summaries").clone();
+    let _ = app.emit("notification-summaries", all);
+}
+
+/// Writes a summary for each stack of two or more that has none for what it holds now, one at a time, on the Summaries task, only
+/// when that task runs on this computer (a notification is never sent anywhere to be summarised) and the person has not turned
+/// summaries off. Asked again while it runs, it goes round once more when it is done.
+pub fn refresh_summaries(app: &AppHandle) {
+    let allowed = SUMMARIES_ON.load(Ordering::SeqCst)
+        && helix_config::inference_routing::load().is_local_route("summarize");
+    if !allowed {
+        let had = !SUMMARIES.lock().expect("summaries").is_empty();
+        SUMMARIES.lock().expect("summaries").clear();
+        if had {
+            emit_summaries(app);
+        }
+        return;
+    }
+    if SUMMARIZING.swap(true, Ordering::SeqCst) {
+        AGAIN.store(true, Ordering::SeqCst);
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let items = view(&app).items;
+            let wanted: Vec<(String, String, Vec<(String, String)>)> = summary::stacks(&items)
+                .into_iter()
+                .filter(|(_, list)| list.len() >= summary::MIN_STACK)
+                .map(|(name, list)| {
+                    (
+                        name.clone(),
+                        summary::key(&list),
+                        summary::messages(&name, &list),
+                    )
+                })
+                .collect();
+            // Only stacks that are still there keep their line.
+            SUMMARIES.lock().expect("summaries").retain(|s| {
+                wanted
+                    .iter()
+                    .any(|(name, key, _)| *name == s.app && *key == s.key)
+            });
+            for (name, key, messages) in wanted {
+                let done = SUMMARIES
+                    .lock()
+                    .expect("summaries")
+                    .iter()
+                    .any(|s| s.app == name && s.key == key);
+                if done {
+                    continue;
+                }
+                let Ok(args) = crate::mobius_talk::chat_args_for(&messages, "summarize") else {
+                    continue;
+                };
+                let mut text = String::new();
+                let outcome = crate::writing::stream_chat(args, |piece| {
+                    match piece {
+                        crate::writing::Piece::More(chunk) => text.push_str(&chunk),
+                        crate::writing::Piece::Whole(whole) => text = whole,
+                    }
+                    true
+                })
+                .await;
+                match outcome {
+                    Ok(()) => {
+                        let line = summary::tidy(&text);
+                        if line.is_empty() {
+                            continue;
+                        }
+                        eprintln!(
+                            "NOTIFICATIONS summary {} ({} chars)",
+                            name.chars().take(40).collect::<String>(),
+                            line.chars().count()
+                        );
+                        {
+                            let mut all = SUMMARIES.lock().expect("summaries");
+                            all.retain(|s| s.app != name);
+                            all.push(SummaryView {
+                                app: name,
+                                key,
+                                text: line,
+                            });
+                        }
+                        emit_summaries(&app);
+                    }
+                    Err(why) => {
+                        eprintln!("NOTIFICATIONS summary failed: {why}");
+                        break;
+                    }
+                }
+            }
+            if !AGAIN.swap(false, Ordering::SeqCst) {
+                break;
+            }
+        }
+        SUMMARIZING.store(false, Ordering::SeqCst);
+        emit_summaries(&app);
+    });
+}
+
+#[tauri::command]
+pub fn notification_summaries() -> Vec<SummaryView> {
+    SUMMARIES.lock().expect("summaries").clone()
 }
 
 /// Sleeps until the earliest moment something in the store changes by itself (a toast ends, a notification stops being live).
@@ -307,6 +440,7 @@ fn apply_prefs(app: &AppHandle) -> bool {
         );
         shell.notifications.set_dnd(prefs.dnd);
         shell.notifications.set_quiet(quiet);
+        SUMMARIES_ON.store(prefs.summaries, Ordering::SeqCst);
         shell.notifications.remember_apps(read_seen_apps());
         shell
             .notifications

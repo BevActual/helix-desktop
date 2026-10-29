@@ -2343,6 +2343,7 @@ fn main() {
             pointer::pointer_undo,
             pointer::pointer_copy,
             pointer::pointer_back,
+            notify::notification_summaries,
             island::island_undo,
             island::media_toggle,
             island::media_next,

@@ -2589,6 +2589,23 @@ body.hx-shell.hx-modern .nico { border-radius: 10px; box-shadow: inset 0 0 0 .5p
 body.hx-shell.hx-modern .napp { text-transform: none; letter-spacing: 0; font-size: 11.5px; }
 body.hx-shell.hx-modern .nrow { border-radius: 18px; background: color-mix(in srgb, var(--label) 7%, transparent); box-shadow: inset 0 0 0 .5px var(--hairline); }
 body.hx-shell.hx-modern #notifs { width: 392px; }
+/* Stacks: several from one app are one card with the edges of the others peeking out below; the summary line has a sparkle. */
+.nstack { display: flex; gap: 11px; padding: 11px 13px; width: 100%; text-align: left; position: relative; margin-bottom: 6px;
+  border-radius: 18px; background: color-mix(in srgb, var(--label) 7%, transparent); color: inherit; font: inherit;
+  box-shadow: inset 0 0 0 .5px var(--hairline), 0 5px 0 -2px color-mix(in srgb, var(--label) 9%, transparent); }
+/* The cards beneath: offset shadows (drawn only outside the card, so nothing shows through the glass). */
+.nstack.deep { margin-bottom: 10px; box-shadow: inset 0 0 0 .5px var(--hairline), 0 5px 0 -2px color-mix(in srgb, var(--label) 9%, transparent),
+  0 10px 0 -5px color-mix(in srgb, var(--label) 6%, transparent); }
+.nstack:hover { background: color-mix(in srgb, var(--label) 11%, transparent); }
+.ncount { margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; background: color-mix(in srgb, var(--label) 12%, transparent); }
+.nsummary { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
+.nsummary svg.i { flex: none; width: 14px; height: 14px; margin-top: 2px; color: var(--accent); }
+.nstack-open { display: flex; flex-direction: column; gap: 6px; }
+.nstack-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px; }
+.nstack-title { flex: 1; font-size: 13px; font-weight: 700; }
+.nstack-head button { padding: 3px 11px; font-size: 12px; border-radius: 999px; }
+.nstack-head button:last-child { width: 24px; height: 24px; padding: 0; display: grid; place-items: center; }
+.nstack-head button svg { width: 12px; height: 12px; }
 
 /* The dock: a glass shelf with a lit rim; icons spring; a running app has a small dot. */
 body.hx-shell.hx-modern #dock { padding: 8px 9px 10px; border-radius: calc(28px * var(--shape-dock)); background-image: var(--sheen);

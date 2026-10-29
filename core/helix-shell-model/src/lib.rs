@@ -11,6 +11,7 @@ pub mod glass;
 pub mod identity;
 pub mod island;
 pub mod launcher;
+pub mod notification_summary;
 pub mod notifications;
 pub mod panel_surface;
 pub mod panels_ipc;

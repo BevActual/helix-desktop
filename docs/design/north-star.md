@@ -113,6 +113,12 @@ agents in their boxes; local-first privacy; the compositor as part of the produc
   when something is picked: that window alone (the bubble is never in it), cut to the patch around the pointer, kept in memory while the
   bubble is open, on the Vision task (labelled "On this computer" or "Answered online" from the routing). An answer takes the menu's place,
   with a back button. `helix_shell_model::pointer`, `shell/…/pointer.rs`, `compositor/src/helix/point.rs`. Nested: `ui-suite.sh pointer`.
-* Next: notification summaries (intelligence in place, continued), then the Setup Assistant and settings audit.
+* 2026-10-29 (evening): **notification summaries**: the shade stacks notifications by app; a stack of two or more is one card (the
+  edges of the others peek out below) with a one-line summary by the small Summaries model ("Pat and Sam agreed on Friday after lunch"),
+  written when the shade opens and again only when the stack changes. A click opens the stack, which can be cleared at once. Only on this
+  computer: if the Summaries task is routed online there are no summaries (a notification is never sent anywhere to be summarised); the
+  notification is data to the model, never instructions. Settings → Notifications → "Summarize notifications" turns it off.
+  `helix_shell_model::notification_summary`, `notify.rs`. Nested: `ui-suite.sh notification-summaries`.
+* Next: the Setup Assistant and settings audit.
 
 The roadmap's other sections (foundations, Settings pages, apps) continue, but new work there is built as actions from the start.

@@ -78,6 +78,9 @@ pub struct NotificationPrefs {
     pub quiet_end: u32,
     /// Rules by application (see [`app_key`]); an application with no entry gets banners.
     pub app_rules: BTreeMap<String, AppRule>,
+    /// A stack of notifications from one application gets a one-line summary, written on this computer (never sent anywhere: when the
+    /// Summaries task is routed online, there are no summaries).
+    pub summaries: bool,
 }
 
 impl Default for NotificationPrefs {
@@ -90,6 +93,7 @@ impl Default for NotificationPrefs {
             quiet_start: QUIET_START_DEFAULT,
             quiet_end: QUIET_END_DEFAULT,
             app_rules: BTreeMap::new(),
+            summaries: true,
         }
     }
 }
@@ -129,6 +133,9 @@ impl NotificationPrefs {
         }
         if let Some(on) = value.get("quiet").and_then(Value::as_bool) {
             prefs.quiet = on;
+        }
+        if let Some(on) = value.get("summaries").and_then(Value::as_bool) {
+            prefs.summaries = on;
         }
         if let Some(n) = value.get("quiet_start").and_then(Value::as_u64) {
             prefs.quiet_start = (n % 24) as u32;
@@ -187,6 +194,7 @@ impl NotificationPrefs {
             "max_toasts": self.max_toasts,
             "dnd": self.dnd,
             "quiet": self.quiet,
+            "summaries": self.summaries,
             "quiet_start": self.quiet_start,
             "quiet_end": self.quiet_end,
             "app_rules": self.app_rules.iter().map(|(k, v)| (k.clone(), v.as_str())).collect::<BTreeMap<_, _>>(),
@@ -200,6 +208,7 @@ impl NotificationPrefs {
         match name {
             "dnd" => next.dnd = value.as_bool().ok_or(PrefsError::BadValue)?,
             "quiet" => next.quiet = value.as_bool().ok_or(PrefsError::BadValue)?,
+            "summaries" => next.summaries = value.as_bool().ok_or(PrefsError::BadValue)?,
             "quiet_start" | "quiet_end" => {
                 let n = value.as_u64().ok_or(PrefsError::BadValue)?;
                 if n > 23 {
@@ -286,6 +295,14 @@ impl NotificationPrefs {
                 "More than this wait in the notification list.",
                 Control::Slider { min: TOASTS_MIN as f64, max: TOASTS_MAX as f64, integer: true, value: self.max_toasts as f64 },
             ),
+            row(
+                "Summaries",
+                "summaries",
+                "Summarize notifications",
+                "Several notifications from one app are stacked with a one-line summary, written on this computer. Nothing is sent \
+anywhere: if Summaries are set to answer online in Models, there are no summaries.",
+                Control::Switch { on: self.summaries },
+            ),
         ];
         // Applications, by the name their notifications carry; the ones with a rule are listed even if they have not sent anything lately.
         let mut apps: BTreeMap<String, String> = BTreeMap::new();
@@ -316,7 +333,7 @@ impl NotificationPrefs {
     /// A change made on the page, as the page sent it.
     pub fn apply(&self, id: &str, change: &Change) -> Result<NotificationPrefs, PrefsError> {
         match (id, change) {
-            ("dnd" | "quiet", Change::Switch(on)) => self.set(id, &json!(on)),
+            ("dnd" | "quiet" | "summaries", Change::Switch(on)) => self.set(id, &json!(on)),
             (id, Change::Choice(value)) if id.starts_with("app:") => {
                 let rule = AppRule::parse(value).ok_or(PrefsError::BadValue)?;
                 self.with_rule(&id[4..], rule)
@@ -460,10 +477,18 @@ mod tests {
                 "quiet_start",
                 "quiet_end",
                 "toast_seconds",
-                "max_toasts"
+                "max_toasts",
+                "summaries"
             ]
         );
         assert!(p.apply("dnd", &Change::Switch(true)).unwrap().dnd);
+        assert!(p.summaries);
+        assert!(
+            !p.apply("summaries", &Change::Switch(false))
+                .unwrap()
+                .summaries
+        );
+        assert!(!NotificationPrefs::parse(r#"{"summaries": false}"#).summaries);
         assert!(p.apply("quiet", &Change::Switch(true)).unwrap().quiet);
         assert_eq!(
             p.apply("quiet_start", &Change::Number(9.0))

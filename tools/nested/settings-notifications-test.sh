@@ -18,7 +18,7 @@ PY
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
 mkdir -p "$(dirname "$FILE")"; echo '["Chat","Mail"]' > "$(dirname "$FILE")/notification-apps.json"
 click_id page-notifications; sleep 1.5; shot settings-notifications
-for id in dnd quiet quiet_start quiet_end toast_seconds max_toasts; do has_id "set-$id" && echo "ok: $id is on the page" || fail "no row for $id"; done
+for id in dnd quiet quiet_start quiet_end toast_seconds max_toasts summaries; do has_id "set-$id" && echo "ok: $id is on the page" || fail "no row for $id"; done
 has_id set-notification.position && fail "a setting the shell ignores is still listed" || echo "ok: nothing the shell ignores"
 click_id set-toast_seconds-number; wtype "10"; wtype -k Return; sleep 1
 grep -q '"toast_seconds":10' "$FILE" && echo "ok: a typed time written" || fail "time not written: $(cat "$FILE" 2>&1)"
